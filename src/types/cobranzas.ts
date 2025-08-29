@@ -1,17 +1,29 @@
+// src/types/cobranzas.ts
+
+/* ──────────────────────────────────────────────────────────
+   Tipos base
+   ────────────────────────────────────────────────────────── */
+
+export type MetodoPago = 'efectivo' | 'transferencia' | 'yape' | 'plin';
+
+/* ──────────────────────────────────────────────────────────
+   Pagos de cuotas (ligados a empadronados/periodos)
+   ────────────────────────────────────────────────────────── */
+
 export interface Pago {
   id: string;
   empadronadoId: string;
   numeroPadron: string;
   mes: number; // 1-12
   año: number;
-  monto: number;
-  montoOriginal: number;
+  monto: number; // monto final (descuentos/recargos aplicados)
+  montoOriginal: number; // monto base de la cuota
   fechaVencimiento: string; // DD/MM/YYYY
   fechaPago?: string; // DD/MM/YYYY
   estado: 'pendiente' | 'pagado' | 'moroso' | 'sancionado';
-  metodoPago?: 'efectivo' | 'transferencia' | 'yape' | 'plin';
+  metodoPago?: MetodoPago;
   numeroOperacion?: string;
-  comprobantePago?: string; // URL del archivo
+  comprobantePago?: string; // URL/BASE64 del archivo
   observaciones?: string;
   descuentos?: Descuento[];
   recargos?: Recargo[];
@@ -45,6 +57,29 @@ export interface Recargo {
   activo: boolean;
 }
 
+/* ──────────────────────────────────────────────────────────
+   Ingresos libres (donaciones, eventos, alquileres, etc.)
+   NO están ligados a cuotas ni a empadronados
+   ────────────────────────────────────────────────────────── */
+
+export interface Ingreso {
+  id: string;
+  concepto: string;                                // p.ej. "Donación cancha", "Evento", "Alquiler local"
+  categoria: 'donacion' | 'evento' | 'alquiler' | 'otros';
+  monto: number;
+  fecha: string;                                   // DD/MM/YYYY
+  metodoPago?: MetodoPago | null;
+  numeroOperacion?: string | null;
+  archivoUrl?: string | null;                      // comprobante (PDF/imagen) opcional
+  registradoPor?: string;                          // uid del usuario que lo registró
+  createdAt: number;
+  updatedAt: number;
+}
+
+/* ──────────────────────────────────────────────────────────
+   Egresos
+   ────────────────────────────────────────────────────────── */
+
 export interface Egreso {
   id: string;
   concepto: string;
@@ -60,11 +95,15 @@ export interface Egreso {
   updatedAt: number;
 }
 
+/* ──────────────────────────────────────────────────────────
+   Configuración y estadísticas
+   ────────────────────────────────────────────────────────── */
+
 export interface ConfiguracionCobranzas {
   montoMensual: number;
-  diaVencimiento: number; // 15
-  diaCierre: number; // 14
-  diasProntoPago: number; // 3
+  diaVencimiento: number;      // 15
+  diaCierre: number;           // 14
+  diasProntoPago: number;      // 3
   porcentajeProntoPago: number;
   porcentajeMorosidad: number;
   porcentajeSancion: number;
@@ -75,14 +114,18 @@ export interface ConfiguracionCobranzas {
 
 export interface EstadisticasCobranzas {
   totalEmpadronados: number;
-  totalRecaudado: number;
-  totalPendiente: number;
-  totalMorosos: number;
-  tasaCobranza: number;
-  ingresosMes: number;
+  totalRecaudado: number; // cuotas cobradas + ingresos libres (acumulado)
+  totalPendiente: number; // sólo de cuotas
+  totalMorosos: number;   // sólo de cuotas
+  tasaCobranza: number;   // sólo de cuotas
+  ingresosMes: number;    // ingresos del mes (ingresos libres + cobranzas del mes si así se decide)
   egresosMes: number;
   saldoActual: number;
 }
+
+/* ──────────────────────────────────────────────────────────
+   Reportes / comprobantes
+   ────────────────────────────────────────────────────────── */
 
 export interface ReporteCobranza {
   empadronadoId: string;
@@ -107,7 +150,10 @@ export interface ComprobanteEmision {
   firmadoPor: string;
 }
 
-// Tipos para declaraciones juradas y sanciones
+/* ──────────────────────────────────────────────────────────
+   Declaraciones juradas y sanciones
+   ────────────────────────────────────────────────────────── */
+
 export interface DeclaracionJurada {
   id: string;
   empadronadoId: string;
