@@ -45,7 +45,7 @@ const EmpadronadoForm: React.FC = () => {
     vehiculos: [],
     habilitado: true,
     telefonos: [{ numero: '' }],
-    fechaIngreso: Date.now(),
+    fechaIngreso: Date.now(), // Initialize with current timestamp
     manzana: '',
     lote: '',
     etapa: '',
@@ -421,8 +421,16 @@ const EmpadronadoForm: React.FC = () => {
               <Input
                 id="fechaIngreso"
                 type="date"
-                value={new Date(formData.fechaIngreso).toISOString().split('T')[0]}
-                onChange={(e) => setFormData(prev => ({ ...prev, fechaIngreso: new Date(e.target.value).getTime() }))}
+                value={formData.fechaIngreso && !isNaN(formData.fechaIngreso) 
+                  ? new Date(formData.fechaIngreso).toISOString().split('T')[0] 
+                  : new Date().toISOString().split('T')[0]
+                }
+                onChange={(e) => {
+                  const dateValue = e.target.value;
+                  if (dateValue) {
+                    setFormData(prev => ({ ...prev, fechaIngreso: new Date(dateValue).getTime() }));
+                  }
+                }}
               />
             </div>
           </CardContent>
