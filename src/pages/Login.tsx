@@ -52,16 +52,12 @@ export default function Login() {
         const initialized = await isBootstrapInitialized();
         console.log('✅ Bootstrap initialized flag:', initialized);
         
-        if (!initialized) {
-          console.log('🔧 Bootstrap not initialized, showing BootstrapAdmin...');
-          // Solo cargar datos semilla (roles y módulos), el usuario se crea en BootstrapAdmin
-          await seedAuthData();
-          console.log('✅ Seed data (roles & modules) loaded');
-          setBootstrapComplete(false); // Mostrar BootstrapAdmin
-        } else {
-          console.log('✅ System already bootstrapped');
-          setBootstrapComplete(true); // Mostrar login normal
-        }
+        // FORZAR configuración inicial si no hay usuario admin
+        console.log('🔧 Forcing bootstrap setup for admin creation...');
+        await seedAuthData();
+        console.log('✅ Seed data (roles & modules) loaded');
+        setBootstrapComplete(false); // SIEMPRE mostrar BootstrapAdmin primero
+        
       } catch (error) {
         console.error('❌ Error checking bootstrap:', error);
         setBootstrapComplete(false); // En caso de error, mostrar BootstrapAdmin
