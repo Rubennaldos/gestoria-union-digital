@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import Users from "./pages/admin/Users";
 import UserNew from "./pages/admin/UserNew";
 import UserPermissions from "./pages/admin/UserPermissions";
+import Empadronados from "./pages/Empadronados";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/admin/users" element={<Users />} />
           <Route path="/admin/users/new" element={<UserNew />} />
           <Route path="/admin/users/:uid/permissions" element={<UserPermissions />} />
+          <Route path="/padron" element={<Empadronados />} />
           <Route path="/login" element={<Login />} />
           <Route path="/inicio" element={<Index />} />
           <Route path="/finanzas" element={<Finanzas />} />
