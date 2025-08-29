@@ -12,6 +12,7 @@ import Sesiones from "./pages/Sesiones";
 import NotFound from "./pages/NotFound";
 import Users from "./pages/admin/Users";
 import UserNew from "./pages/admin/UserNew";
+import UserPermissions from "./pages/admin/UserPermissions";
 
 const queryClient = new QueryClient();
 
@@ -29,9 +30,12 @@ const App = () => (
               <Route path="/inicio" element={<Index />} />
               <Route path="/finanzas" element={<Finanzas />} />
               <Route path="/sesiones" element={<Sesiones />} />
+              {/* Rutas de usuarios */}
+              <Route path="/usuarios" element={<Users />} />
               {/* Admin routes */}
               <Route path="/admin/users" element={<Users />} />
               <Route path="/admin/users/new" element={<UserNew />} />
+              <Route path="/admin/users/:uid/permissions" element={<UserPermissions />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
