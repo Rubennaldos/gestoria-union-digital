@@ -34,6 +34,9 @@ const Empadronados: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'habilitado' | 'deshabilitado'>('all');
   const [filterVivienda, setFilterVivienda] = useState<'all' | 'construida' | 'construccion' | 'terreno'>('all');
   const [filterVive, setFilterVive] = useState<'all' | 'si' | 'no'>('all');
+  const [filterManzana, setFilterManzana] = useState('');
+  const [filterLote, setFilterLote] = useState('');
+  const [filterEtapa, setFilterEtapa] = useState('');
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -44,7 +47,7 @@ const Empadronados: React.FC = () => {
 
   useEffect(() => {
     applyFilters();
-  }, [empadronados, searchTerm, filterStatus, filterVivienda, filterVive]);
+  }, [empadronados, searchTerm, filterStatus, filterVivienda, filterVive, filterManzana, filterLote, filterEtapa]);
 
   const loadData = async () => {
     setLoading(true);
@@ -89,6 +92,27 @@ const Empadronados: React.FC = () => {
     if (filterStatus !== 'all') {
       filtered = filtered.filter(e => 
         filterStatus === 'habilitado' ? e.habilitado : !e.habilitado
+      );
+    }
+
+    // Filtro por manzana
+    if (filterManzana.trim()) {
+      filtered = filtered.filter(e => 
+        e.manzana?.toLowerCase().includes(filterManzana.toLowerCase())
+      );
+    }
+
+    // Filtro por lote
+    if (filterLote.trim()) {
+      filtered = filtered.filter(e => 
+        e.lote?.toLowerCase().includes(filterLote.toLowerCase())
+      );
+    }
+
+    // Filtro por etapa
+    if (filterEtapa.trim()) {
+      filtered = filtered.filter(e => 
+        e.etapa?.toLowerCase().includes(filterEtapa.toLowerCase())
       );
     }
 
@@ -270,7 +294,7 @@ const Empadronados: React.FC = () => {
                 <Label htmlFor="search">Buscar</Label>
                 <Input
                   id="search"
-                  placeholder="Nombre, apellidos, padrón, DNI o hijos..."
+                  placeholder="Nombre, apellidos, padrón, DNI o familia..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -317,6 +341,56 @@ const Empadronados: React.FC = () => {
                     <SelectItem value="no">No vive aquí</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+              <div>
+                <Label htmlFor="manzana">Manzana</Label>
+                <Input
+                  id="manzana"
+                  placeholder="Filtrar por manzana..."
+                  value={filterManzana}
+                  onChange={(e) => setFilterManzana(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="lote">Lote</Label>
+                <Input
+                  id="lote"
+                  placeholder="Filtrar por lote..."
+                  value={filterLote}
+                  onChange={(e) => setFilterLote(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="etapa">Etapa</Label>
+                <Input
+                  id="etapa"
+                  placeholder="Filtrar por etapa..."
+                  value={filterEtapa}
+                  onChange={(e) => setFilterEtapa(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setFilterStatus('all');
+                    setFilterVivienda('all');
+                    setFilterVive('all');
+                    setFilterManzana('');
+                    setFilterLote('');
+                    setFilterEtapa('');
+                  }}
+                  className="w-full"
+                >
+                  Limpiar Filtros
+                </Button>
               </div>
             </div>
           </CardContent>
