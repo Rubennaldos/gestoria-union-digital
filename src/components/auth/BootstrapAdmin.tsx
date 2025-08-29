@@ -54,11 +54,19 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
     setError(null);
 
     try {
+      // Auto-generar email si está vacío
+      let email = data.email.trim();
+      const username = data.username?.trim() || 'presidencia';
+      
+      if (!email) {
+        email = `${username}@jpusap.local`;
+      }
+
       // Crear usuario admin (Presidencia)
       const uid = await createUserAndProfile({
         displayName: data.displayName,
-        email: data.email,
-        username: data.username || undefined,
+        email,
+        username,
         roleId: 'presidencia',
         activo: true,
         password: data.password
@@ -90,7 +98,19 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
       onComplete();
     } catch (err: any) {
       console.error('Error creating admin:', err);
-      setError(err.message || 'Error al crear el administrador');
+      let errorMessage = 'Error al crear el administrador';
+      
+      if (err.message.includes('email-already-in-use')) {
+        errorMessage = 'El email ya está registrado';
+      } else if (err.message.includes('weak-password')) {
+        errorMessage = 'La contraseña es muy débil';
+      } else if (err.message.includes('invalid-email')) {
+        errorMessage = 'Email inválido';
+      } else if (err.message.includes('ya está en uso')) {
+        errorMessage = err.message; // Mensaje específico de username duplicado
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -133,7 +153,6 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
                 control={form.control}
                 name="email"
                 rules={{ 
-                  required: 'El email es requerido',
                   pattern: {
                     value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
                     message: 'Email inválido'
@@ -141,19 +160,22 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
                 }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>Email (opcional)</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                         <Input 
                           className="pl-10" 
-                          placeholder="presidente@example.com" 
+                          placeholder="presidencia@jpusap.local (auto-generado)" 
                           type="email"
                           {...field} 
                         />
                       </div>
                     </FormControl>
                     <FormMessage />
+                    <p className="text-xs text-muted-foreground">
+                      Si se deja vacío, se auto-generará: usuario@jpusap.local
+                    </p>
                   </FormItem>
                 )}
               />

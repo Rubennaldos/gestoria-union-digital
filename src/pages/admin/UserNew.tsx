@@ -91,9 +91,19 @@ export default function UserNew() {
 
     try {
       const { confirmPassword, ...userData } = data;
+      
+      // Auto-generar email si está vacío
+      let email = userData.email.trim();
+      const username = userData.username?.trim();
+      
+      if (!email && username) {
+        email = `${username}@jpusap.local`;
+      }
+
       const uid = await createUserAndProfile({
         ...userData,
-        username: userData.username || undefined,
+        email,
+        username: username || undefined,
         phone: userData.phone || undefined
       });
 
@@ -114,6 +124,8 @@ export default function UserNew() {
         errorMessage = 'La contraseña es muy débil';
       } else if (err.message.includes('invalid-email')) {
         errorMessage = 'Email inválido';
+      } else if (err.message.includes('ya está en uso')) {
+        errorMessage = err.message; // Mensaje específico de username duplicado
       }
       
       setError(errorMessage);
@@ -184,7 +196,6 @@ export default function UserNew() {
                       control={form.control}
                       name="email"
                       rules={{ 
-                        required: 'El email es requerido',
                         pattern: {
                           value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
                           message: 'Email inválido'
@@ -192,19 +203,22 @@ export default function UserNew() {
                       }}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email</FormLabel>
+                          <FormLabel>Email (opcional)</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                               <Input 
                                 className="pl-10" 
-                                placeholder="usuario@email.com" 
+                                placeholder="usuario@jpusap.local (auto-generado)" 
                                 type="email"
                                 {...field} 
                               />
                             </div>
                           </FormControl>
                           <FormMessage />
+                          <p className="text-xs text-muted-foreground">
+                            Si se deja vacío, se auto-generará basado en el usuario
+                          </p>
                         </FormItem>
                       )}
                     />

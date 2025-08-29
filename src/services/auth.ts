@@ -5,7 +5,7 @@ import {
   sendPasswordResetEmail,
   User as FirebaseUser 
 } from "firebase/auth";
-import { auth } from "@/config/firebase";
+import { auth, adminAuth } from "@/config/firebase";
 import { get, ref } from "firebase/database";
 import { db } from "@/config/firebase";
 import { UserProfile, CreateUserForm } from "@/types/auth";
@@ -41,18 +41,33 @@ export const signInWithEmailOrUsername = async (identifier: string, password: st
 export const createUserAndProfile = async (userData: CreateUserForm): Promise<string> => {
   const { password, ...profileData } = userData;
   
-  // Crear usuario en Firebase Auth
-  const result = await createUserWithEmailAndPassword(auth, userData.email, password);
+  // Verificar que el username sea único si se proporciona
+  if (userData.username) {
+    const usernameRef = ref(db, `usernames/${userData.username}`);
+    const snapshot = await get(usernameRef);
+    
+    if (snapshot.exists()) {
+      throw new Error(`El usuario "${userData.username}" ya está en uso`);
+    }
+  }
+  
+  // Usar app secundaria para crear usuarios sin afectar la sesión principal
+  const result = await createUserWithEmailAndPassword(adminAuth, userData.email, password);
   const uid = result.user.uid;
   
-  // Crear perfil en RTDB
-  await createUserProfile(uid, {
-    ...profileData,
-    uid,
-    createdAt: Date.now()
-  });
-  
-  return uid;
+  try {
+    // Crear perfil en RTDB
+    await createUserProfile(uid, {
+      ...profileData,
+      uid,
+      createdAt: Date.now()
+    });
+    
+    return uid;
+  } finally {
+    // IMPORTANTE: Cerrar sesión de la app secundaria para no afectar la sesión principal
+    await signOut(adminAuth);
+  }
 };
 
 export const resetPassword = async (email: string) => {
