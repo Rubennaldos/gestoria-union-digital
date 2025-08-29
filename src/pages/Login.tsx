@@ -44,16 +44,25 @@ export default function Login() {
     }
   }, [user, profile, navigate]);
 
-  // Forzar bootstrap para crear usuario administrador
+  // Verificar bootstrap al cargar
   useEffect(() => {
     const checkBootstrap = async () => {
       try {
-        console.log('🔄 Forcing bootstrap setup for admin creation...');
-        await seedAuthData();
-        console.log('✅ Seed data (roles & modules) loaded');
-        setBootstrapComplete(false); // Forzar mostrar BootstrapAdmin
+        console.log('🔄 Checking bootstrap status...');
+        const initialized = await isBootstrapInitialized();
+        console.log('✅ Bootstrap initialized flag:', initialized);
+        
+        if (!initialized) {
+          console.log('🔧 Bootstrap not initialized, loading seed data...');
+          await seedAuthData();
+          console.log('✅ Seed data (roles & modules) loaded');
+          setBootstrapComplete(false); // Mostrar BootstrapAdmin
+        } else {
+          console.log('✅ System already bootstrapped, showing login');
+          setBootstrapComplete(true); // Mostrar login normal
+        }
       } catch (error) {
-        console.error('❌ Error preparing bootstrap:', error);
+        console.error('❌ Error checking bootstrap:', error);
         setBootstrapComplete(false);
       }
     };
