@@ -1,12 +1,13 @@
-import { ref, push, set, get, update, remove, query, orderByChild, equalTo, runTransaction } from 'firebase/database';
+import { ref, push, set, get, update, remove } from 'firebase/database';
 import { db } from '@/config/firebase';
-import { 
-  Pago, 
-  Egreso, 
-  ConfiguracionCobranzas, 
-  EstadisticasCobranzas, 
+import {
+  Pago,
+  Egreso,
+  Ingreso,                    // ⬅️ nuevo tipo
+  ConfiguracionCobranzas,
+  EstadisticasCobranzas,
   DeclaracionJurada,
-  PlantillaSancion 
+  PlantillaSancion,
 } from '@/types/cobranzas';
 import { Empadronado } from '@/types/empadronados';
 
@@ -14,8 +15,8 @@ import { Empadronado } from '@/types/empadronados';
    Helpers de periodos/fechas
    ────────────────────────────────────────────────────────── */
 const pad2 = (n: number) => String(n).padStart(2, '0');
-const periodFromYM = (y: number, m: number) => `${y}-${pad2(m)}`;        // "2025-08"
-const periodCompact = (period: string) => period.replace('-', '');       // "202508"
+const periodFromYM = (y: number, m: number) => `${y}-${pad2(m)}`; // "2025-08"
+const periodCompact = (period: string) => period.replace('-', ''); // "202508"
 const nowPeriod = () => {
   const d = new Date();
   return periodFromYM(d.getFullYear(), d.getMonth() + 1);
@@ -31,7 +32,6 @@ const monthsBetween = (from: string, to: string) => {
   return (ty - fy) * 12 + (tm - fm);
 };
 const toEsDate = (y: number, m: number, day: number) => {
-  // Devuelve "dd/mm/aaaa" para es-PE
   const d = new Date(y, m - 1, day);
   const dd = pad2(d.getDate());
   const mm = pad2(d.getMonth() + 1);
@@ -48,15 +48,15 @@ export const obtenerConfiguracion = async (): Promise<ConfiguracionCobranzas> =>
   if (!snapshot.exists()) {
     const configDefault: ConfiguracionCobranzas = {
       montoMensual: 50,
-      diaVencimiento: 15,     // vence el 15
-      diaCierre: 14,          // corte el 14
-      diasProntoPago: 3,      // días 1..3 del mes
+      diaVencimiento: 15,
+      diaCierre: 14,
+      diasProntoPago: 3,
       porcentajeProntoPago: 10,
       porcentajeMorosidad: 5,
       porcentajeSancion: 10,
       serieComprobantes: 'COB',
       numeroComprobanteActual: 1,
-      sede: 'Principal'
+      sede: 'Principal',
     };
     await set(configRef, configDefault);
     return configDefault;
@@ -71,7 +71,7 @@ export const actualizarConfiguracion = async (config: ConfiguracionCobranzas): P
 };
 
 /* ──────────────────────────────────────────────────────────
-   Empadronados (para utilidades internas)
+   Empadronados (utils)
    ────────────────────────────────────────────────────────── */
 const obtenerEmpadronados = async (): Promise<Empadronado[]> => {
   const { getEmpadronados } = await import('@/services/empadronados');
@@ -100,24 +100,23 @@ const ensureChargeForPeriod = async (emp: Empadronado, period: string) => {
   await set(ref(db, `${node}/${chargeId}`), {
     empadronadoId: emp.id,
     numeroPadron: emp.numeroPadron,
-    periodo: period,                 // "YYYY-MM"
-    vencimiento: vencStr,            // "dd/mm/aaaa"
+    periodo: period,
+    vencimiento: vencStr,
     montoBase: cfg.montoMensual,
     descuentos: [],
     recargos: [],
-    total: cfg.montoMensual,         // total con descuentos/recargos aplicados (actual)
-    saldo: cfg.montoMensual,         // lo que falta pagar
-    estado: 'pendiente',             // pendiente | pagado | moroso
+    total: cfg.montoMensual,
+    saldo: cfg.montoMensual,
+    estado: 'pendiente', // pendiente | pagado | moroso
     timestamps: {
       creado: new Date().toISOString(),
       actualizado: new Date().toISOString(),
-    }
+    },
   });
 
   return true;
 };
 
-/** Genera cargos desde 2025-01 para un empadronado (para usar al crearlo) */
 export const ensureChargesForNewMember = async (empId: string, startPeriod = '2025-01') => {
   const emp = await getEmpadronadoById(empId);
   if (!emp) return 0;
@@ -134,7 +133,6 @@ export const ensureChargesForNewMember = async (empId: string, startPeriod = '20
   return created;
 };
 
-/** Genera cargos para TODOS en un periodo concreto (internamente) */
 const ensureChargesForAllInPeriod = async (period: string) => {
   const padr = await obtenerEmpadronados();
   let created = 0;
@@ -147,7 +145,6 @@ const ensureChargesForAllInPeriod = async (period: string) => {
   return created;
 };
 
-/** Backfill desde 2025-01 hasta hoy (si tenías empadronados antes) */
 export const generarPagosDesdeEnero = async (_userUid: string): Promise<void> => {
   const start = '2025-01';
   const last = nowPeriod();
@@ -159,35 +156,26 @@ export const generarPagosDesdeEnero = async (_userUid: string): Promise<void> =>
   }
 };
 
-/** Compatibilidad: antes generabas “pagos mensuales”, ahora asegura CHARGES del mes */
 export const generarPagosMensuales = async (mes: number, año: number, _userUid: string): Promise<void> => {
   const period = periodFromYM(año, mes);
   await ensureChargesForAllInPeriod(period);
 };
 
 /* ──────────────────────────────────────────────────────────
-   PAGOS: cobranzas/pagos  (comprobante + actualiza charge)
+   PAGOS (cuotas)
    ────────────────────────────────────────────────────────── */
-/**
- * Crea un pago y liquida el charge del periodo.
- * - Aplica pronto pago si corresponde.
- * - Deja constancia del pago en `cobranzas/pagos`.
- * - Actualiza el charge (saldo=0, estado=pagado, fechaPago, método, op, comprobante).
- */
 export const crearPago = async (
   pagoData: Omit<Pago, 'id' | 'createdAt' | 'updatedAt'>,
   userUid: string
 ): Promise<string> => {
   const cfg = await obtenerConfiguracion();
 
-  // Asegura que exista el CHARGE del periodo
   const period = periodFromYM(pagoData.año, pagoData.mes);
   const emp = await getEmpadronadoById(pagoData.empadronadoId);
   if (!emp) throw new Error('Empadronado no encontrado');
 
   await ensureChargeForPeriod(emp, period);
 
-  // Lee charge (único) del periodo/emp
   const chargesNode = `cobranzas/charges/${periodCompact(period)}/${emp.id}`;
   const chargesSnap = await get(ref(db, chargesNode));
   if (!chargesSnap.exists()) throw new Error('Charge no encontrado');
@@ -196,7 +184,7 @@ export const crearPago = async (
   const chargeId = Object.keys(charges)[0];
   const charge = charges[chargeId];
 
-  // Cálculo de pronto pago
+  // Pronto pago (días 1..N)
   let descuentoAplicado = 0;
   const today = new Date();
   const diaHoy = today.getDate();
@@ -204,32 +192,33 @@ export const crearPago = async (
     descuentoAplicado = (charge.montoBase * (cfg.porcentajeProntoPago ?? 0)) / 100;
   }
 
-  // Monto final a pagar (no negativo)
   const final = Math.max(0, Number(charge.total) - descuentoAplicado);
 
-  // Actualiza CHARGE (pagado)
   await update(ref(db, `${chargesNode}/${chargeId}`), {
     estado: 'pagado',
-    descuentos: descuentoAplicado > 0 
-      ? [...(charge.descuentos || []), {
-          id: `pp_${Date.now()}`,
-          tipo: 'pronto_pago',
-          porcentaje: cfg.porcentajeProntoPago,
-          monto: descuentoAplicado,
-          motivo: `Pronto pago (${cfg.porcentajeProntoPago}%)`,
-          fechaAplicacion: new Date().toLocaleDateString('es-PE')
-        }] 
-      : (charge.descuentos || []),
+    descuentos:
+      descuentoAplicado > 0
+        ? [
+            ...(charge.descuentos || []),
+            {
+              id: `pp_${Date.now()}`,
+              tipo: 'pronto_pago',
+              porcentaje: cfg.porcentajeProntoPago,
+              monto: descuentoAplicado,
+              motivo: `Pronto pago (${cfg.porcentajeProntoPago}%)`,
+              fechaAplicacion: new Date().toLocaleDateString('es-PE'),
+            },
+          ]
+        : charge.descuentos || [],
     total: Number(charge.total) - descuentoAplicado,
     saldo: 0,
     metodoPago: pagoData.metodoPago || null,
     numeroOperacion: pagoData.numeroOperacion || null,
     comprobante: pagoData.comprobantePago || null,
     fechaPago: new Date().toLocaleDateString('es-PE'),
-    timestamps: { ...(charge.timestamps || {}), actualizado: new Date().toISOString() }
+    timestamps: { ...(charge.timestamps || {}), actualizado: new Date().toISOString() },
   });
 
-  // Crea registro del PAGO (comprobante/boleta)
   const pagosRef = ref(db, 'cobranzas/pagos');
   const nuevoPagoRef = push(pagosRef);
   const pago: Pago = {
@@ -239,14 +228,13 @@ export const crearPago = async (
     updatedAt: Date.now(),
     creadoPor: userUid,
     montoOriginal: charge.montoBase,
-    monto: final
+    monto: final,
   };
   await set(nuevoPagoRef, pago);
 
   return nuevoPagoRef.key!;
 };
 
-/** Lista de pagos (comprobantes emitidos) */
 export const obtenerPagos = async (): Promise<Pago[]> => {
   const snapshot = await get(ref(db, 'cobranzas/pagos'));
   if (!snapshot.exists()) return [];
@@ -254,24 +242,14 @@ export const obtenerPagos = async (): Promise<Pago[]> => {
   return pagos.sort((a, b) => b.updatedAt - a.updatedAt);
 };
 
-/**
- * Para la UI del detalle del asociado:
- * Devuelve la “vista” de periodos del asociado como Pago[]:
- *  - Si el charge está pendiente o moroso → item con estado pendiente/moroso.
- *  - Si está pagado → intenta enriquecer con el pago real en cobranzas/pagos.
- */
 export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise<Pago[]> => {
-  // Leer CHARGES del asociado en todos los periodos
   const chargesRoot = ref(db, 'cobranzas/charges');
   const chargesSnap = await get(chargesRoot);
   if (!chargesSnap.exists()) return [];
 
-  const periods = chargesSnap.val(); // { YYYYMM: { empId: { chargeId: {...} } } }
+  const periods = chargesSnap.val();
   const items: Pago[] = [];
-
-  // Pre-carga pagos del asociado para mapear detalles (método, op, comprobante)
-  const pagosEmp = (await obtenerPagos())
-    .filter(p => p.empadronadoId === empadronadoId);
+  const pagosEmp = (await obtenerPagos()).filter((p) => p.empadronadoId === empadronadoId);
 
   Object.keys(periods).forEach((yyyymm) => {
     const node = periods[yyyymm]?.[empadronadoId];
@@ -281,10 +259,7 @@ export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise
     const año = Number(yyyymm.slice(0, 4));
     const mes = Number(yyyymm.slice(4, 6));
 
-    // Si está pagado, busca el pago real para traer método/operación/comprobante
-    const pagoReal = c.estado === 'pagado'
-      ? pagosEmp.find(p => p.año === año && p.mes === mes)
-      : undefined;
+    const pagoReal = c.estado === 'pagado' ? pagosEmp.find((p) => p.año === año && p.mes === mes) : undefined;
 
     items.push({
       id: chargeId,
@@ -295,7 +270,7 @@ export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise
       montoOriginal: Number(c.montoBase) || 0,
       monto: Number(c.total) || 0,
       fechaVencimiento: c.vencimiento,
-      estado: c.estado, // 'pendiente' | 'pagado' | 'moroso'
+      estado: c.estado,
       descuentos: c.descuentos || [],
       recargos: c.recargos || [],
       metodoPago: pagoReal?.metodoPago || c.metodoPago || null,
@@ -304,43 +279,91 @@ export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise
       fechaPago: pagoReal?.fechaPago || c.fechaPago || null,
       creadoPor: pagoReal?.creadoPor || undefined,
       createdAt: pagoReal?.createdAt || undefined,
-      updatedAt: pagoReal?.updatedAt || undefined
+      updatedAt: pagoReal?.updatedAt || undefined,
     } as Pago);
   });
 
-  // Orden: más recientes primero
-  return items.sort((a, b) => (b.año - a.año) || (b.mes - a.mes));
+  return items.sort((a, b) => b.año - a.año || b.mes - a.mes);
 };
 
-/** Actualiza metadatos del PAGO (no toca el charge) */
-export const actualizarPago = async (
-  pagoId: string, 
-  updates: Partial<Pago>, 
-  userUid: string
-): Promise<void> => {
+export const actualizarPago = async (pagoId: string, updates: Partial<Pago>, userUid: string): Promise<void> => {
   const pagoRef = ref(db, `cobranzas/pagos/${pagoId}`);
   await update(pagoRef, {
     ...updates,
     updatedAt: Date.now(),
-    pagadoPor: userUid
+    pagadoPor: userUid,
   });
+};
+
+/* ──────────────────────────────────────────────────────────
+   INGRESOS LIBRES (donaciones / eventos / alquiler / otros)
+   ────────────────────────────────────────────────────────── */
+// Nodo: cobranzas/ingresos/{id}
+
+export const crearIngreso = async (
+  ingresoData: Omit<Ingreso, 'id' | 'createdAt' | 'updatedAt' | 'registradoPor'>,
+  userUid: string
+): Promise<string> => {
+  const ingresosRef = ref(db, 'cobranzas/ingresos');
+  const nuevoRef = push(ingresosRef);
+
+  const ingreso: Ingreso = {
+    ...ingresoData,
+    id: nuevoRef.key!,
+    registradoPor: userUid,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  await set(nuevoRef, ingreso);
+  return nuevoRef.key!;
+};
+
+export const obtenerIngresos = async (): Promise<Ingreso[]> => {
+  const snap = await get(ref(db, 'cobranzas/ingresos'));
+  if (!snap.exists()) return [];
+  const list = Object.values(snap.val()) as Ingreso[];
+  return list.sort((a, b) => b.updatedAt - a.updatedAt);
+};
+
+export const obtenerIngresosMes = async (año: number, mes: number): Promise<Ingreso[]> => {
+  const all = await obtenerIngresos();
+  return all.filter((i) => {
+    // i.fecha: "dd/mm/aaaa"
+    const [, mm, aa] = i.fecha.split('/');
+    return Number(mm) === mes && Number(aa) === año;
+  });
+};
+
+export const actualizarIngreso = async (ingresoId: string, updates: Partial<Ingreso>): Promise<void> => {
+  await update(ref(db, `cobranzas/ingresos/${ingresoId}`), {
+    ...updates,
+    updatedAt: Date.now(),
+  });
+};
+
+export const eliminarIngreso = async (ingresoId: string): Promise<void> => {
+  await remove(ref(db, `cobranzas/ingresos/${ingresoId}`));
 };
 
 /* ──────────────────────────────────────────────────────────
    EGRESOS
    ────────────────────────────────────────────────────────── */
-export const crearEgreso = async (egresoData: Omit<Egreso, 'id' | 'createdAt' | 'updatedAt'>, userUid: string): Promise<string> => {
+export const crearEgreso = async (
+  egresoData: Omit<Egreso, 'id' | 'createdAt' | 'updatedAt'>,
+  userUid: string
+): Promise<string> => {
   const egresosRef = ref(db, 'cobranzas/egresos');
   const nuevoEgresoRef = push(egresosRef);
-  
+
   const egreso: Egreso = {
     ...egresoData,
     id: nuevoEgresoRef.key!,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    realizadoPor: userUid
+    realizadoPor: userUid,
   };
-  
+
   await set(nuevoEgresoRef, egreso);
   return nuevoEgresoRef.key!;
 };
@@ -353,21 +376,27 @@ export const obtenerEgresos = async (): Promise<Egreso[]> => {
 };
 
 /* ──────────────────────────────────────────────────────────
-   Declaraciones Juradas (descuentos) y Sanciones (recargos)
+   Declaraciones juradas / Sanciones
    ────────────────────────────────────────────────────────── */
-export const crearDeclaracionJurada = async (declaracionData: Omit<DeclaracionJurada, 'id' | 'fechaSolicitud'>): Promise<string> => {
+export const crearDeclaracionJurada = async (
+  declaracionData: Omit<DeclaracionJurada, 'id' | 'fechaSolicitud'>
+): Promise<string> => {
   const declaracionesRef = ref(db, 'cobranzas/declaracionesJuradas');
   const nuevaDeclaracionRef = push(declaracionesRef);
   const declaracion: DeclaracionJurada = {
     ...declaracionData,
     id: nuevaDeclaracionRef.key!,
-    fechaSolicitud: new Date().toLocaleDateString('es-PE')
+    fechaSolicitud: new Date().toLocaleDateString('es-PE'),
   };
   await set(nuevaDeclaracionRef, declaracion);
   return nuevaDeclaracionRef.key!;
 };
 
-export const aprobarDeclaracionJurada = async (declaracionId: string, aprobadoPor: 'presidente' | 'fiscal', _userUid: string): Promise<void> => {
+export const aprobarDeclaracionJurada = async (
+  declaracionId: string,
+  aprobadoPor: 'presidente' | 'fiscal',
+  _userUid: string
+): Promise<void> => {
   const declaracionRef = ref(db, `cobranzas/declaracionesJuradas/${declaracionId}`);
   const snapshot = await get(declaracionRef);
   if (!snapshot.exists()) return;
@@ -378,8 +407,10 @@ export const aprobarDeclaracionJurada = async (declaracionId: string, aprobadoPo
   if (aprobadoPor === 'presidente') updates.aprobadoPorPresidente = true;
   if (aprobadoPor === 'fiscal') updates.aprobadoPorFiscal = true;
 
-  if ((declaracion.aprobadoPorPresidente || aprobadoPor === 'presidente') &&
-      (declaracion.aprobadoPorFiscal || aprobadoPor === 'fiscal')) {
+  if (
+    (declaracion.aprobadoPorPresidente || aprobadoPor === 'presidente') &&
+    (declaracion.aprobadoPorFiscal || aprobadoPor === 'fiscal')
+  ) {
     updates.estado = 'aprobado';
     updates.fechaAprobacion = new Date().toLocaleDateString('es-PE');
   }
@@ -396,97 +427,87 @@ export const aplicarSancion = async (sancionData: Omit<PlantillaSancion, 'id'>):
 };
 
 /* ──────────────────────────────────────────────────────────
-   Estadísticas (lee CHARGES y EGRESOS)
+   Estadísticas (lee CHARGES + INGRESOS + EGRESOS del mes)
    ────────────────────────────────────────────────────────── */
 export const generarEstadisticas = async (): Promise<EstadisticasCobranzas> => {
-  const [egresos, empadronados] = await Promise.all([
-    obtenerEgresos(),
-    obtenerEmpadronados(),
-  ]);
+  const [egresos, empadronados] = await Promise.all([obtenerEgresos(), obtenerEmpadronados()]);
 
   const hoy = new Date();
   const añoActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
-  const periodKeyMesActual = periodCompact(periodFromYM(añoActual, mesActual));
+  const periodKey = periodCompact(periodFromYM(añoActual, mesActual));
 
-  // ── LECTURA DE TODOS LOS CHARGES (TODOS LOS PERIODOS) ─────────────
-  const chargesRootSnap = await get(ref(db, 'cobranzas/charges'));
+  // CHARGES del mes (cuotas)
+  const chargesSnap = await get(ref(db, `cobranzas/charges/${periodKey}`));
+  const chargesByEmp = chargesSnap.exists() ? chargesSnap.val() : {};
+  let recaudadoCuotas = 0;
+  let totalPendiente = 0;
+  let totalMorosos = 0;
 
-  let totalRecaudado = 0;     // acumulado (sumatoria de total - saldo)
-  let totalPendiente = 0;     // acumulado (sumatoria de saldos)
-  let totalMorosos = 0;       // cantidad de empadronados con AL MENOS un cargo moroso/pasado
-  let totalCharges = 0;       // cargos totales
-  let paidCharges = 0;        // cargos pagados (saldo 0)
-  const morososSet = new Set<string>();
+  Object.keys(chargesByEmp).forEach((empId) => {
+    const node = chargesByEmp[empId];
+    const chargeId = Object.keys(node)[0];
+    const c = node[chargeId];
+    const total = Number(c.total || 0);
+    const saldo = Number(c.saldo || 0);
 
-  if (chargesRootSnap.exists()) {
-    const allPeriods = chargesRootSnap.val() as Record<string, any>; // {YYYYMM:{empId:{chargeId:{...}}}}
+    recaudadoCuotas += total - saldo; // si está pagado → total, si no → 0
+    totalPendiente += saldo;
+    if (c.estado === 'moroso') totalMorosos += 1;
+  });
 
-    for (const yyyymm of Object.keys(allPeriods)) {
-      const perNode = allPeriods[yyyymm];
-      for (const empId of Object.keys(perNode)) {
-        const node = perNode[empId];
-        const chargeId = Object.keys(node)[0];
-        const c = node[chargeId];
+  // INGRESOS libres del mes (donaciones/eventos/etc.)
+  const ingresosLibresMes = (await obtenerIngresosMes(añoActual, mesActual)).reduce(
+    (sum, i) => sum + Number(i.monto || 0),
+    0
+  );
 
-        totalCharges += 1;
-
-        const total = Number(c.total || 0);
-        const saldo = Number(c.saldo || 0);
-        totalRecaudado += total - saldo;
-        totalPendiente += saldo;
-
-        // ¿Está vencido y con saldo?
-        let vencido = false;
-        if (c.vencimiento) {
-          const [dd, mm, aa] = String(c.vencimiento).split('/');
-          const vencDate = new Date(Number(aa), Number(mm) - 1, Number(dd));
-          vencido = hoy.getTime() > vencDate.getTime();
-        }
-        const esMoroso = c.estado === 'moroso' || (vencido && saldo > 0);
-        if (esMoroso) morososSet.add(empId);
-
-        if (saldo <= 0 || c.estado === 'pagado') paidCharges += 1;
-      }
-    }
-  }
-
-  totalMorosos = morososSet.size;
-  const tasaCobranza = totalCharges > 0 ? (paidCharges / totalCharges) * 100 : 0;
-
-  // ── Egresos del mes actual (si los usas en otra vista) ─────────────
+  // EGRESOS del mes
   const egresosMesActual = egresos.filter((e) => {
-    const [dd, mm, aa] = e.fecha.split('/');
+    const [, mm, aa] = e.fecha.split('/'); // "dd/mm/aaaa"
     return Number(mm) === mesActual && Number(aa) === añoActual;
   });
-  const totalEgresosMes = egresosMesActual.reduce((sum, e) => sum + Number(e.monto || 0), 0);
+  const totalEgresos = egresosMesActual.reduce((sum, e) => sum + Number(e.monto || 0), 0);
+
+  // Tasa de cobranza (sólo cuotas)
+  const tasaCobranza =
+    empadronados.length > 0
+      ? (Object.keys(chargesByEmp).filter((empId) => {
+          const c = chargesByEmp[empId];
+          const id = Object.keys(c)[0];
+          return c[id]?.estado === 'pagado';
+        }).length /
+          empadronados.length) *
+        100
+      : 0;
+
+  // Totales para cards
+  const totalRecaudado = recaudadoCuotas + ingresosLibresMes;
+  const ingresosMes = totalRecaudado;
+  const saldoActual = totalRecaudado - totalEgresos;
 
   return {
     totalEmpadronados: empadronados.length,
-    totalRecaudado,             // AHORA acumulado real
-    totalPendiente,             // AHORA acumulado real
-    totalMorosos,               // empadronados con deuda vencida
-    tasaCobranza,               // % de cargos pagados sobre el total
-    ingresosMes: Math.max(0, totalRecaudado), // puedes cambiar si quieres solo del mes
-    egresosMes: totalEgresosMes,
-    saldoActual: Math.max(0, totalRecaudado) - totalEgresosMes
+    totalRecaudado,
+    totalPendiente,
+    totalMorosos,
+    tasaCobranza,
+    ingresosMes,
+    egresosMes: totalEgresos,
+    saldoActual,
   };
 };
 
 /* ──────────────────────────────────────────────────────────
-   Cierre mensual (morosidad automática por vencimiento)
+   Cierre mensual (morosidad por vencimiento)
    ────────────────────────────────────────────────────────── */
-/**
- * Recorre TODOS los charges de todos los periodos y:
- * - Si la fecha actual es posterior al vencimiento y saldo > 0 → aplica recargo y marca moroso.
- */
 export const ejecutarCierreMensual = async (_userUid: string): Promise<void> => {
   const cfg = await obtenerConfiguracion();
   const chargesRootSnap = await get(ref(db, 'cobranzas/charges'));
   if (!chargesRootSnap.exists()) return;
 
   const today = new Date();
-  const allPeriods = chargesRootSnap.val(); // { YYYYMM: { empId: { chargeId: {...} } } }
+  const allPeriods = chargesRootSnap.val();
 
   for (const yyyymm of Object.keys(allPeriods)) {
     const perNode = allPeriods[yyyymm];
@@ -497,7 +518,6 @@ export const ejecutarCierreMensual = async (_userUid: string): Promise<void> => 
 
       if (c.estado === 'pagado') continue;
 
-      // Parse vencimiento "dd/mm/aaaa"
       const [dd, mm, aa] = String(c.vencimiento || '').split('/');
       const vencDate = new Date(Number(aa), Number(mm) - 1, Number(dd));
 
@@ -506,17 +526,20 @@ export const ejecutarCierreMensual = async (_userUid: string): Promise<void> => 
 
         await update(ref(db, `cobranzas/charges/${yyyymm}/${empId}/${chargeId}`), {
           estado: 'moroso',
-          recargos: [...(c.recargos || []), {
-            id: `mor_${Date.now()}`,
-            tipo: 'morosidad',
-            porcentaje: cfg.porcentajeMorosidad,
-            monto: recargoMonto,
-            motivo: 'Recargo por morosidad',
-            fechaAplicacion: new Date().toLocaleDateString('es-PE')
-          }],
+          recargos: [
+            ...(c.recargos || []),
+            {
+              id: `mor_${Date.now()}`,
+              tipo: 'morosidad',
+              porcentaje: cfg.porcentajeMorosidad,
+              monto: recargoMonto,
+              motivo: 'Recargo por morosidad',
+              fechaAplicacion: new Date().toLocaleDateString('es-PE'),
+            },
+          ],
           total: Number(c.total || 0) + recargoMonto,
           saldo: Number(c.saldo || 0) + recargoMonto,
-          timestamps: { ...(c.timestamps || {}), actualizado: new Date().toISOString() }
+          timestamps: { ...(c.timestamps || {}), actualizado: new Date().toISOString() },
         });
       }
     }
