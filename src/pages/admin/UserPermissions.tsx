@@ -22,7 +22,8 @@ import {
   Copy,
   Save,
   User,
-  Loader2
+  Loader2,
+  Home
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -196,6 +197,11 @@ export default function UserPermissions() {
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+                <Home className="w-4 h-4" />
+                Inicio
+              </Button>
+              <div className="h-6 w-px bg-border" />
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/admin/users" className="gap-2">
                   <ArrowLeft className="w-4 h-4" />

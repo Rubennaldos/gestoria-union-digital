@@ -208,9 +208,21 @@ const Empadronados: React.FC = () => {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Padrón de Asociados</h1>
-          <p className="text-muted-foreground">Gestión completa del registro de asociados</p>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/')}
+            className="gap-2"
+          >
+            <Home className="w-4 h-4" />
+            Inicio
+          </Button>
+          <div className="h-6 w-px bg-border" />
+          <div>
+            <h1 className="text-2xl font-bold">Padrón de Asociados</h1>
+            <p className="text-muted-foreground">Gestión completa del registro de asociados</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button 

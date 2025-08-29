@@ -1,4 +1,4 @@
-import { DollarSign, TrendingUp, CreditCard, FileText, AlertCircle } from "lucide-react";
+import { DollarSign, TrendingUp, CreditCard, FileText, AlertCircle, Home } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,21 @@ const Finanzas = () => {
       
       <main className="container mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Finanzas</h1>
-            <p className="text-muted-foreground">Gestión económica y presupuestaria</p>
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => window.location.href = '/'}
+              className="gap-2"
+            >
+              <Home className="w-4 h-4" />
+              Inicio
+            </Button>
+            <div className="h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Finanzas</h1>
+              <p className="text-muted-foreground">Gestión económica y presupuestaria</p>
+            </div>
           </div>
           <Button className="bg-primary hover:bg-primary-hover">
             <DollarSign className="h-4 w-4 mr-2" />

@@ -21,7 +21,8 @@ import {
   Phone, 
   Shield,
   Loader2,
-  Plus
+  Plus,
+  Home
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
@@ -140,6 +141,11 @@ export default function UserNew() {
       <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
+              <Home className="w-4 h-4" />
+              Inicio
+            </Button>
+            <div className="h-6 w-px bg-border" />
             <Button variant="ghost" size="sm" asChild>
               <Link to="/admin/users" className="gap-2">
                 <ArrowLeft className="w-4 h-4" />

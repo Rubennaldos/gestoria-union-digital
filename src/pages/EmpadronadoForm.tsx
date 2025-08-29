@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Plus, X } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Home } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique } from '@/services/empadronados';
 
@@ -294,12 +294,23 @@ const EmpadronadoForm: React.FC = () => {
       <div className="flex items-center gap-4 mb-6">
         <Button 
           variant="ghost" 
+          size="sm" 
+          onClick={() => navigate('/')}
+          className="gap-2"
+        >
+          <Home className="w-4 h-4" />
+          Inicio
+        </Button>
+        <div className="h-6 w-px bg-border" />
+        <Button 
+          variant="ghost" 
           size="sm"
           onClick={() => navigate('/padron')}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver al Padrón
         </Button>
+        <div className="h-6 w-px bg-border" />
         <div>
           <h1 className="text-2xl font-bold">
             {isEditing ? 'Editar Empadronado' : 'Nuevo Empadronado'}
