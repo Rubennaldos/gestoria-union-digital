@@ -1,12 +1,12 @@
-import { ref, push, set, get, update, remove, query, orderByChild, equalTo, runTransaction } from 'firebase/database';
+import { ref, push, set, get, update, remove } from 'firebase/database';
 import { db } from '@/config/firebase';
-import { 
-  Pago, 
-  Egreso, 
-  ConfiguracionCobranzas, 
-  EstadisticasCobranzas, 
+import {
+  Pago,
+  Egreso,
+  ConfiguracionCobranzas,
+  EstadisticasCobranzas,
   DeclaracionJurada,
-  PlantillaSancion 
+  PlantillaSancion
 } from '@/types/cobranzas';
 import { Empadronado } from '@/types/empadronados';
 
@@ -31,7 +31,6 @@ const monthsBetween = (from: string, to: string) => {
   return (ty - fy) * 12 + (tm - fm);
 };
 const toEsDate = (y: number, m: number, day: number) => {
-  // Devuelve "dd/mm/aaaa" para es-PE
   const d = new Date(y, m - 1, day);
   const dd = pad2(d.getDate());
   const mm = pad2(d.getMonth() + 1);
@@ -170,7 +169,7 @@ export const generarPagosMensuales = async (mes: number, año: number, _userUid:
    ────────────────────────────────────────────────────────── */
 /**
  * Crea un pago y liquida el charge del periodo.
- * - Aplica pronto pago si corresponde.
+ * - Aplica pronto pago si corresponde (días 1..N del mes actual).
  * - Deja constancia del pago en `cobranzas/pagos`.
  * - Actualiza el charge (saldo=0, estado=pagado, fechaPago, método, op, comprobante).
  */
@@ -199,9 +198,9 @@ export const crearPago = async (
   // Cálculo de pronto pago
   let descuentoAplicado = 0;
   const today = new Date();
-  const diaHoy = today.getDate();
-  if (cfg.diasProntoPago && diaHoy >= 1 && diaHoy <= cfg.diasProntoPago) {
-    descuentoAplicado = (charge.montoBase * (cfg.porcentajeProntoPago ?? 0)) / 100;
+  const esMismoPeriodo = today.getFullYear() === pagoData.año && (today.getMonth() + 1) === pagoData.mes;
+  if (esMismoPeriodo && cfg.diasProntoPago && today.getDate() >= 1 && today.getDate() <= cfg.diasProntoPago) {
+    descuentoAplicado = (Number(charge.montoBase) * (cfg.porcentajeProntoPago ?? 0)) / 100;
   }
 
   // Monto final a pagar (no negativo)
@@ -210,7 +209,7 @@ export const crearPago = async (
   // Actualiza CHARGE (pagado)
   await update(ref(db, `${chargesNode}/${chargeId}`), {
     estado: 'pagado',
-    descuentos: descuentoAplicado > 0 
+    descuentos: descuentoAplicado > 0
       ? [...(charge.descuentos || []), {
           id: `pp_${Date.now()}`,
           tipo: 'pronto_pago',
@@ -218,7 +217,7 @@ export const crearPago = async (
           monto: descuentoAplicado,
           motivo: `Pronto pago (${cfg.porcentajeProntoPago}%)`,
           fechaAplicacion: new Date().toLocaleDateString('es-PE')
-        }] 
+        }]
       : (charge.descuentos || []),
     total: Number(charge.total) - descuentoAplicado,
     saldo: 0,
@@ -238,7 +237,7 @@ export const crearPago = async (
     createdAt: Date.now(),
     updatedAt: Date.now(),
     creadoPor: userUid,
-    montoOriginal: charge.montoBase,
+    montoOriginal: Number(charge.montoBase),
     monto: final
   };
   await set(nuevoPagoRef, pago);
@@ -261,17 +260,15 @@ export const obtenerPagos = async (): Promise<Pago[]> => {
  *  - Si está pagado → intenta enriquecer con el pago real en cobranzas/pagos.
  */
 export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise<Pago[]> => {
-  // Leer CHARGES del asociado en todos los periodos
   const chargesRoot = ref(db, 'cobranzas/charges');
   const chargesSnap = await get(chargesRoot);
   if (!chargesSnap.exists()) return [];
 
-  const periods = chargesSnap.val(); // { YYYYMM: { empId: { chargeId: {...} } } }
+  const periods = chargesSnap.val() as Record<string, any>;
   const items: Pago[] = [];
 
   // Pre-carga pagos del asociado para mapear detalles (método, op, comprobante)
-  const pagosEmp = (await obtenerPagos())
-    .filter(p => p.empadronadoId === empadronadoId);
+  const pagosEmp = (await obtenerPagos()).filter(p => p.empadronadoId === empadronadoId);
 
   Object.keys(periods).forEach((yyyymm) => {
     const node = periods[yyyymm]?.[empadronadoId];
@@ -281,7 +278,6 @@ export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise
     const año = Number(yyyymm.slice(0, 4));
     const mes = Number(yyyymm.slice(4, 6));
 
-    // Si está pagado, busca el pago real para traer método/operación/comprobante
     const pagoReal = c.estado === 'pagado'
       ? pagosEmp.find(p => p.año === año && p.mes === mes)
       : undefined;
@@ -308,14 +304,13 @@ export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise
     } as Pago);
   });
 
-  // Orden: más recientes primero
   return items.sort((a, b) => (b.año - a.año) || (b.mes - a.mes));
 };
 
 /** Actualiza metadatos del PAGO (no toca el charge) */
 export const actualizarPago = async (
-  pagoId: string, 
-  updates: Partial<Pago>, 
+  pagoId: string,
+  updates: Partial<Pago>,
   userUid: string
 ): Promise<void> => {
   const pagoRef = ref(db, `cobranzas/pagos/${pagoId}`);
@@ -332,7 +327,7 @@ export const actualizarPago = async (
 export const crearEgreso = async (egresoData: Omit<Egreso, 'id' | 'createdAt' | 'updatedAt'>, userUid: string): Promise<string> => {
   const egresosRef = ref(db, 'cobranzas/egresos');
   const nuevoEgresoRef = push(egresosRef);
-  
+
   const egreso: Egreso = {
     ...egresoData,
     id: nuevoEgresoRef.key!,
@@ -340,7 +335,7 @@ export const crearEgreso = async (egresoData: Omit<Egreso, 'id' | 'createdAt' | 
     updatedAt: Date.now(),
     realizadoPor: userUid
   };
-  
+
   await set(nuevoEgresoRef, egreso);
   return nuevoEgresoRef.key!;
 };
@@ -430,7 +425,6 @@ export const generarEstadisticas = async (): Promise<EstadisticasCobranzas> => {
 
   // Egresos del mes actual
   const egresosMesActual = egresos.filter((e) => {
-    // e.fecha en "dd/mm/aaaa"
     const [dd, mm, aa] = e.fecha.split('/');
     return Number(mm) === mesActual && Number(aa) === añoActual;
   });
@@ -459,17 +453,13 @@ export const generarEstadisticas = async (): Promise<EstadisticasCobranzas> => {
 /* ──────────────────────────────────────────────────────────
    Cierre mensual (morosidad automática por vencimiento)
    ────────────────────────────────────────────────────────── */
-/**
- * Recorre TODOS los charges de todos los periodos y:
- * - Si la fecha actual es posterior al vencimiento y saldo > 0 → aplica recargo y marca moroso.
- */
 export const ejecutarCierreMensual = async (_userUid: string): Promise<void> => {
   const cfg = await obtenerConfiguracion();
   const chargesRootSnap = await get(ref(db, 'cobranzas/charges'));
   if (!chargesRootSnap.exists()) return;
 
   const today = new Date();
-  const allPeriods = chargesRootSnap.val(); // { YYYYMM: { empId: { chargeId: {...} } } }
+  const allPeriods = chargesRootSnap.val() as Record<string, any>;
 
   for (const yyyymm of Object.keys(allPeriods)) {
     const perNode = allPeriods[yyyymm];
