@@ -34,8 +34,19 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Si se requiere un rol específico, verificar
   if (requireRole && user.profile?.roleId !== requireRole) {
+    console.log('🚫 Access denied:', {
+      requiredRole: requireRole,
+      userRole: user.profile?.roleId,
+      userProfile: user.profile,
+      redirecting: 'to /inicio'
+    });
     return <Navigate to="/inicio" replace />;
   }
+
+  console.log('✅ Access granted:', {
+    requiredRole: requireRole,
+    userRole: user.profile?.roleId
+  });
 
   return <>{children}</>;
 };

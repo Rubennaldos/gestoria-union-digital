@@ -33,7 +33,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      console.log('🔄 Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
+      
       if (firebaseUser) {
+        console.log('👤 Firebase user UID:', firebaseUser.uid);
         const authUser: AuthUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -42,15 +45,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Obtener perfil del usuario
         try {
+          console.log('📖 Fetching user profile...');
           const userProfile = await getUserProfile(firebaseUser.uid);
+          console.log('👤 User profile loaded:', userProfile);
           setProfile(userProfile);
           setUser({ ...authUser, profile: userProfile || undefined });
         } catch (error) {
-          console.error('Error loading user profile:', error);
+          console.error('❌ Error loading user profile:', error);
           setProfile(null);
           setUser(authUser);
         }
       } else {
+        console.log('👋 No user logged in');
         setUser(null);
         setProfile(null);
       }
