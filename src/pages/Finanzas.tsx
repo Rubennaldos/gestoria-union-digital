@@ -5,19 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const Finanzas = () => {
+  // TODO: Conectar con datos reales de Firebase/API
   const resumenFinanciero = {
-    ingresosMes: "S/ 15,420",
-    egresosMes: "S/ 8,750",
-    saldoActual: "S/ 45,280",
-    cuotasPendientes: 23
+    ingresosMes: "S/ 0",
+    egresosMes: "S/ 0", 
+    saldoActual: "S/ 0",
+    cuotasPendientes: 0
   };
 
-  const ultimosMovimientos = [
-    { id: 1, fecha: "2024-08-25", concepto: "Cuota ordinaria - Etapa 3", monto: "S/ 180", tipo: "ingreso" },
-    { id: 2, fecha: "2024-08-24", concepto: "Pago vigilancia", monto: "S/ 2,500", tipo: "egreso" },
-    { id: 3, fecha: "2024-08-23", concepto: "Mantenimiento parques", monto: "S/ 850", tipo: "egreso" },
-    { id: 4, fecha: "2024-08-22", concepto: "Cuota extraordinaria", monto: "S/ 300", tipo: "ingreso" }
-  ];
+  const ultimosMovimientos: any[] = [];
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
@@ -125,19 +121,26 @@ const Finanzas = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {ultimosMovimientos.map((mov) => (
-                <div key={mov.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{mov.concepto}</p>
-                    <p className="text-xs text-muted-foreground">{mov.fecha}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={mov.tipo === "ingreso" ? "default" : "secondary"}>
-                      {mov.tipo === "ingreso" ? "+" : "-"}{mov.monto}
-                    </Badge>
-                  </div>
+              {ultimosMovimientos.length === 0 ? (
+                <div className="text-center py-8">
+                  <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No hay movimientos registrados</p>
                 </div>
-              ))}
+              ) : (
+                ultimosMovimientos.map((mov) => (
+                  <div key={mov.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">{mov.concepto}</p>
+                      <p className="text-xs text-muted-foreground">{mov.fecha}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={mov.tipo === "ingreso" ? "default" : "secondary"}>
+                        {mov.tipo === "ingreso" ? "+" : "-"}{mov.monto}
+                      </Badge>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>

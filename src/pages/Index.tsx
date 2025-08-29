@@ -9,6 +9,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AlertsWidget } from "@/components/dashboard/AlertsWidget";
 import { SeedDataButton } from "@/components/ui/seedDataButton";
 
+// TODO: Los módulos deberían mostrar badges dinámicos basados en datos reales
 const modules = [
   {
     title: "Usuarios y Permisos",
@@ -19,7 +20,7 @@ const modules = [
     restricted: true
   },
   {
-    title: "Padrón y Delegados",
+    title: "Padrón y Delegados", 
     description: "Registro de asociados por etapas",
     icon: UserCheck,
     href: "/padron",
@@ -29,7 +30,7 @@ const modules = [
     title: "Actas y Archivos",
     description: "Redacción y gestión documental",
     icon: FileText,
-    href: "/actas",
+    href: "/actas", 
     color: "primary" as const
   },
   {
@@ -37,16 +38,16 @@ const modules = [
     description: "Convocatorias, quórum y votaciones",
     icon: Calendar,
     href: "/sesiones",
-    color: "primary" as const,
-    badge: "2"
+    color: "primary" as const
+    // badge será dinámico basado en próximas sesiones
   },
   {
     title: "Finanzas",
     description: "Cuotas, pagos y presupuestos",
     icon: DollarSign,
     href: "/finanzas",
-    color: "success" as const,
-    badge: "!"
+    color: "success" as const
+    // badge será dinámico basado en pendientes
   },
   {
     title: "Sanciones",
@@ -57,7 +58,7 @@ const modules = [
   },
   {
     title: "Seguridad",
-    description: "Incidentes y planes de vigilancia",
+    description: "Incidentes y planes de vigilancia", 
     icon: Shield,
     href: "/seguridad",
     color: "warning" as const
@@ -73,7 +74,7 @@ const modules = [
     title: "Deportes",
     description: "Torneos y actividades recreativas",
     icon: Trophy,
-    href: "/deportes",
+    href: "/deportes", 
     color: "success" as const
   },
   {
@@ -112,7 +113,7 @@ const modules = [
     color: "primary" as const
   },
   {
-    title: "Auditoría",
+    title: "Auditoría", 
     description: "Revisión y conformidad",
     icon: Search,
     href: "/auditoria",
@@ -166,7 +167,8 @@ const Index = () => {
                 icon={module.icon}
                 href={module.href}
                 color={module.color}
-                badge={module.badge}
+                // badge será dinámico en el futuro
+                badge={undefined}
               />
             ))}
           </div>
