@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+// Auth services imports
 import { createUserAndProfile } from '@/services/auth';
 import { applyMirrorPermissions } from '@/services/rtdb';
 import { setBootstrapInitialized } from '@/utils/seedAuthData';
