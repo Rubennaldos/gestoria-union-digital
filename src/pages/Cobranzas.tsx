@@ -34,6 +34,10 @@ import {
 import { EstadisticasCobranzas, Pago, Egreso } from "@/types/cobranzas";
 import { getEmpadronados } from "@/services/empadronados";
 import { Empadronado } from "@/types/empadronados";
+import { RegistrarPagoModal } from "@/components/cobranzas/RegistrarPagoModal";
+import { DeclaracionJuradaModal } from "@/components/cobranzas/DeclaracionJuradaModal";
+import { SancionModal } from "@/components/cobranzas/SancionModal";
+import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadronadoModal";
 
 const Cobranzas = () => {
   const { user } = useAuth();
@@ -44,6 +48,12 @@ const Cobranzas = () => {
   const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [pagosEmpadronados, setPagosEmpadronados] = useState<Record<string, Pago[]>>({});
   const [loading, setLoading] = useState(true);
+  
+  // Estados para modales
+  const [registrarPagoModal, setRegistrarPagoModal] = useState<{ open: boolean; pago?: Pago }>({ open: false });
+  const [declaracionModal, setDeclaracionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
+  const [sancionModal, setSancionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
+  const [detalleModal, setDetalleModal] = useState<{ open: boolean; empadronado?: Empadronado }>({ open: false });
 
   useEffect(() => {
     cargarDatos();
@@ -244,15 +254,27 @@ const Cobranzas = () => {
 
         {/* Acciones Rápidas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Button variant="outline" className="h-auto p-4 flex flex-col space-y-2">
+          <Button 
+            variant="outline" 
+            className="h-auto p-4 flex flex-col space-y-2"
+            onClick={() => setRegistrarPagoModal({ open: true })}
+          >
             <Receipt className="h-6 w-6" />
             <span className="text-sm">Registrar Pago</span>
           </Button>
-          <Button variant="outline" className="h-auto p-4 flex flex-col space-y-2">
+          <Button 
+            variant="outline" 
+            className="h-auto p-4 flex flex-col space-y-2"
+            onClick={() => setDeclaracionModal({ open: true })}
+          >
             <Download className="h-6 w-6" />
             <span className="text-sm">Plantilla Descuento</span>
           </Button>
-          <Button variant="outline" className="h-auto p-4 flex flex-col space-y-2">
+          <Button 
+            variant="outline" 
+            className="h-auto p-4 flex flex-col space-y-2"
+            onClick={() => setSancionModal({ open: true })}
+          >
             <Upload className="h-6 w-6" />
             <span className="text-sm">Subir Sanción</span>
           </Button>
@@ -334,7 +356,11 @@ const Cobranzas = () => {
                                  estado === 'moroso' ? 'Moroso' : 'Pendiente'}
                               </Badge>
                               
-                              <Button variant="outline" size="sm">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => setDetalleModal({ open: true, empadronado })}
+                              >
                                 Ver Detalles
                               </Button>
                             </div>
@@ -449,6 +475,38 @@ const Cobranzas = () => {
       </main>
 
       <BottomNavigation />
+
+      {/* Modales */}
+      <RegistrarPagoModal
+        open={registrarPagoModal.open}
+        onOpenChange={(open) => setRegistrarPagoModal({ open })}
+        pago={registrarPagoModal.pago}
+        onSuccess={cargarDatos}
+      />
+
+      <DeclaracionJuradaModal
+        open={declaracionModal.open}
+        onOpenChange={(open) => setDeclaracionModal({ open })}
+        empadronadoId={declaracionModal.empadronadoId}
+        onSuccess={cargarDatos}
+      />
+
+      <SancionModal
+        open={sancionModal.open}
+        onOpenChange={(open) => setSancionModal({ open })}
+        empadronadoId={sancionModal.empadronadoId}
+        onSuccess={cargarDatos}
+      />
+
+      <DetalleEmpadronadoModal
+        open={detalleModal.open}
+        onOpenChange={(open) => setDetalleModal({ open })}
+        empadronado={detalleModal.empadronado || null}
+        onRegistrarPago={(pago) => {
+          setDetalleModal({ open: false });
+          setRegistrarPagoModal({ open: true, pago });
+        }}
+      />
     </div>
   );
 };
