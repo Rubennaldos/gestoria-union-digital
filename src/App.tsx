@@ -26,8 +26,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          {/* Ir directamente al panel de admin sin autenticación */}
-          <Route path="/" element={<Users />} />
+          {/* Página de inicio por defecto */}
+          <Route path="/" element={<Index />} />
           <Route path="/admin/users" element={<Users />} />
           <Route path="/admin/users/new" element={<UserNew />} />
           <Route path="/admin/users/:uid/permissions" element={<UserPermissions />} />
