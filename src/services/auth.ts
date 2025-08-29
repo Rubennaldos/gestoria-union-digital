@@ -9,7 +9,7 @@ import { auth, adminAuth } from "@/config/firebase";
 import { get, ref } from "firebase/database";
 import { db } from "@/config/firebase";
 import { UserProfile, CreateUserForm } from "@/types/auth";
-import { createUserProfile, getUserProfile } from "./rtdb";
+import { createUserProfile, getUserProfile, updateUserProfile } from "./rtdb";
 
 export const signInWithEmailOrUsername = async (identifier: string, password: string) => {
   let email = identifier;
@@ -40,7 +40,23 @@ export const signInWithEmailOrUsername = async (identifier: string, password: st
   console.log('👤 User profile:', profile);
   
   if (!profile?.activo) {
-    console.log('❌ User is not active, signing out...');
+    console.log('❌ User is not active');
+    
+    // Si es el usuario presidencia, activarlo automáticamente
+    if (profile?.roleId === 'presidencia') {
+      console.log('🔧 Auto-activating presidencia user...');
+      try {
+        await updateUserProfile(result.user.uid, { activo: true }, result.user.uid);
+        console.log('✅ Presidencia user activated successfully');
+        // Re-cargar el perfil actualizado
+        const updatedProfile = await getUserProfile(result.user.uid);
+        console.log('✅ Updated profile:', updatedProfile);
+        return result;
+      } catch (error) {
+        console.error('❌ Error activating presidencia user:', error);
+      }
+    }
+    
     await signOut(auth);
     throw new Error("USUARIO_SUSPENDIDO: Tu acceso está deshabilitado, contacta a Presidencia.");
   }
