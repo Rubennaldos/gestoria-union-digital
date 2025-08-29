@@ -6,57 +6,57 @@
 
 @layer base {
   :root {
-    /* Base colors - Professional banking palette */
-    --background: 248 250 252; /* slate-50 */
-    --foreground: 203 24% 9%; /* slate-900 */
+    /* BCP Banking colors - Deep blue and orange */
+    --background: 0 0% 98%; /* Almost white */
+    --foreground: 220 26% 14%; /* Dark blue-gray */
 
     /* Card system */
-    --card: 0 0% 100%; /* pure white */
-    --card-foreground: 203 24% 9%;
-    --card-hover: 248 250 252;
+    --card: 0 0% 100%; /* Pure white */
+    --card-foreground: 220 26% 14%;
+    --card-hover: 210 40% 98%;
 
-    /* Primary - Professional blue */
-    --primary: 213 94% 19%; /* blue-800 */
+    /* Primary - BCP Deep Blue */
+    --primary: 220 91% 18%; /* Deep BCP blue */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 213 94% 16%;
-    --primary-light: 213 94% 85%;
+    --primary-hover: 220 91% 15%;
+    --primary-light: 220 91% 85%;
 
-    /* Secondary - Light blue accents */
-    --secondary: 213 27% 84%; /* blue-200 */
-    --secondary-foreground: 213 94% 19%;
-    --secondary-hover: 213 27% 80%;
+    /* Secondary - Light blue tones */
+    --secondary: 220 60% 95%; /* Very light blue */
+    --secondary-foreground: 220 91% 18%;
+    --secondary-hover: 220 60% 90%;
 
-    /* Alert/Warning - Banking orange */
-    --warning: 32 95% 44%; /* orange-500 */
+    /* BCP Orange accents */
+    --warning: 25 95% 53%; /* BCP orange */
     --warning-foreground: 0 0% 100%;
-    --warning-light: 32 95% 92%;
+    --warning-light: 25 95% 94%;
 
     /* Success - Banking green */
-    --success: 142 76% 36%; /* green-600 */
+    --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
     --success-light: 142 76% 92%;
 
     /* Muted tones */
-    --muted: 215 20% 96%; /* slate-100 */
-    --muted-foreground: 215 16% 47%; /* slate-500 */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
 
-    /* Accent for highlights */
-    --accent: 213 27% 84%;
-    --accent-foreground: 213 94% 19%;
+    /* Accent - BCP Orange */
+    --accent: 25 95% 53%;
+    --accent-foreground: 0 0% 100%;
 
     /* Error states */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     /* Borders and inputs */
-    --border: 214 32% 91%; /* slate-200 */
-    --input: 214 32% 91%;
-    --ring: 213 94% 19%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 25 95% 53%;
 
-    /* Navigation */
-    --nav-primary: 213 94% 19%;
-    --nav-secondary: 215 28% 17%; /* slate-800 */
-    --nav-accent: 32 95% 44%;
+    /* Navigation - BCP Style */
+    --nav-primary: 220 91% 18%;
+    --nav-secondary: 220 26% 14%;
+    --nav-accent: 25 95% 53%;
 
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(213 94% 19%), hsl(213 94% 16%));
