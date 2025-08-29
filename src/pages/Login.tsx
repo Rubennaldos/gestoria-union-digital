@@ -48,15 +48,23 @@ export default function Login() {
   useEffect(() => {
     const checkBootstrap = async () => {
       try {
+        console.log('🔄 Checking bootstrap status...');
         const initialized = await isBootstrapInitialized();
+        console.log('✅ Bootstrap initialized flag:', initialized);
+        
         if (!initialized) {
-          // Cargar datos semilla
+          console.log('🔧 Bootstrap not initialized, showing BootstrapAdmin...');
+          // Solo cargar datos semilla (roles y módulos), el usuario se crea en BootstrapAdmin
           await seedAuthData();
+          console.log('✅ Seed data (roles & modules) loaded');
+          setBootstrapComplete(false); // Mostrar BootstrapAdmin
+        } else {
+          console.log('✅ System already bootstrapped');
+          setBootstrapComplete(true); // Mostrar login normal
         }
-        setBootstrapComplete(initialized);
       } catch (error) {
-        console.error('Error checking bootstrap:', error);
-        setBootstrapComplete(false);
+        console.error('❌ Error checking bootstrap:', error);
+        setBootstrapComplete(false); // En caso de error, mostrar BootstrapAdmin
       }
     };
 

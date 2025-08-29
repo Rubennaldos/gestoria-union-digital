@@ -40,6 +40,8 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
   });
 
   const onSubmit = async (data: BootstrapForm) => {
+    console.log('🚀 BootstrapAdmin: Starting user creation process...');
+    
     if (data.password !== data.confirmPassword) {
       form.setError('confirmPassword', { message: 'Las contraseñas no coinciden' });
       return;
@@ -62,7 +64,11 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
         email = `${username}@jpusap.local`;
       }
 
+      console.log('📧 Using email:', email);
+      console.log('👤 Using username:', username);
+
       // Crear usuario admin (Presidencia)
+      console.log('🔐 Creating user in Firebase Auth...');
       const uid = await createUserAndProfile({
         displayName: data.displayName,
         email,
@@ -71,6 +77,7 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
         activo: true,
         password: data.password
       });
+      console.log('✅ User created with UID:', uid);
 
       // Asignar permisos admin a todos los módulos
       const adminPermissions: Record<string, "admin"> = {};
@@ -85,16 +92,21 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
         adminPermissions[module] = 'admin';
       });
 
+      console.log('🛡️ Applying admin permissions...');
       await applyMirrorPermissions(uid, adminPermissions, uid);
+      console.log('✅ Admin permissions applied');
 
       // Marcar bootstrap como inicializado
+      console.log('🏁 Marking bootstrap as initialized...');
       await setBootstrapInitialized();
+      console.log('✅ Bootstrap marked as initialized');
 
       toast({
         title: "Administrador creado",
         description: "El usuario Presidencia ha sido creado exitosamente.",
       });
 
+      console.log('🎉 Bootstrap process completed successfully');
       onComplete();
     } catch (err: any) {
       console.error('Error creating admin:', err);
