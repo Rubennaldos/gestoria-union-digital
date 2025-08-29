@@ -215,12 +215,8 @@ export const generarEstadisticas = async (): Promise<EstadisticasCobranzas> => {
 
 // Función auxiliar para obtener empadronados
 const obtenerEmpadronados = async (): Promise<Empadronado[]> => {
-  const empadronadosRef = ref(db, 'empadronados');
-  const snapshot = await get(empadronadosRef);
-  
-  if (!snapshot.exists()) return [];
-  
-  return Object.values(snapshot.val()) as Empadronado[];
+  const { getEmpadronados } = await import('@/services/empadronados');
+  return await getEmpadronados();
 };
 
 // Generar pagos automáticamente para todos los empadronados
@@ -232,19 +228,46 @@ export const generarPagosMensuales = async (mes: number, año: number, userUid: 
   
   for (const empadronado of empadronados) {
     if (empadronado.habilitado && empadronado.vive) {
-      await crearPago({
-        empadronadoId: empadronado.id,
-        numeroPadron: empadronado.numeroPadron,
-        mes,
-        año,
-        monto: config.montoMensual,
-        montoOriginal: config.montoMensual,
-        fechaVencimiento,
-        estado: 'pendiente',
-        descuentos: [],
-        recargos: [],
-        creadoPor: userUid
-      }, userUid);
+      // Verificar si ya existe pago para este mes/año
+      const pagosExistentes = await obtenerPagosPorEmpadronado(empadronado.id);
+      const pagoExiste = pagosExistentes.some(p => p.mes === mes && p.año === año);
+      
+      if (!pagoExiste) {
+        await crearPago({
+          empadronadoId: empadronado.id,
+          numeroPadron: empadronado.numeroPadron,
+          mes,
+          año,
+          monto: config.montoMensual,
+          montoOriginal: config.montoMensual,
+          fechaVencimiento,
+          estado: 'pendiente',
+          descuentos: [],
+          recargos: [],
+          creadoPor: userUid
+        }, userUid);
+      }
+    }
+  }
+};
+
+// Generar pagos desde enero 15 hasta la fecha actual
+export const generarPagosDesdeEnero = async (userUid: string): Promise<void> => {
+  const fechaInicio = new Date(2025, 0, 15); // 15 enero 2025
+  const fechaActual = new Date();
+  
+  let mesActual = fechaInicio.getMonth() + 1;
+  let añoActual = fechaInicio.getFullYear();
+  
+  while (añoActual < fechaActual.getFullYear() || 
+         (añoActual === fechaActual.getFullYear() && mesActual <= fechaActual.getMonth() + 1)) {
+    
+    await generarPagosMensuales(mesActual, añoActual, userUid);
+    
+    mesActual++;
+    if (mesActual > 12) {
+      mesActual = 1;
+      añoActual++;
     }
   }
 };

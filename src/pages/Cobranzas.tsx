@@ -11,7 +11,9 @@ import {
   Upload,
   Calendar,
   PlusCircle,
-  Receipt
+  Receipt,
+  UserCheck,
+  Play
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +26,14 @@ import {
   generarEstadisticas, 
   ejecutarCierreMensual, 
   generarPagosMensuales,
+  generarPagosDesdeEnero,
   obtenerPagos,
-  obtenerEgresos 
+  obtenerEgresos,
+  obtenerPagosPorEmpadronado
 } from "@/services/cobranzas";
 import { EstadisticasCobranzas, Pago, Egreso } from "@/types/cobranzas";
+import { getEmpadronados } from "@/services/empadronados";
+import { Empadronado } from "@/types/empadronados";
 
 const Cobranzas = () => {
   const { user } = useAuth();
@@ -35,6 +41,8 @@ const Cobranzas = () => {
   const [estadisticas, setEstadisticas] = useState<EstadisticasCobranzas | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [egresos, setEgresos] = useState<Egreso[]>([]);
+  const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
+  const [pagosEmpadronados, setPagosEmpadronados] = useState<Record<string, Pago[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,15 +52,25 @@ const Cobranzas = () => {
   const cargarDatos = async () => {
     try {
       setLoading(true);
-      const [stats, pagosList, egresosList] = await Promise.all([
+      const [stats, pagosList, egresosList, empadronadosList] = await Promise.all([
         generarEstadisticas(),
         obtenerPagos(),
-        obtenerEgresos()
+        obtenerEgresos(),
+        getEmpadronados()
       ]);
       
       setEstadisticas(stats);
       setPagos(pagosList.slice(0, 10)); // Últimos 10 pagos
       setEgresos(egresosList.slice(0, 10)); // Últimos 10 egresos
+      setEmpadronados(empadronadosList);
+
+      // Cargar pagos por empadronado
+      const pagosMap: Record<string, Pago[]> = {};
+      for (const empadronado of empadronadosList) {
+        const pagosEmp = await obtenerPagosPorEmpadronado(empadronado.id);
+        pagosMap[empadronado.id] = pagosEmp;
+      }
+      setPagosEmpadronados(pagosMap);
     } catch (error) {
       toast({
         title: "Error",
@@ -86,15 +104,11 @@ const Cobranzas = () => {
   const generarPagos = async () => {
     if (!user) return;
     
-    const fecha = new Date();
-    const mes = fecha.getMonth() + 1;
-    const año = fecha.getFullYear();
-    
     try {
-      await generarPagosMensuales(mes, año, user.uid);
+      await generarPagosDesdeEnero(user.uid);
       toast({
         title: "Éxito",
-        description: `Pagos generados para ${mes}/${año}`
+        description: "Pagos generados desde enero 15 hasta la fecha actual"
       });
       cargarDatos();
     } catch (error) {
@@ -104,6 +118,23 @@ const Cobranzas = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const calcularDeudaTotal = (empadronadoId: string): number => {
+    const pagosEmp = pagosEmpadronados[empadronadoId] || [];
+    return pagosEmp
+      .filter(p => p.estado === 'pendiente' || p.estado === 'moroso')
+      .reduce((total, p) => total + p.monto, 0);
+  };
+
+  const obtenerEstadoEmpadronado = (empadronadoId: string): string => {
+    const pagosEmp = pagosEmpadronados[empadronadoId] || [];
+    const tieneDeudas = pagosEmp.some(p => p.estado === 'pendiente' || p.estado === 'moroso');
+    const tieneMoroso = pagosEmp.some(p => p.estado === 'moroso');
+    
+    if (tieneMoroso) return 'moroso';
+    if (tieneDeudas) return 'pendiente';
+    return 'al_dia';
   };
 
   if (loading) {
@@ -142,8 +173,8 @@ const Cobranzas = () => {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={generarPagos}>
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Generar Pagos
+              <Play className="h-4 w-4 mr-2" />
+              Generar desde Enero
             </Button>
             <Button onClick={ejecutarCierre}>
               <Calendar className="h-4 w-4 mr-2" />
@@ -232,12 +263,90 @@ const Cobranzas = () => {
         </div>
 
         {/* Contenido Principal */}
-        <Tabs defaultValue="pagos" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="empadronados" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="empadronados">Asociados</TabsTrigger>
             <TabsTrigger value="pagos">Pagos Recientes</TabsTrigger>
             <TabsTrigger value="egresos">Egresos</TabsTrigger>
             <TabsTrigger value="configuracion">Configuración</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="empadronados">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" />
+                  Lista de Asociados y Estado de Pagos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {empadronados.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No hay asociados registrados</p>
+                      <p className="text-sm text-muted-foreground">
+                        Registra asociados desde el módulo de Empadronamiento
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4">
+                      {empadronados.map((empadronado) => {
+                        const deudaTotal = calcularDeudaTotal(empadronado.id);
+                        const estado = obtenerEstadoEmpadronado(empadronado.id);
+                        const cantidadPagos = pagosEmpadronados[empadronado.id]?.length || 0;
+                        
+                        return (
+                          <div key={empadronado.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <p className="font-semibold text-sm">
+                                    {empadronado.nombre} {empadronado.apellidos}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Padrón: {empadronado.numeroPadron} • DNI: {empadronado.dni}
+                                  </p>
+                                  {empadronado.manzana && empadronado.lote && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Mz. {empadronado.manzana} Lt. {empadronado.lote}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center space-x-3">
+                              <div className="text-right">
+                                <p className="text-sm font-medium">
+                                  Deuda Total: S/ {deudaTotal.toFixed(2)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {cantidadPagos} pagos generados
+                                </p>
+                              </div>
+                              
+                              <Badge variant={
+                                estado === 'al_dia' ? 'default' : 
+                                estado === 'moroso' ? 'destructive' : 'secondary'
+                              }>
+                                {estado === 'al_dia' ? 'Al día' : 
+                                 estado === 'moroso' ? 'Moroso' : 'Pendiente'}
+                              </Badge>
+                              
+                              <Button variant="outline" size="sm">
+                                Ver Detalles
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="pagos">
             <Card>
