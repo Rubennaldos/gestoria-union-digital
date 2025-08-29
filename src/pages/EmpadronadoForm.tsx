@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Plus, X } from 'lucide-react';
-import { CreateEmpadronadoForm, Empadronado } from '@/types/empadronados';
+import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique } from '@/services/empadronados';
 
 const EmpadronadoForm: React.FC = () => {
@@ -22,7 +22,17 @@ const EmpadronadoForm: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(isEditing);
-  const [newHijo, setNewHijo] = useState('');
+  const [newFamilyMember, setNewFamilyMember] = useState<FamilyMember>({
+    nombre: '',
+    apellidos: '',
+    parentezco: '',
+    cumpleanos: ''
+  });
+  const [newPhone, setNewPhone] = useState('');
+  const [newVehicle, setNewVehicle] = useState<Vehicle>({
+    placa: '',
+    tipo: 'vehiculo'
+  });
   
   // Form state
   const [formData, setFormData] = useState<CreateEmpadronadoForm>({
@@ -31,19 +41,19 @@ const EmpadronadoForm: React.FC = () => {
     apellidos: '',
     dni: '',
     familia: '',
-    placasVehiculares: '',
+    miembrosFamilia: [],
+    vehiculos: [],
     habilitado: true,
-    telefono1: '',
-    telefono2: '',
-    telefono3: '',
+    telefonos: [{ numero: '' }],
     fechaIngreso: Date.now(),
-    direccion: '',
+    manzana: '',
+    lote: '',
+    etapa: '',
     genero: 'masculino',
     vive: true,
     estadoVivienda: 'terreno',
     cumpleanos: '',
-    observaciones: '',
-    hijos: []
+    observaciones: ''
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -67,19 +77,19 @@ const EmpadronadoForm: React.FC = () => {
           apellidos: empadronado.apellidos,
           dni: empadronado.dni,
           familia: empadronado.familia,
-          placasVehiculares: empadronado.placasVehiculares || '',
+          miembrosFamilia: empadronado.miembrosFamilia || [],
+          vehiculos: empadronado.vehiculos || [],
           habilitado: empadronado.habilitado,
-          telefono1: empadronado.telefono1 || '',
-          telefono2: empadronado.telefono2 || '',
-          telefono3: empadronado.telefono3 || '',
+          telefonos: empadronado.telefonos || [{ numero: '' }],
           fechaIngreso: empadronado.fechaIngreso,
-          direccion: empadronado.direccion,
+          manzana: empadronado.manzana || '',
+          lote: empadronado.lote || '',
+          etapa: empadronado.etapa || '',
           genero: empadronado.genero,
           vive: empadronado.vive,
           estadoVivienda: empadronado.estadoVivienda,
           cumpleanos: empadronado.cumpleanos,
-          observaciones: empadronado.observaciones || '',
-          hijos: empadronado.hijos || []
+          observaciones: empadronado.observaciones || ''
         });
       } else {
         toast({
@@ -110,7 +120,8 @@ const EmpadronadoForm: React.FC = () => {
     if (!formData.apellidos.trim()) newErrors.apellidos = 'Los apellidos son requeridos';
     if (!formData.dni.trim()) newErrors.dni = 'El DNI es requerido';
     if (!formData.familia.trim()) newErrors.familia = 'La familia es requerida';
-    if (!formData.direccion.trim()) newErrors.direccion = 'La dirección es requerida';
+    if (!formData.manzana?.trim()) newErrors.manzana = 'La manzana es requerida';
+    if (!formData.lote?.trim()) newErrors.lote = 'El lote es requerido';
     if (!formData.cumpleanos.trim()) newErrors.cumpleanos = 'El cumpleaños es requerido';
 
     // Validar formato de DNI (8 dígitos)
@@ -146,12 +157,13 @@ const EmpadronadoForm: React.FC = () => {
       const submitData = {
         ...formData,
         // Limpiar campos opcionales vacíos
-        placasVehiculares: formData.placasVehiculares?.trim() || undefined,
-        telefono1: formData.telefono1?.trim() || undefined,
-        telefono2: formData.telefono2?.trim() || undefined,
-        telefono3: formData.telefono3?.trim() || undefined,
+        miembrosFamilia: formData.miembrosFamilia && formData.miembrosFamilia.length > 0 ? formData.miembrosFamilia : undefined,
+        vehiculos: formData.vehiculos && formData.vehiculos.length > 0 ? formData.vehiculos : undefined,
+        telefonos: formData.telefonos?.filter(t => t.numero.trim()) || undefined,
         observaciones: formData.observaciones?.trim() || undefined,
-        hijos: formData.hijos && formData.hijos.length > 0 ? formData.hijos : undefined
+        manzana: formData.manzana?.trim() || undefined,
+        lote: formData.lote?.trim() || undefined,
+        etapa: formData.etapa?.trim() || undefined
       };
 
       let success = false;
@@ -182,20 +194,54 @@ const EmpadronadoForm: React.FC = () => {
     }
   };
 
-  const addHijo = () => {
-    if (newHijo.trim()) {
+  const addFamilyMember = () => {
+    if (newFamilyMember.nombre.trim() && newFamilyMember.apellidos.trim()) {
       setFormData(prev => ({
         ...prev,
-        hijos: [...(prev.hijos || []), newHijo.trim()]
+        miembrosFamilia: [...(prev.miembrosFamilia || []), { ...newFamilyMember }]
       }));
-      setNewHijo('');
+      setNewFamilyMember({ nombre: '', apellidos: '', parentezco: '', cumpleanos: '' });
     }
   };
 
-  const removeHijo = (index: number) => {
+  const removeFamilyMember = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      hijos: prev.hijos?.filter((_, i) => i !== index) || []
+      miembrosFamilia: prev.miembrosFamilia?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  const addPhone = () => {
+    if (newPhone.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        telefonos: [...(prev.telefonos || []), { numero: newPhone.trim() }]
+      }));
+      setNewPhone('');
+    }
+  };
+
+  const removePhone = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      telefonos: prev.telefonos?.filter((_, i) => i !== index) || []
+    }));
+  };
+
+  const addVehicle = () => {
+    if (newVehicle.placa.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        vehiculos: [...(prev.vehiculos || []), { ...newVehicle }]
+      }));
+      setNewVehicle({ placa: '', tipo: 'vehiculo' });
+    }
+  };
+
+  const removeVehicle = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      vehiculos: prev.vehiculos?.filter((_, i) => i !== index) || []
     }));
   };
 
@@ -350,6 +396,59 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Miembros de Familia */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Miembros de la Familia</CardTitle>
+            <CardDescription>Agregar otros miembros que viven en la familia</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+              <Input
+                value={newFamilyMember.nombre}
+                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, nombre: e.target.value }))}
+                placeholder="Nombre"
+              />
+              <Input
+                value={newFamilyMember.apellidos}
+                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, apellidos: e.target.value }))}
+                placeholder="Apellidos"
+              />
+              <Input
+                value={newFamilyMember.parentezco}
+                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, parentezco: e.target.value }))}
+                placeholder="Parentezco"
+              />
+              <Input
+                value={newFamilyMember.cumpleanos}
+                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, cumpleanos: e.target.value }))}
+                placeholder="DD/MM/YYYY"
+              />
+              <Button type="button" variant="outline" onClick={addFamilyMember}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {formData.miembrosFamilia && formData.miembrosFamilia.length > 0 && (
+              <div className="space-y-2">
+                {formData.miembrosFamilia.map((miembro, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 border rounded">
+                    <span>{miembro.nombre} {miembro.apellidos} - {miembro.parentezco} ({miembro.cumpleanos})</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFamilyMember(index)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Contacto */}
         <Card>
           <CardHeader>
@@ -357,57 +456,123 @@ const EmpadronadoForm: React.FC = () => {
             <CardDescription>Información de contacto y ubicación</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="direccion">Dirección *</Label>
-              <Textarea
-                id="direccion"
-                value={formData.direccion}
-                onChange={(e) => setFormData(prev => ({ ...prev, direccion: e.target.value }))}
-                placeholder="Mz. A Lote 15, Asociación..."
-              />
-              {errors.direccion && <p className="text-sm text-destructive mt-1">{errors.direccion}</p>}
-            </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="telefono1">Teléfono 1</Label>
+                <Label htmlFor="manzana">Manzana *</Label>
                 <Input
-                  id="telefono1"
-                  value={formData.telefono1}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefono1: e.target.value }))}
-                  placeholder="999888777"
+                  id="manzana"
+                  value={formData.manzana}
+                  onChange={(e) => setFormData(prev => ({ ...prev, manzana: e.target.value }))}
+                  placeholder="A"
                 />
+                {errors.manzana && <p className="text-sm text-destructive mt-1">{errors.manzana}</p>}
               </div>
 
               <div>
-                <Label htmlFor="telefono2">Teléfono 2</Label>
+                <Label htmlFor="lote">Lote *</Label>
                 <Input
-                  id="telefono2"
-                  value={formData.telefono2}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefono2: e.target.value }))}
-                  placeholder="999888777"
+                  id="lote"
+                  value={formData.lote}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lote: e.target.value }))}
+                  placeholder="15"
                 />
+                {errors.lote && <p className="text-sm text-destructive mt-1">{errors.lote}</p>}
               </div>
 
               <div>
-                <Label htmlFor="telefono3">Teléfono 3</Label>
+                <Label htmlFor="etapa">Etapa</Label>
                 <Input
-                  id="telefono3"
-                  value={formData.telefono3}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telefono3: e.target.value }))}
-                  placeholder="999888777"
+                  id="etapa"
+                  value={formData.etapa}
+                  onChange={(e) => setFormData(prev => ({ ...prev, etapa: e.target.value }))}
+                  placeholder="1"
                 />
               </div>
             </div>
 
+            <Separator />
+
             <div>
-              <Label htmlFor="placasVehiculares">Placas Vehiculares</Label>
-              <Input
-                id="placasVehiculares"
-                value={formData.placasVehiculares}
-                onChange={(e) => setFormData(prev => ({ ...prev, placasVehiculares: e.target.value }))}
-                placeholder="ABC-123, DEF-456"
-              />
+              <Label>Teléfonos</Label>
+              {formData.telefonos?.map((telefono, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <Input
+                    value={telefono.numero}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      telefonos: prev.telefonos?.map((t, i) => i === index ? { numero: e.target.value } : t)
+                    }))}
+                    placeholder="999888777"
+                  />
+                  {index > 0 && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => removePhone(index)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="Agregar otro teléfono"
+                />
+                <Button type="button" variant="outline" onClick={addPhone}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <Label>Vehículos</Label>
+              {formData.vehiculos?.map((vehiculo, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <Input
+                    value={vehiculo.placa}
+                    readOnly
+                    placeholder="Placa"
+                  />
+                  <Select
+                    value={vehiculo.tipo}
+                    disabled
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="vehiculo">Vehículo</SelectItem>
+                      <SelectItem value="moto">Moto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" size="sm" onClick={() => removeVehicle(index)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input
+                  value={newVehicle.placa}
+                  onChange={(e) => setNewVehicle(prev => ({ ...prev, placa: e.target.value }))}
+                  placeholder="ABC-123"
+                />
+                <Select
+                  value={newVehicle.tipo}
+                  onValueChange={(value: 'vehiculo' | 'moto') => setNewVehicle(prev => ({ ...prev, tipo: value }))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vehiculo">Vehículo</SelectItem>
+                    <SelectItem value="moto">Moto</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" onClick={addVehicle}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -449,45 +614,6 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Hijos */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Hijos</CardTitle>
-            <CardDescription>Lista de hijos del empadronado</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                value={newHijo}
-                onChange={(e) => setNewHijo(e.target.value)}
-                placeholder="Nombre del hijo"
-                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addHijo())}
-              />
-              <Button type="button" variant="outline" onClick={addHijo}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {formData.hijos && formData.hijos.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {formData.hijos.map((hijo, index) => (
-                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                    {hijo}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-auto p-0 w-4 h-4"
-                      onClick={() => removeHijo(index)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Observaciones */}
         <Card>

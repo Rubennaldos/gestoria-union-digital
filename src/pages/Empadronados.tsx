@@ -78,7 +78,10 @@ const Empadronados: React.FC = () => {
         e.apellidos.toLowerCase().includes(term) ||
         e.numeroPadron.toLowerCase().includes(term) ||
         e.dni.toLowerCase().includes(term) ||
-        (e.hijos && e.hijos.some(hijo => hijo.toLowerCase().includes(term)))
+        (e.miembrosFamilia && e.miembrosFamilia.some(miembro => 
+          miembro.nombre.toLowerCase().includes(term) || 
+          miembro.apellidos.toLowerCase().includes(term)
+        ))
       );
     }
 
@@ -432,28 +435,16 @@ const Empadronados: React.FC = () => {
                                 <div>
                                   <h4 className="font-semibold mb-3">Contacto</h4>
                                   <div className="space-y-2 text-sm">
-                                    <div>
-                                      <Label className="text-muted-foreground">Dirección</Label>
-                                      <p>{selectedEmpadronado.direccion}</p>
-                                    </div>
-                                    {selectedEmpadronado.telefono1 && (
-                                      <div>
-                                        <Label className="text-muted-foreground">Teléfono 1</Label>
-                                        <p>{selectedEmpadronado.telefono1}</p>
-                                      </div>
-                                    )}
-                                    {selectedEmpadronado.telefono2 && (
-                                      <div>
-                                        <Label className="text-muted-foreground">Teléfono 2</Label>
-                                        <p>{selectedEmpadronado.telefono2}</p>
-                                      </div>
-                                    )}
-                                    {selectedEmpadronado.telefono3 && (
-                                      <div>
-                                        <Label className="text-muted-foreground">Teléfono 3</Label>
-                                        <p>{selectedEmpadronado.telefono3}</p>
-                                      </div>
-                                    )}
+                                     <div>
+                                       <Label className="text-muted-foreground">Dirección</Label>
+                                       <p>Mz. {selectedEmpadronado.manzana} Lt. {selectedEmpadronado.lote} {selectedEmpadronado.etapa ? `Etapa ${selectedEmpadronado.etapa}` : ''}</p>
+                                     </div>
+                                     {selectedEmpadronado.telefonos && selectedEmpadronado.telefonos.length > 0 && (
+                                       <div>
+                                         <Label className="text-muted-foreground">Teléfonos</Label>
+                                         <p>{selectedEmpadronado.telefonos.map(t => t.numero).filter(Boolean).join(', ')}</p>
+                                       </div>
+                                     )}
                                   </div>
                                 </div>
 
@@ -481,29 +472,47 @@ const Empadronados: React.FC = () => {
                                         </Badge>
                                       </div>
                                     </div>
-                                    {selectedEmpadronado.placasVehiculares && (
-                                      <div className="col-span-2">
-                                        <Label className="text-muted-foreground">Placas Vehiculares</Label>
-                                        <p>{selectedEmpadronado.placasVehiculares}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
+                                   </div>
+                                 </div>
 
-                                {/* Hijos */}
-                                {selectedEmpadronado.hijos && selectedEmpadronado.hijos.length > 0 && (
-                                  <>
-                                    <Separator />
-                                    <div>
-                                      <h4 className="font-semibold mb-3">Hijos</h4>
-                                      <div className="flex flex-wrap gap-2">
-                                        {selectedEmpadronado.hijos.map((hijo, index) => (
-                                          <Badge key={index} variant="outline">{hijo}</Badge>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </>
-                                )}
+                                 {/* Vehículos */}
+                                 {selectedEmpadronado.vehiculos && selectedEmpadronado.vehiculos.length > 0 && (
+                                   <>
+                                     <Separator />
+                                     <div>
+                                       <h4 className="font-semibold mb-3">Vehículos</h4>
+                                       <div className="space-y-2">
+                                         {selectedEmpadronado.vehiculos.map((vehiculo, index) => (
+                                           <div key={index} className="flex items-center gap-2">
+                                             <Badge variant="outline" className="text-xs">
+                                               {vehiculo.placa} ({vehiculo.tipo})
+                                             </Badge>
+                                           </div>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   </>
+                                 )}
+
+                                 {/* Miembros de Familia */}
+                                 {selectedEmpadronado.miembrosFamilia && selectedEmpadronado.miembrosFamilia.length > 0 && (
+                                   <>
+                                     <Separator />
+                                     <div>
+                                       <h4 className="font-semibold mb-3">Miembros de Familia</h4>
+                                       <div className="space-y-2">
+                                         {selectedEmpadronado.miembrosFamilia.map((miembro, index) => (
+                                           <div key={index} className="border-l-2 border-muted pl-3">
+                                             <p className="font-medium">{miembro.nombre} {miembro.apellidos}</p>
+                                             <p className="text-muted-foreground text-xs">
+                                               {miembro.parentezco} • {miembro.cumpleanos}
+                                             </p>
+                                           </div>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   </>
+                                 )}
 
                                 {/* Observaciones */}
                                 {selectedEmpadronado.observaciones && (

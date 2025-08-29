@@ -1,3 +1,19 @@
+export interface FamilyMember {
+  nombre: string;
+  apellidos: string;
+  parentezco: string;
+  cumpleanos: string; // DD/MM/YYYY
+}
+
+export interface PhoneNumber {
+  numero: string;
+}
+
+export interface Vehicle {
+  placa: string;
+  tipo: 'vehiculo' | 'moto';
+}
+
 export interface Empadronado {
   id: string;
   numeroPadron: string;
@@ -5,19 +21,19 @@ export interface Empadronado {
   apellidos: string;
   dni: string;
   familia: string;
-  placasVehiculares?: string;
+  miembrosFamilia?: FamilyMember[];
+  vehiculos?: Vehicle[];
   habilitado: boolean;
-  telefono1?: string;
-  telefono2?: string;
-  telefono3?: string;
+  telefonos?: PhoneNumber[];
   fechaIngreso: number; // timestamp
-  direccion: string;
+  manzana?: string;
+  lote?: string;
+  etapa?: string;
   genero: 'masculino' | 'femenino';
   vive: boolean;
   estadoVivienda: 'construida' | 'construccion' | 'terreno';
   cumpleanos: string; // DD/MM/YYYY
   observaciones?: string;
-  hijos?: string[]; // Array de nombres de hijos
   createdAt: number;
   updatedAt: number;
   creadoPor: string; // uid del usuario que lo creó
@@ -30,19 +46,19 @@ export interface CreateEmpadronadoForm {
   apellidos: string;
   dni: string;
   familia: string;
-  placasVehiculares?: string;
+  miembrosFamilia?: FamilyMember[];
+  vehiculos?: Vehicle[];
   habilitado: boolean;
-  telefono1?: string;
-  telefono2?: string;
-  telefono3?: string;
+  telefonos?: PhoneNumber[];
   fechaIngreso: number;
-  direccion: string;
+  manzana?: string;
+  lote?: string;
+  etapa?: string;
   genero: 'masculino' | 'femenino';
   vive: boolean;
   estadoVivienda: 'construida' | 'construccion' | 'terreno';
   cumpleanos: string;
   observaciones?: string;
-  hijos?: string[];
 }
 
 export interface UpdateEmpadronadoForm extends Partial<CreateEmpadronadoForm> {}

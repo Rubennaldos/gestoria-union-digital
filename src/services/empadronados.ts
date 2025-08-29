@@ -136,7 +136,10 @@ export const searchEmpadronados = async (searchTerm: string): Promise<Empadronad
       e.apellidos.toLowerCase().includes(term) ||
       e.numeroPadron.toLowerCase().includes(term) ||
       e.dni.toLowerCase().includes(term) ||
-      (e.hijos && e.hijos.some(hijo => hijo.toLowerCase().includes(term)))
+      (e.miembrosFamilia && e.miembrosFamilia.some(miembro => 
+        miembro.nombre.toLowerCase().includes(term) || 
+        miembro.apellidos.toLowerCase().includes(term)
+      ))
     );
   } catch (error) {
     console.error('Error searching empadronados:', error);
