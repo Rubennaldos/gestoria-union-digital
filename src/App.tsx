@@ -16,6 +16,7 @@ import UserNew from "./pages/admin/UserNew";
 import UserPermissions from "./pages/admin/UserPermissions";
 import Empadronados from "./pages/Empadronados";
 import EmpadronadoForm from "./pages/EmpadronadoForm";
+import Cobranzas from "./pages/Cobranzas";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/inicio" element={<Index />} />
           <Route path="/finanzas" element={<Finanzas />} />
           <Route path="/sesiones" element={<Sesiones />} />
+          <Route path="/cobranzas" element={<Cobranzas />} />
           <Route path="/usuarios" element={<Users />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

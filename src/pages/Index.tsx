@@ -50,6 +50,14 @@ const modules = [
     // badge será dinámico basado en pendientes
   },
   {
+    title: "Cobranzas",
+    description: "Gestión de pagos mensuales, descuentos y morosidad",
+    icon: DollarSign,
+    href: "/cobranzas", 
+    color: "success" as const
+    // badge será dinámico basado en pagos pendientes
+  },
+  {
     title: "Sanciones",
     description: "Procedimientos disciplinarios",
     icon: Gavel,
