@@ -4,9 +4,6 @@ import {
   set,
   update,
   remove,
-  query,
-  orderByChild,
-  equalTo,
   get,
   runTransaction,
 } from 'firebase/database';
@@ -17,12 +14,13 @@ import {
   UpdateEmpadronadoForm,
   EmpadronadosStats,
 } from '@/types/empadronados';
+import { Pago } from '@/types/cobranzas';
 import { writeAuditLog } from './rtdb';
 
 const EMPADRONADOS_PATH = 'empadronados';
 
 /* ──────────────────────────────────────────────────────────────
-   Helpers de periodos y config de finanzas
+   Helpers de periodos / fechas
    ────────────────────────────────────────────────────────────── */
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const periodKeyFromDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // 2025-09
@@ -38,46 +36,84 @@ const monthsBetween = (from: string, to: string) => {
   return (ty - fy) * 12 + (tm - fm);
 };
 
-// Enero 2025 como inicio
+// Inicio histórico: enero 2025
 const START_PERIOD = '2025-01';
 
-// Lee monto de cuota desde config (fallback S/50)
-const getCuotaConfig = async (): Promise<{ montoCuota: number }> => {
-  const snap = await get(ref(db, 'config/finanzas/montoCuota'));
-  const monto = snap.exists() ? Number(snap.val()) : 50;
-  return { montoCuota: Number.isFinite(monto) ? monto : 50 };
+/* ──────────────────────────────────────────────────────────────
+   Config de cobranzas (usa tu nodo real de config)
+   ────────────────────────────────────────────────────────────── */
+const getCobranzasConfig = async (): Promise<{ montoMensual: number; diaVencimiento: number }> => {
+  // En tu servicio de cobranzas usas `cobranzas/configuracion`
+  const snap = await get(ref(db, 'cobranzas/configuracion'));
+  if (!snap.exists()) {
+    // Default razonables si no hay config
+    return { montoMensual: 50, diaVencimiento: 15 };
+  }
+  const cfg = snap.val() as any;
+  return {
+    montoMensual: Number(cfg.montoMensual ?? 50),
+    diaVencimiento: Number(cfg.diaVencimiento ?? 15),
+  };
 };
 
-// Crea 1 cargo si NO existe aún para (empId, periodo)
-const ensureChargeForMemberPeriod = async (empId: string, period: string) => {
-  const node = `cobranzas/charges/${compact(period)}/${empId}`;
-  const exist = await get(ref(db, node));
-  if (exist.exists()) return false; // ya existe algo para ese periodo
+/* ──────────────────────────────────────────────────────────────
+   Alta de PAGOS (compatibles con tu UI)
+   - Se guardan en: cobranzas/pagos (plano) con campos de Pago
+   - Se evita duplicado con un índice: cobranzas/pagos_index/{empId}/{YYYYMM}
+   ────────────────────────────────────────────────────────────── */
+const ensurePagoForMemberPeriod = async (
+  emp: Pick<Empadronado, 'id' | 'numeroPadron'>,
+  period: string,
+  authorUid: string = 'system'
+) => {
+  const y = Number(period.slice(0, 4));
+  const m = Number(period.slice(5, 7));
+  const yyyymm = compact(period);
 
-  const { montoCuota } = await getCuotaConfig();
-  const chargeId = push(ref(db, node)).key!;
-  await set(ref(db, `${node}/${chargeId}`), {
-    concepto: 'Cuota mensual',
-    periodo: period,            // ej: 2025-08
-    montoBase: montoCuota,      // 50 por defecto o lo que esté en config
-    descuentos: null,
-    recargos: null,
-    total: montoCuota,
-    saldo: montoCuota,
-    estado: 'pendiente',        // pendiente hasta que registre pago
-    timestamps: {
-      creado: new Date().toISOString(),
-      actualizado: new Date().toISOString(),
-    },
-  });
+  // índice de unicidad por empadronado+periodo
+  const lockRef = ref(db, `cobranzas/pagos_index/${emp.id}/${yyyymm}`);
+  const tx = await runTransaction(lockRef, (cur) => (cur ? cur : { createdAt: Date.now() }));
+  if (!tx.committed) return false; // ya existía
+
+  const { montoMensual, diaVencimiento } = await getCobranzasConfig();
+  const fechaVenc = new Date(y, m - 1, diaVencimiento).toLocaleDateString('es-PE');
+
+  // Crear pago compatible con tu UI
+  const pagosRef = ref(db, 'cobranzas/pagos');
+  const pagoRef = push(pagosRef);
+  const nuevo: Pago = {
+    id: pagoRef.key!,
+    empadronadoId: emp.id,
+    numeroPadron: emp.numeroPadron || '',
+    mes: m,
+    año: y,
+    monto: montoMensual,
+    montoOriginal: montoMensual,
+    fechaVencimiento: fechaVenc,
+    estado: 'pendiente', // pendiente hasta que registren pago
+    descuentos: [],
+    recargos: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    creadoPor: authorUid,
+    // campos opcionales de tu tipo Pago se ignoran si no existen
+  };
+
+  await set(pagoRef, nuevo);
   return true;
 };
 
-// Genera TODAS las cuotas desde START_PERIOD hasta el mes actual para un empadronado
+// Genera TODAS las cuotas (PAGOS) desde START_PERIOD hasta el mes actual para un empadronado
 export const ensureChargesForNewMember = async (
   empId: string,
-  startPeriod: string = START_PERIOD
+  startPeriod: string = START_PERIOD,
+  authorUid: string = 'system'
 ) => {
+  // Necesitamos numeroPadron para la UI
+  const empSnap = await get(ref(db, `${EMPADRONADOS_PATH}/${empId}`));
+  if (!empSnap.exists()) return 0;
+  const emp = empSnap.val() as Empadronado;
+
   const today = new Date();
   const last = periodKeyFromDate(today);
   const diff = monthsBetween(startPeriod, last);
@@ -85,14 +121,17 @@ export const ensureChargesForNewMember = async (
   let created = 0;
   for (let i = 0; i <= diff; i++) {
     const p = addMonths(startPeriod, i);
-    const ok = await ensureChargeForMemberPeriod(empId, p);
+    const ok = await ensurePagoForMemberPeriod({ id: empId, numeroPadron: emp.numeroPadron }, p, authorUid);
     if (ok) created++;
   }
   return created;
 };
 
-// Backfill para TODOS los empadronados existentes (ejecutar una sola vez si ya tenías datos)
-export const backfillChargesForAllEmpadronados = async (startPeriod: string = START_PERIOD) => {
+// Backfill para TODOS los empadronados existentes (ejecutar una sola vez)
+export const backfillChargesForAllEmpadronados = async (
+  startPeriod: string = START_PERIOD,
+  authorUid: string = 'system'
+) => {
   const snap = await get(ref(db, EMPADRONADOS_PATH));
   if (!snap.exists()) return 0;
 
@@ -101,21 +140,21 @@ export const backfillChargesForAllEmpadronados = async (startPeriod: string = ST
 
   for (const empId of Object.keys(data)) {
     const emp = data[empId];
-    // Solo generamos para habilitados por defecto (ajusta si quieres otro criterio)
+    // Generar solo para habilitados (ajusta a tu política)
     if (emp?.habilitado === false) continue;
-    total += await ensureChargesForNewMember(empId, startPeriod);
+    total += await ensureChargesForNewMember(empId, startPeriod, authorUid);
   }
   return total;
 };
 
-// Seguro mensual (opcional): genera la cuota del MES ACTUAL una sola vez para todos
-export const ensureCurrentMonthChargesForAll = async () => {
+// Asegura solo la cuota del MES ACTUAL (evita duplicados por transacción)
+export const ensureCurrentMonthChargesForAll = async (authorUid: string = 'system') => {
   const period = periodKeyFromDate(new Date());
-  const lockRef = ref(db, `cobranzas/periods/${compact(period)}/generated`);
+  const yyyymm = compact(period);
+  const periodLock = ref(db, `cobranzas/periods/${yyyymm}/generated`);
 
-  // Transacción para evitar duplicados si 2 usuarios abren a la vez
-  const tx = await runTransaction(lockRef, (cur) => (cur ? cur : true));
-  if (!tx.committed) return 0; // ya estaba generado
+  const tx = await runTransaction(periodLock, (cur) => (cur ? cur : { at: Date.now() }));
+  if (!tx.committed) return 0; // ya se generó
 
   const snap = await get(ref(db, EMPADRONADOS_PATH));
   if (!snap.exists()) return 0;
@@ -126,7 +165,11 @@ export const ensureCurrentMonthChargesForAll = async () => {
   for (const empId of Object.keys(data)) {
     const emp = data[empId];
     if (emp?.habilitado === false) continue;
-    const ok = await ensureChargeForMemberPeriod(empId, period);
+    const ok = await ensurePagoForMemberPeriod(
+      { id: empId, numeroPadron: emp.numeroPadron },
+      period,
+      authorUid
+    );
     if (ok) created++;
   }
   return created;
@@ -152,7 +195,7 @@ const removeUndefined = (obj: any): any => {
    CRUD Empadronados
    ────────────────────────────────────────────────────────────── */
 
-// Crear nuevo empadronado (AUTO-genera deuda desde 2025-01)
+// Crear empadronado → AUTOGENERA pagos desde 2025-01
 export const createEmpadronado = async (
   data: CreateEmpadronadoForm,
   actorUid: string
@@ -172,11 +215,9 @@ export const createEmpadronado = async (
     const cleanData = removeUndefined(empadronado);
     await set(empadronadoRef, cleanData);
 
-    // 🔹 Genera automáticamente TODAS las cuotas desde ENERO-2025
-    //    (puedes cambiar el criterio: solo si está habilitado, etc.)
-    const debeGenerar = cleanData.habilitado !== false; // por defecto sí
-    if (debeGenerar) {
-      await ensureChargesForNewMember(id, START_PERIOD);
+    // Genera automáticamente TODAS las cuotas desde ENERO-2025 si está habilitado
+    if (cleanData.habilitado !== false) {
+      await ensureChargesForNewMember(id, START_PERIOD, actorUid);
     }
 
     await writeAuditLog({
@@ -279,7 +320,7 @@ export const deleteEmpadronado = async (
   }
 };
 
-// Buscar empadronados por nombre o número de padrón
+// Buscar empadronados
 export const searchEmpadronados = async (searchTerm: string): Promise<Empadronado[]> => {
   try {
     const empadronados = await getEmpadronados();
@@ -304,7 +345,7 @@ export const searchEmpadronados = async (searchTerm: string): Promise<Empadronad
   }
 };
 
-// Obtener estadísticas
+// Estadísticas simples
 export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
   try {
     const empadronados = await getEmpadronados();
@@ -334,7 +375,7 @@ export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
   }
 };
 
-// Verificar si un número de padrón ya existe
+// Unicidad de padrón
 export const isNumeroPadronUnique = async (numeroPadron: string, excludeId?: string): Promise<boolean> => {
   try {
     const empadronados = await getEmpadronados();
