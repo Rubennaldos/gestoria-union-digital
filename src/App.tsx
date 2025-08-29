@@ -26,12 +26,9 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Redirigir directamente al panel de admin */}
+              <Route path="/" element={<Users />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
               <Route path="/inicio" element={
                 <ProtectedRoute>
                   <Index />
