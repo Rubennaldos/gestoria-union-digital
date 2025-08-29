@@ -2,41 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Banking-style design system for Gestoria Union Digital */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base colors - Professional banking palette */
+    --background: 248 250 252; /* slate-50 */
+    --foreground: 203 24% 9%; /* slate-900 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* Card system */
+    --card: 0 0% 100%; /* pure white */
+    --card-foreground: 203 24% 9%;
+    --card-hover: 248 250 252;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    /* Primary - Professional blue */
+    --primary: 213 94% 19%; /* blue-800 */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 213 94% 16%;
+    --primary-light: 213 94% 85%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Secondary - Light blue accents */
+    --secondary: 213 27% 84%; /* blue-200 */
+    --secondary-foreground: 213 94% 19%;
+    --secondary-hover: 213 27% 80%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Alert/Warning - Banking orange */
+    --warning: 32 95% 44%; /* orange-500 */
+    --warning-foreground: 0 0% 100%;
+    --warning-light: 32 95% 92%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Success - Banking green */
+    --success: 142 76% 36%; /* green-600 */
+    --success-foreground: 0 0% 100%;
+    --success-light: 142 76% 92%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Muted tones */
+    --muted: 215 20% 96%; /* slate-100 */
+    --muted-foreground: 215 16% 47%; /* slate-500 */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Accent for highlights */
+    --accent: 213 27% 84%;
+    --accent-foreground: 213 94% 19%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Error states */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --radius: 0.5rem;
+    /* Borders and inputs */
+    --border: 214 32% 91%; /* slate-200 */
+    --input: 214 32% 91%;
+    --ring: 213 94% 19%;
+
+    /* Navigation */
+    --nav-primary: 213 94% 19%;
+    --nav-secondary: 215 28% 17%; /* slate-800 */
+    --nav-accent: 32 95% 44%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(213 94% 19%), hsl(213 94% 16%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(248 250 252));
+    --gradient-alert: linear-gradient(135deg, hsl(32 95% 44%), hsl(32 95% 40%));
+
+    /* Shadows */
+    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-card-hover: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-button: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+
+    /* Transitions */
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
