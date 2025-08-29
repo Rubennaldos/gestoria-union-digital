@@ -120,8 +120,8 @@ export default function UsersAdmin() {
       user.email.toLowerCase().includes(filters.search.toLowerCase()) ||
       user.username?.toLowerCase().includes(filters.search.toLowerCase());
 
-    const matchesRole = !filters.roleId || user.roleId === filters.roleId;
-    const matchesStatus = filters.activo === '' || user.activo.toString() === filters.activo;
+    const matchesRole = !filters.roleId || filters.roleId === 'all' || user.roleId === filters.roleId;
+    const matchesStatus = filters.activo === '' || filters.activo === 'all' || user.activo.toString() === filters.activo;
 
     return matchesSearch && matchesRole && matchesStatus;
   });
@@ -205,7 +205,7 @@ export default function UsersAdmin() {
                   <SelectValue placeholder="Filtrar por rol" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los roles</SelectItem>
+                  <SelectItem value="all">Todos los roles</SelectItem>
                   {roles.map(role => (
                     <SelectItem key={role.id} value={role.id}>
                       {role.nombre}
@@ -222,7 +222,7 @@ export default function UsersAdmin() {
                   <SelectValue placeholder="Filtrar por estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los estados</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="true">Activos</SelectItem>
                   <SelectItem value="false">Suspendidos</SelectItem>
                 </SelectContent>
