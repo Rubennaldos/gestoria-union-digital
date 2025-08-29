@@ -156,28 +156,46 @@ const EmpadronadoForm: React.FC = () => {
     try {
       const submitData = {
         ...formData,
-        // Limpiar campos opcionales vacíos y filtrar datos incompletos
-        miembrosFamilia: formData.miembrosFamilia?.filter(miembro => 
+        // Limpiar campos completamente - solo incluir si tienen valor
+        ...(formData.miembrosFamilia?.filter(miembro => 
           miembro.nombre?.trim() && miembro.apellidos?.trim()
-        ).map(miembro => ({
-          nombre: miembro.nombre.trim(),
-          apellidos: miembro.apellidos.trim(),
-          parentezco: miembro.parentezco?.trim() || '',
-          cumpleanos: miembro.cumpleanos?.trim() || ''
-        })) || undefined,
-        vehiculos: formData.vehiculos?.filter(vehiculo => 
+        ).length > 0 && {
+          miembrosFamilia: formData.miembrosFamilia.filter(miembro => 
+            miembro.nombre?.trim() && miembro.apellidos?.trim()
+          ).map(miembro => ({
+            nombre: miembro.nombre.trim(),
+            apellidos: miembro.apellidos.trim(),
+            parentezco: miembro.parentezco?.trim() || '',
+            cumpleanos: miembro.cumpleanos?.trim() || ''
+          }))
+        }),
+        ...(formData.vehiculos?.filter(vehiculo => 
           vehiculo.placa?.trim()
-        ).map(vehiculo => ({
-          placa: vehiculo.placa.trim(),
-          tipo: vehiculo.tipo
-        })) || undefined,
-        telefonos: formData.telefonos?.filter(t => t.numero?.trim()).map(t => ({
-          numero: t.numero.trim()
-        })) || undefined,
-        observaciones: formData.observaciones?.trim() || undefined,
-        manzana: formData.manzana?.trim() || undefined,
-        lote: formData.lote?.trim() || undefined,
-        etapa: formData.etapa?.trim() || undefined
+        ).length > 0 && {
+          vehiculos: formData.vehiculos.filter(vehiculo => 
+            vehiculo.placa?.trim()
+          ).map(vehiculo => ({
+            placa: vehiculo.placa.trim(),
+            tipo: vehiculo.tipo
+          }))
+        }),
+        ...(formData.telefonos?.filter(t => t.numero?.trim()).length > 0 && {
+          telefonos: formData.telefonos.filter(t => t.numero?.trim()).map(t => ({
+            numero: t.numero.trim()
+          }))
+        }),
+        ...(formData.observaciones?.trim() && {
+          observaciones: formData.observaciones.trim()
+        }),
+        ...(formData.manzana?.trim() && {
+          manzana: formData.manzana.trim()
+        }),
+        ...(formData.lote?.trim() && {
+          lote: formData.lote.trim()
+        }),
+        ...(formData.etapa?.trim() && {
+          etapa: formData.etapa.trim()
+        })
       };
 
       let success = false;

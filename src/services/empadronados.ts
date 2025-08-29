@@ -5,6 +5,26 @@ import { writeAuditLog } from './rtdb';
 
 const EMPADRONADOS_PATH = 'empadronados';
 
+// Función para eliminar valores undefined de un objeto recursivamente
+const removeUndefined = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined).filter(item => item !== undefined);
+  }
+  
+  if (obj !== null && typeof obj === 'object') {
+    const cleanObj: any = {};
+    Object.keys(obj).forEach(key => {
+      const value = removeUndefined(obj[key]);
+      if (value !== undefined) {
+        cleanObj[key] = value;
+      }
+    });
+    return cleanObj;
+  }
+  
+  return obj;
+};
+
 // Crear nuevo empadronado
 export const createEmpadronado = async (
   data: CreateEmpadronadoForm, 
@@ -22,7 +42,10 @@ export const createEmpadronado = async (
       creadoPor: actorUid
     };
 
-    await set(empadronadoRef, empadronado);
+    // Eliminar todos los valores undefined antes de enviar a Firebase
+    const cleanData = removeUndefined(empadronado);
+
+    await set(empadronadoRef, cleanData);
     
     await writeAuditLog({
       actorUid,
