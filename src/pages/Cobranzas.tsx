@@ -10,13 +10,11 @@ import {
   Download, 
   Upload,
   Calendar,
-  PlusCircle,
   Receipt,
   UserCheck,
-  Play
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,7 +23,6 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   generarEstadisticas, 
   ejecutarCierreMensual, 
-  generarPagosMensuales,
   generarPagosDesdeEnero,
   obtenerPagos,
   obtenerEgresos,
@@ -42,50 +39,104 @@ import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadrona
 const Cobranzas = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+
   const [estadisticas, setEstadisticas] = useState<EstadisticasCobranzas | null>(null);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [egresos, setEgresos] = useState<Egreso[]>([]);
   const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [pagosEmpadronados, setPagosEmpadronados] = useState<Record<string, Pago[]>>({});
   const [loading, setLoading] = useState(true);
-  
-  // Estados para modales
+  const [autoInitHecho, setAutoInitHecho] = useState(false);
+
+  // Modales
   const [registrarPagoModal, setRegistrarPagoModal] = useState<{ open: boolean; pago?: Pago }>({ open: false });
   const [declaracionModal, setDeclaracionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
   const [sancionModal, setSancionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
   const [detalleModal, setDetalleModal] = useState<{ open: boolean; empadronado?: Empadronado }>({ open: false });
 
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(); // hará autogeneración si faltan cargos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const cargarDatos = async () => {
+  const cargarDatos = async (reintentoTrasGenerar = false) => {
     try {
       setLoading(true);
+
+      // Cargamos todo
       const [stats, pagosList, egresosList, empadronadosList] = await Promise.all([
         generarEstadisticas(),
         obtenerPagos(),
         obtenerEgresos(),
         getEmpadronados()
       ]);
-      
-      setEstadisticas(stats);
-      setPagos(pagosList.slice(0, 10)); // Últimos 10 pagos
-      setEgresos(egresosList.slice(0, 10)); // Últimos 10 egresos
+
+      // Si NO hay cargos todavía y hay empadronados, generamos automáticamente desde enero 2025 (solo 1 vez)
+      if (!autoInitHecho && empadronadosList.length > 0 && pagosList.length === 0) {
+        try {
+          await generarPagosDesdeEnero(user?.uid || "system");
+          setAutoInitHecho(true);
+
+          toast({
+            title: "Inicialización automática",
+            description: "Se generaron los cargos desde enero 2025 para todos los asociados."
+          });
+
+          // Re-cargar una vez para reflejar los cargos recién creados
+          if (!reintentoTrasGenerar) {
+            await cargarDatos(true);
+            return;
+          }
+        } catch {
+          // si falla, seguimos sin romper la pantalla
+        }
+      }
+
+      setPagos(pagosList.slice(0, 10));
+      setEgresos(egresosList.slice(0, 10));
       setEmpadronados(empadronadosList);
 
-      // Cargar pagos por empadronado
+      // Pagos por empadronado
       const pagosMap: Record<string, Pago[]> = {};
-      for (const empadronado of empadronadosList) {
-        const pagosEmp = await obtenerPagosPorEmpadronado(empadronado.id);
-        pagosMap[empadronado.id] = pagosEmp;
+      for (const emp of empadronadosList) {
+        const pagosEmp = await obtenerPagosPorEmpadronado(emp.id);
+        pagosMap[emp.id] = pagosEmp;
       }
       setPagosEmpadronados(pagosMap);
+
+      // --- Ajuste de estadísticas como respaldo (si el servicio trae 0 para pendientes/morosos) ---
+      const allPagos = Object.values(pagosMap).flat();
+      const totalPendienteAll = allPagos
+        .filter(p => p.estado === "pendiente" || p.estado === "moroso")
+        .reduce((sum, p) => sum + p.monto, 0);
+
+      // Número de morosos (personas con al menos un pago en morosidad)
+      const morososSet = new Set<string>();
+      for (const [empId, arr] of Object.entries(pagosMap)) {
+        if (arr.some(p => p.estado === "moroso")) morososSet.add(empId);
+      }
+      const totalMorososAll = morososSet.size;
+
+      const statsAjustadas: EstadisticasCobranzas = {
+        totalEmpadronados: stats.totalEmpadronados,
+        totalRecaudado: stats.totalRecaudado,
+        // Si el servicio da 0 pero hay deuda pendiente, usamos la suma global
+        totalPendiente: stats.totalPendiente > 0 ? stats.totalPendiente : totalPendienteAll,
+        // Si el servicio da 0 pero hay morosos, usamos el conteo global
+        totalMorosos: stats.totalMorosos > 0 ? stats.totalMorosos : totalMorososAll,
+        tasaCobranza: stats.tasaCobranza,
+        ingresosMes: stats.ingresosMes,
+        egresosMes: stats.egresosMes,
+        saldoActual: stats.saldoActual,
+      };
+
+      setEstadisticas(statsAjustadas);
+
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudieron cargar los datos de cobranzas",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -94,57 +145,29 @@ const Cobranzas = () => {
 
   const ejecutarCierre = async () => {
     if (!user) return;
-    
     try {
       await ejecutarCierreMensual(user.uid);
-      toast({
-        title: "Éxito",
-        description: "Cierre mensual ejecutado correctamente"
-      });
+      toast({ title: "Éxito", description: "Cierre mensual ejecutado correctamente" });
       cargarDatos();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo ejecutar el cierre mensual",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const generarPagos = async () => {
-    if (!user) return;
-    
-    try {
-      await generarPagosDesdeEnero(user.uid);
-      toast({
-        title: "Éxito",
-        description: "Pagos generados desde enero 15 hasta la fecha actual"
-      });
-      cargarDatos();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudieron generar los pagos",
-        variant: "destructive"
-      });
+    } catch {
+      toast({ title: "Error", description: "No se pudo ejecutar el cierre mensual", variant: "destructive" });
     }
   };
 
   const calcularDeudaTotal = (empadronadoId: string): number => {
     const pagosEmp = pagosEmpadronados[empadronadoId] || [];
     return pagosEmp
-      .filter(p => p.estado === 'pendiente' || p.estado === 'moroso')
+      .filter(p => p.estado === "pendiente" || p.estado === "moroso")
       .reduce((total, p) => total + p.monto, 0);
   };
 
   const obtenerEstadoEmpadronado = (empadronadoId: string): string => {
     const pagosEmp = pagosEmpadronados[empadronadoId] || [];
-    const tieneDeudas = pagosEmp.some(p => p.estado === 'pendiente' || p.estado === 'moroso');
-    const tieneMoroso = pagosEmp.some(p => p.estado === 'moroso');
-    
-    if (tieneMoroso) return 'moroso';
-    if (tieneDeudas) return 'pendiente';
-    return 'al_dia';
+    const tieneDeudas = pagosEmp.some(p => p.estado === "pendiente" || p.estado === "moroso");
+    const tieneMoroso = pagosEmp.some(p => p.estado === "moroso");
+    if (tieneMoroso) return "moroso";
+    if (tieneDeudas) return "pendiente";
+    return "al_dia";
   };
 
   if (loading) {
@@ -161,7 +184,7 @@ const Cobranzas = () => {
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <TopNavigation />
-      
+
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -169,7 +192,7 @@ const Cobranzas = () => {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => window.location.href = '/'}
+              onClick={() => (window.location.href = "/")}
               className="gap-2"
             >
               <Home className="w-4 h-4" />
@@ -182,10 +205,11 @@ const Cobranzas = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={generarPagos}>
+            {/* Botón de “Generar desde Enero” oculto porque ya se hace automático */}
+            {/* <Button variant="outline" onClick={() => {}}>
               <Play className="h-4 w-4 mr-2" />
               Generar desde Enero
-            </Button>
+            </Button> */}
             <Button onClick={ejecutarCierre}>
               <Calendar className="h-4 w-4 mr-2" />
               Ejecutar Cierre
@@ -202,7 +226,7 @@ const Cobranzas = () => {
                 <div>
                   <p className="text-sm text-success font-medium">Recaudado</p>
                   <p className="text-xl font-bold text-success">
-                    S/ {estadisticas?.totalRecaudado.toFixed(2) || '0.00'}
+                    S/ {estadisticas?.totalRecaudado.toFixed(2) || "0.00"}
                   </p>
                 </div>
               </div>
@@ -216,7 +240,7 @@ const Cobranzas = () => {
                 <div>
                   <p className="text-sm text-warning font-medium">Pendiente</p>
                   <p className="text-xl font-bold text-warning">
-                    S/ {estadisticas?.totalPendiente.toFixed(2) || '0.00'}
+                    S/ {estadisticas?.totalPendiente.toFixed(2) || "0.00"}
                   </p>
                 </div>
               </div>
@@ -244,7 +268,7 @@ const Cobranzas = () => {
                 <div>
                   <p className="text-sm text-primary font-medium">Tasa Cobranza</p>
                   <p className="text-xl font-bold text-primary">
-                    {estadisticas?.tasaCobranza.toFixed(1) || '0.0'}%
+                    {estadisticas?.tasaCobranza.toFixed(1) || "0.0"}%
                   </p>
                 </div>
               </div>
@@ -295,13 +319,12 @@ const Cobranzas = () => {
 
           <TabsContent value="empadronados">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-2">
                   <UserCheck className="h-5 w-5" />
-                  Lista de Asociados y Estado de Pagos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+                  <span className="font-semibold">Lista de Asociados y Estado de Pagos</span>
+                </div>
+
                 <div className="space-y-4">
                   {empadronados.length === 0 ? (
                     <div className="text-center py-8">
@@ -313,54 +336,34 @@ const Cobranzas = () => {
                     </div>
                   ) : (
                     <div className="grid gap-4">
-                      {empadronados.map((empadronado) => {
-                        const deudaTotal = calcularDeudaTotal(empadronado.id);
-                        const estado = obtenerEstadoEmpadronado(empadronado.id);
-                        const cantidadPagos = pagosEmpadronados[empadronado.id]?.length || 0;
-                        
+                      {empadronados.map((emp) => {
+                        const deudaTotal = calcularDeudaTotal(emp.id);
+                        const estado = obtenerEstadoEmpadronado(emp.id);
+                        const cantidadPagos = pagosEmpadronados[emp.id]?.length || 0;
+
                         return (
-                          <div key={empadronado.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div key={emp.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
                             <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <div className="flex-1">
-                                  <p className="font-semibold text-sm">
-                                    {empadronado.nombre} {empadronado.apellidos}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Padrón: {empadronado.numeroPadron} • DNI: {empadronado.dni}
-                                  </p>
-                                  {empadronado.manzana && empadronado.lote && (
-                                    <p className="text-xs text-muted-foreground">
-                                      Mz. {empadronado.manzana} Lt. {empadronado.lote}
-                                    </p>
-                                  )}
-                                </div>
+                              <div className="font-semibold text-sm">
+                                {emp.nombre} {emp.apellidos}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Padrón: {emp.numeroPadron} • DNI: {emp.dni}
+                                {emp.manzana && emp.lote ? ` • Mz. ${emp.manzana} Lt. ${emp.lote}` : ""}
                               </div>
                             </div>
-                            
+
                             <div className="flex items-center space-x-3">
                               <div className="text-right">
-                                <p className="text-sm font-medium">
-                                  Deuda Total: S/ {deudaTotal.toFixed(2)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {cantidadPagos} pagos generados
-                                </p>
+                                <p className="text-sm font-medium">Deuda Total: S/ {deudaTotal.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">{cantidadPagos} pagos generados</p>
                               </div>
-                              
-                              <Badge variant={
-                                estado === 'al_dia' ? 'default' : 
-                                estado === 'moroso' ? 'destructive' : 'secondary'
-                              }>
-                                {estado === 'al_dia' ? 'Al día' : 
-                                 estado === 'moroso' ? 'Moroso' : 'Pendiente'}
+
+                              <Badge variant={estado === "al_dia" ? "default" : estado === "moroso" ? "destructive" : "secondary"}>
+                                {estado === "al_dia" ? "Al día" : estado === "moroso" ? "Moroso" : "Pendiente"}
                               </Badge>
-                              
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => setDetalleModal({ open: true, empadronado })}
-                              >
+
+                              <Button variant="outline" size="sm" onClick={() => setDetalleModal({ open: true, empadronado: emp })}>
                                 Ver Detalles
                               </Button>
                             </div>
@@ -370,24 +373,19 @@ const Cobranzas = () => {
                     </div>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="pagos">
             <Card>
-              <CardHeader>
-                <CardTitle>Últimos Pagos Registrados</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="p-4">
+                <div className="font-semibold mb-2">Últimos Pagos Registrados</div>
                 <div className="space-y-4">
                   {pagos.length === 0 ? (
                     <div className="text-center py-8">
                       <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                       <p className="text-muted-foreground">No hay pagos registrados</p>
-                      <p className="text-sm text-muted-foreground">
-                        Usa "Generar Pagos" para crear los pagos del mes actual
-                      </p>
                     </div>
                   ) : (
                     pagos.map((pago) => (
@@ -400,9 +398,9 @@ const Cobranzas = () => {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Badge variant={
-                            pago.estado === 'pagado' ? 'default' : 
-                            pago.estado === 'moroso' ? 'destructive' : 
-                            pago.estado === 'sancionado' ? 'destructive' : 'secondary'
+                            pago.estado === "pagado" ? "default" : 
+                            pago.estado === "moroso" ? "destructive" : 
+                            pago.estado === "sancionado" ? "destructive" : "secondary"
                           }>
                             S/ {pago.monto.toFixed(2)}
                           </Badge>
@@ -414,16 +412,14 @@ const Cobranzas = () => {
                     ))
                   )}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="egresos">
             <Card>
-              <CardHeader>
-                <CardTitle>Últimos Egresos Registrados</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div className="p-4">
+                <div className="font-semibold mb-2">Últimos Egresos Registrados</div>
                 <div className="space-y-4">
                   {egresos.length === 0 ? (
                     <div className="text-center py-8">
@@ -440,35 +436,24 @@ const Cobranzas = () => {
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <Badge variant="destructive">
-                            -S/ {egreso.monto.toFixed(2)}
-                          </Badge>
-                          <Badge variant="outline">
-                            {egreso.estado}
-                          </Badge>
+                          <Badge variant="destructive">-S/ {egreso.monto.toFixed(2)}</Badge>
+                          <Badge variant="outline">{egreso.estado}</Badge>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </TabsContent>
 
           <TabsContent value="configuracion">
             <Card>
-              <CardHeader>
-                <CardTitle>Configuración de Cobranzas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Configuración disponible próximamente</p>
-                  <p className="text-sm text-muted-foreground">
-                    Aquí podrás configurar montos, fechas y porcentajes
-                  </p>
-                </div>
-              </CardContent>
+              <div className="p-4 text-center py-8">
+                <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Configuración disponible próximamente</p>
+                <p className="text-sm text-muted-foreground">Aquí podrás configurar montos, fechas y porcentajes</p>
+              </div>
             </Card>
           </TabsContent>
         </Tabs>
