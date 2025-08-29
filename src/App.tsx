@@ -19,60 +19,25 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <AuthzProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Redirigir directamente al panel de admin */}
-              <Route path="/" element={<Users />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/inicio" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/finanzas" element={
-                <ProtectedRoute>
-                  <Finanzas />
-                </ProtectedRoute>
-              } />
-              <Route path="/sesiones" element={
-                <ProtectedRoute>
-                  <Sesiones />
-                </ProtectedRoute>
-              } />
-              {/* Rutas de usuarios */}
-              <Route path="/usuarios" element={
-                <ProtectedRoute requireRole="presidencia">
-                  <Users />
-                </ProtectedRoute>
-              } />
-              {/* Admin routes - solo para presidencia */}
-              <Route path="/admin/users" element={
-                <ProtectedRoute requireRole="presidencia">
-                  <Users />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/users/new" element={
-                <ProtectedRoute requireRole="presidencia">
-                  <UserNew />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/users/:uid/permissions" element={
-                <ProtectedRoute requireRole="presidencia">
-                  <UserPermissions />
-                </ProtectedRoute>
-              } />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </AuthzProvider>
-    </AuthProvider>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          {/* Ir directamente al panel de admin sin autenticación */}
+          <Route path="/" element={<Users />} />
+          <Route path="/admin/users" element={<Users />} />
+          <Route path="/admin/users/new" element={<UserNew />} />
+          <Route path="/admin/users/:uid/permissions" element={<UserPermissions />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/inicio" element={<Index />} />
+          <Route path="/finanzas" element={<Finanzas />} />
+          <Route path="/sesiones" element={<Sesiones />} />
+          <Route path="/usuarios" element={<Users />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 
