@@ -1,4 +1,4 @@
-import { database } from '@/lib/firebase';
+import { db } from '@/config/firebase';
 import { ref, set } from 'firebase/database';
 import { Usuario, Sesion, Finanza, Cuota, IncidenteSeguridad, Comunicado, Alert } from '@/types/firebase';
 
@@ -138,10 +138,10 @@ export const seedFirebaseData = async () => {
 
     // Write all seed data to Firebase
     await Promise.all([
-      set(ref(database, 'users'), usuarios),
-      set(ref(database, 'alerts'), alerts),
-      set(ref(database, 'finanzas'), finanzas),
-      set(ref(database, 'sesiones'), sesiones)
+      set(ref(db, 'users'), usuarios),
+      set(ref(db, 'alerts'), alerts),
+      set(ref(db, 'finanzas'), finanzas),
+      set(ref(db, 'sesiones'), sesiones)
     ]);
 
     console.log('Seed data uploaded successfully to Firebase RTDB');

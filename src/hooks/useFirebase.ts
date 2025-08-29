@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { database } from '@/lib/firebase';
+import { db } from '@/config/firebase';
 import { ref, onValue, push, set, update, remove, DatabaseReference } from 'firebase/database';
 
 // Hook for reading data from Firebase RTDB
@@ -9,7 +9,7 @@ export const useFirebaseData = <T>(path: string) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const dataRef = ref(database, path);
+    const dataRef = ref(db, path);
     
     const unsubscribe = onValue(dataRef, 
       (snapshot) => {
@@ -40,7 +40,7 @@ export const useFirebaseWrite = () => {
     setLoading(true);
     setError(null);
     try {
-      await set(ref(database, path), data);
+      await set(ref(db, path), data);
       setLoading(false);
       return true;
     } catch (err: any) {
@@ -54,7 +54,7 @@ export const useFirebaseWrite = () => {
     setLoading(true);
     setError(null);
     try {
-      await update(ref(database, path), updates);
+      await update(ref(db, path), updates);
       setLoading(false);
       return true;
     } catch (err: any) {
@@ -68,7 +68,7 @@ export const useFirebaseWrite = () => {
     setLoading(true);
     setError(null);
     try {
-      const newRef = await push(ref(database, path), data);
+      const newRef = await push(ref(db, path), data);
       setLoading(false);
       return newRef.key;
     } catch (err: any) {
@@ -82,7 +82,7 @@ export const useFirebaseWrite = () => {
     setLoading(true);
     setError(null);
     try {
-      await remove(ref(database, path));
+      await remove(ref(db, path));
       setLoading(false);
       return true;
     } catch (err: any) {
