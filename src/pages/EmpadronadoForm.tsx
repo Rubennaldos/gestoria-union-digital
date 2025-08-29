@@ -156,10 +156,24 @@ const EmpadronadoForm: React.FC = () => {
     try {
       const submitData = {
         ...formData,
-        // Limpiar campos opcionales vacíos
-        miembrosFamilia: formData.miembrosFamilia && formData.miembrosFamilia.length > 0 ? formData.miembrosFamilia : undefined,
-        vehiculos: formData.vehiculos && formData.vehiculos.length > 0 ? formData.vehiculos : undefined,
-        telefonos: formData.telefonos?.filter(t => t.numero.trim()) || undefined,
+        // Limpiar campos opcionales vacíos y filtrar datos incompletos
+        miembrosFamilia: formData.miembrosFamilia?.filter(miembro => 
+          miembro.nombre?.trim() && miembro.apellidos?.trim()
+        ).map(miembro => ({
+          nombre: miembro.nombre.trim(),
+          apellidos: miembro.apellidos.trim(),
+          parentezco: miembro.parentezco?.trim() || '',
+          cumpleanos: miembro.cumpleanos?.trim() || ''
+        })) || undefined,
+        vehiculos: formData.vehiculos?.filter(vehiculo => 
+          vehiculo.placa?.trim()
+        ).map(vehiculo => ({
+          placa: vehiculo.placa.trim(),
+          tipo: vehiculo.tipo
+        })) || undefined,
+        telefonos: formData.telefonos?.filter(t => t.numero?.trim()).map(t => ({
+          numero: t.numero.trim()
+        })) || undefined,
         observaciones: formData.observaciones?.trim() || undefined,
         manzana: formData.manzana?.trim() || undefined,
         lote: formData.lote?.trim() || undefined,
