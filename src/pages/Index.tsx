@@ -7,6 +7,7 @@ import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation"
 import { ModuleCard } from "@/components/ui/module-card";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { AlertsWidget } from "@/components/dashboard/AlertsWidget";
+import { SeedDataButton } from "@/components/ui/seedDataButton";
 
 const modules = [
   {
@@ -133,13 +134,16 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-            Panel Principal
-          </h1>
-          <p className="text-muted-foreground">
-            Sistema de Gestión - Junta Directiva
-          </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
+          <div className="text-center md:text-left">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Panel Principal
+            </h1>
+            <p className="text-muted-foreground">
+              Sistema de Gestión - Junta Directiva
+            </p>
+          </div>
+          <SeedDataButton />
         </div>
 
         {/* Quick Actions and Alerts - Mobile Grid */}

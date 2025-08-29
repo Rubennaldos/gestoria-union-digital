@@ -1,50 +1,30 @@
-import { AlertTriangle, Clock, CheckCircle } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, DollarSign, Calendar, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-const alerts = [
-  {
-    id: 1,
-    type: "warning",
-    title: "Cuotas vencidas",
-    message: "15 asociados con cuotas pendientes",
-    time: "2 horas",
-    priority: "alta"
-  },
-  {
-    id: 2,
-    type: "info",
-    title: "Acta por aprobar",
-    message: "Sesión JD del 15/08 pendiente",
-    time: "1 día",
-    priority: "media"
-  },
-  {
-    id: 3,
-    type: "success",
-    title: "Quórum alcanzado",
-    message: "Próxima asamblea confirmada",
-    time: "3 horas",
-    priority: "baja"
-  }
-];
+import { useFirebaseData } from "@/hooks/useFirebase";
+import { Alert } from "@/types/firebase";
 
 const getIcon = (type: string) => {
   switch (type) {
-    case "warning":
+    case "cuota_vencida":
+      return DollarSign;
+    case "sesion_proxima":
+      return Calendar;
+    case "incidente_seguridad":
       return AlertTriangle;
-    case "info":
-      return Clock;
-    case "success":
-      return CheckCircle;
+    case "comunicado_urgente":
+      return AlertTriangle;
+    case "quorum_faltante":
+      return AlertTriangle;
     default:
-      return AlertTriangle;
+      return Info;
   }
 };
 
 const getVariant = (priority: string) => {
   switch (priority) {
     case "alta":
+    case "urgente":
       return "destructive";
     case "media":
       return "secondary";
@@ -56,35 +36,45 @@ const getVariant = (priority: string) => {
 };
 
 export const AlertsWidget = () => {
+  const { data: alerts, loading, error } = useFirebaseData<{ [key: string]: Alert }>('/alerts');
+  
+  const alertsList = alerts ? Object.values(alerts) : [];
+  const highPriorityCount = alertsList.filter(alert => alert.prioridad === "alta" || alert.prioridad === "urgente").length;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-lg font-semibold flex items-center justify-between">
           Alertas y Notificaciones
           <Badge variant="secondary" className="text-xs">
-            {alerts.filter(a => a.priority === "alta").length}
+            {highPriorityCount}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {alerts.map((alert) => {
-          const Icon = getIcon(alert.type);
+        {loading && <p className="text-sm text-muted-foreground">Cargando alertas...</p>}
+        {error && <p className="text-sm text-destructive">Error al cargar alertas: {error}</p>}
+        {alertsList.map((alert) => {
+          const Icon = getIcon(alert.tipo);
           return (
             <div key={alert.id} className="flex items-start space-x-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
               <Icon className="h-5 w-5 mt-0.5 text-muted-foreground" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-medium text-sm">{alert.title}</h4>
-                  <Badge variant={getVariant(alert.priority) as any} className="text-xs">
-                    {alert.priority}
+                  <h4 className="font-medium text-sm">{alert.titulo}</h4>
+                  <Badge variant={getVariant(alert.prioridad) as any} className="text-xs">
+                    {alert.prioridad}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground mb-1">{alert.message}</p>
-                <span className="text-xs text-muted-foreground">hace {alert.time}</span>
+                <p className="text-sm text-muted-foreground mb-1">{alert.mensaje}</p>
+                <span className="text-xs text-muted-foreground">{new Date(alert.fecha).toLocaleDateString()}</span>
               </div>
             </div>
           );
         })}
+        {!loading && !error && alertsList.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">No hay alertas pendientes</p>
+        )}
       </CardContent>
     </Card>
   );
