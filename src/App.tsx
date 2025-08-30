@@ -18,6 +18,7 @@ import Empadronados from "./pages/Empadronados";
 import EmpadronadoForm from "./pages/EmpadronadoForm";
 import Cobranzas from "./pages/Cobranzas";
 import Sanciones from "./pages/Sanciones";
+import Deportes from "./pages/Deportes";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/sesiones" element={<Sesiones />} />
           <Route path="/cobranzas" element={<Cobranzas />} />
           <Route path="/sanciones" element={<Sanciones />} />
+          <Route path="/deportes" element={<Deportes />} />
           <Route path="/usuarios" element={<Users />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
