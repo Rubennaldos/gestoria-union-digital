@@ -43,6 +43,7 @@ export default function Deportes() {
         obtenerEstadisticas()
       ]);
       
+      console.log('Canchas cargadas:', canchasData);
       setCanchas(canchasData);
       setReservas(reservasData);
       setEstadisticas(estadisticasData);
