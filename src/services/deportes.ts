@@ -169,7 +169,13 @@ export const crearReserva = async (
       precio,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      createdBy
+      createdBy,
+      ...(reservaData.recurrente?.esRecurrente && {
+        recurrente: {
+          ...reservaData.recurrente,
+          reservasGeneradas: []
+        }
+      })
     };
     
     const newRef = push(ref(db, 'deportes/reservas'));
@@ -246,16 +252,15 @@ export const registrarPago = async (
     
     // Crear ingreso en cobranzas
     const cancha = await obtenerCancha(reserva.canchaId);
-    const ingresoId = const ingresoId = await crearIngreso({
-      concepto: `Reserva ${cancha?.nombre} - ${reserva.nombreCliente}`,
-      categoria: 'Deportes',
-      subcategoria: cancha?.tipo === 'futbol' ? 'Cancha Fútbol' : 'Cancha Vóley',
+    const ingresoId = await crearIngreso({
+      concepto: `Reserva ${cancha?.nombre} - ${reserva.nombreCliente} (${cancha?.tipo === 'futbol' ? 'Fútbol' : 'Vóley'})`,
+      categoria: 'otros',
       monto: montoPago,
       fecha: new Date().toISOString().split('T')[0],
       metodoPago: formPago.metodoPago,
       numeroOperacion: formPago.numeroOperacion,
-      comprobanteUrl: voucherUrl
-    });
+      archivoUrl: voucherUrl
+    }, actorUid);
     
     // Vincular ingreso con reserva
     await actualizarReserva(reservaId, { ingresoId });
