@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { NuevaSancionModal } from "@/components/sanciones/NuevaSancionModal";
 import { getSanciones, getSancionesStats } from "@/services/sanciones";
 import { Sancion, SancionesStats, TipoEntidad, TipoSancion, EstadoSancion } from "@/types/sanciones";
 
@@ -20,6 +21,7 @@ const Sanciones = () => {
   const [filtroTipoEntidad, setFiltroTipoEntidad] = useState<TipoEntidad | "">("");
   const [filtroTipoSancion, setFiltroTipoSancion] = useState<TipoSancion | "">("");
   const [filtroEstado, setFiltroEstado] = useState<EstadoSancion | "">("");
+  const [showNuevaSancionModal, setShowNuevaSancionModal] = useState(false);
 
   const loadData = async () => {
     try {
@@ -124,7 +126,10 @@ const Sanciones = () => {
               <p className="text-muted-foreground">Gestión de sanciones disciplinarias</p>
             </div>
           </div>
-          <Button className="bg-destructive hover:bg-destructive/90">
+          <Button 
+            className="bg-destructive hover:bg-destructive/90"
+            onClick={() => setShowNuevaSancionModal(true)}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nueva Sanción
           </Button>
@@ -350,6 +355,12 @@ const Sanciones = () => {
           </CardContent>
         </Card>
       </main>
+
+      <NuevaSancionModal
+        open={showNuevaSancionModal}
+        onOpenChange={setShowNuevaSancionModal}
+        onSuccess={loadData}
+      />
 
       <BottomNavigation />
     </div>
