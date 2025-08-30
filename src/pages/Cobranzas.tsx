@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  CreditCard, 
-  AlertCircle, 
-  Home, 
-  Users, 
-  FileText, 
-  Download, 
+import {
+  DollarSign,
+  TrendingUp,
+  CreditCard,
+  AlertCircle,
+  Home,
+  Users,
+  FileText,
+  Download,
   Upload,
   Calendar,
   Receipt,
@@ -20,13 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  generarEstadisticas, 
-  ejecutarCierreMensual, 
+import {
+  generarEstadisticas,
+  ejecutarCierreMensual,
   generarPagosDesdeEnero,
   obtenerPagos,
   obtenerEgresos,
-  obtenerPagosPorEmpadronado
+  obtenerPagosPorEmpadronado,
 } from "@/services/cobranzas";
 import { EstadisticasCobranzas, Pago, Egreso } from "@/types/cobranzas";
 import { getEmpadronados } from "@/services/empadronados";
@@ -35,6 +35,7 @@ import { RegistrarPagoModal } from "@/components/cobranzas/RegistrarPagoModal";
 import { DeclaracionJuradaModal } from "@/components/cobranzas/DeclaracionJuradaModal";
 import { SancionModal } from "@/components/cobranzas/SancionModal";
 import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadronadoModal";
+import { RegistrarIngresoModal } from "@/components/cobranzas/RegistrarIngresoModal"; // ⬅️ NUEVO
 
 const Cobranzas = () => {
   const { user } = useAuth();
@@ -49,13 +50,16 @@ const Cobranzas = () => {
   const [autoInitHecho, setAutoInitHecho] = useState(false);
 
   // Modales
+  const [registrarIngresoModal, setRegistrarIngresoModal] = useState<{ open: boolean }>({ open: false }); // ⬅️ NUEVO
   const [registrarPagoModal, setRegistrarPagoModal] = useState<{ open: boolean; pago?: Pago }>({ open: false });
-  const [declaracionModal, setDeclaracionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
+  const [declaracionModal, setDeclaracionModal] = useState<{ open: boolean; empadronadoId?: string }>({
+    open: false,
+  });
   const [sancionModal, setSancionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
   const [detalleModal, setDetalleModal] = useState<{ open: boolean; empadronado?: Empadronado }>({ open: false });
 
   useEffect(() => {
-    cargarDatos(); // hará autogeneración si faltan cargos
+    cargarDatos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -63,15 +67,14 @@ const Cobranzas = () => {
     try {
       setLoading(true);
 
-      // Cargamos todo
       const [stats, pagosList, egresosList, empadronadosList] = await Promise.all([
         generarEstadisticas(),
         obtenerPagos(),
         obtenerEgresos(),
-        getEmpadronados()
+        getEmpadronados(),
       ]);
 
-      // Si NO hay cargos todavía y hay empadronados, generamos automáticamente desde enero 2025 (solo 1 vez)
+      // Autogeneración de cargos si es primera vez
       if (!autoInitHecho && empadronadosList.length > 0 && pagosList.length === 0) {
         try {
           await generarPagosDesdeEnero(user?.uid || "system");
@@ -79,16 +82,15 @@ const Cobranzas = () => {
 
           toast({
             title: "Inicialización automática",
-            description: "Se generaron los cargos desde enero 2025 para todos los asociados."
+            description: "Se generaron los cargos desde enero 2025 para todos los asociados.",
           });
 
-          // Re-cargar una vez para reflejar los cargos recién creados
           if (!reintentoTrasGenerar) {
             await cargarDatos(true);
             return;
           }
         } catch {
-          // si falla, seguimos sin romper la pantalla
+          // ignorar
         }
       }
 
@@ -104,25 +106,22 @@ const Cobranzas = () => {
       }
       setPagosEmpadronados(pagosMap);
 
-      // --- Ajuste de estadísticas como respaldo (si el servicio trae 0 para pendientes/morosos) ---
+      // Respaldo para pendientes/morosos si el servicio trae 0
       const allPagos = Object.values(pagosMap).flat();
       const totalPendienteAll = allPagos
-        .filter(p => p.estado === "pendiente" || p.estado === "moroso")
+        .filter((p) => p.estado === "pendiente" || p.estado === "moroso")
         .reduce((sum, p) => sum + p.monto, 0);
 
-      // Número de morosos (personas con al menos un pago en morosidad)
       const morososSet = new Set<string>();
       for (const [empId, arr] of Object.entries(pagosMap)) {
-        if (arr.some(p => p.estado === "moroso")) morososSet.add(empId);
+        if (arr.some((p) => p.estado === "moroso")) morososSet.add(empId);
       }
       const totalMorososAll = morososSet.size;
 
       const statsAjustadas: EstadisticasCobranzas = {
         totalEmpadronados: stats.totalEmpadronados,
         totalRecaudado: stats.totalRecaudado,
-        // Si el servicio da 0 pero hay deuda pendiente, usamos la suma global
         totalPendiente: stats.totalPendiente > 0 ? stats.totalPendiente : totalPendienteAll,
-        // Si el servicio da 0 pero hay morosos, usamos el conteo global
         totalMorosos: stats.totalMorosos > 0 ? stats.totalMorosos : totalMorososAll,
         tasaCobranza: stats.tasaCobranza,
         ingresosMes: stats.ingresosMes,
@@ -131,7 +130,6 @@ const Cobranzas = () => {
       };
 
       setEstadisticas(statsAjustadas);
-
     } catch (error) {
       toast({
         title: "Error",
@@ -157,14 +155,14 @@ const Cobranzas = () => {
   const calcularDeudaTotal = (empadronadoId: string): number => {
     const pagosEmp = pagosEmpadronados[empadronadoId] || [];
     return pagosEmp
-      .filter(p => p.estado === "pendiente" || p.estado === "moroso")
+      .filter((p) => p.estado === "pendiente" || p.estado === "moroso")
       .reduce((total, p) => total + p.monto, 0);
   };
 
   const obtenerEstadoEmpadronado = (empadronadoId: string): string => {
     const pagosEmp = pagosEmpadronados[empadronadoId] || [];
-    const tieneDeudas = pagosEmp.some(p => p.estado === "pendiente" || p.estado === "moroso");
-    const tieneMoroso = pagosEmp.some(p => p.estado === "moroso");
+    const tieneDeudas = pagosEmp.some((p) => p.estado === "pendiente" || p.estado === "moroso");
+    const tieneMoroso = pagosEmp.some((p) => p.estado === "moroso");
     if (tieneMoroso) return "moroso";
     if (tieneDeudas) return "pendiente";
     return "al_dia";
@@ -189,9 +187,9 @@ const Cobranzas = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => (window.location.href = "/")}
               className="gap-2"
             >
@@ -205,11 +203,6 @@ const Cobranzas = () => {
             </div>
           </div>
           <div className="flex gap-2">
-            {/* Botón de “Generar desde Enero” oculto porque ya se hace automático */}
-            {/* <Button variant="outline" onClick={() => {}}>
-              <Play className="h-4 w-4 mr-2" />
-              Generar desde Enero
-            </Button> */}
             <Button onClick={ejecutarCierre}>
               <Calendar className="h-4 w-4 mr-2" />
               Ejecutar Cierre
@@ -278,30 +271,34 @@ const Cobranzas = () => {
 
         {/* Acciones Rápidas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Button 
-            variant="outline" 
+          {/* ⬇️ AHORA REGISTRAR INGRESO */}
+          <Button
+            variant="outline"
             className="h-auto p-4 flex flex-col space-y-2"
-            onClick={() => setRegistrarPagoModal({ open: true })}
+            onClick={() => setRegistrarIngresoModal({ open: true })}
           >
-            <Receipt className="h-6 w-6" />
-            <span className="text-sm">Registrar Pago</span>
+            <DollarSign className="h-6 w-6" />
+            <span className="text-sm">Registrar Ingreso</span>
           </Button>
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             className="h-auto p-4 flex flex-col space-y-2"
             onClick={() => setDeclaracionModal({ open: true })}
           >
             <Download className="h-6 w-6" />
             <span className="text-sm">Plantilla Descuento</span>
           </Button>
-          <Button 
-            variant="outline" 
+
+          <Button
+            variant="outline"
             className="h-auto p-4 flex flex-col space-y-2"
             onClick={() => setSancionModal({ open: true })}
           >
             <Upload className="h-6 w-6" />
             <span className="text-sm">Subir Sanción</span>
           </Button>
+
           <Button variant="outline" className="h-auto p-4 flex flex-col space-y-2">
             <FileText className="h-6 w-6" />
             <span className="text-sm">Reportes</span>
@@ -342,7 +339,10 @@ const Cobranzas = () => {
                         const cantidadPagos = pagosEmpadronados[emp.id]?.length || 0;
 
                         return (
-                          <div key={emp.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div
+                            key={emp.id}
+                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+                          >
                             <div className="flex-1">
                               <div className="font-semibold text-sm">
                                 {emp.nombre} {emp.apellidos}
@@ -359,11 +359,19 @@ const Cobranzas = () => {
                                 <p className="text-xs text-muted-foreground">{cantidadPagos} pagos generados</p>
                               </div>
 
-                              <Badge variant={estado === "al_dia" ? "default" : estado === "moroso" ? "destructive" : "secondary"}>
+                              <Badge
+                                variant={
+                                  estado === "al_dia" ? "default" : estado === "moroso" ? "destructive" : "secondary"
+                                }
+                              >
                                 {estado === "al_dia" ? "Al día" : estado === "moroso" ? "Moroso" : "Pendiente"}
                               </Badge>
 
-                              <Button variant="outline" size="sm" onClick={() => setDetalleModal({ open: true, empadronado: emp })}>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDetalleModal({ open: true, empadronado: emp })}
+                              >
                                 Ver Detalles
                               </Button>
                             </div>
@@ -397,16 +405,20 @@ const Cobranzas = () => {
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <Badge variant={
-                            pago.estado === "pagado" ? "default" : 
-                            pago.estado === "moroso" ? "destructive" : 
-                            pago.estado === "sancionado" ? "destructive" : "secondary"
-                          }>
+                          <Badge
+                            variant={
+                              pago.estado === "pagado"
+                                ? "default"
+                                : pago.estado === "moroso"
+                                ? "destructive"
+                                : pago.estado === "sancionado"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
                             S/ {pago.monto.toFixed(2)}
                           </Badge>
-                          <Badge variant="outline">
-                            {pago.estado}
-                          </Badge>
+                          <Badge variant="outline">{pago.estado}</Badge>
                         </div>
                       </div>
                     ))
@@ -462,10 +474,18 @@ const Cobranzas = () => {
       <BottomNavigation />
 
       {/* Modales */}
+      {/* Pago de cuotas: se abre desde el detalle de un asociado */}
       <RegistrarPagoModal
         open={registrarPagoModal.open}
         onOpenChange={(open) => setRegistrarPagoModal({ open })}
         pago={registrarPagoModal.pago}
+        onSuccess={cargarDatos}
+      />
+
+      {/* Ingresos libres (donaciones/eventos/etc.) */}
+      <RegistrarIngresoModal
+        open={registrarIngresoModal.open}
+        onOpenChange={(open) => setRegistrarIngresoModal({ open })}
         onSuccess={cargarDatos}
       />
 
