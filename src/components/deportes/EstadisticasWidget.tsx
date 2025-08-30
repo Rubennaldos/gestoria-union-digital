@@ -62,20 +62,18 @@ export const EstadisticasWidget = ({ estadisticas }: EstadisticasWidgetProps) =>
         <CardContent>
           <div className="space-y-4">
             {estadisticas.horariosPopulares.slice(0, 8).map((horario, index) => (
-              <div key={horario.hora} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-16 text-center">
-                    <span className="font-mono text-sm">{horario.hora}</span>
-                  </div>
-                  <div className="flex-1">
-                    <Progress 
-                      value={(horario.reservas / estadisticas.horariosPopulares[0].reservas) * 100} 
-                      className="h-2"
-                    />
-                  </div>
-                  <div className="w-12 text-right">
-                    <span className="text-sm font-medium">{horario.reservas}</span>
-                  </div>
+              <div key={horario.hora} className="flex items-center gap-3">
+                <div className="w-14 text-center flex-shrink-0">
+                  <span className="font-mono text-sm">{horario.hora}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Progress 
+                    value={(horario.reservas / estadisticas.horariosPopulares[0].reservas) * 100} 
+                    className="h-2"
+                  />
+                </div>
+                <div className="w-10 text-right flex-shrink-0">
+                  <span className="text-sm font-medium">{horario.reservas}</span>
                 </div>
               </div>
             ))}
