@@ -1,6 +1,7 @@
 import { db } from '@/config/firebase';
 import { ref, set } from 'firebase/database';
 import { Usuario, Sesion, Finanza, Cuota, IncidenteSeguridad, Comunicado, Alert } from '@/types/firebase';
+import { seedDeportesData } from './seedDeportesData';
 
 // Seed data for Firebase RTDB
 export const seedFirebaseData = async () => {
@@ -141,7 +142,8 @@ export const seedFirebaseData = async () => {
       set(ref(db, 'users'), usuarios),
       set(ref(db, 'alerts'), alerts),
       set(ref(db, 'finanzas'), finanzas),
-      set(ref(db, 'sesiones'), sesiones)
+      set(ref(db, 'sesiones'), sesiones),
+      seedDeportesData() // Agregar datos de deportes
     ]);
 
     console.log('Seed data uploaded successfully to Firebase RTDB');

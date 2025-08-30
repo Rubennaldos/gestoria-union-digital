@@ -5,11 +5,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search, User, Check } from "lucide-react";
-// import { obtenerEmpadronados } from "@/services/empadronados";
+import { searchEmpadronados } from "@/services/empadronados";
 
 interface EmpadronadoData {
   id: string;
   nombre: string;
+  apellidos: string;
   dni: string;
   telefono?: string;
   aporta?: boolean;
@@ -37,22 +38,15 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
 
       setLoading(true);
       try {
-        // Simulación temporal hasta integrar con empadronados
-        const empadronados: any[] = [];
-        const filtrados = empadronados
-          .filter(emp => 
-            emp.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-            emp.dni.includes(busqueda) ||
-            (emp.telefono && emp.telefono.includes(busqueda))
-          )
-          .slice(0, 5)
-          .map(emp => ({
-            id: emp.id,
-            nombre: `${emp.nombre} ${emp.apellidoPaterno} ${emp.apellidoMaterno}`.trim(),
-            dni: emp.dni,
-            telefono: emp.telefono,
-            aporta: emp.aporta
-          }));
+        const empadronados = await searchEmpadronados(busqueda);
+        const filtrados = empadronados.slice(0, 5).map(emp => ({
+          id: emp.id,
+          nombre: emp.nombre,
+          apellidos: emp.apellidos,
+          dni: emp.dni,
+          telefono: emp.telefonos?.[0]?.numero,
+          aporta: true // Todos los empadronados son aportantes por defecto
+        }));
 
         setResultados(filtrados);
         setMostrarResultados(true);
@@ -70,7 +64,7 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
 
   const handleSeleccionar = (empadronado: EmpadronadoData) => {
     setSeleccionado(empadronado);
-    setBusqueda(empadronado.nombre);
+    setBusqueda(`${empadronado.nombre} ${empadronado.apellidos}`);
     setMostrarResultados(false);
     onSeleccionar(empadronado);
   };
@@ -120,12 +114,12 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">{empadronado.nombre}</p>
-                    <p className="text-sm text-muted-foreground">
-                      DNI: {empadronado.dni}
-                      {empadronado.telefono && ` • Tel: ${empadronado.telefono}`}
-                    </p>
-                  </div>
+                     <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
+                     <p className="text-sm text-muted-foreground">
+                       DNI: {empadronado.dni}
+                       {empadronado.telefono && ` • Tel: ${empadronado.telefono}`}
+                     </p>
+                   </div>
                   <div className="flex items-center gap-2">
                     {empadronado.aporta && (
                       <Badge variant="secondary">Aportante</Badge>
@@ -146,7 +140,7 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-600" />
                   <div>
-                    <p className="font-medium text-green-800">{seleccionado.nombre}</p>
+                    <p className="font-medium text-green-800">{seleccionado.nombre} {seleccionado.apellidos}</p>
                     <p className="text-sm text-green-600">
                       DNI: {seleccionado.dni}
                       {seleccionado.telefono && ` • Tel: ${seleccionado.telefono}`}

@@ -32,7 +32,7 @@ export const NuevaReservaModal = ({
   fechaFinPredeterminada
 }: NuevaReservaModalProps) => {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState<FormReserva>({
+  const [form, setForm] = useState<FormReserva & { direccion?: string }>({
     canchaId: '',
     nombreCliente: '',
     dni: '',
@@ -40,8 +40,10 @@ export const NuevaReservaModal = ({
     fechaInicio: '',
     fechaFin: '',
     esAportante: false,
-    observaciones: ''
+    observaciones: '',
+    direccion: ''
   });
+  const [esEmpadronado, setEsEmpadronado] = useState(true);
   const [mostrarRecurrente, setMostrarRecurrente] = useState(false);
   const [precioCalculado, setPrecioCalculado] = useState<{
     base: number;
@@ -201,10 +203,23 @@ export const NuevaReservaModal = ({
   const handleEmpadronadoSelect = (empadronado: any) => {
     setForm(prev => ({
       ...prev,
-      nombreCliente: empadronado.nombre,
+      nombreCliente: `${empadronado.nombre} ${empadronado.apellidos}`,
       dni: empadronado.dni,
       telefono: empadronado.telefono || '',
       esAportante: empadronado.aporta || false
+    }));
+  };
+
+  const toggleTipoCliente = () => {
+    setEsEmpadronado(!esEmpadronado);
+    // Limpiar formulario al cambiar tipo
+    setForm(prev => ({
+      ...prev,
+      nombreCliente: '',
+      dni: '',
+      telefono: '',
+      direccion: '',
+      esAportante: false
     }));
   };
 
@@ -234,51 +249,85 @@ export const NuevaReservaModal = ({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <BusquedaEmpadronado onSeleccionar={handleEmpadronadoSelect} />
-                
-                <div>
-                  <Label htmlFor="nombreCliente">Nombre Completo *</Label>
-                  <Input
-                    id="nombreCliente"
-                    value={form.nombreCliente}
-                    onChange={(e) => setForm(prev => ({ ...prev, nombreCliente: e.target.value }))}
-                    placeholder="Nombre del cliente"
-                    required
-                  />
+                {/* Toggle entre empadronado y no empadronado */}
+                <div className="flex items-center space-x-4 p-3 bg-muted rounded-lg">
+                  <Button
+                    type="button"
+                    variant={esEmpadronado ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => !esEmpadronado && toggleTipoCliente()}
+                  >
+                    Empadronado
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!esEmpadronado ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => esEmpadronado && toggleTipoCliente()}
+                  >
+                    No Empadronado
+                  </Button>
                 </div>
 
-                <div>
-                  <Label htmlFor="dni">DNI</Label>
-                  <Input
-                    id="dni"
-                    value={form.dni}
-                    onChange={(e) => setForm(prev => ({ ...prev, dni: e.target.value }))}
-                    placeholder="12345678"
-                  />
-                </div>
+                {esEmpadronado ? (
+                  <BusquedaEmpadronado onSeleccionar={handleEmpadronadoSelect} />
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="nombreCliente">Nombre Completo *</Label>
+                      <Input
+                        id="nombreCliente"
+                        value={form.nombreCliente}
+                        onChange={(e) => setForm(prev => ({ ...prev, nombreCliente: e.target.value }))}
+                        placeholder="Nombre del cliente"
+                        required
+                      />
+                    </div>
 
-                <div>
-                  <Label htmlFor="telefono">Teléfono *</Label>
-                  <Input
-                    id="telefono"
-                    value={form.telefono}
-                    onChange={(e) => setForm(prev => ({ ...prev, telefono: e.target.value }))}
-                    placeholder="987654321"
-                    required
-                  />
-                </div>
+                    <div>
+                      <Label htmlFor="dni">DNI</Label>
+                      <Input
+                        id="dni"
+                        value={form.dni}
+                        onChange={(e) => setForm(prev => ({ ...prev, dni: e.target.value }))}
+                        placeholder="12345678"
+                      />
+                    </div>
 
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="esAportante"
-                    checked={form.esAportante}
-                    onCheckedChange={(checked) => setForm(prev => ({ ...prev, esAportante: checked }))}
-                  />
-                  <Label htmlFor="esAportante">Es aportante</Label>
-                  {form.esAportante && (
-                    <Badge variant="secondary">Descuento aplicado</Badge>
-                  )}
-                </div>
+                    <div>
+                      <Label htmlFor="telefono">Teléfono *</Label>
+                      <Input
+                        id="telefono"
+                        value={form.telefono}
+                        onChange={(e) => setForm(prev => ({ ...prev, telefono: e.target.value }))}
+                        placeholder="987654321"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="direccion">Dirección</Label>
+                      <Input
+                        id="direccion"
+                        value={form.direccion || ''}
+                        onChange={(e) => setForm(prev => ({ ...prev, direccion: e.target.value }))}
+                        placeholder="Dirección del cliente"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="esAportante"
+                        checked={form.esAportante}
+                        onCheckedChange={(checked) => setForm(prev => ({ ...prev, esAportante: checked }))}
+                      />
+                      <Label htmlFor="esAportante">Es aportante</Label>
+                      {form.esAportante && (
+                        <Badge variant="secondary">Descuento aplicado</Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
