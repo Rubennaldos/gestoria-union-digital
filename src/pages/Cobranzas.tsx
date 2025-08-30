@@ -35,7 +35,22 @@ import { RegistrarPagoModal } from "@/components/cobranzas/RegistrarPagoModal";
 import { DeclaracionJuradaModal } from "@/components/cobranzas/DeclaracionJuradaModal";
 import { SancionModal } from "@/components/cobranzas/SancionModal";
 import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadronadoModal";
-import RegistrarIngresoModal from "@/components/cobranzas/RegistrarIngresoModal"; // ⬅️ NUEVO
+
+/* Helpers para fechas y morosidad en UI */
+const parseEs = (s?: string | null) => {
+  if (!s) return null;
+  const [dd, mm, aa] = s.split("/").map(Number);
+  if (!dd || !mm || !aa) return null;
+  return new Date(aa, mm - 1, dd);
+};
+const hoy = () => new Date();
+const esMorosoUI = (p: Pago) => {
+  const v = parseEs(p.fechaVencimiento);
+  const vencido = v ? v.getTime() < hoy().getTime() : false;
+  return p.estado === "moroso" || (vencido && (p.estado === "pendiente" || p.estado === "sancionado"));
+};
+
+type Filtro = "todos" | "morosos" | "pendientes" | "aldia";
 
 const Cobranzas = () => {
   const { user } = useAuth();
@@ -49,17 +64,16 @@ const Cobranzas = () => {
   const [loading, setLoading] = useState(true);
   const [autoInitHecho, setAutoInitHecho] = useState(false);
 
+  const [filtro, setFiltro] = useState<Filtro>("todos");
+
   // Modales
-  const [registrarIngresoModal, setRegistrarIngresoModal] = useState<{ open: boolean }>({ open: false }); // ⬅️ NUEVO
   const [registrarPagoModal, setRegistrarPagoModal] = useState<{ open: boolean; pago?: Pago }>({ open: false });
-  const [declaracionModal, setDeclaracionModal] = useState<{ open: boolean; empadronadoId?: string }>({
-    open: false,
-  });
+  const [declaracionModal, setDeclaracionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
   const [sancionModal, setSancionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
   const [detalleModal, setDetalleModal] = useState<{ open: boolean; empadronado?: Empadronado }>({ open: false });
 
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(); // hará autogeneración si faltan cargos
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,23 +88,21 @@ const Cobranzas = () => {
         getEmpadronados(),
       ]);
 
-      // Autogeneración de cargos si es primera vez
+      // Autogenera cargos desde enero si recién se instala
       if (!autoInitHecho && empadronadosList.length > 0 && pagosList.length === 0) {
         try {
           await generarPagosDesdeEnero(user?.uid || "system");
           setAutoInitHecho(true);
-
           toast({
             title: "Inicialización automática",
             description: "Se generaron los cargos desde enero 2025 para todos los asociados.",
           });
-
           if (!reintentoTrasGenerar) {
             await cargarDatos(true);
             return;
           }
         } catch {
-          // ignorar
+          // seguimos sin romper
         }
       }
 
@@ -98,7 +110,7 @@ const Cobranzas = () => {
       setEgresos(egresosList.slice(0, 10));
       setEmpadronados(empadronadosList);
 
-      // Pagos por empadronado
+      // Cargar pagos por empadronado y calcular KPI reales (morosos por vencimiento)
       const pagosMap: Record<string, Pago[]> = {};
       for (const emp of empadronadosList) {
         const pagosEmp = await obtenerPagosPorEmpadronado(emp.id);
@@ -106,23 +118,27 @@ const Cobranzas = () => {
       }
       setPagosEmpadronados(pagosMap);
 
-      // Respaldo para pendientes/morosos si el servicio trae 0
-      const allPagos = Object.values(pagosMap).flat();
-      const totalPendienteAll = allPagos
-        .filter((p) => p.estado === "pendiente" || p.estado === "moroso")
-        .reduce((sum, p) => sum + p.monto, 0);
-
+      // --- KPI UI basados en vencimientos (no dependemos solo del estado "moroso") ---
+      let deudaPendiente = 0;
       const morososSet = new Set<string>();
-      for (const [empId, arr] of Object.entries(pagosMap)) {
-        if (arr.some((p) => p.estado === "moroso")) morososSet.add(empId);
-      }
-      const totalMorososAll = morososSet.size;
+
+      Object.entries(pagosMap).forEach(([empId, arr]) => {
+        let tieneMoroso = false;
+        for (const p of arr) {
+          const moroso = esMorosoUI(p);
+          if (moroso) tieneMoroso = true;
+
+          // Deuda pendiente = sumamos montos de pendientes o morosos (vencidos o no)
+          if (p.estado === "pendiente" || moroso) deudaPendiente += Number(p.monto || 0);
+        }
+        if (tieneMoroso) morososSet.add(empId);
+      });
 
       const statsAjustadas: EstadisticasCobranzas = {
         totalEmpadronados: stats.totalEmpadronados,
-        totalRecaudado: stats.totalRecaudado,
-        totalPendiente: stats.totalPendiente > 0 ? stats.totalPendiente : totalPendienteAll,
-        totalMorosos: stats.totalMorosos > 0 ? stats.totalMorosos : totalMorososAll,
+        totalRecaudado: stats.totalRecaudado,   // mes actual
+        totalPendiente: deudaPendiente,        // acumulado todos los periodos
+        totalMorosos: morososSet.size,         // asociados con al menos un periodo moroso
         tasaCobranza: stats.tasaCobranza,
         ingresosMes: stats.ingresosMes,
         egresosMes: stats.egresosMes,
@@ -155,18 +171,33 @@ const Cobranzas = () => {
   const calcularDeudaTotal = (empadronadoId: string): number => {
     const pagosEmp = pagosEmpadronados[empadronadoId] || [];
     return pagosEmp
-      .filter((p) => p.estado === "pendiente" || p.estado === "moroso")
-      .reduce((total, p) => total + p.monto, 0);
+      .filter((p) => p.estado === "pendiente" || esMorosoUI(p))
+      .reduce((total, p) => total + Number(p.monto || 0), 0);
   };
 
   const obtenerEstadoEmpadronado = (empadronadoId: string): string => {
     const pagosEmp = pagosEmpadronados[empadronadoId] || [];
-    const tieneDeudas = pagosEmp.some((p) => p.estado === "pendiente" || p.estado === "moroso");
-    const tieneMoroso = pagosEmp.some((p) => p.estado === "moroso");
+    const tieneMoroso = pagosEmp.some(esMorosoUI);
     if (tieneMoroso) return "moroso";
-    if (tieneDeudas) return "pendiente";
+    const tienePendiente = pagosEmp.some((p) => p.estado === "pendiente" && !esMorosoUI(p));
+    if (tienePendiente) return "pendiente";
     return "al_dia";
   };
+
+  // Lista filtrada según el filtro activo
+  const empadronadosFiltrados = empadronados.filter((emp) => {
+    const arr = pagosEmpadronados[emp.id] || [];
+    switch (filtro) {
+      case "morosos":
+        return arr.some(esMorosoUI);
+      case "pendientes":
+        return arr.some((p) => p.estado === "pendiente" && !esMorosoUI(p));
+      case "aldia":
+        return arr.every((p) => p.estado === "pagado" || (!esMorosoUI(p) && p.estado !== "moroso"));
+      default:
+        return true;
+    }
+  });
 
   if (loading) {
     return (
@@ -178,6 +209,13 @@ const Cobranzas = () => {
       </div>
     );
   }
+
+  const filtroLabel: Record<Filtro, string> = {
+    todos: "Todos",
+    morosos: "Morosos",
+    pendientes: "Pendientes",
+    aldia: "Al día",
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
@@ -210,9 +248,13 @@ const Cobranzas = () => {
           </div>
         </div>
 
-        {/* Estadísticas */}
+        {/* Estadísticas (cards clicables para filtrar) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-success/20 bg-success/5">
+          <Card
+            className="border-success/20 bg-success/5 cursor-pointer"
+            onClick={() => setFiltro("todos")}
+            title="Quitar filtro"
+          >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <TrendingUp className="h-5 w-5 text-success" />
@@ -226,7 +268,11 @@ const Cobranzas = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-warning/20 bg-warning/5">
+          <Card
+            className="border-warning/20 bg-warning/5 hover:bg-warning/10 cursor-pointer"
+            onClick={() => setFiltro("pendientes")}
+            title="Ver solo pendientes"
+          >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <CreditCard className="h-5 w-5 text-warning" />
@@ -240,7 +286,11 @@ const Cobranzas = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-destructive/20 bg-destructive/5">
+          <Card
+            className="border-destructive/20 bg-destructive/5 hover:bg-destructive/10 cursor-pointer"
+            onClick={() => setFiltro("morosos")}
+            title="Ver solo morosos"
+          >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <AlertCircle className="h-5 w-5 text-destructive" />
@@ -271,16 +321,14 @@ const Cobranzas = () => {
 
         {/* Acciones Rápidas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* ⬇️ AHORA REGISTRAR INGRESO */}
           <Button
             variant="outline"
             className="h-auto p-4 flex flex-col space-y-2"
-            onClick={() => setRegistrarIngresoModal({ open: true })}
+            onClick={() => setRegistrarPagoModal({ open: true })}
           >
-            <DollarSign className="h-6 w-6" />
+            <Receipt className="h-6 w-6" />
             <span className="text-sm">Registrar Ingreso</span>
           </Button>
-
           <Button
             variant="outline"
             className="h-auto p-4 flex flex-col space-y-2"
@@ -289,7 +337,6 @@ const Cobranzas = () => {
             <Download className="h-6 w-6" />
             <span className="text-sm">Plantilla Descuento</span>
           </Button>
-
           <Button
             variant="outline"
             className="h-auto p-4 flex flex-col space-y-2"
@@ -298,12 +345,21 @@ const Cobranzas = () => {
             <Upload className="h-6 w-6" />
             <span className="text-sm">Subir Sanción</span>
           </Button>
-
           <Button variant="outline" className="h-auto p-4 flex flex-col space-y-2">
             <FileText className="h-6 w-6" />
             <span className="text-sm">Reportes</span>
           </Button>
         </div>
+
+        {/* Filtro activo */}
+        {filtro !== "todos" && (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline">Filtro: {filtroLabel[filtro]}</Badge>
+            <Button variant="ghost" size="sm" onClick={() => setFiltro("todos")}>
+              Quitar filtro
+            </Button>
+          </div>
+        )}
 
         {/* Contenido Principal */}
         <Tabs defaultValue="empadronados" className="space-y-4">
@@ -323,17 +379,14 @@ const Cobranzas = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {empadronados.length === 0 ? (
+                  {empadronadosFiltrados.length === 0 ? (
                     <div className="text-center py-8">
                       <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <p className="text-muted-foreground">No hay asociados registrados</p>
-                      <p className="text-sm text-muted-foreground">
-                        Registra asociados desde el módulo de Empadronamiento
-                      </p>
+                      <p className="text-muted-foreground">No se encontraron asociados con el filtro actual</p>
                     </div>
                   ) : (
                     <div className="grid gap-4">
-                      {empadronados.map((emp) => {
+                      {empadronadosFiltrados.map((emp) => {
                         const deudaTotal = calcularDeudaTotal(emp.id);
                         const estado = obtenerEstadoEmpadronado(emp.id);
                         const cantidadPagos = pagosEmpadronados[emp.id]?.length || 0;
@@ -361,7 +414,11 @@ const Cobranzas = () => {
 
                               <Badge
                                 variant={
-                                  estado === "al_dia" ? "default" : estado === "moroso" ? "destructive" : "secondary"
+                                  estado === "al_dia"
+                                    ? "default"
+                                    : estado === "moroso"
+                                    ? "destructive"
+                                    : "secondary"
                                 }
                               >
                                 {estado === "al_dia" ? "Al día" : estado === "moroso" ? "Moroso" : "Pendiente"}
@@ -474,18 +531,10 @@ const Cobranzas = () => {
       <BottomNavigation />
 
       {/* Modales */}
-      {/* Pago de cuotas: se abre desde el detalle de un asociado */}
       <RegistrarPagoModal
         open={registrarPagoModal.open}
         onOpenChange={(open) => setRegistrarPagoModal({ open })}
         pago={registrarPagoModal.pago}
-        onSuccess={cargarDatos}
-      />
-
-      {/* Ingresos libres (donaciones/eventos/etc.) */}
-      <RegistrarIngresoModal
-        open={registrarIngresoModal.open}
-        onOpenChange={(open) => setRegistrarIngresoModal({ open })}
         onSuccess={cargarDatos}
       />
 
