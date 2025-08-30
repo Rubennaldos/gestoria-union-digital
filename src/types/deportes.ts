@@ -2,7 +2,7 @@ export type EstadoReserva = 'pendiente' | 'pagado' | 'cancelado' | 'no-show' | '
 
 export type MetodoPago = 'efectivo' | 'transferencia' | 'yape' | 'plin';
 
-export type TipoCancha = 'futbol' | 'voley';
+export type TipoCancha = 'futbol' | 'voley' | 'basquet' | 'tenis' | 'padel';
 
 export interface Cancha {
   id: string;
