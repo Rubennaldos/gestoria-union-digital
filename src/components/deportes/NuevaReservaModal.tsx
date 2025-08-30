@@ -54,6 +54,7 @@ export const NuevaReservaModal = ({
 
   useEffect(() => {
     if (open) {
+      console.log('Modal abierto, canchas disponibles:', canchas);
       // Resetear formulario
       setForm({
         canchaId: canchas.length > 0 ? canchas[0].id : '',
@@ -65,8 +66,10 @@ export const NuevaReservaModal = ({
         fechaFin: fechaFinPredeterminada ? 
           fechaFinPredeterminada.toISOString().slice(0, 16) : '',
         esAportante: false,
-        observaciones: ''
+        observaciones: '',
+        direccion: ''
       });
+      setEsEmpadronado(true);
       setMostrarRecurrente(false);
       setPrecioCalculado(null);
     }
@@ -346,8 +349,8 @@ export const NuevaReservaModal = ({
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar cancha" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {canchas.map(cancha => (
+                    <SelectContent className="bg-background border shadow-lg z-50">
+                      {canchas.filter(cancha => cancha.activa).map(cancha => (
                         <SelectItem key={cancha.id} value={cancha.id}>
                           {cancha.nombre} - {cancha.ubicacion === 'boulevard' ? 'Boulevard' : 'Quinta Llana'}
                           {cancha.tipo === 'futbol' ? ' ⚽' : ' 🏐'}

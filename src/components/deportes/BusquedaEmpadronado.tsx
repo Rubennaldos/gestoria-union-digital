@@ -114,12 +114,12 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
               >
                 <div className="flex items-center justify-between">
                   <div>
-                     <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
-                     <p className="text-sm text-muted-foreground">
-                       DNI: {empadronado.dni}
-                       {empadronado.telefono && ` • Tel: ${empadronado.telefono}`}
-                     </p>
-                   </div>
+                    <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
+                    <p className="text-sm text-muted-foreground">
+                      DNI: {empadronado.dni}
+                      {empadronado.telefono && ` • Tel: ${empadronado.telefono}`}
+                    </p>
+                  </div>
                   <div className="flex items-center gap-2">
                     {empadronado.aporta && (
                       <Badge variant="secondary">Aportante</Badge>
@@ -134,14 +134,14 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
 
         {/* Empadronado seleccionado */}
         {seleccionado && !mostrarResultados && (
-          <Card className="mt-2 border-green-200 bg-green-50">
+          <Card className="mt-2 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-green-600" />
+                  <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <div>
-                    <p className="font-medium text-green-800">{seleccionado.nombre} {seleccionado.apellidos}</p>
-                    <p className="text-sm text-green-600">
+                    <p className="font-medium text-green-800 dark:text-green-200">{seleccionado.nombre} {seleccionado.apellidos}</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
                       DNI: {seleccionado.dni}
                       {seleccionado.telefono && ` • Tel: ${seleccionado.telefono}`}
                     </p>
