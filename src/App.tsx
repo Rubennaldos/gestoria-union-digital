@@ -17,6 +17,7 @@ import UserPermissions from "./pages/admin/UserPermissions";
 import Empadronados from "./pages/Empadronados";
 import EmpadronadoForm from "./pages/EmpadronadoForm";
 import Cobranzas from "./pages/Cobranzas";
+import Sanciones from "./pages/Sanciones";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           
           <Route path="/sesiones" element={<Sesiones />} />
           <Route path="/cobranzas" element={<Cobranzas />} />
+          <Route path="/sanciones" element={<Sanciones />} />
           <Route path="/usuarios" element={<Users />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
