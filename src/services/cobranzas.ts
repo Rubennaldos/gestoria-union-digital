@@ -430,73 +430,86 @@ export const aplicarSancion = async (sancionData: Omit<PlantillaSancion, 'id'>):
    Estadísticas (lee CHARGES + INGRESOS + EGRESOS del mes)
    ────────────────────────────────────────────────────────── */
 export const generarEstadisticas = async (): Promise<EstadisticasCobranzas> => {
-  const [egresos, empadronados] = await Promise.all([obtenerEgresos(), obtenerEmpadronados()]);
+  const [egresos, empadronados] = await Promise.all([
+    obtenerEgresos(),
+    obtenerEmpadronados(),
+  ]);
 
   const hoy = new Date();
   const añoActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
-  const periodKey = periodCompact(periodFromYM(añoActual, mesActual));
+  const keyMesActual = periodCompact(periodFromYM(añoActual, mesActual));
 
-  // CHARGES del mes (cuotas)
-  const chargesSnap = await get(ref(db, `cobranzas/charges/${periodKey}`));
-  const chargesByEmp = chargesSnap.exists() ? chargesSnap.val() : {};
-  let recaudadoCuotas = 0;
-  let totalPendiente = 0;
-  let totalMorosos = 0;
+  // Totales globales (todos los meses)
+  let totalPendienteGlobal = 0;
+  const morososGlobal = new Set<string>();
 
-  Object.keys(chargesByEmp).forEach((empId) => {
-    const node = chargesByEmp[empId];
-    const chargeId = Object.keys(node)[0];
-    const c = node[chargeId];
-    const total = Number(c.total || 0);
-    const saldo = Number(c.saldo || 0);
+  // Totales del mes actual (para KPIs mensuales)
+  let recaudadoMesActual = 0;
+  let cargosMesActual = 0;
+  let pagadosMesActual = 0;
 
-    recaudadoCuotas += total - saldo; // si está pagado → total, si no → 0
-    totalPendiente += saldo;
-    if (c.estado === 'moroso') totalMorosos += 1;
+  const chargesRootSnap = await get(ref(db, "cobranzas/charges"));
+  if (chargesRootSnap.exists()) {
+    const allPeriods = chargesRootSnap.val() as Record<
+      string,
+      Record<string, Record<string, any>>
+    >; // {YYYYMM: {empId: {chargeId: charge}}}
+
+    for (const yyyymm of Object.keys(allPeriods)) {
+      const perNode = allPeriods[yyyymm];
+      const esMesActual = yyyymm === keyMesActual;
+
+      for (const empId of Object.keys(perNode)) {
+        const node = perNode[empId];
+        const chargeId = Object.keys(node)[0];
+        const c = node[chargeId];
+
+        const total = Number(c.total || 0);
+        const saldo = Number(c.saldo || 0);
+
+        // Global: deuda total acumulada
+        totalPendienteGlobal += saldo;
+        if (c.estado === "moroso") morososGlobal.add(empId);
+
+        // Mes actual: recaudado y tasa de cobranza
+        if (esMesActual) {
+          cargosMesActual += 1;
+          recaudadoMesActual += (total - saldo); // lo efectivamente cobrado del mes
+          if (c.estado === "pagado") pagadosMesActual += 1;
+        }
+      }
+    }
+  }
+
+  // Egresos del mes actual
+  const egresosMesActual = egresos.filter((e) => {
+    const [dd, mm, aa] = e.fecha.split("/");
+    return Number(mm) === mesActual && Number(aa) === añoActual;
   });
-
-  // INGRESOS libres del mes (donaciones/eventos/etc.)
-  const ingresosLibresMes = (await obtenerIngresosMes(añoActual, mesActual)).reduce(
-    (sum, i) => sum + Number(i.monto || 0),
+  const totalEgresosMes = egresosMesActual.reduce(
+    (sum, e) => sum + Number(e.monto || 0),
     0
   );
 
-  // EGRESOS del mes
-  const egresosMesActual = egresos.filter((e) => {
-    const [, mm, aa] = e.fecha.split('/'); // "dd/mm/aaaa"
-    return Number(mm) === mesActual && Number(aa) === añoActual;
-  });
-  const totalEgresos = egresosMesActual.reduce((sum, e) => sum + Number(e.monto || 0), 0);
-
-  // Tasa de cobranza (sólo cuotas)
+  // Tasa de cobranza: % de empadronados con su cargo del mes actual pagado
   const tasaCobranza =
     empadronados.length > 0
-      ? (Object.keys(chargesByEmp).filter((empId) => {
-          const c = chargesByEmp[empId];
-          const id = Object.keys(c)[0];
-          return c[id]?.estado === 'pagado';
-        }).length /
-          empadronados.length) *
-        100
+      ? (pagadosMesActual / empadronados.length) * 100
       : 0;
-
-  // Totales para cards
-  const totalRecaudado = recaudadoCuotas + ingresosLibresMes;
-  const ingresosMes = totalRecaudado;
-  const saldoActual = totalRecaudado - totalEgresos;
 
   return {
     totalEmpadronados: empadronados.length,
-    totalRecaudado,
-    totalPendiente,
-    totalMorosos,
+    totalRecaudado: recaudadoMesActual,   // del mes actual
+    totalPendiente: totalPendienteGlobal, // acumulado todos los meses
+    totalMorosos: morososGlobal.size,     // socios con algún periodo moroso
     tasaCobranza,
-    ingresosMes,
-    egresosMes: totalEgresos,
-    saldoActual,
+    ingresosMes: recaudadoMesActual,
+    egresosMes: totalEgresosMes,
+    saldoActual: recaudadoMesActual - totalEgresosMes,
   };
 };
+
 
 /* ──────────────────────────────────────────────────────────
    Cierre mensual (morosidad por vencimiento)
