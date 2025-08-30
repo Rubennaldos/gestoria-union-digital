@@ -42,14 +42,6 @@ const modules = [
     // badge será dinámico basado en próximas sesiones
   },
   {
-    title: "Finanzas",
-    description: "Cuotas, pagos y presupuestos",
-    icon: DollarSign,
-    href: "/finanzas",
-    color: "success" as const
-    // badge será dinámico basado en pendientes
-  },
-  {
     title: "Cobranzas",
     description: "Gestión de pagos mensuales, descuentos y morosidad",
     icon: DollarSign,

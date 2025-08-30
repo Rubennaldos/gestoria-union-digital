@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const navigationItems = [
   { icon: Home, label: "Inicio", href: "/" },
   { icon: Calendar, label: "Sesiones", href: "/sesiones" },
-  { icon: DollarSign, label: "Finanzas", href: "/finanzas" },
+  { icon: DollarSign, label: "Cobranzas", href: "/cobranzas" },
   { icon: Shield, label: "Seguridad", href: "/seguridad" },
   { icon: MoreHorizontal, label: "Más", href: "/modulos" },
 ];

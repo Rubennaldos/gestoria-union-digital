@@ -8,7 +8,7 @@ import { AuthzProvider } from "@/contexts/AuthzContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import Finanzas from "./pages/Finanzas";
+
 import Sesiones from "./pages/Sesiones";
 import NotFound from "./pages/NotFound";
 import Users from "./pages/admin/Users";
@@ -37,7 +37,7 @@ const App = () => (
           <Route path="/padron/editar/:id" element={<EmpadronadoForm />} />
           <Route path="/login" element={<Login />} />
           <Route path="/inicio" element={<Index />} />
-          <Route path="/finanzas" element={<Finanzas />} />
+          
           <Route path="/sesiones" element={<Sesiones />} />
           <Route path="/cobranzas" element={<Cobranzas />} />
           <Route path="/usuarios" element={<Users />} />
