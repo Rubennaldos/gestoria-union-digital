@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { AlertTriangle, CalendarIcon, Upload } from "lucide-react";
+import { AlertTriangle, CalendarIcon, Upload, Download, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createSancion, getEntidadesSancionables } from "@/services/sanciones";
 import { CreateSancionForm, TipoEntidad, TipoSancion } from "@/types/sanciones";
@@ -80,6 +80,70 @@ export const NuevaSancionModal = ({ open, onOpenChange, onSuccess }: NuevaSancio
     return entidad.id;
   };
 
+  const descargarPlantillaSancion = () => {
+    const plantilla = `
+ACTA DE SANCIÓN N° _______________
+
+RESOLUCIÓN N° _______________
+
+FECHA: ${new Date().toLocaleDateString('es-PE')}
+
+ANTECEDENTES:
+En sesión de Junta Directiva de fecha _____________, se acordó aplicar la siguiente sanción:
+
+DATOS DE LA PERSONA/ENTIDAD SANCIONADA:
+- Nombre/Razón Social: _______________________________
+- DNI/RUC/Placa: ___________________________________
+- Domicilio/Ubicación: _____________________________
+
+TIPO DE SANCIÓN: _____________________________________
+
+MOTIVO: ____________________________________________
+_________________________________________________
+_________________________________________________
+
+DESCRIPCIÓN DE LOS HECHOS:
+_________________________________________________
+_________________________________________________
+_________________________________________________
+
+MONTO DE LA MULTA (si aplica): S/ ___________________
+
+FECHA DE VENCIMIENTO: _______________________________
+
+DISPOSICIONES:
+1. La presente sanción deberá ser cumplida en el plazo establecido.
+2. El incumplimiento de la presente resolución acarreará las medidas adicionales previstas en el estatuto.
+3. La presente resolución es apelable dentro de los 15 días calendario siguientes a su notificación.
+
+OBSERVACIONES:
+_________________________________________________
+_________________________________________________
+
+Dado en _____________ a los ____ días del mes de _________ del año 2024.
+
+
+_____________________          _____________________
+    PRESIDENTE                      FISCAL
+   Junta Directiva               Junta Directiva
+
+
+SELLO:
+    `;
+    
+    const element = document.createElement('a');
+    element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(plantilla);
+    element.download = `plantilla_sancion_${new Date().getTime()}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    
+    toast({
+      title: "Plantilla descargada",
+      description: "Complete los datos y obtenga las firmas correspondientes"
+    });
+  };
+
   const getEntidadDocumento = (entidad: any) => {
     if ('dni' in entidad) return entidad.dni;
     if ('ruc' in entidad) return entidad.ruc;
@@ -97,7 +161,7 @@ export const NuevaSancionModal = ({ open, onOpenChange, onSuccess }: NuevaSancio
         fechaVencimiento: fechaVencimiento ? fechaVencimiento.toISOString().split('T')[0] : undefined
       };
 
-      await createSancion(sancionData);
+      await createSancion(sancionData, archivoDocumento || undefined);
 
       toast({
         title: "Sanción creada",
@@ -132,6 +196,25 @@ export const NuevaSancionModal = ({ open, onOpenChange, onSuccess }: NuevaSancio
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Descargar Plantilla */}
+          <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-primary">Plantilla de Sanción</p>
+                <p className="text-xs text-primary/80">Descargue, complete y adjunte el documento firmado</p>
+              </div>
+              <Button 
+                type="button" 
+                onClick={descargarPlantillaSancion} 
+                variant="outline" 
+                size="sm"
+                className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar
+              </Button>
+            </div>
+          </div>
           {/* Tipo de Entidad */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -276,18 +359,18 @@ export const NuevaSancionModal = ({ open, onOpenChange, onSuccess }: NuevaSancio
                     selected={fechaVencimiento}
                     onSelect={setFechaVencimiento}
                     disabled={(date) => date < new Date()}
-                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
                   />
                 </PopoverContent>
               </Popover>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="resolucion">Número de Resolución</Label>
+              <Label htmlFor="resolucion">Número de Acta de la Resolución</Label>
               <Input
                 id="resolucion"
                 {...register('resolucion')}
-                placeholder="Ej: RES-001-2024"
+                placeholder="Ej: ACTA-001-2024"
               />
             </div>
           </div>
@@ -303,32 +386,40 @@ export const NuevaSancionModal = ({ open, onOpenChange, onSuccess }: NuevaSancio
             />
           </div>
 
-          {/* Archivo del Documento */}
+          {/* Documento de Sanción */}
           <div className="space-y-2">
-            <Label htmlFor="archivo">Documento de Sanción (Opcional)</Label>
+            <Label htmlFor="archivo">Documento de Sanción Firmado *</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Suba el acta de sanción firmada por el Presidente y Fiscal (PDF, JPG, PNG)
+            </p>
             <div className="flex items-center gap-2">
               <Input
                 type="file"
-                accept="application/pdf,image/*"
+                accept="application/pdf,image/jpeg,image/jpg,image/png"
                 onChange={(e) => setArchivoDocumento(e.target.files?.[0] || null)}
                 className="flex-1"
+                required
               />
               <Button type="button" variant="outline" size="sm">
                 <Upload className="h-4 w-4" />
               </Button>
             </div>
             {archivoDocumento && (
-              <p className="text-xs text-muted-foreground">
-                Archivo seleccionado: {archivoDocumento.name}
-              </p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <FileText className="h-4 w-4" />
+                <span>Archivo seleccionado: {archivoDocumento.name}</span>
+              </div>
             )}
+            <p className="text-xs text-destructive">
+              * Este campo es obligatorio. Debe adjuntar el documento firmado.
+            </p>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} variant="destructive">
+            <Button type="submit" disabled={loading || !archivoDocumento} variant="destructive">
               {loading ? "Creando..." : "Crear Sanción"}
             </Button>
           </DialogFooter>

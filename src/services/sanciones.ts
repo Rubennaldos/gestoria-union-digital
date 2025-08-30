@@ -13,6 +13,9 @@ import {
   DelegadoSancionable,
   JuntaDirectivaSancionable
 } from '@/types/sanciones';
+import { db } from '@/config/firebase';
+import { ref, push, set, get, update, remove, query, orderByChild } from 'firebase/database';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // Simulación de datos para desarrollo
 let sanciones: Sancion[] = [
@@ -147,56 +150,101 @@ let entidadesSancionables = {
 };
 
 export const getSanciones = async (filters?: SancionFilters): Promise<Sancion[]> => {
-  // Simular delay de API
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  let result = [...sanciones];
-  
-  if (filters) {
-    if (filters.tipoEntidad) {
-      result = result.filter(s => s.tipoEntidad === filters.tipoEntidad);
+  try {
+    const sancionesRef = ref(db, 'sanciones');
+    const snapshot = await get(sancionesRef);
+    
+    if (!snapshot.exists()) {
+      return [];
     }
-    if (filters.tipoSancion) {
-      result = result.filter(s => s.tipoSancion === filters.tipoSancion);
+    
+    const sancionesData = snapshot.val();
+    let result: Sancion[] = Object.keys(sancionesData).map(key => ({
+      id: key,
+      ...sancionesData[key]
+    }));
+    
+    if (filters) {
+      if (filters.tipoEntidad) {
+        result = result.filter(s => s.tipoEntidad === filters.tipoEntidad);
+      }
+      if (filters.tipoSancion) {
+        result = result.filter(s => s.tipoSancion === filters.tipoSancion);
+      }
+      if (filters.estado) {
+        result = result.filter(s => s.estado === filters.estado);
+      }
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        result = result.filter(s => 
+          s.entidadNombre.toLowerCase().includes(search) ||
+          s.motivo.toLowerCase().includes(search) ||
+          s.numeroSancion.toLowerCase().includes(search)
+        );
+      }
     }
-    if (filters.estado) {
-      result = result.filter(s => s.estado === filters.estado);
-    }
-    if (filters.search) {
-      const search = filters.search.toLowerCase();
-      result = result.filter(s => 
-        s.entidadNombre.toLowerCase().includes(search) ||
-        s.motivo.toLowerCase().includes(search) ||
-        s.numeroSancion.toLowerCase().includes(search)
-      );
-    }
+    
+    return result.sort((a, b) => b.createdAt - a.createdAt);
+  } catch (error) {
+    console.error('Error getting sanciones:', error);
+    throw error;
   }
-  
-  return result.sort((a, b) => b.createdAt - a.createdAt);
 };
 
 export const getSancionById = async (id: string): Promise<Sancion | null> => {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return sanciones.find(s => s.id === id) || null;
+  try {
+    const sancionRef = ref(db, `sanciones/${id}`);
+    const snapshot = await get(sancionRef);
+    
+    if (snapshot.exists()) {
+      return { id, ...snapshot.val() };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting sancion:', error);
+    throw error;
+  }
 };
 
-export const createSancion = async (data: CreateSancionForm): Promise<Sancion> => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  const newSancion: Sancion = {
-    id: `san-${Date.now()}`,
-    numeroSancion: `SAN-${new Date().getFullYear()}-${String(sanciones.length + 1).padStart(3, '0')}`,
-    ...data,
-    fechaAplicacion: new Date().toISOString().split('T')[0],
-    estado: 'activa',
-    aplicadoPor: 'current-user-id', // En producción sería el ID del usuario actual
-    aplicadoPorNombre: 'Usuario Actual', // En producción sería el nombre del usuario actual
-    createdAt: Date.now(),
-    updatedAt: Date.now()
-  };
-  
-  sanciones.push(newSancion);
-  return newSancion;
+export const createSancion = async (data: CreateSancionForm, archivoDocumento?: File): Promise<Sancion> => {
+  try {
+    // Generar número de sanción
+    const sancionesRef = ref(db, 'sanciones');
+    const snapshot = await get(sancionesRef);
+    const count = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+    const numeroSancion = `SAN-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    
+    let documentoSancionUrl = undefined;
+    
+    // Subir archivo si existe
+    if (archivoDocumento) {
+      const storage = getStorage();
+      const fileName = `sanciones/${Date.now()}_${archivoDocumento.name}`;
+      const fileRef = storageRef(storage, fileName);
+      await uploadBytes(fileRef, archivoDocumento);
+      documentoSancionUrl = await getDownloadURL(fileRef);
+    }
+    
+    const newSancion: Omit<Sancion, 'id'> = {
+      numeroSancion,
+      ...data,
+      fechaAplicacion: new Date().toISOString().split('T')[0],
+      estado: 'activa',
+      aplicadoPor: 'current-user-id', // En producción sería el ID del usuario actual
+      aplicadoPorNombre: 'Usuario Actual', // En producción sería el nombre del usuario actual
+      documentoSancion: documentoSancionUrl,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    
+    const newRef = push(sancionesRef);
+    await set(newRef, newSancion);
+    
+    return { id: newRef.key!, ...newSancion };
+  } catch (error) {
+    console.error('Error creating sancion:', error);
+    throw error;
+  }
 };
 
 export const updateSancion = async (id: string, data: UpdateSancionForm): Promise<Sancion> => {
