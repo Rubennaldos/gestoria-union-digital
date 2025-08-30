@@ -17,6 +17,8 @@ import { db } from '@/config/firebase';
 import { ref, push, set, get, update, remove, query, orderByChild } from 'firebase/database';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
+// Firebase Database service for Sanciones module
+
 // Simulación de datos para desarrollo
 let sanciones: Sancion[] = [
   {
