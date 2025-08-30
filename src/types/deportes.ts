@@ -2,6 +2,7 @@ export type EstadoReserva = 'pendiente' | 'pagado' | 'cancelado' | 'no-show' | '
 
 export type MetodoPago = 'efectivo' | 'transferencia' | 'yape' | 'plin';
 
+// Sports court types for facility reservations
 export type TipoCancha = 'futbol' | 'voley' | 'basquet' | 'tenis' | 'padel';
 
 export interface Cancha {

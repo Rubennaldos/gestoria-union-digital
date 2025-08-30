@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings, Clock, DollarSign, Shield, MessageSquare, Plus } from "lucide-react";
-import { ConfiguracionDeportes, TipoCancha } from "@/types/deportes";
+import { ConfiguracionDeportes } from "@/types/deportes";
+import type { TipoCancha } from "@/types/deportes";
 import { obtenerConfiguracion, actualizarConfiguracion, crearCancha } from "@/services/deportes";
 import { toast } from "@/hooks/use-toast";
 
