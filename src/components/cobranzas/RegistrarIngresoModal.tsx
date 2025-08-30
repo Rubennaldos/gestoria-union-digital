@@ -7,7 +7,6 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { useToast } from "@/hooks/use-toast";
 import { crearIngreso } from "@/services/cobranzas";
 import { useAuth } from "@/contexts/AuthContext";
-import { MetodoPago } from "@/types/cobranzas";
 
 interface Props {
   open: boolean;
@@ -29,7 +28,7 @@ export default function RegistrarIngresoModal({ open, onOpenChange, onSuccess }:
     const aa = d.getFullYear();
     return `${dd}/${mm}/${aa}`;
   });
-  const [metodo, setMetodo] = useState<MetodoPago | "">("");
+  const [metodo, setMetodo] = useState<string>("");
   const [operacion, setOperacion] = useState<string>("");
   const [archivoUrl, setArchivoUrl] = useState<string>("");
   const [loading, setLoading] = useState(false);
@@ -68,7 +67,8 @@ export default function RegistrarIngresoModal({ open, onOpenChange, onSuccess }:
           fecha,
           metodoPago: metodo || null,
           numeroOperacion: operacion || null,
-          archivoUrl: archivoUrl || null
+          archivoUrl: archivoUrl || null,
+          registradoPor: user.uid
         },
         user.uid
       );
@@ -124,15 +124,7 @@ export default function RegistrarIngresoModal({ open, onOpenChange, onSuccess }:
             </div>
             <div className="space-y-1">
               <Label>Método de pago</Label>
-              <Select value={metodo} onValueChange={(v) => setMetodo(v as MetodoPago | "")}>
-                <SelectTrigger><SelectValue placeholder="Selecciona método" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="efectivo">Efectivo</SelectItem>
-                  <SelectItem value="transferencia">Transferencia</SelectItem>
-                  <SelectItem value="yape">Yape</SelectItem>
-                  <SelectItem value="plin">Plin</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input value={metodo} onChange={(e) => setMetodo(e.target.value)} placeholder="Efectivo / Yape / Plin / Transferencia" />
             </div>
           </div>
 
