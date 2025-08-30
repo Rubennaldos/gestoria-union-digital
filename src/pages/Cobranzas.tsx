@@ -35,7 +35,7 @@ import { RegistrarPagoModal } from "@/components/cobranzas/RegistrarPagoModal";
 import { DeclaracionJuradaModal } from "@/components/cobranzas/DeclaracionJuradaModal";
 import { SancionModal } from "@/components/cobranzas/SancionModal";
 import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadronadoModal";
-import { RegistrarIngresoModal } from "@/components/cobranzas/RegistrarIngresoModal"; // ⬅️ NUEVO
+import RegistrarIngresoModal from "@/components/cobranzas/RegistrarIngresoModal"; // ⬅️ NUEVO
 
 const Cobranzas = () => {
   const { user } = useAuth();
