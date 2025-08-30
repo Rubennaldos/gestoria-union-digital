@@ -430,71 +430,77 @@ export const aplicarSancion = async (sancionData: Omit<PlantillaSancion, 'id'>):
    Estadísticas (lee CHARGES + INGRESOS + EGRESOS del mes)
    ────────────────────────────────────────────────────────── */
 export const generarEstadisticas = async (): Promise<EstadisticasCobranzas> => {
-  const [egresos, empadronados] = await Promise.all([obtenerEgresos(), obtenerEmpadronados()]);
+  const [egresos, empadronados] = await Promise.all([
+    obtenerEgresos(),
+    obtenerEmpadronados(),
+  ]);
 
   const hoy = new Date();
   const añoActual = hoy.getFullYear();
   const mesActual = hoy.getMonth() + 1;
-  const periodKey = periodCompact(periodFromYM(añoActual, mesActual));
+  const periodKeyMesActual = periodCompact(periodFromYM(añoActual, mesActual));
 
-  // CHARGES del mes (cuotas)
-  const chargesSnap = await get(ref(db, `cobranzas/charges/${periodKey}`));
-  const chargesByEmp = chargesSnap.exists() ? chargesSnap.val() : {};
-  let recaudadoCuotas = 0;
-  let totalPendiente = 0;
-  let totalMorosos = 0;
+  // ── LECTURA DE TODOS LOS CHARGES (TODOS LOS PERIODOS) ─────────────
+  const chargesRootSnap = await get(ref(db, 'cobranzas/charges'));
 
-  Object.keys(chargesByEmp).forEach((empId) => {
-    const node = chargesByEmp[empId];
-    const chargeId = Object.keys(node)[0];
-    const c = node[chargeId];
-    const total = Number(c.total || 0);
-    const saldo = Number(c.saldo || 0);
+  let totalRecaudado = 0;     // acumulado (sumatoria de total - saldo)
+  let totalPendiente = 0;     // acumulado (sumatoria de saldos)
+  let totalMorosos = 0;       // cantidad de empadronados con AL MENOS un cargo moroso/pasado
+  let totalCharges = 0;       // cargos totales
+  let paidCharges = 0;        // cargos pagados (saldo 0)
+  const morososSet = new Set<string>();
 
-    recaudadoCuotas += total - saldo; // si está pagado → total, si no → 0
-    totalPendiente += saldo;
-    if (c.estado === 'moroso') totalMorosos += 1;
-  });
+  if (chargesRootSnap.exists()) {
+    const allPeriods = chargesRootSnap.val() as Record<string, any>; // {YYYYMM:{empId:{chargeId:{...}}}}
 
-  // INGRESOS libres del mes (donaciones/eventos/etc.)
-  const ingresosLibresMes = (await obtenerIngresosMes(añoActual, mesActual)).reduce(
-    (sum, i) => sum + Number(i.monto || 0),
-    0
-  );
+    for (const yyyymm of Object.keys(allPeriods)) {
+      const perNode = allPeriods[yyyymm];
+      for (const empId of Object.keys(perNode)) {
+        const node = perNode[empId];
+        const chargeId = Object.keys(node)[0];
+        const c = node[chargeId];
 
-  // EGRESOS del mes
+        totalCharges += 1;
+
+        const total = Number(c.total || 0);
+        const saldo = Number(c.saldo || 0);
+        totalRecaudado += total - saldo;
+        totalPendiente += saldo;
+
+        // ¿Está vencido y con saldo?
+        let vencido = false;
+        if (c.vencimiento) {
+          const [dd, mm, aa] = String(c.vencimiento).split('/');
+          const vencDate = new Date(Number(aa), Number(mm) - 1, Number(dd));
+          vencido = hoy.getTime() > vencDate.getTime();
+        }
+        const esMoroso = c.estado === 'moroso' || (vencido && saldo > 0);
+        if (esMoroso) morososSet.add(empId);
+
+        if (saldo <= 0 || c.estado === 'pagado') paidCharges += 1;
+      }
+    }
+  }
+
+  totalMorosos = morososSet.size;
+  const tasaCobranza = totalCharges > 0 ? (paidCharges / totalCharges) * 100 : 0;
+
+  // ── Egresos del mes actual (si los usas en otra vista) ─────────────
   const egresosMesActual = egresos.filter((e) => {
-    const [, mm, aa] = e.fecha.split('/'); // "dd/mm/aaaa"
+    const [dd, mm, aa] = e.fecha.split('/');
     return Number(mm) === mesActual && Number(aa) === añoActual;
   });
-  const totalEgresos = egresosMesActual.reduce((sum, e) => sum + Number(e.monto || 0), 0);
-
-  // Tasa de cobranza (sólo cuotas)
-  const tasaCobranza =
-    empadronados.length > 0
-      ? (Object.keys(chargesByEmp).filter((empId) => {
-          const c = chargesByEmp[empId];
-          const id = Object.keys(c)[0];
-          return c[id]?.estado === 'pagado';
-        }).length /
-          empadronados.length) *
-        100
-      : 0;
-
-  // Totales para cards
-  const totalRecaudado = recaudadoCuotas + ingresosLibresMes;
-  const ingresosMes = totalRecaudado;
-  const saldoActual = totalRecaudado - totalEgresos;
+  const totalEgresosMes = egresosMesActual.reduce((sum, e) => sum + Number(e.monto || 0), 0);
 
   return {
     totalEmpadronados: empadronados.length,
-    totalRecaudado,
-    totalPendiente,
-    totalMorosos,
-    tasaCobranza,
-    ingresosMes,
-    egresosMes: totalEgresos,
-    saldoActual,
+    totalRecaudado,             // AHORA acumulado real
+    totalPendiente,             // AHORA acumulado real
+    totalMorosos,               // empadronados con deuda vencida
+    tasaCobranza,               // % de cargos pagados sobre el total
+    ingresosMes: Math.max(0, totalRecaudado), // puedes cambiar si quieres solo del mes
+    egresosMes: totalEgresosMes,
+    saldoActual: Math.max(0, totalRecaudado) - totalEgresosMes
   };
 };
 
