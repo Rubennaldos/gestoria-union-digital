@@ -208,12 +208,12 @@ const Sanciones = () => {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Tipo de Entidad</label>
-                <Select value={filtroTipoEntidad} onValueChange={(value) => setFiltroTipoEntidad(value as TipoEntidad | "")}>
+                <Select value={filtroTipoEntidad || "all"} onValueChange={(value) => setFiltroTipoEntidad(value === "all" ? "" : value as TipoEntidad)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas las entidades" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas las entidades</SelectItem>
+                    <SelectItem value="all">Todas las entidades</SelectItem>
                     <SelectItem value="empadronado">Empadronados</SelectItem>
                     <SelectItem value="maestro_obra">Maestros de Obra</SelectItem>
                     <SelectItem value="direccion">Dirección</SelectItem>
@@ -227,12 +227,12 @@ const Sanciones = () => {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Tipo de Sanción</label>
-                <Select value={filtroTipoSancion} onValueChange={(value) => setFiltroTipoSancion(value as TipoSancion | "")}>
+                <Select value={filtroTipoSancion || "all"} onValueChange={(value) => setFiltroTipoSancion(value === "all" ? "" : value as TipoSancion)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos los tipos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los tipos</SelectItem>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
                     <SelectItem value="amonestacion">Amonestación</SelectItem>
                     <SelectItem value="multa">Multa</SelectItem>
                     <SelectItem value="suspension_temporal">Suspensión Temporal</SelectItem>
@@ -245,12 +245,12 @@ const Sanciones = () => {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Estado</label>
-                <Select value={filtroEstado} onValueChange={(value) => setFiltroEstado(value as EstadoSancion | "")}>
+                <Select value={filtroEstado || "all"} onValueChange={(value) => setFiltroEstado(value === "all" ? "" : value as EstadoSancion)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos los estados" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos los estados</SelectItem>
+                    <SelectItem value="all">Todos los estados</SelectItem>
                     <SelectItem value="activa">Activa</SelectItem>
                     <SelectItem value="cumplida">Cumplida</SelectItem>
                     <SelectItem value="anulada">Anulada</SelectItem>
