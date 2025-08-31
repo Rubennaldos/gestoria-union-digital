@@ -9,180 +9,196 @@ import { auth, adminAuth } from "@/config/firebase";
 import { get, ref } from "firebase/database";
 import { db } from "@/config/firebase";
 import { CreateUserForm } from "@/types/auth";
-import {
-  createUserProfile,
-  getUserProfile,
-  updateUserProfile,
-} from "./rtdb";
+import { createUserProfile, getUserProfile, updateUserProfile } from "./rtdb";
+import { getEmpadronadoById, linkAuthToEmpadronado } from "@/services/empadronados";
 
-/* ──────────────────────────────────────────────────────────
-   Helpers
-   ────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   Utils
+   ───────────────────────────────────────────────────────── */
 const normalize = (v?: string | null) => (v || "").trim().toLowerCase();
-const SUPER_EMAIL = "presidencia@jpusap.com";
+const RESERVED_SUPER_EMAIL = "presidencia@jpusap.com";
 
-/* ──────────────────────────────────────────────────────────
-   Login con email o username
-   ────────────────────────────────────────────────────────── */
-export const signInWithEmailOrUsername = async (
-  identifier: string,
-  password: string
-) => {
-  let email = normalize(identifier);
+/** Busca email por username normalizado */
+const resolveEmailByUsername = async (usernameRaw: string): Promise<string | null> => {
+  const username = normalize(usernameRaw);
+  if (!username) return null;
+  const usernameRef = ref(db, `usernames/${username}`);
+  const snapshot = await get(usernameRef);
+  return snapshot.exists() ? String(snapshot.val().email || "") : null;
+};
 
-  console.log("🔐 Login attempt with identifier:", identifier);
+/** Verifica que un username (normalizado) esté libre */
+const ensureUsernameAvailable = async (usernameRaw?: string | null) => {
+  const username = normalize(usernameRaw);
+  if (!username) return; // no hay username
+  const usernameRef = ref(db, `usernames/${username}`);
+  const snapshot = await get(usernameRef);
+  if (snapshot.exists()) {
+    throw new Error(`El usuario "${username}" ya está en uso`);
+  }
+};
 
-  // Si no es un email, buscar mapping por username
-  if (!email.includes("@")) {
-    console.log("🔍 Looking up username in database...");
-    const usernameRef = ref(db, `usernames/${identifier}`);
-    const snapshot = await get(usernameRef);
+/* ─────────────────────────────────────────────────────────
+   Login: email o username
+   ───────────────────────────────────────────────────────── */
+export const signInWithEmailOrUsername = async (identifier: string, password: string) => {
+  let email = identifier;
 
-    if (!snapshot.exists()) {
-      console.log("❌ Username not found in database");
-      // Debug opcional de todos los usernames
+  console.log("🔐 Login attempt:", identifier);
+
+  // Si el identificador NO tiene @, lo tratamos como username
+  if (!identifier.includes("@")) {
+    console.log("🔍 Resolviendo username en RTDB...");
+    const foundEmail = await resolveEmailByUsername(identifier);
+    if (!foundEmail) {
+      console.log("❌ Username no encontrado");
+      // Debug opcional
       const allUsernamesRef = ref(db, "usernames");
       const allSnapshot = await get(allUsernamesRef);
       if (allSnapshot.exists()) {
-        console.log("🔍 Available usernames:", Object.keys(allSnapshot.val()));
-      } else {
-        console.log("❌ No usernames found in database at all");
+        console.log("🧭 Usernames disponibles:", Object.keys(allSnapshot.val()));
       }
       throw new Error("Usuario no encontrado");
     }
-
-    email = normalize(snapshot.val().email);
-    console.log("✅ Username resolved to email:", email);
+    email = foundEmail;
+    console.log("✅ Username resuelto a email:", email);
+  } else {
+    email = normalize(email);
   }
 
-  console.log("🔑 Attempting Firebase authentication...");
+  console.log("🔑 Firebase Auth signIn...");
   const result = await signInWithEmailAndPassword(auth, email, password);
-  console.log("✅ Firebase auth successful, checking user profile...");
 
-  // Verificar/crear perfil
-  let profile = await getUserProfile(result.user.uid);
-  console.log("👤 User profile:", profile);
+  console.log("✅ Auth OK, leyendo perfil...");
+  const profile = await getUserProfile(result.user.uid);
+  console.log("👤 Perfil:", profile);
 
-  // Si NO hay perfil y es el superusuario → crear perfil automático
-  if (!profile && normalize(result.user.email) === SUPER_EMAIL) {
-    console.log("🆕 No profile for presidencia; creating default profile...");
-    await createUserProfile(
-      result.user.uid,
-      {
-        uid: result.user.uid,
-        email: normalize(result.user.email || SUPER_EMAIL),
-        username: "presidencia",
-        displayName: result.user.displayName || "Administrador Presidencia",
-        roleId: "presidencia",
-        activo: true,
-        createdAt: Date.now(),
-        tipoUsuario: "presidente",
-        fechaInicioMandato: Date.now(),
-        fechaFinMandato: Date.now() + 365 * 24 * 60 * 60 * 1000,
-      },
-      result.user.uid
-    );
-    profile = await getUserProfile(result.user.uid);
-    console.log("✅ Auto profile created:", profile);
-  }
-
-  // Si está inactivo y es presidencia, activar
+  // Si el perfil no está activo
   if (!profile?.activo) {
-    console.log("❌ User is not active");
-
-    if (profile?.roleId === "presidencia" || email === SUPER_EMAIL) {
-      console.log("🔧 Auto-activating presidencia user...");
+    // Auto-activar SOLO si es la cuenta de Presidencia
+    if (normalize(profile?.roleId) === "presidencia" || normalize(email) === RESERVED_SUPER_EMAIL) {
       try {
-        await updateUserProfile(
-          result.user.uid,
-          { activo: true },
-          result.user.uid
-        );
-        console.log("✅ Presidencia user activated successfully");
-        const updatedProfile = await getUserProfile(result.user.uid);
-        console.log("✅ Updated profile:", updatedProfile);
+        await updateUserProfile(result.user.uid, { activo: true }, result.user.uid);
+        console.log("✅ Presidencia activada automáticamente");
         return result;
-      } catch (error) {
-        console.error("❌ Error activating presidencia user:", error);
+      } catch (e) {
+        console.error("❌ Error auto-activando Presidencia:", e);
       }
     }
 
     await signOut(auth);
-    throw new Error(
-      "USUARIO_SUSPENDIDO: Tu acceso está deshabilitado, contacta a Presidencia."
-    );
+    throw new Error("USUARIO_SUSPENDIDO: Tu acceso está deshabilitado, contacta a Presidencia.");
   }
 
-  console.log("✅ Login successful");
+  console.log("✅ Login exitoso");
   return result;
 };
 
-/* ──────────────────────────────────────────────────────────
-   Crear usuario (Auth) + perfil (RTDB)
-   ────────────────────────────────────────────────────────── */
-export const createUserAndProfile = async (
-  userData: CreateUserForm
-): Promise<string> => {
-  const { password, ...profileData } = userData;
+/* ─────────────────────────────────────────────────────────
+   Crear usuario + perfil (usando app secundaria)
+   ───────────────────────────────────────────────────────── */
+export const createUserAndProfile = async (userData: CreateUserForm): Promise<string> => {
+  const {
+    password,
+    email: rawEmail,
+    username: rawUsername,
+    roleId,
+    empadronadoId,
+    ...restProfile
+  } = userData;
 
-  console.log("🔧 createUserAndProfile called with:", {
-    email: userData.email,
-    username: userData.username,
+  const email = normalize(rawEmail);
+  const username = normalize(rawUsername);
+
+  console.log("🔧 createUserAndProfile:", {
+    email,
+    username,
     displayName: userData.displayName,
     roleId: userData.roleId,
+    empadronadoId,
   });
 
-  // Validar username único si viene
-  if (userData.username) {
-    console.log("🔍 Checking username uniqueness:", userData.username);
-    const usernameRef = ref(db, `usernames/${userData.username}`);
-    const snapshot = await get(usernameRef);
-
-    if (snapshot.exists()) {
-      console.log("❌ Username already exists");
-      throw new Error(`El usuario "${userData.username}" ya está en uso`);
-    }
-    console.log("✅ Username is available");
+  // Reglas para la cuenta reservada de Presidencia
+  if (email === RESERVED_SUPER_EMAIL && normalize(roleId) !== "presidencia") {
+    throw new Error(
+      `El correo ${RESERVED_SUPER_EMAIL} solo puede usarse con el rol "presidencia".`
+    );
   }
 
-  // Normalizar email
-  const email = normalize(userData.email);
+  // Username único (si se proporciona)
+  await ensureUsernameAvailable(username);
 
-  console.log("🔐 Creating user in Firebase Auth with adminAuth...");
-  const result = await createUserWithEmailAndPassword(
-    adminAuth,
-    email,
-    password
-  );
+  console.log("🔐 Creando usuario en Auth (adminAuth)...");
+  const result = await createUserWithEmailAndPassword(adminAuth, email, password);
   const uid = result.user.uid;
-  console.log("✅ Firebase Auth user created with UID:", uid);
+  console.log("✅ Usuario Auth creado UID:", uid);
 
   try {
-    console.log("💾 Creating user profile in RTDB...");
-    await createUserProfile(
+    console.log("💾 Creando perfil en RTDB...");
+    await createUserProfile(uid, {
+      ...restProfile,
+      email,
+      username: username || undefined,
+      roleId,
       uid,
-      {
-        ...profileData,
-        uid,
-        email,
-        createdAt: Date.now(),
-      },
-      uid // actorUid = el mismo usuario creado (si fuese un administrador, podrías pasar su uid)
-    );
-    console.log("✅ User profile created in RTDB");
+      createdAt: Date.now(),
+      empadronadoId: empadronadoId || undefined,
+    });
 
+    // Vincular al padrón si corresponde
+    if (empadronadoId) {
+      const emp = await getEmpadronadoById(empadronadoId);
+      if (!emp) {
+        console.warn("⚠️ Empadronado no encontrado para empadronadoId:", empadronadoId);
+      } else {
+        await linkAuthToEmpadronado(empadronadoId, uid, email);
+        console.log("🔗 Empadronado vinculado al usuario.");
+      }
+    }
+
+    console.log("✅ Perfil creado y todo OK");
     return uid;
   } finally {
-    // Importante: cerrar sesión de la app secundaria
-    console.log("🚪 Signing out from adminAuth...");
+    // MUY IMPORTANTE: Cerrar sesión de la app secundaria
+    console.log("🚪 Cerrando sesión adminAuth...");
     await signOut(adminAuth);
-    console.log("✅ Signed out from adminAuth");
+    console.log("✅ adminAuth signOut");
   }
 };
 
-/* ──────────────────────────────────────────────────────────
-   Utilidades de Auth
-   ────────────────────────────────────────────────────────── */
+/* Helper para crear la cuenta de un empadronado directo desde el padrón */
+export const createAccountForEmpadronado = async (
+  empadronadoId: string,
+  opts: {
+    email: string;
+    password: string;
+    displayName: string;
+    username?: string;
+    phone?: string;
+    roleId?: string; // por defecto "asociado"
+  }
+) => {
+  const emp = await getEmpadronadoById(empadronadoId);
+  if (!emp) throw new Error("Empadronado no encontrado");
+
+  const uid = await createUserAndProfile({
+    displayName: opts.displayName,
+    email: opts.email,
+    username: opts.username,
+    phone: opts.phone,
+    roleId: opts.roleId || "asociado",
+    activo: true,
+    password: opts.password,
+    empadronadoId,
+    tipoUsuario: "asociado",
+  });
+
+  return uid;
+};
+
+/* ─────────────────────────────────────────────────────────
+   Otros helpers estándar
+   ───────────────────────────────────────────────────────── */
 export const resetPassword = async (email: string) => {
   await sendPasswordResetEmail(auth, normalize(email));
 };
