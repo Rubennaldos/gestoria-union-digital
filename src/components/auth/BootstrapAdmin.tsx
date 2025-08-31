@@ -75,7 +75,12 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
         username,
         roleId: 'presidencia',
         activo: true,
-        password: data.password
+        password: data.password,
+        tipoUsuario: 'presidente',
+        phone: undefined,
+        empadronadoId: undefined,
+        fechaInicioMandato: Date.now(),
+        fechaFinMandato: Date.now() + (365 * 24 * 60 * 60 * 1000) // Un año
       });
       console.log('✅ User created with UID:', uid);
 

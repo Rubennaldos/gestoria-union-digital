@@ -13,6 +13,8 @@ import { useAuthz } from '@/contexts/AuthzContext';
 import { createUserAndProfile } from '@/services/auth';
 import { listRoles } from '@/services/rtdb';
 import { CreateUserForm, Role } from '@/types/auth';
+import { Empadronado } from '@/types/empadronados';
+import { UserEmpadronadoSelector } from '@/components/auth/UserEmpadronadoSelector';
 import { 
   ArrowLeft, 
   User, 
@@ -34,6 +36,7 @@ export default function UserNew() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedEmpadronado, setSelectedEmpadronado] = useState<Empadronado | null>(null);
 
   const form = useForm<CreateUserForm & { confirmPassword: string }>({
     defaultValues: {
@@ -44,7 +47,11 @@ export default function UserNew() {
       roleId: '',
       activo: true,
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      empadronadoId: '',
+      tipoUsuario: 'asociado',
+      fechaInicioMandato: undefined,
+      fechaFinMandato: undefined
     }
   });
 
@@ -263,6 +270,38 @@ export default function UserNew() {
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name="empadronadoId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Empadronado Asociado (opcional)</FormLabel>
+                          <FormControl>
+                            <UserEmpadronadoSelector
+                              value={field.value}
+                              onChange={(empadronadoId, empadronado) => {
+                                field.onChange(empadronadoId);
+                                setSelectedEmpadronado(empadronado);
+                                // Auto-rellenar datos si están vacíos
+                                if (!form.getValues('displayName')) {
+                                  form.setValue('displayName', `${empadronado.nombre} ${empadronado.apellidos}`);
+                                }
+                                if (!form.getValues('phone') && empadronado.telefonos?.[0]) {
+                                  form.setValue('phone', empadronado.telefonos[0].numero);
+                                }
+                              }}
+                              onClear={() => {
+                                field.onChange('');
+                                setSelectedEmpadronado(null);
+                              }}
+                              placeholder="Buscar empadronado por nombre, DNI o padrón..."
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   {/* Configuración de Cuenta */}
@@ -271,11 +310,62 @@ export default function UserNew() {
                     
                     <FormField
                       control={form.control}
+                      name="tipoUsuario"
+                      rules={{ required: 'El tipo de usuario es requerido' }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tipo de Usuario</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Seleccionar tipo" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="administrador">
+                                <div>
+                                  <div className="font-medium">Administrador</div>
+                                  <div className="text-xs text-muted-foreground">Acceso total al sistema</div>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="presidente">
+                                <div>
+                                  <div className="font-medium">Presidente</div>
+                                  <div className="text-xs text-muted-foreground">Presidencia de JPUSAP</div>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="directivo">
+                                <div>
+                                  <div className="font-medium">Directivo</div>
+                                  <div className="text-xs text-muted-foreground">Miembro de junta directiva</div>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="delegado">
+                                <div>
+                                  <div className="font-medium">Delegado</div>
+                                  <div className="text-xs text-muted-foreground">Delegado por sector/manzana</div>
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="asociado">
+                                <div>
+                                  <div className="font-medium">Asociado</div>
+                                  <div className="text-xs text-muted-foreground">Usuario básico del sistema</div>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
                       name="roleId"
                       rules={{ required: 'El rol es requerido' }}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Rol</FormLabel>
+                          <FormLabel>Rol Funcional</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
                               <SelectTrigger>
@@ -297,6 +387,48 @@ export default function UserNew() {
                         </FormItem>
                       )}
                     />
+
+                    {(form.watch('tipoUsuario') === 'directivo' || form.watch('tipoUsuario') === 'delegado') && (
+                      <>
+                        <FormField
+                          control={form.control}
+                          name="fechaInicioMandato"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Inicio del Mandato</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  {...field}
+                                  value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
+                                  onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).getTime() : undefined)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="fechaFinMandato"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Fin del Mandato</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="date"
+                                  {...field}
+                                  value={field.value ? new Date(field.value).toISOString().split('T')[0] : ''}
+                                  onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value).getTime() : undefined)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
+                    )}
 
                     <FormField
                       control={form.control}

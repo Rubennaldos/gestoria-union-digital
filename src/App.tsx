@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthzProvider } from "@/contexts/AuthzContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminCreator } from "@/components/auth/AdminCreator";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 
@@ -29,7 +30,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
+        <AuthProvider>
+          <AuthzProvider>
+            <Routes>
           {/* Página de inicio por defecto */}
           <Route path="/" element={<Index />} />
           <Route path="/admin/users" element={<Users />} />
@@ -41,14 +44,44 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/inicio" element={<Index />} />
           
-          <Route path="/sesiones" element={<Sesiones />} />
-          <Route path="/cobranzas" element={<Cobranzas />} />
-          <Route path="/sanciones" element={<Sanciones />} />
-          <Route path="/deportes" element={<Deportes />} />
-          <Route path="/patrimonio" element={<Patrimonio />} />
-          <Route path="/usuarios" element={<Users />} />
+          <Route path="/sesiones" element={
+            <ProtectedRoute>
+              <Sesiones />
+            </ProtectedRoute>
+          } />
+          <Route path="/cobranzas" element={
+            <ProtectedRoute>
+              <Cobranzas />
+            </ProtectedRoute>
+          } />
+          <Route path="/sanciones" element={
+            <ProtectedRoute>
+              <Sanciones />
+            </ProtectedRoute>
+          } />
+          <Route path="/deportes" element={
+            <ProtectedRoute>
+              <Deportes />
+            </ProtectedRoute>
+          } />
+          <Route path="/patrimonio" element={
+            <ProtectedRoute>
+              <Patrimonio />
+            </ProtectedRoute>
+          } />
+          <Route path="/usuarios" element={
+            <ProtectedRoute>
+              <Users />
+            </ProtectedRoute>
+          } />
+          
+          {/* Bootstrap inicial */}
+          <Route path="/bootstrap" element={<AdminCreator />} />
+          
           <Route path="*" element={<NotFound />} />
-        </Routes>
+            </Routes>
+          </AuthzProvider>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

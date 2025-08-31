@@ -11,6 +11,10 @@ export interface UserProfile {
   activo: boolean;
   phone?: string;
   createdAt: number;
+  empadronadoId?: string; // Relación con empadronado
+  tipoUsuario: 'administrador' | 'presidente' | 'directivo' | 'delegado' | 'asociado';
+  fechaInicioMandato?: number; // Para directivos y delegados
+  fechaFinMandato?: number; // Para directivos y delegados
 }
 
 export interface UsernameMapping {
@@ -79,6 +83,10 @@ export interface CreateUserForm {
   roleId: string;
   activo: boolean;
   password: string;
+  empadronadoId?: string;
+  tipoUsuario: 'administrador' | 'presidente' | 'directivo' | 'delegado' | 'asociado';
+  fechaInicioMandato?: number;
+  fechaFinMandato?: number;
 }
 
 export interface UpdateUserForm {
@@ -87,6 +95,10 @@ export interface UpdateUserForm {
   phone?: string;
   roleId?: string;
   activo?: boolean;
+  empadronadoId?: string;
+  tipoUsuario?: 'administrador' | 'presidente' | 'directivo' | 'delegado' | 'asociado';
+  fechaInicioMandato?: number;
+  fechaFinMandato?: number;
 }
 
 export interface CreateDelegationForm {
