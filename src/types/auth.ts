@@ -1,20 +1,31 @@
 // Firebase Auth & RTDB Types for Users & Permissions Module
 
+/* ──────────────────────────────────────────────────────────
+   Permission model
+   ────────────────────────────────────────────────────────── */
 export type PermissionLevel = "none" | "read" | "write" | "approve" | "admin";
+export type Permission = Record<string, PermissionLevel>;
+export type EffectivePermissions = Permission;
 
+/* ──────────────────────────────────────────────────────────
+   User model
+   ────────────────────────────────────────────────────────── */
 export interface UserProfile {
   uid: string;
   email: string;
-  username?: string;
   displayName: string;
-  roleId: string;
+  roleId: string; // p.ej. 'asociado' | 'presidencia' | ...
   activo: boolean;
+
+  // opcionales / metadatos
+  username?: string;
   phone?: string;
-  createdAt: number;
   empadronadoId?: string; // Relación con empadronado
-  tipoUsuario: 'administrador' | 'presidente' | 'directivo' | 'delegado' | 'asociado';
-  fechaInicioMandato?: number; // Para directivos y delegados
-  fechaFinMandato?: number; // Para directivos y delegados
+  tipoUsuario?: "administrador" | "presidente" | "directivo" | "delegado" | "asociado";
+  fechaInicioMandato?: number; // Para directivos/delegados
+  fechaFinMandato?: number;    // Para directivos/delegados
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 export interface UsernameMapping {
@@ -22,30 +33,33 @@ export interface UsernameMapping {
   email: string;
 }
 
+/* ──────────────────────────────────────────────────────────
+   RBAC models
+   ────────────────────────────────────────────────────────── */
 export interface Role {
   id: string;
   nombre: string;
-  descripcion: string;
+  descripcion?: string;
+  orden: number; // para ordenar en UI
 }
 
 export interface Module {
   id: string;
   nombre: string;
-  icon: string;
   orden: number;
-  requiereAprobacion: boolean;
+  icon?: string;
+  requiereAprobacion?: boolean;
 }
 
-export interface Permission {
-  [moduleId: string]: PermissionLevel;
-}
-
+/* ──────────────────────────────────────────────────────────
+   Delegations / Audit
+   ────────────────────────────────────────────────────────── */
 export interface Delegation {
-  uid: string;
+  uid: string;            // = targetUid
   startTs: number;
   endTs: number;
   grantedByUid: string;
-  modules?: Permission; // específicos o total
+  modules?: Permission;   // específicos o total
 }
 
 export interface AuditLog {
@@ -59,14 +73,16 @@ export interface AuditLog {
   new?: any;
 }
 
+/* ──────────────────────────────────────────────────────────
+   Bootstrap
+   ────────────────────────────────────────────────────────── */
 export interface BootstrapData {
   initialized: boolean;
 }
 
-export interface EffectivePermissions {
-  [moduleId: string]: PermissionLevel;
-}
-
+/* ──────────────────────────────────────────────────────────
+   Auth wrappers & forms
+   ────────────────────────────────────────────────────────── */
 export interface AuthUser {
   uid: string;
   email: string | null;
@@ -74,31 +90,33 @@ export interface AuthUser {
   profile?: UserProfile;
 }
 
-// Form types
 export interface CreateUserForm {
   displayName: string;
   email: string;
-  username?: string;
-  phone?: string;
+  password: string;
   roleId: string;
   activo: boolean;
-  password: string;
+
+  username?: string;
+  phone?: string;
   empadronadoId?: string;
-  tipoUsuario: 'administrador' | 'presidente' | 'directivo' | 'delegado' | 'asociado';
+  tipoUsuario?: "administrador" | "presidente" | "directivo" | "delegado" | "asociado";
   fechaInicioMandato?: number;
   fechaFinMandato?: number;
 }
 
 export interface UpdateUserForm {
+  email?: string;
   displayName?: string;
   username?: string;
   phone?: string;
   roleId?: string;
   activo?: boolean;
   empadronadoId?: string;
-  tipoUsuario?: 'administrador' | 'presidente' | 'directivo' | 'delegado' | 'asociado';
+  tipoUsuario?: "administrador" | "presidente" | "directivo" | "delegado" | "asociado";
   fechaInicioMandato?: number;
   fechaFinMandato?: number;
+  updatedAt?: number;
 }
 
 export interface CreateDelegationForm {
