@@ -43,10 +43,8 @@ const START_PERIOD = '2025-01';
    Config de cobranzas (usa tu nodo real de config)
    ────────────────────────────────────────────────────────────── */
 const getCobranzasConfig = async (): Promise<{ montoMensual: number; diaVencimiento: number }> => {
-  // En tu servicio de cobranzas usas `cobranzas/configuracion`
   const snap = await get(ref(db, 'cobranzas/configuracion'));
   if (!snap.exists()) {
-    // Default razonables si no hay config
     return { montoMensual: 50, diaVencimiento: 15 };
   }
   const cfg = snap.val() as any;
@@ -58,8 +56,8 @@ const getCobranzasConfig = async (): Promise<{ montoMensual: number; diaVencimie
 
 /* ──────────────────────────────────────────────────────────────
    Alta de PAGOS (compatibles con tu UI)
-   - Se guardan en: cobranzas/pagos (plano) con campos de Pago
-   - Se evita duplicado con un índice: cobranzas/pagos_index/{empId}/{YYYYMM}
+   - Guardado en: cobranzas/pagos
+   - Índice de unicidad: cobranzas/pagos_index/{empId}/{YYYYMM}
    ────────────────────────────────────────────────────────────── */
 const ensurePagoForMemberPeriod = async (
   emp: Pick<Empadronado, 'id' | 'numeroPadron'>,
@@ -70,17 +68,17 @@ const ensurePagoForMemberPeriod = async (
   const m = Number(period.slice(5, 7));
   const yyyymm = compact(period);
 
-  // índice de unicidad por empadronado+periodo
+  // Índice de unicidad (si ya existe, no crea otro)
   const lockRef = ref(db, `cobranzas/pagos_index/${emp.id}/${yyyymm}`);
   const tx = await runTransaction(lockRef, (cur) => (cur ? cur : { createdAt: Date.now() }));
-  if (!tx.committed) return false; // ya existía
+  if (!tx.committed) return false;
 
   const { montoMensual, diaVencimiento } = await getCobranzasConfig();
   const fechaVenc = new Date(y, m - 1, diaVencimiento).toLocaleDateString('es-PE');
 
-  // Crear pago compatible con tu UI
   const pagosRef = ref(db, 'cobranzas/pagos');
   const pagoRef = push(pagosRef);
+
   const nuevo: Pago = {
     id: pagoRef.key!,
     empadronadoId: emp.id,
@@ -90,26 +88,24 @@ const ensurePagoForMemberPeriod = async (
     monto: montoMensual,
     montoOriginal: montoMensual,
     fechaVencimiento: fechaVenc,
-    estado: 'pendiente', // pendiente hasta que registren pago
+    estado: 'pendiente',
     descuentos: [],
     recargos: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
     creadoPor: authorUid,
-    // campos opcionales de tu tipo Pago se ignoran si no existen
   };
 
   await set(pagoRef, nuevo);
   return true;
 };
 
-// Genera TODAS las cuotas (PAGOS) desde START_PERIOD hasta el mes actual para un empadronado
+// Genera TODAS las cuotas desde START_PERIOD hasta el mes actual para un empadronado
 export const ensureChargesForNewMember = async (
   empId: string,
   startPeriod: string = START_PERIOD,
   authorUid: string = 'system'
 ) => {
-  // Necesitamos numeroPadron para la UI
   const empSnap = await get(ref(db, `${EMPADRONADOS_PATH}/${empId}`));
   if (!empSnap.exists()) return 0;
   const emp = empSnap.val() as Empadronado;
@@ -121,13 +117,17 @@ export const ensureChargesForNewMember = async (
   let created = 0;
   for (let i = 0; i <= diff; i++) {
     const p = addMonths(startPeriod, i);
-    const ok = await ensurePagoForMemberPeriod({ id: empId, numeroPadron: emp.numeroPadron }, p, authorUid);
+    const ok = await ensurePagoForMemberPeriod(
+      { id: empId, numeroPadron: emp.numeroPadron },
+      p,
+      authorUid
+    );
     if (ok) created++;
   }
   return created;
 };
 
-// Backfill para TODOS los empadronados existentes (ejecutar una sola vez)
+// Backfill para TODOS los empadronados (ejecutar una sola vez)
 export const backfillChargesForAllEmpadronados = async (
   startPeriod: string = START_PERIOD,
   authorUid: string = 'system'
@@ -140,21 +140,20 @@ export const backfillChargesForAllEmpadronados = async (
 
   for (const empId of Object.keys(data)) {
     const emp = data[empId];
-    // Generar solo para habilitados (ajusta a tu política)
     if (emp?.habilitado === false) continue;
     total += await ensureChargesForNewMember(empId, startPeriod, authorUid);
   }
   return total;
 };
 
-// Asegura solo la cuota del MES ACTUAL (evita duplicados por transacción)
+// Asegura solo la cuota del MES ACTUAL (con bloqueo de periodo)
 export const ensureCurrentMonthChargesForAll = async (authorUid: string = 'system') => {
   const period = periodKeyFromDate(new Date());
   const yyyymm = compact(period);
   const periodLock = ref(db, `cobranzas/periods/${yyyymm}/generated`);
 
   const tx = await runTransaction(periodLock, (cur) => (cur ? cur : { at: Date.now() }));
-  if (!tx.committed) return 0; // ya se generó
+  if (!tx.committed) return 0;
 
   const snap = await get(ref(db, EMPADRONADOS_PATH));
   if (!snap.exists()) return 0;
@@ -176,7 +175,7 @@ export const ensureCurrentMonthChargesForAll = async (authorUid: string = 'syste
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Util: eliminar valores undefined
+   Utils
    ────────────────────────────────────────────────────────────── */
 const removeUndefined = (obj: any): any => {
   if (Array.isArray(obj)) return obj.map(removeUndefined).filter((item) => item !== undefined);
@@ -192,10 +191,29 @@ const removeUndefined = (obj: any): any => {
 };
 
 /* ──────────────────────────────────────────────────────────────
+   Vinculación con usuarios del sistema
+   ────────────────────────────────────────────────────────────── */
+export const linkAuthToEmpadronado = async (empadronadoId: string, uid: string, email: string) => {
+  await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
+    authUid: uid,
+    emailAcceso: email,
+    updatedAt: Date.now(),
+  });
+};
+
+export const unlinkAuthFromEmpadronado = async (empadronadoId: string) => {
+  await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
+    authUid: null,
+    emailAcceso: null,
+    updatedAt: Date.now(),
+  });
+};
+
+/* ──────────────────────────────────────────────────────────────
    CRUD Empadronados
    ────────────────────────────────────────────────────────────── */
 
-// Crear empadronado → AUTOGENERA pagos desde 2025-01
+// Crear empadronado → AUTOGENERA pagos desde 2025-01 (si está habilitado)
 export const createEmpadronado = async (
   data: CreateEmpadronadoForm,
   actorUid: string
@@ -215,7 +233,6 @@ export const createEmpadronado = async (
     const cleanData = removeUndefined(empadronado);
     await set(empadronadoRef, cleanData);
 
-    // Genera automáticamente TODAS las cuotas desde ENERO-2025 si está habilitado
     if (cleanData.habilitado !== false) {
       await ensureChargesForNewMember(id, START_PERIOD, actorUid);
     }
@@ -234,7 +251,7 @@ export const createEmpadronado = async (
   }
 };
 
-// Obtener todos los empadronados
+// Obtener todos
 export const getEmpadronados = async (): Promise<Empadronado[]> => {
   try {
     const snapshot = await get(ref(db, EMPADRONADOS_PATH));
@@ -247,7 +264,7 @@ export const getEmpadronados = async (): Promise<Empadronado[]> => {
   }
 };
 
-// Obtener empadronado por ID
+// Obtener por ID
 export const getEmpadronado = async (id: string): Promise<Empadronado | null> => {
   try {
     const snapshot = await get(ref(db, `${EMPADRONADOS_PATH}/${id}`));
@@ -258,7 +275,10 @@ export const getEmpadronado = async (id: string): Promise<Empadronado | null> =>
   }
 };
 
-// Actualizar empadronado
+// Alias claro para otros módulos
+export const getEmpadronadoById = getEmpadronado;
+
+// Actualizar
 export const updateEmpadronado = async (
   id: string,
   updates: UpdateEmpadronadoForm,
@@ -268,11 +288,11 @@ export const updateEmpadronado = async (
     const oldData = await getEmpadronado(id);
     if (!oldData) return false;
 
-    const updateData = {
+    const updateData = removeUndefined({
       ...updates,
       updatedAt: Date.now(),
       modificadoPor: actorUid,
-    };
+    });
 
     await update(ref(db, `${EMPADRONADOS_PATH}/${id}`), updateData);
 
@@ -292,7 +312,7 @@ export const updateEmpadronado = async (
   }
 };
 
-// Eliminar empadronado
+// Eliminar
 export const deleteEmpadronado = async (
   id: string,
   actorUid: string,
@@ -320,25 +340,29 @@ export const deleteEmpadronado = async (
   }
 };
 
-// Buscar empadronados
+// Buscar
 export const searchEmpadronados = async (searchTerm: string): Promise<Empadronado[]> => {
   try {
     const empadronados = await getEmpadronados();
-    const term = searchTerm.toLowerCase();
+    const term = (searchTerm || '').toLowerCase();
 
-    return empadronados.filter(
-      (e) =>
-        e.nombre.toLowerCase().includes(term) ||
-        e.apellidos.toLowerCase().includes(term) ||
-        e.numeroPadron.toLowerCase().includes(term) ||
-        e.dni.toLowerCase().includes(term) ||
-        (e.miembrosFamilia &&
-          e.miembrosFamilia.some(
-            (miembro) =>
-              miembro.nombre.toLowerCase().includes(term) ||
-              miembro.apellidos.toLowerCase().includes(term)
-          ))
-    );
+    return empadronados.filter((e) => {
+      const hayMiembros = Array.isArray((e as any).miembrosFamilia);
+      const matchMiembros =
+        hayMiembros &&
+        (e as any).miembrosFamilia.some(
+          (m: any) =>
+            String(m?.nombre || '').toLowerCase().includes(term) ||
+            String(m?.apellidos || '').toLowerCase().includes(term)
+        );
+      return (
+        String(e.nombre || '').toLowerCase().includes(term) ||
+        String(e.apellidos || '').toLowerCase().includes(term) ||
+        String(e.numeroPadron || '').toLowerCase().includes(term) ||
+        String(e.dni || '').toLowerCase().includes(term) ||
+        !!matchMiembros
+      );
+    });
   } catch (error) {
     console.error('Error searching empadronados:', error);
     return [];
@@ -352,13 +376,13 @@ export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
 
     return {
       total: empadronados.length,
-      viven: empadronados.filter((e) => e.vive).length,
-      construida: empadronados.filter((e) => e.estadoVivienda === 'construida').length,
-      construccion: empadronados.filter((e) => e.estadoVivienda === 'construccion').length,
-      terreno: empadronados.filter((e) => e.estadoVivienda === 'terreno').length,
-      masculinos: empadronados.filter((e) => e.genero === 'masculino').length,
-      femeninos: empadronados.filter((e) => e.genero === 'femenino').length,
-      habilitados: empadronados.filter((e) => e.habilitado).length,
+      viven: empadronados.filter((e) => (e as any).vive).length,
+      construida: empadronados.filter((e) => (e as any).estadoVivienda === 'construida').length,
+      construccion: empadronados.filter((e) => (e as any).estadoVivienda === 'construccion').length,
+      terreno: empadronados.filter((e) => (e as any).estadoVivienda === 'terreno').length,
+      masculinos: empadronados.filter((e) => (e as any).genero === 'masculino').length,
+      femeninos: empadronados.filter((e) => (e as any).genero === 'femenino').length,
+      habilitados: empadronados.filter((e) => !!e.habilitado).length,
     };
   } catch (error) {
     console.error('Error getting stats:', error);
