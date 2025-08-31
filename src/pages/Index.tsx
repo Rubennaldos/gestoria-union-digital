@@ -1,7 +1,7 @@
 import { 
   Users, FileText, Calendar, DollarSign, Shield, MessageSquare,
   Trophy, Heart, GraduationCap, Vote, Package, BarChart3,
-  UserCheck, Search, Gavel, Building
+  UserCheck, Search, Gavel, Building, UserCircle
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { ModuleCard } from "@/components/ui/module-card";
@@ -125,6 +125,13 @@ const modules = [
     icon: Building,
     href: "/obras",
     color: "secondary" as const
+  },
+  {
+    title: "Portal del Asociado",
+    description: "Visitas, pagos, eventos y sugerencias",
+    icon: UserCircle,
+    href: "/portal-asociado",
+    color: "primary" as const
   }
 ];
 
