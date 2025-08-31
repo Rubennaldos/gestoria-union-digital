@@ -6,44 +6,51 @@ import {
   remove,
   get,
   runTransaction,
-} from 'firebase/database';
-import { db } from '@/config/firebase';
+  query,
+  orderByChild,
+  equalTo,
+} from "firebase/database";
+import { db } from "@/config/firebase";
 import {
   Empadronado,
   CreateEmpadronadoForm,
   UpdateEmpadronadoForm,
   EmpadronadosStats,
-} from '@/types/empadronados';
-import { Pago } from '@/types/cobranzas';
-import { writeAuditLog } from './rtdb';
+} from "@/types/empadronados";
+import { Pago } from "@/types/cobranzas";
+import { writeAuditLog } from "./rtdb";
 
-const EMPADRONADOS_PATH = 'empadronados';
+const EMPADRONADOS_PATH = "empadronados";
 
 /* ──────────────────────────────────────────────────────────────
    Helpers de periodos / fechas
    ────────────────────────────────────────────────────────────── */
-const pad2 = (n: number) => String(n).padStart(2, '0');
-const periodKeyFromDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // 2025-09
-const compact = (period: string) => period.replace('-', ''); // 2025-09 -> 202509
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const periodKeyFromDate = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // 2025-09
+const compact = (period: string) => period.replace("-", ""); // 2025-09 -> 202509
 const addMonths = (period: string, n: number) => {
-  const [y, m] = period.split('-').map(Number);
+  const [y, m] = period.split("-").map(Number);
   const base = new Date(y, m - 1 + n, 1);
   return `${base.getFullYear()}-${pad2(base.getMonth() + 1)}`;
 };
 const monthsBetween = (from: string, to: string) => {
-  const [fy, fm] = from.split('-').map(Number);
-  const [ty, tm] = to.split('-').map(Number);
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
   return (ty - fy) * 12 + (tm - fm);
 };
 
 // Inicio histórico: enero 2025
-const START_PERIOD = '2025-01';
+const START_PERIOD = "2025-01";
 
 /* ──────────────────────────────────────────────────────────────
-   Config de cobranzas (usa tu nodo real de config)
+   Config de cobranzas
    ────────────────────────────────────────────────────────────── */
-const getCobranzasConfig = async (): Promise<{ montoMensual: number; diaVencimiento: number }> => {
-  const snap = await get(ref(db, 'cobranzas/configuracion'));
+const getCobranzasConfig = async (): Promise<{
+  montoMensual: number;
+  diaVencimiento: number;
+}> => {
+  const snap = await get(ref(db, "cobranzas/configuracion"));
   if (!snap.exists()) {
     return { montoMensual: 50, diaVencimiento: 15 };
   }
@@ -60,9 +67,9 @@ const getCobranzasConfig = async (): Promise<{ montoMensual: number; diaVencimie
    - Índice de unicidad: cobranzas/pagos_index/{empId}/{YYYYMM}
    ────────────────────────────────────────────────────────────── */
 const ensurePagoForMemberPeriod = async (
-  emp: Pick<Empadronado, 'id' | 'numeroPadron'>,
+  emp: Pick<Empadronado, "id" | "numeroPadron">,
   period: string,
-  authorUid: string = 'system'
+  authorUid: string = "system"
 ) => {
   const y = Number(period.slice(0, 4));
   const m = Number(period.slice(5, 7));
@@ -70,25 +77,29 @@ const ensurePagoForMemberPeriod = async (
 
   // Índice de unicidad (si ya existe, no crea otro)
   const lockRef = ref(db, `cobranzas/pagos_index/${emp.id}/${yyyymm}`);
-  const tx = await runTransaction(lockRef, (cur) => (cur ? cur : { createdAt: Date.now() }));
+  const tx = await runTransaction(lockRef, (cur) =>
+    cur ? cur : { createdAt: Date.now() }
+  );
   if (!tx.committed) return false;
 
   const { montoMensual, diaVencimiento } = await getCobranzasConfig();
-  const fechaVenc = new Date(y, m - 1, diaVencimiento).toLocaleDateString('es-PE');
+  const fechaVenc = new Date(y, m - 1, diaVencimiento).toLocaleDateString(
+    "es-PE"
+  );
 
-  const pagosRef = ref(db, 'cobranzas/pagos');
+  const pagosRef = ref(db, "cobranzas/pagos");
   const pagoRef = push(pagosRef);
 
   const nuevo: Pago = {
     id: pagoRef.key!,
     empadronadoId: emp.id,
-    numeroPadron: emp.numeroPadron || '',
+    numeroPadron: emp.numeroPadron || "",
     mes: m,
     año: y,
     monto: montoMensual,
     montoOriginal: montoMensual,
     fechaVencimiento: fechaVenc,
-    estado: 'pendiente',
+    estado: "pendiente",
     descuentos: [],
     recargos: [],
     createdAt: Date.now(),
@@ -104,7 +115,7 @@ const ensurePagoForMemberPeriod = async (
 export const ensureChargesForNewMember = async (
   empId: string,
   startPeriod: string = START_PERIOD,
-  authorUid: string = 'system'
+  authorUid: string = "system"
 ) => {
   const empSnap = await get(ref(db, `${EMPADRONADOS_PATH}/${empId}`));
   if (!empSnap.exists()) return 0;
@@ -130,7 +141,7 @@ export const ensureChargesForNewMember = async (
 // Backfill para TODOS los empadronados (ejecutar una sola vez)
 export const backfillChargesForAllEmpadronados = async (
   startPeriod: string = START_PERIOD,
-  authorUid: string = 'system'
+  authorUid: string = "system"
 ) => {
   const snap = await get(ref(db, EMPADRONADOS_PATH));
   if (!snap.exists()) return 0;
@@ -147,12 +158,16 @@ export const backfillChargesForAllEmpadronados = async (
 };
 
 // Asegura solo la cuota del MES ACTUAL (con bloqueo de periodo)
-export const ensureCurrentMonthChargesForAll = async (authorUid: string = 'system') => {
+export const ensureCurrentMonthChargesForAll = async (
+  authorUid: string = "system"
+) => {
   const period = periodKeyFromDate(new Date());
   const yyyymm = compact(period);
   const periodLock = ref(db, `cobranzas/periods/${yyyymm}/generated`);
 
-  const tx = await runTransaction(periodLock, (cur) => (cur ? cur : { at: Date.now() }));
+  const tx = await runTransaction(periodLock, (cur) =>
+    cur ? cur : { at: Date.now() }
+  );
   if (!tx.committed) return 0;
 
   const snap = await get(ref(db, EMPADRONADOS_PATH));
@@ -178,8 +193,9 @@ export const ensureCurrentMonthChargesForAll = async (authorUid: string = 'syste
    Utils
    ────────────────────────────────────────────────────────────── */
 const removeUndefined = (obj: any): any => {
-  if (Array.isArray(obj)) return obj.map(removeUndefined).filter((item) => item !== undefined);
-  if (obj !== null && typeof obj === 'object') {
+  if (Array.isArray(obj))
+    return obj.map(removeUndefined).filter((item) => item !== undefined);
+  if (obj !== null && typeof obj === "object") {
     const cleanObj: any = {};
     Object.keys(obj).forEach((key) => {
       const value = removeUndefined(obj[key]);
@@ -193,7 +209,11 @@ const removeUndefined = (obj: any): any => {
 /* ──────────────────────────────────────────────────────────────
    Vinculación con usuarios del sistema
    ────────────────────────────────────────────────────────────── */
-export const linkAuthToEmpadronado = async (empadronadoId: string, uid: string, email: string) => {
+export const linkAuthToEmpadronado = async (
+  empadronadoId: string,
+  uid: string,
+  email: string
+) => {
   await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
     authUid: uid,
     emailAcceso: email,
@@ -207,6 +227,39 @@ export const unlinkAuthFromEmpadronado = async (empadronadoId: string) => {
     emailAcceso: null,
     updatedAt: Date.now(),
   });
+};
+
+/* ──────────────────────────────────────────────────────────────
+   Búsqueda directa por DNI o Nº de padrón
+   (usa índices .indexOn ["dni","numeroPadron"] en las reglas)
+   ────────────────────────────────────────────────────────────── */
+export const findEmpadronadoByDniOrPadron = async (
+  term: string
+): Promise<Empadronado | null> => {
+  const t = (term || "").trim();
+  if (!t) return null;
+
+  // 1) Buscar por número de padrón
+  let q = query(
+    ref(db, EMPADRONADOS_PATH),
+    orderByChild("numeroPadron"),
+    equalTo(t)
+  );
+  let snap = await get(q);
+  if (snap.exists()) {
+    const v = snap.val();
+    return (Object.values(v)[0] as Empadronado) ?? null;
+  }
+
+  // 2) Buscar por DNI
+  q = query(ref(db, EMPADRONADOS_PATH), orderByChild("dni"), equalTo(t));
+  snap = await get(q);
+  if (snap.exists()) {
+    const v = snap.val();
+    return (Object.values(v)[0] as Empadronado) ?? null;
+  }
+
+  return null;
 };
 
 /* ──────────────────────────────────────────────────────────────
@@ -239,14 +292,14 @@ export const createEmpadronado = async (
 
     await writeAuditLog({
       actorUid,
-      accion: 'crear_empadronado',
-      moduloId: 'empadronados',
+      accion: "crear_empadronado",
+      moduloId: "empadronados",
       new: empadronado,
     });
 
     return id;
   } catch (error) {
-    console.error('Error creating empadronado:', error);
+    console.error("Error creating empadronado:", error);
     return null;
   }
 };
@@ -259,18 +312,20 @@ export const getEmpadronados = async (): Promise<Empadronado[]> => {
     const data = snapshot.val();
     return Object.values(data) as Empadronado[];
   } catch (error) {
-    console.error('Error getting empadronados:', error);
+    console.error("Error getting empadronados:", error);
     return [];
   }
 };
 
 // Obtener por ID
-export const getEmpadronado = async (id: string): Promise<Empadronado | null> => {
+export const getEmpadronado = async (
+  id: string
+): Promise<Empadronado | null> => {
   try {
     const snapshot = await get(ref(db, `${EMPADRONADOS_PATH}/${id}`));
     return snapshot.exists() ? (snapshot.val() as Empadronado) : null;
   } catch (error) {
-    console.error('Error getting empadronado:', error);
+    console.error("Error getting empadronado:", error);
     return null;
   }
 };
@@ -299,15 +354,15 @@ export const updateEmpadronado = async (
     await writeAuditLog({
       actorUid,
       targetUid: id,
-      accion: 'actualizar_empadronado',
-      moduloId: 'empadronados',
+      accion: "actualizar_empadronado",
+      moduloId: "empadronados",
       old: oldData,
       new: { ...oldData, ...updateData },
     });
 
     return true;
   } catch (error) {
-    console.error('Error updating empadronado:', error);
+    console.error("Error updating empadronado:", error);
     return false;
   }
 };
@@ -327,24 +382,26 @@ export const deleteEmpadronado = async (
     await writeAuditLog({
       actorUid,
       targetUid: id,
-      accion: 'eliminar_empadronado',
-      moduloId: 'empadronados',
+      accion: "eliminar_empadronado",
+      moduloId: "empadronados",
       old: oldData,
       new: { motivo },
     });
 
     return true;
   } catch (error) {
-    console.error('Error deleting empadronado:', error);
+    console.error("Error deleting empadronado:", error);
     return false;
   }
 };
 
-// Buscar
-export const searchEmpadronados = async (searchTerm: string): Promise<Empadronado[]> => {
+// Buscar (cliente) — mantiene compatibilidad con tu UI
+export const searchEmpadronados = async (
+  searchTerm: string
+): Promise<Empadronado[]> => {
   try {
     const empadronados = await getEmpadronados();
-    const term = (searchTerm || '').toLowerCase();
+    const term = (searchTerm || "").toLowerCase();
 
     return empadronados.filter((e) => {
       const hayMiembros = Array.isArray((e as any).miembrosFamilia);
@@ -352,19 +409,19 @@ export const searchEmpadronados = async (searchTerm: string): Promise<Empadronad
         hayMiembros &&
         (e as any).miembrosFamilia.some(
           (m: any) =>
-            String(m?.nombre || '').toLowerCase().includes(term) ||
-            String(m?.apellidos || '').toLowerCase().includes(term)
+            String(m?.nombre || "").toLowerCase().includes(term) ||
+            String(m?.apellidos || "").toLowerCase().includes(term)
         );
       return (
-        String(e.nombre || '').toLowerCase().includes(term) ||
-        String(e.apellidos || '').toLowerCase().includes(term) ||
-        String(e.numeroPadron || '').toLowerCase().includes(term) ||
-        String(e.dni || '').toLowerCase().includes(term) ||
+        String(e.nombre || "").toLowerCase().includes(term) ||
+        String(e.apellidos || "").toLowerCase().includes(term) ||
+        String(e.numeroPadron || "").toLowerCase().includes(term) ||
+        String(e.dni || "").toLowerCase().includes(term) ||
         !!matchMiembros
       );
     });
   } catch (error) {
-    console.error('Error searching empadronados:', error);
+    console.error("Error searching empadronados:", error);
     return [];
   }
 };
@@ -376,16 +433,16 @@ export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
 
     return {
       total: empadronados.length,
-      viven: empadronados.filter((e) => (e as any).vive).length,
-      construida: empadronados.filter((e) => (e as any).estadoVivienda === 'construida').length,
-      construccion: empadronados.filter((e) => (e as any).estadoVivienda === 'construccion').length,
-      terreno: empadronados.filter((e) => (e as any).estadoVivienda === 'terreno').length,
-      masculinos: empadronados.filter((e) => (e as any).genero === 'masculino').length,
-      femeninos: empadronados.filter((e) => (e as any).genero === 'femenino').length,
-      habilitados: empadronados.filter((e) => !!e.habilitado).length,
+      viven: empadronados.filter((e: any) => !!e.vive).length,
+      construida: empadronados.filter((e: any) => e.estadoVivienda === "construida").length,
+      construccion: empadronados.filter((e: any) => e.estadoVivienda === "construccion").length,
+      terreno: empadronados.filter((e: any) => e.estadoVivienda === "terreno").length,
+      masculinos: empadronados.filter((e: any) => e.genero === "masculino").length,
+      femeninos: empadronados.filter((e: any) => e.genero === "femenino").length,
+      habilitados: empadronados.filter((e: any) => !!e.habilitado).length,
     };
   } catch (error) {
-    console.error('Error getting stats:', error);
+    console.error("Error getting stats:", error);
     return {
       total: 0,
       viven: 0,
@@ -400,12 +457,17 @@ export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
 };
 
 // Unicidad de padrón
-export const isNumeroPadronUnique = async (numeroPadron: string, excludeId?: string): Promise<boolean> => {
+export const isNumeroPadronUnique = async (
+  numeroPadron: string,
+  excludeId?: string
+): Promise<boolean> => {
   try {
     const empadronados = await getEmpadronados();
-    return !empadronados.some((e) => e.numeroPadron === numeroPadron && e.id !== excludeId);
+    return !empadronados.some(
+      (e) => e.numeroPadron === numeroPadron && e.id !== excludeId
+    );
   } catch (error) {
-    console.error('Error checking numero padron:', error);
+    console.error("Error checking numero padron:", error);
     return false;
   }
 };
