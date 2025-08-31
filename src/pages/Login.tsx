@@ -9,20 +9,36 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { BootstrapAdmin } from '@/components/auth/BootstrapAdmin';
 import { signInWithEmailOrUsername } from '@/services/auth';
-import { isBootstrapInitialized, seedAuthData } from '@/utils/seedAuthData';
-import { resetBootstrap } from '@/utils/resetBootstrap';
+
 import { useAuth } from '@/contexts/AuthContext';
 import { Shield, Mail, Lock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+// 🔸 Leemos el flag directo del servicio RTDB
+import { isBootstrapInitialized } from '@/services/rtdb';
+// Para el fallback a admin existente
+import { ref, get } from 'firebase/database';
+import { db } from '@/config/firebase';
+
 interface LoginForm {
-  identifier: string; // email o username
+  identifier: string;
   password: string;
 }
 
 const normalize = (v?: string | null) => (v || '').trim().toLowerCase();
 const isSuperAdmin = (email?: string | null, roleId?: string | null | undefined) =>
   normalize(email) === 'presidencia@jpusap.com' || normalize(roleId || '') === 'super_admin';
+
+// Fallback: si no hay flag, pero ya existe un admin en /users
+const hasAnyAdminInDb = async () => {
+  const snap = await get(ref(db, 'users'));
+  if (!snap.exists()) return false;
+  const users = Object.values(snap.val() as Record<string, any>);
+  return users.some(
+    (u: any) =>
+      (u?.roleId === 'super_admin' || u?.roleId === 'presidencia') && u?.activo === true
+  );
+};
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
@@ -34,41 +50,35 @@ export default function Login() {
   const location = useLocation();
   const { toast } = useToast();
 
-  const form = useForm<LoginForm>({
-    defaultValues: {
-      identifier: '',
-      password: ''
-    }
-  });
+  const form = useForm<LoginForm>({ defaultValues: { identifier: '', password: '' } });
 
-  // Si ya está logueado, enviamos a donde quería ir (o /inicio)
+  // Si ya está logueado, redirigimos a donde quería ir o /inicio
   useEffect(() => {
     if (!user) return;
-
     const from = (location.state as any)?.from?.pathname || '/inicio';
-    // Super admin entra a todo; los demás también pasan al inicio.
-    // Si en el futuro quieres redirigir por rol, aquí es el lugar.
-    if (isSuperAdmin(user.email, profile?.roleId)) {
-      navigate(from, { replace: true });
-    } else {
-      navigate(from, { replace: true });
-    }
-  }, [user, profile?.roleId, location.state, navigate]);
+    navigate(from, { replace: true });
+  }, [user, location.state, navigate]);
 
-  // Verificar bootstrap al cargar (carga roles/módulos base y habilita BootstrapAdmin si falta)
+  // Verificar bootstrap + fallback a admin ya existente
   useEffect(() => {
     const checkBootstrap = async () => {
       try {
         const initialized = await isBootstrapInitialized();
-        if (!initialized) {
-          await seedAuthData();
-          setBootstrapComplete(false); // Mostrar BootstrapAdmin
-        } else {
-          setBootstrapComplete(true); // Mostrar login normal
+        if (initialized) {
+          setBootstrapComplete(true);
+          return;
         }
+        // Fallback: si no hay flag pero ya hay admin en /users
+        if (await hasAnyAdminInDb()) {
+          setBootstrapComplete(true);
+          return;
+        }
+        // Si no hay nada, mostrar BootstrapAdmin
+        setBootstrapComplete(false);
       } catch (err) {
         console.error('❌ Error checking bootstrap:', err);
-        setBootstrapComplete(false);
+        // En error, mejor dejar entrar al login normal para no bloquear
+        setBootstrapComplete(true);
       }
     };
     checkBootstrap();
@@ -77,19 +87,13 @@ export default function Login() {
   const onSubmit = async (data: LoginForm) => {
     setLoading(true);
     setError(null);
-
     try {
       await signInWithEmailOrUsername(data.identifier, data.password);
-      toast({
-        title: 'Inicio de sesión exitoso',
-        description: 'Bienvenido al sistema.',
-      });
-      // La redirección real ocurre en el useEffect que observa `user`
+      toast({ title: 'Inicio de sesión exitoso', description: 'Bienvenido al sistema.' });
+      // La redirección ocurre en el useEffect de arriba
     } catch (err: any) {
-      console.error('Login error:', err);
-      let errorMessage = 'Error al iniciar sesión';
-
       const msg = String(err?.message || '').toLowerCase();
+      let errorMessage = 'Error al iniciar sesión';
       if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
         errorMessage = 'Tu acceso está deshabilitado, contacta a Presidencia.';
       } else if (msg.includes('user-not-found') || msg.includes('usuario no encontrado')) {
@@ -99,7 +103,6 @@ export default function Login() {
       } else if (msg.includes('invalid-email')) {
         errorMessage = 'Email inválido';
       }
-
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -107,6 +110,7 @@ export default function Login() {
   };
 
   const handleBootstrapComplete = () => {
+    // BootstrapAdmin nos avisa que ya terminó (dejó el flag en true)
     setBootstrapComplete(true);
     toast({
       title: 'Sistema inicializado',
@@ -114,31 +118,12 @@ export default function Login() {
     });
   };
 
-  const handleResetBootstrap = async () => {
-    if (!confirm('¿Estás seguro de que quieres resetear el sistema? Esto eliminará la configuración actual.')) return;
-    try {
-      await resetBootstrap();
-      toast({
-        title: 'Sistema reseteado',
-        description: 'Puedes volver a configurar el administrador.',
-      });
-      setBootstrapComplete(false);
-    } catch (err) {
-      console.error('Error resetting bootstrap:', err);
-      toast({
-        title: 'Error',
-        description: 'No se pudo resetear el sistema.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // Mostrar pantalla de bootstrap si no está inicializado
+  // Muestra BootstrapAdmin si NO está inicializado
   if (bootstrapComplete === false) {
     return <BootstrapAdmin onComplete={handleBootstrapComplete} />;
   }
 
-  // Mostrar loader mientras verifica bootstrap
+  // Loader mientras verificamos
   if (bootstrapComplete === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -150,6 +135,7 @@ export default function Login() {
     );
   }
 
+  // Login normal
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
       <Card className="w-full max-w-md">
@@ -160,7 +146,6 @@ export default function Login() {
           <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
           <CardDescription>Sistema de Gestión Vecinal JPUSAP</CardDescription>
         </CardHeader>
-
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -176,7 +161,7 @@ export default function Login() {
                         <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                         <Input
                           className="pl-10"
-                          placeholder="usuario@email.com"
+                          placeholder="presidencia@jpusap.com"
                           autoComplete="username"
                           {...field}
                         />
@@ -220,15 +205,6 @@ export default function Login() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Iniciar Sesión
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-2"
-                onClick={handleResetBootstrap}
-              >
-                Resetear Sistema
               </Button>
             </form>
           </Form>
