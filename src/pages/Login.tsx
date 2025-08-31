@@ -1,6 +1,7 @@
+// src/pages/Login.tsx
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,19 +13,26 @@ import { isBootstrapInitialized, seedAuthData } from '@/utils/seedAuthData';
 import { resetBootstrap } from '@/utils/resetBootstrap';
 import { useAuth } from '@/contexts/AuthContext';
 import { Shield, Mail, Lock, Loader2 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface LoginForm {
   identifier: string; // email o username
   password: string;
 }
 
+const normalize = (v?: string | null) => (v || '').trim().toLowerCase();
+const isSuperAdmin = (email?: string | null, roleId?: string | null | undefined) =>
+  normalize(email) === 'presidencia@jpusap.com' || normalize(roleId || '') === 'super_admin';
+
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bootstrapComplete, setBootstrapComplete] = useState<boolean | null>(null);
+
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { toast } = useToast();
 
   const form = useForm<LoginForm>({
     defaultValues: {
@@ -33,41 +41,36 @@ export default function Login() {
     }
   });
 
-  // Verificar si ya está logueado
+  // Si ya está logueado, enviamos a donde quería ir (o /inicio)
   useEffect(() => {
-    if (user && profile?.activo) {
-      // Redirigir según rol
-      if (profile.roleId === 'presidencia') {
-        navigate('/admin/users');
-      } else {
-        navigate('/inicio');
-      }
-    }
-  }, [user, profile, navigate]);
+    if (!user) return;
 
-  // Verificar bootstrap al cargar
+    const from = (location.state as any)?.from?.pathname || '/inicio';
+    // Super admin entra a todo; los demás también pasan al inicio.
+    // Si en el futuro quieres redirigir por rol, aquí es el lugar.
+    if (isSuperAdmin(user.email, profile?.roleId)) {
+      navigate(from, { replace: true });
+    } else {
+      navigate(from, { replace: true });
+    }
+  }, [user, profile?.roleId, location.state, navigate]);
+
+  // Verificar bootstrap al cargar (carga roles/módulos base y habilita BootstrapAdmin si falta)
   useEffect(() => {
     const checkBootstrap = async () => {
       try {
-        console.log('🔄 Checking bootstrap status...');
         const initialized = await isBootstrapInitialized();
-        console.log('✅ Bootstrap initialized flag:', initialized);
-        
         if (!initialized) {
-          console.log('🔧 Bootstrap not initialized, loading seed data...');
           await seedAuthData();
-          console.log('✅ Seed data (roles & modules) loaded');
           setBootstrapComplete(false); // Mostrar BootstrapAdmin
         } else {
-          console.log('✅ System already bootstrapped, showing login');
           setBootstrapComplete(true); // Mostrar login normal
         }
-      } catch (error) {
-        console.error('❌ Error checking bootstrap:', error);
+      } catch (err) {
+        console.error('❌ Error checking bootstrap:', err);
         setBootstrapComplete(false);
       }
     };
-
     checkBootstrap();
   }, []);
 
@@ -77,28 +80,26 @@ export default function Login() {
 
     try {
       await signInWithEmailOrUsername(data.identifier, data.password);
-      
       toast({
-        title: "Inicio de sesión exitoso",
-        description: "Bienvenido al sistema.",
+        title: 'Inicio de sesión exitoso',
+        description: 'Bienvenido al sistema.',
       });
-
+      // La redirección real ocurre en el useEffect que observa `user`
     } catch (err: any) {
       console.error('Login error:', err);
       let errorMessage = 'Error al iniciar sesión';
-      
-      if (err.message.includes('USUARIO_SUSPENDIDO')) {
+
+      const msg = String(err?.message || '').toLowerCase();
+      if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
         errorMessage = 'Tu acceso está deshabilitado, contacta a Presidencia.';
-      } else if (err.message.includes('user-not-found') || err.message.includes('Usuario no encontrado')) {
+      } else if (msg.includes('user-not-found') || msg.includes('usuario no encontrado')) {
         errorMessage = 'Usuario no encontrado';
-      } else if (err.message.includes('wrong-password')) {
+      } else if (msg.includes('wrong-password')) {
         errorMessage = 'Contraseña incorrecta';
-      } else if (err.message.includes('invalid-email')) {
+      } else if (msg.includes('invalid-email')) {
         errorMessage = 'Email inválido';
-      } else if (err.message.includes('user-disabled')) {
-        errorMessage = 'Usuario deshabilitado';
       }
-      
+
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -108,28 +109,27 @@ export default function Login() {
   const handleBootstrapComplete = () => {
     setBootstrapComplete(true);
     toast({
-      title: "Sistema inicializado",
-      description: "Ahora puedes iniciar sesión con la cuenta de Presidencia.",
+      title: 'Sistema inicializado',
+      description: 'Ahora puedes iniciar sesión con la cuenta de Presidencia.',
     });
   };
 
   const handleResetBootstrap = async () => {
-    if (confirm('¿Estás seguro de que quieres resetear el sistema? Esto eliminará la configuración actual.')) {
-      try {
-        await resetBootstrap();
-        toast({
-          title: "Sistema reseteado",
-          description: "Puedes volver a configurar el administrador.",
-        });
-        setBootstrapComplete(false);
-      } catch (err) {
-        console.error('Error resetting bootstrap:', err);
-        toast({
-          title: "Error",
-          description: "No se pudo resetear el sistema.",
-          variant: "destructive"
-        });
-      }
+    if (!confirm('¿Estás seguro de que quieres resetear el sistema? Esto eliminará la configuración actual.')) return;
+    try {
+      await resetBootstrap();
+      toast({
+        title: 'Sistema reseteado',
+        description: 'Puedes volver a configurar el administrador.',
+      });
+      setBootstrapComplete(false);
+    } catch (err) {
+      console.error('Error resetting bootstrap:', err);
+      toast({
+        title: 'Error',
+        description: 'No se pudo resetear el sistema.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -158,10 +158,9 @@ export default function Login() {
             <Shield className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-2xl">Iniciar Sesión</CardTitle>
-          <CardDescription>
-            Sistema de Gestión Vecinal JPUSAP
-          </CardDescription>
+          <CardDescription>Sistema de Gestión Vecinal JPUSAP</CardDescription>
         </CardHeader>
+
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -175,10 +174,11 @@ export default function Login() {
                     <FormControl>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          className="pl-10" 
+                        <Input
+                          className="pl-10"
                           placeholder="usuario@email.com"
-                          {...field} 
+                          autoComplete="username"
+                          {...field}
                         />
                       </div>
                     </FormControl>
@@ -197,11 +197,12 @@ export default function Login() {
                     <FormControl>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                        <Input 
-                          className="pl-10" 
-                          type="password" 
+                        <Input
+                          className="pl-10"
+                          type="password"
                           placeholder="••••••••"
-                          {...field} 
+                          autoComplete="current-password"
+                          {...field}
                         />
                       </div>
                     </FormControl>
@@ -220,11 +221,11 @@ export default function Login() {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Iniciar Sesión
               </Button>
-              
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full mt-2" 
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-2"
                 onClick={handleResetBootstrap}
               >
                 Resetear Sistema
