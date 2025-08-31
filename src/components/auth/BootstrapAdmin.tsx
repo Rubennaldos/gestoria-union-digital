@@ -1,61 +1,45 @@
+// src/components/auth/BootstrapAdmin.tsx
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-import { Shield, User, Mail, Lock, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-
 import { createUserAndProfile } from '@/services/auth';
-import { applyMirrorPermissions, setBootstrapInitialized } from '@/services/rtdb';
+import { applyMirrorPermissions } from '@/services/rtdb';
+import { setBootstrapInitialized } from '@/services/rtdb'; // ✅ usar services/rtdb
+import { Shield, User, Mail, Lock, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface BootstrapForm {
   displayName: string;
-  email?: string;
+  email: string;
   username?: string;
   password: string;
   confirmPassword: string;
 }
 
 interface BootstrapAdminProps {
-  onComplete: () => void;
+  onComplete: () => void; // el padre (Login) pondrá bootstrapComplete=true
 }
-
-const DEFAULT_EMAIL = 'presidencia@jpusap.com';
-const DEFAULT_USERNAME = 'presidencia';
 
 export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
-  const navigate = useNavigate();
 
   const form = useForm<BootstrapForm>({
     defaultValues: {
       displayName: 'Administrador Presidencia',
-      email: DEFAULT_EMAIL,
-      username: DEFAULT_USERNAME,
-      password: '',
-      confirmPassword: '',
-    },
+      email: 'presidencia@jpusap.com',   // ✅ mismo dominio que vas a usar
+      username: 'presidencia',
+      password: 'jpusap2024',
+      confirmPassword: 'jpusap2024'
+    }
   });
 
-  const finishAndGoLogin = async (message?: string) => {
-    await setBootstrapInitialized();
-    if (message) {
-      toast({ title: 'Listo', description: message });
-    }
-    onComplete?.();
-    navigate('/login', { replace: true });
-  };
-
   const onSubmit = async (data: BootstrapForm) => {
-    setError(null);
-
     if (data.password !== data.confirmPassword) {
       form.setError('confirmPassword', { message: 'Las contraseñas no coinciden' });
       return;
@@ -66,53 +50,63 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
     }
 
     setLoading(true);
-    try {
-      const email = (data.email || DEFAULT_EMAIL).trim().toLowerCase();
-      const username = (data.username || DEFAULT_USERNAME).trim().toLowerCase();
+    setError(null);
 
-      // Crea el usuario en Auth con app secundaria y su perfil en RTDB
+    try {
+      const email = (data.email || `${data.username || 'presidencia'}@jpusap.com`).trim();
+      const username = (data.username || 'presidencia').trim();
+
+      // 1) Crear usuario + perfil
       const uid = await createUserAndProfile({
+        displayName: data.displayName,
         email,
-        password: data.password,
         username,
-        displayName: data.displayName.trim(),
-        roleId: 'super_admin',   // acceso total
+        roleId: 'presidencia',
         activo: true,
-        phone: '',               // evita "undefined" en RTDB
+        password: data.password,
+        tipoUsuario: 'presidente',
+        phone: undefined,
+        empadronadoId: undefined,
+        fechaInicioMandato: Date.now(),
+        fechaFinMandato: Date.now() + 365 * 24 * 60 * 60 * 1000
       });
 
-      // Permisos admin para todos los módulos
-      const adminPermissions: Record<string, 'admin'> = {};
-      [
-        'sesiones', 'actas', 'archivos', 'finanzas', 'seguridad',
-        'comunicaciones', 'deportes', 'salud', 'ambiente', 'educacion',
-        'cultura', 'auditoria', 'padron', 'sanciones', 'patrimonio',
-        'planTrabajo', 'electoral'
-      ].forEach((m) => (adminPermissions[m] = 'admin'));
+      // 2) Dar permisos admin a todos los módulos
+      const modules = [
+        'sesiones','actas','archivos','finanzas','seguridad',
+        'comunicaciones','deportes','salud','ambiente','educacion',
+        'cultura','auditoria','padron','sanciones','patrimonio',
+        'planTrabajo','electoral'
+      ] as const;
 
+      const adminPermissions: Record<string, 'admin'> = {};
+      modules.forEach(m => { adminPermissions[m] = 'admin'; });
       await applyMirrorPermissions(uid, adminPermissions, uid);
 
-      await finishAndGoLogin('Administrador creado. Inicia sesión con tu cuenta de Presidencia.');
-    } catch (e: any) {
-      // Si el correo ya existe en Firebase Auth, marcamos bootstrap como hecho y vamos a login
-      const code = String(e?.code || '').toLowerCase();
-      const msg = String(e?.message || '').toLowerCase();
+      // 3) Marcar bootstrap como hecho y salir a login
+      await setBootstrapInitialized();
+      toast({ title: 'Administrador creado', description: 'Ahora puedes iniciar sesión.' });
+      onComplete();
+    } catch (err: any) {
+      // ✅ si el correo YA EXISTE, marcamos bootstrap y salimos del asistente
+      const msg = String(err?.code || err?.message || '').toLowerCase();
 
-      if (code.includes('auth/email-already-in-use') || msg.includes('email-already-in-use')) {
-        await finishAndGoLogin('El correo ya existe. Te llevamos al inicio de sesión.');
+      if (msg.includes('auth/email-already-in-use') || msg.includes('email-already-in-use')) {
+        await setBootstrapInitialized();
+        toast({
+          title: 'Cuenta ya existente',
+          description: 'La cuenta de presidencia ya existe. Continuando al inicio de sesión.',
+        });
+        onComplete(); // ← quita la pantalla de configuración y muestra el login
         return;
       }
 
-      // Username duplicado (mensaje custom desde RTDB)
-      if (msg.includes('ya está en uso') || msg.includes('username')) {
-        setError(e?.message || 'El usuario ya está en uso');
-      } else if (code.includes('auth/invalid-email') || msg.includes('invalid-email')) {
-        setError('Email inválido');
-      } else if (code.includes('auth/weak-password') || msg.includes('weak-password')) {
-        setError('La contraseña es muy débil');
-      } else {
-        setError('Error al crear el administrador');
-      }
+      let errorMessage = 'Error al crear el administrador';
+      if (msg.includes('weak-password')) errorMessage = 'La contraseña es muy débil';
+      if (msg.includes('invalid-email')) errorMessage = 'Email inválido';
+      if (msg.includes('ya está en uso')) errorMessage = err.message;
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -154,10 +148,7 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
                 control={form.control}
                 name="email"
                 rules={{
-                  pattern: {
-                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: 'Email inválido',
-                  },
+                  pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email inválido' }
                 }}
                 render={({ field }) => (
                   <FormItem>
@@ -165,18 +156,11 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
                     <FormControl>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          className="pl-10"
-                          type="email"
-                          placeholder={DEFAULT_EMAIL}
-                          {...field}
-                        />
+                        <Input className="pl-10" type="email" placeholder="presidencia@jpusap.com" {...field} />
                       </div>
                     </FormControl>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Sugerido: <b>{DEFAULT_EMAIL}</b>
-                    </p>
                     <FormMessage />
+                    <p className="text-xs text-muted-foreground">Sugerido: presidencia@jpusap.com</p>
                   </FormItem>
                 )}
               />
@@ -188,7 +172,7 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
                   <FormItem>
                     <FormLabel>Usuario (opcional)</FormLabel>
                     <FormControl>
-                      <Input placeholder={DEFAULT_USERNAME} {...field} />
+                      <Input placeholder="presidencia" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -198,10 +182,7 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
               <FormField
                 control={form.control}
                 name="password"
-                rules={{
-                  required: 'La contraseña es requerida',
-                  minLength: { value: 6, message: 'Mínimo 6 caracteres' },
-                }}
+                rules={{ required: 'La contraseña es requerida', minLength: { value: 6, message: 'Mínimo 6 caracteres' } }}
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Contraseña</FormLabel>
