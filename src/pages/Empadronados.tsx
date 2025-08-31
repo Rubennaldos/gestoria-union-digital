@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,10 +13,146 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, Phone, Calendar, FileText, Download } from 'lucide-react';
+import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, Download, KeyRound } from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
-import { getEmpadronados, getEmpadronadosStats, searchEmpadronados, deleteEmpadronado } from '@/services/empadronados';
+import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
+import { useAuth } from '@/contexts/AuthContext';
+import { createUserAndProfile } from '@/services/auth';
 
+// ─────────────────────────────────────────────────────────────
+// Modal local para crear acceso (Auth + Perfil RTDB) desde padrón
+// ─────────────────────────────────────────────────────────────
+type CrearAccesoProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  empadronado: Empadronado | null;
+  onCreated: () => void;
+};
+
+const toSlug = (s: string) =>
+  (s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+const sugerirCredenciales = (e: Empadronado) => {
+  const baseUser = e.numeroPadron?.trim()
+    ? `emp-${e.numeroPadron.trim().toLowerCase()}`
+    : `emp-${toSlug(`${e.nombre} ${e.apellidos}`)}`;
+  const email = `${baseUser}@jpusap.com`;
+  const password = (e.dni && e.dni.length >= 6) ? e.dni : 'jpusap2024';
+  return { email, username: baseUser, password };
+};
+
+const CrearAccesoEmpadronadoModal: React.FC<CrearAccesoProps> = ({ open, onOpenChange, empadronado, onCreated }) => {
+  const { toast } = useToast();
+  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('jpusap2024');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open && empadronado) {
+      const s = sugerirCredenciales(empadronado);
+      setEmail(s.email);
+      setUsername(s.username);
+      setPassword(s.password);
+    }
+  }, [open, empadronado]);
+
+  const crear = async () => {
+    if (!empadronado) return;
+    if (!email.trim() || !username.trim() || !password.trim()) {
+      toast({ title: 'Faltan datos', description: 'Completa email, usuario y contraseña.', variant: 'destructive' });
+      return;
+    }
+    if (password.length < 6) {
+      toast({ title: 'Contraseña muy corta', description: 'Mínimo 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await createUserAndProfile({
+        displayName: `${empadronado.nombre} ${empadronado.apellidos}`,
+        email: email.trim().toLowerCase(),
+        username: username.trim().toLowerCase(),
+        phone: empadronado.telefonos?.[0]?.numero || '',
+        roleId: 'asociado',
+        activo: true,
+        password,
+        empadronadoId: empadronado.id,
+        tipoUsuario: 'asociado'
+      });
+      toast({ title: 'Acceso creado', description: 'Se creó la cuenta para el asociado.' });
+      onOpenChange(false);
+      onCreated();
+    } catch (err: any) {
+      const msg = String(err?.message || '');
+      let friendly = 'No se pudo crear el acceso.';
+      if (msg.includes('email-already-in-use')) friendly = 'El email ya está registrado.';
+      if (msg.includes('ya está en uso')) friendly = msg;
+      toast({ title: 'Error', description: friendly, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Crear acceso para el asociado</DialogTitle>
+          <DialogDescription>
+            Genera el usuario del sistema vinculado a este empadronado (rol: asociado).
+          </DialogDescription>
+        </DialogHeader>
+
+        {empadronado && (
+          <div className="space-y-3">
+            <div className="p-3 bg-accent rounded">
+              <div className="text-sm font-medium">
+                {empadronado.nombre} {empadronado.apellidos}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Padrón {empadronado.numeroPadron} • DNI {empadronado.dni}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@jpusap.com" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Usuario</Label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="emp-0001" />
+              <p className="text-xs text-muted-foreground">Usa el padrón para estandarizar (ej: emp-0001).</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Contraseña temporal</Label>
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
+              <p className="text-xs text-muted-foreground">Recomienda cambiarla en el primer inicio de sesión.</p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+              <Button onClick={crear} disabled={loading}>
+                {loading ? 'Creando...' : 'Crear acceso'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────
+// Página principal
+// ─────────────────────────────────────────────────────────────
 const Empadronados: React.FC = () => {
   const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [filteredEmpadronados, setFilteredEmpadronados] = useState<Empadronado[]>([]);
@@ -37,9 +173,12 @@ const Empadronados: React.FC = () => {
   const [filterManzana, setFilterManzana] = useState('');
   const [filterLote, setFilterLote] = useState('');
   const [filterEtapa, setFilterEtapa] = useState('');
-  
+
+  const [crearAccesoOpen, setCrearAccesoOpen] = useState(false);
+
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadData();
@@ -56,7 +195,6 @@ const Empadronados: React.FC = () => {
         getEmpadronados(),
         getEmpadronadosStats()
       ]);
-      
       setEmpadronados(empadronadosData);
       setStats(statsData);
     } catch (error) {
@@ -73,57 +211,51 @@ const Empadronados: React.FC = () => {
   const applyFilters = () => {
     let filtered = [...empadronados];
 
-    // Filtro por búsqueda
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(e => 
+      filtered = filtered.filter(e =>
         e.nombre.toLowerCase().includes(term) ||
         e.apellidos.toLowerCase().includes(term) ||
         e.numeroPadron.toLowerCase().includes(term) ||
         e.dni.toLowerCase().includes(term) ||
-        (e.miembrosFamilia && e.miembrosFamilia.some(miembro => 
-          miembro.nombre.toLowerCase().includes(term) || 
-          miembro.apellidos.toLowerCase().includes(term)
-        ))
+        (e.miembrosFamilia &&
+          e.miembrosFamilia.some(miembro =>
+            miembro.nombre.toLowerCase().includes(term) ||
+            miembro.apellidos.toLowerCase().includes(term)
+          ))
       );
     }
 
-    // Filtro por estado
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(e => 
+      filtered = filtered.filter(e =>
         filterStatus === 'habilitado' ? e.habilitado : !e.habilitado
       );
     }
 
-    // Filtro por manzana
     if (filterManzana.trim()) {
-      filtered = filtered.filter(e => 
+      filtered = filtered.filter(e =>
         e.manzana?.toLowerCase().includes(filterManzana.toLowerCase())
       );
     }
 
-    // Filtro por lote
     if (filterLote.trim()) {
-      filtered = filtered.filter(e => 
+      filtered = filtered.filter(e =>
         e.lote?.toLowerCase().includes(filterLote.toLowerCase())
       );
     }
 
-    // Filtro por etapa
     if (filterEtapa.trim()) {
-      filtered = filtered.filter(e => 
+      filtered = filtered.filter(e =>
         e.etapa?.toLowerCase().includes(filterEtapa.toLowerCase())
       );
     }
 
-    // Filtro por vivienda
     if (filterVivienda !== 'all') {
       filtered = filtered.filter(e => e.estadoVivienda === filterVivienda);
     }
 
-    // Filtro por si vive
     if (filterVive !== 'all') {
-      filtered = filtered.filter(e => 
+      filtered = filtered.filter(e =>
         filterVive === 'si' ? e.vive : !e.vive
       );
     }
@@ -142,12 +274,9 @@ const Empadronados: React.FC = () => {
     }
 
     try {
-      const success = await deleteEmpadronado(selectedEmpadronado.id, 'admin-user', deleteMotivo);
+      const success = await deleteEmpadronado(selectedEmpadronado.id, user?.uid || 'system', deleteMotivo);
       if (success) {
-        toast({
-          title: "Éxito",
-          description: "Empadronado eliminado correctamente"
-        });
+        toast({ title: "Éxito", description: "Empadronado eliminado correctamente" });
         setShowDeleteDialog(false);
         setDeletePassword('');
         setDeleteMotivo('');
@@ -615,6 +744,20 @@ const Empadronados: React.FC = () => {
                           )}
                         </SheetContent>
                       </Sheet>
+
+                      {/* Nuevo botón: Crear acceso */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEmpadronado(empadronado);
+                          setCrearAccesoOpen(true);
+                        }}
+                        title="Crear acceso"
+                        className="text-primary"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
                       
                       <Button 
                         variant="ghost" 
@@ -624,12 +767,15 @@ const Empadronados: React.FC = () => {
                         <Edit3 className="h-4 w-4" />
                       </Button>
                       
-                      <AlertDialog>
+                      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                         <AlertDialogTrigger asChild>
                           <Button 
                             variant="ghost" 
                             size="sm"
-                            onClick={() => setSelectedEmpadronado(empadronado)}
+                            onClick={() => {
+                              setSelectedEmpadronado(empadronado);
+                              setShowDeleteDialog(true);
+                            }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -693,7 +839,7 @@ const Empadronados: React.FC = () => {
               ))}
             </TableBody>
           </Table>
-          
+
           {filteredEmpadronados.length === 0 && (
             <div className="p-8 text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -714,6 +860,14 @@ const Empadronados: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de crear acceso */}
+      <CrearAccesoEmpadronadoModal
+        open={crearAccesoOpen}
+        onOpenChange={setCrearAccesoOpen}
+        empadronado={selectedEmpadronado}
+        onCreated={loadData}
+      />
     </div>
   );
 };
