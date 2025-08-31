@@ -10,51 +10,52 @@ import {
   PermissionLevel,
   UpdateUserForm,
   CreateDelegationForm,
-  EffectivePermissions,
+  EffectivePermissions
 } from "@/types/auth";
 
-/* ──────────────────────────────────────────────────────────
+/* ────────────────────────────────
    Helpers
-   ────────────────────────────────────────────────────────── */
-const usernamesPath = (u: string) => `usernames/${u}`;
-const userPath = (uid: string) => `users/${uid}`;
+   ──────────────────────────────── */
+const cleanUndefined = <T extends Record<string, any>>(obj: T): T => {
+  const out: Record<string, any> = {};
+  Object.entries(obj || {}).forEach(([k, v]) => {
+    if (v !== undefined) {
+      if (v && typeof v === "object" && !Array.isArray(v)) {
+        out[k] = cleanUndefined(v as any);
+      } else {
+        out[k] = v;
+      }
+    }
+  });
+  return out as T;
+};
 
-/* ──────────────────────────────────────────────────────────
-   USERS
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Users
+   ──────────────────────────────── */
 export const createUserProfile = async (
   uid: string,
   userData: Omit<UserProfile, "uid"> & { uid: string }
 ) => {
-  // 1) Si viene username, validar que no exista
-  if (userData.username) {
-    const unameRef = ref(db, usernamesPath(userData.username));
-    const unameSnap = await get(unameRef);
-    if (unameSnap.exists()) {
-      throw new Error(`El usuario "${userData.username}" ya está en uso`);
-    }
-  }
+  const userRef = ref(db, `users/${uid}`);
+  const data = cleanUndefined(userData);
+  await set(userRef, data);
 
-  // 2) Guardar perfil
-  const userRef = ref(db, userPath(uid));
-  await set(userRef, userData);
-
-  // 3) Mapping username -> { uid, email }
-  if (userData.username) {
-    const usernameRef = ref(db, usernamesPath(userData.username));
-    await set(usernameRef, { uid, email: userData.email });
+  if (data.username) {
+    const usernameRef = ref(db, `usernames/${data.username}`);
+    await set(usernameRef, { uid, email: data.email });
   }
 
   await writeAuditLog({
-    actorUid: userData.uid,
+    actorUid: data.uid,
     targetUid: uid,
     accion: "USUARIO_CREADO",
-    new: userData,
+    new: data
   });
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
-  const userRef = ref(db, userPath(uid));
+  const userRef = ref(db, `users/${uid}`);
   const snapshot = await get(userRef);
   return snapshot.exists() ? (snapshot.val() as UserProfile) : null;
 };
@@ -64,48 +65,20 @@ export const updateUserProfile = async (
   updates: UpdateUserForm,
   actorUid: string
 ) => {
-  const userRef = ref(db, userPath(uid));
+  const userRef = ref(db, `users/${uid}`);
   const oldData = await getUserProfile(uid);
 
-  // Validación de cambio de username (único)
-  if (updates.username && updates.username !== oldData?.username) {
-    const newUsernameRef = ref(db, usernamesPath(updates.username));
-    const newUnameSnap = await get(newUsernameRef);
-    if (newUnameSnap.exists()) {
-      const { uid: existingUid } = newUnameSnap.val() || {};
-      if (existingUid && existingUid !== uid) {
-        throw new Error(`El usuario "${updates.username}" ya está en uso`);
-      }
-    }
-  }
+  const changes = cleanUndefined(updates);
+  await update(userRef, changes);
 
-  await update(userRef, updates);
-
-  // Mantener mapping de username en sync:
-  // a) Si cambió username → eliminar anterior y crear nuevo
-  if (updates.username && updates.username !== oldData?.username) {
+  // Si cambió el username, actualizar mapping
+  if (changes.username && oldData?.username !== changes.username) {
     if (oldData?.username) {
-      await set(ref(db, usernamesPath(oldData.username)), null);
+      const oldUsernameRef = ref(db, `usernames/${oldData.username}`);
+      await set(oldUsernameRef, null);
     }
-    await set(ref(db, usernamesPath(updates.username)), {
-      uid,
-      email: updates.email ?? oldData?.email ?? null,
-    });
-  }
-
-  // b) Si NO cambió username pero cambió email → actualizar email en mapping
-  if (!updates.username && updates.email && oldData?.username) {
-    await set(ref(db, usernamesPath(oldData.username)), {
-      uid,
-      email: updates.email,
-    });
-  }
-
-  // c) Si se removió el username (lo ponen vacío/null)
-  if (updates.username === "" || updates.username === null) {
-    if (oldData?.username) {
-      await set(ref(db, usernamesPath(oldData.username)), null);
-    }
+    const newUsernameRef = ref(db, `usernames/${changes.username}`);
+    await set(newUsernameRef, { uid, email: oldData?.email });
   }
 
   await writeAuditLog({
@@ -113,11 +86,15 @@ export const updateUserProfile = async (
     targetUid: uid,
     accion: "USUARIO_ACTUALIZADO",
     old: oldData || undefined,
-    new: updates,
+    new: changes
   });
 };
 
-export const toggleUserActive = async (uid: string, activo: boolean, actorUid: string) => {
+export const toggleUserActive = async (
+  uid: string,
+  activo: boolean,
+  actorUid: string
+) => {
   await updateUserProfile(uid, { activo }, actorUid);
 };
 
@@ -131,22 +108,18 @@ export const listUsers = async (filters?: {
 
   if (!snapshot.exists()) return [];
 
-  let users: UserProfile[] = Object.values(snapshot.val());
+  let users: UserProfile[] = Object.values(snapshot.val() as Record<string, UserProfile>);
 
   if (filters) {
-    if (filters.roleId) {
-      users = users.filter((u) => u.roleId === filters.roleId);
-    }
-    if (filters.activo !== undefined) {
-      users = users.filter((u) => u.activo === filters.activo);
-    }
+    if (filters.roleId) users = users.filter((u) => u.roleId === filters.roleId);
+    if (filters.activo !== undefined) users = users.filter((u) => u.activo === filters.activo);
     if (filters.search) {
-      const search = filters.search.toLowerCase();
+      const s = filters.search.toLowerCase();
       users = users.filter(
         (u) =>
-          u.displayName.toLowerCase().includes(search) ||
-          u.email.toLowerCase().includes(search) ||
-          (u.username ? u.username.toLowerCase().includes(search) : false)
+          u.displayName?.toLowerCase().includes(s) ||
+          u.email?.toLowerCase().includes(s) ||
+          u.username?.toLowerCase().includes(s)
       );
     }
   }
@@ -154,9 +127,9 @@ export const listUsers = async (filters?: {
   return users;
 };
 
-/* ──────────────────────────────────────────────────────────
-   PERMISSIONS
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Permissions
+   ──────────────────────────────── */
 export const setPermission = async (
   uid: string,
   moduleId: string,
@@ -174,11 +147,14 @@ export const setPermission = async (
     accion: "PERMISO_CAMBIADO",
     moduloId: moduleId,
     old: oldLevel,
-    new: level,
+    new: level
   });
 };
 
-export const getPermission = async (uid: string, moduleId: string): Promise<PermissionLevel> => {
+export const getPermission = async (
+  uid: string,
+  moduleId: string
+): Promise<PermissionLevel> => {
   const permRef = ref(db, `permissions/${uid}/${moduleId}`);
   const snapshot = await get(permRef);
   return snapshot.exists() ? (snapshot.val() as PermissionLevel) : "none";
@@ -195,62 +171,60 @@ export const applyMirrorPermissions = async (
   mirrorConfig: Permission,
   actorUid: string
 ) => {
-  const updates: { [key: string]: PermissionLevel } = {};
+  const updates: Record<string, PermissionLevel> = {};
   for (const [moduleId, level] of Object.entries(mirrorConfig)) {
     updates[`permissions/${uid}/${moduleId}`] = level as PermissionLevel;
   }
-  // update(root) con paths absolutos
   await update(ref(db), updates);
 
   await writeAuditLog({
     actorUid,
     targetUid: uid,
     accion: "PERMISOS_ESPEJO_APLICADOS",
-    new: mirrorConfig,
+    new: mirrorConfig
   });
 };
 
 export const getEffectivePermissions = async (uid: string): Promise<EffectivePermissions> => {
-  const basePermissions = await getUserPermissions(uid);
+  const base = await getUserPermissions(uid);
   const delegation = await getActiveDelegation(uid);
+  if (!delegation) return base;
 
-  if (!delegation) return basePermissions;
-
-  const effective: EffectivePermissions = { ...basePermissions };
+  const effective: EffectivePermissions = { ...base };
   if (delegation.modules) {
     for (const [moduleId, level] of Object.entries(delegation.modules)) {
-      const current = effective[moduleId] || "none";
-      // Solo elevar permisos (nunca reducir)
-      const rank = (lvl: PermissionLevel) =>
-        ({ none: 0, read: 1, write: 2, approve: 3, admin: 4 }[lvl]);
-
-      if (rank(level as PermissionLevel) > rank(current)) {
-        effective[moduleId] = level as PermissionLevel;
+      const cur = effective[moduleId] || "none";
+      if (
+        cur === "none" ||
+        level === "admin" ||
+        (level === "approve" && cur !== "admin") ||
+        (level === "write" && !["admin", "approve"].includes(cur)) ||
+        (level === "read" && cur === "none")
+      ) {
+        effective[moduleId] = level;
       }
     }
   }
-
   return effective;
 };
 
-/* ──────────────────────────────────────────────────────────
-   DELEGATIONS
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Delegations
+   ──────────────────────────────── */
 export const setDelegation = async (delegationData: CreateDelegationForm, actorUid: string) => {
   const delegationRef = ref(db, `delegations/${delegationData.targetUid}`);
   const delegation: Delegation = {
     uid: delegationData.targetUid,
     ...delegationData,
-    grantedByUid: actorUid,
+    grantedByUid: actorUid
   };
-
-  await set(delegationRef, delegation);
+  await set(delegationRef, cleanUndefined(delegation));
 
   await writeAuditLog({
     actorUid,
     targetUid: delegationData.targetUid,
     accion: "DELEGACION_CREADA",
-    new: delegation,
+    new: delegation
   });
 };
 
@@ -261,8 +235,7 @@ export const getActiveDelegation = async (uid: string): Promise<Delegation | nul
 
   const delegation = snapshot.val() as Delegation;
   const now = Date.now();
-
-  if (now >= delegation.startTs && now <= delegation.endTs) {
+  if (now >= (delegation.startTs || 0) && now <= (delegation.endTs || 0)) {
     return delegation;
   }
   return null;
@@ -278,13 +251,13 @@ export const revokeDelegation = async (uid: string, actorUid: string) => {
     actorUid,
     targetUid: uid,
     accion: "DELEGACION_REVOCADA",
-    old: oldDelegation || undefined,
+    old: oldDelegation || undefined
   });
 };
 
-/* ──────────────────────────────────────────────────────────
-   ROLES & MODULES
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Roles & Modules
+   ──────────────────────────────── */
 export const listRoles = async (): Promise<Role[]> => {
   const rolesRef = ref(db, "roles");
   const snapshot = await get(rolesRef);
@@ -294,22 +267,24 @@ export const listRoles = async (): Promise<Role[]> => {
 export const listModules = async (): Promise<Module[]> => {
   const modulesRef = ref(db, "modules");
   const snapshot = await get(modulesRef);
-  const modules: Module[] = snapshot.exists() ? (Object.values(snapshot.val()) as Module[]) : [];
-  return modules.sort((a, b) => a.orden - b.orden);
+  const modules: Module[] = snapshot.exists()
+    ? (Object.values(snapshot.val()) as Module[])
+    : [];
+  return modules.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
 };
 
-/* ──────────────────────────────────────────────────────────
-   AUDIT
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Audit
+   ──────────────────────────────── */
 export const writeAuditLog = async (entry: Omit<AuditLog, "id" | "ts">) => {
   const logsRef = ref(db, "auditLogs");
   const newLogRef = push(logsRef);
 
-  const auditEntry: AuditLog = {
+  const auditEntry: AuditLog = cleanUndefined({
     ...entry,
     id: newLogRef.key!,
-    ts: Date.now(),
-  };
+    ts: Date.now()
+  } as AuditLog);
 
   await set(newLogRef, auditEntry);
 };
@@ -326,28 +301,27 @@ export const listAuditLogs = async (filters?: {
 
   if (!snapshot.exists()) return [];
 
-  let logs: AuditLog[] = Object.values(snapshot.val());
-
-  logs.sort((a, b) => b.ts - a.ts);
+  let logs: AuditLog[] = Object.values(snapshot.val() as Record<string, AuditLog>);
+  logs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
   if (filters) {
     if (filters.actorUid) logs = logs.filter((l) => l.actorUid === filters.actorUid);
     if (filters.targetUid) logs = logs.filter((l) => l.targetUid === filters.targetUid);
     if (filters.moduloId) logs = logs.filter((l) => l.moduloId === filters.moduloId);
-    if (filters.startTs) logs = logs.filter((l) => l.ts >= filters.startTs!);
-    if (filters.endTs) logs = logs.filter((l) => l.ts <= filters.endTs!);
+    if (filters.startTs) logs = logs.filter((l) => (l.ts || 0) >= filters.startTs!);
+    if (filters.endTs) logs = logs.filter((l) => (l.ts || 0) <= filters.endTs!);
   }
 
   return logs;
 };
 
-/* ──────────────────────────────────────────────────────────
-   BOOTSTRAP
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Bootstrap
+   ──────────────────────────────── */
 export const isBootstrapInitialized = async (): Promise<boolean> => {
   const bootstrapRef = ref(db, "bootstrap/initialized");
   const snapshot = await get(bootstrapRef);
-  return snapshot.exists() ? Boolean(snapshot.val()) : false;
+  return snapshot.exists() ? (snapshot.val() as boolean) : false;
 };
 
 export const setBootstrapInitialized = async () => {
@@ -355,22 +329,23 @@ export const setBootstrapInitialized = async () => {
   await set(bootstrapRef, true);
 };
 
-/* ──────────────────────────────────────────────────────────
-   REAL-TIME SUBSCRIPTIONS
-   (Devolvemos función para desuscribir)
-   ────────────────────────────────────────────────────────── */
+/* ────────────────────────────────
+   Subscriptions (con unsubscribe)
+   ──────────────────────────────── */
 export const onPermissions = (uid: string, callback: (permissions: Permission) => void) => {
   const permRef = ref(db, `permissions/${uid}`);
-  const unsubscribe = onValue(permRef, (snapshot) => {
+  const handler = (snapshot: any) => {
     callback(snapshot.exists() ? (snapshot.val() as Permission) : {});
-  });
-  return () => off(permRef) || (typeof unsubscribe === "function" ? unsubscribe() : undefined);
+  };
+  onValue(permRef, handler);
+  return () => off(permRef, "value", handler);
 };
 
 export const onUserProfile = (uid: string, callback: (profile: UserProfile | null) => void) => {
-  const uRef = ref(db, `users/${uid}`);
-  const unsubscribe = onValue(uRef, (snapshot) => {
+  const userRef = ref(db, `users/${uid}`);
+  const handler = (snapshot: any) => {
     callback(snapshot.exists() ? (snapshot.val() as UserProfile) : null);
-  });
-  return () => off(uRef) || (typeof unsubscribe === "function" ? unsubscribe() : undefined);
+  };
+  onValue(userRef, handler);
+  return () => off(userRef, "value", handler);
 };
