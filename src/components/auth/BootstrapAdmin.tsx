@@ -31,11 +31,11 @@ export const BootstrapAdmin: React.FC<BootstrapAdminProps> = ({ onComplete }) =>
 
   const form = useForm<BootstrapForm>({
     defaultValues: {
-      displayName: '',
-      email: '',
-      username: '',
-      password: '',
-      confirmPassword: ''
+      displayName: 'Administrador Presidencia',
+      email: 'presidencia@jpusap.local',
+      username: 'presidencia',
+      password: 'jpusap2024',
+      confirmPassword: 'jpusap2024'
     }
   });
 

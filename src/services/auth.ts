@@ -24,6 +24,15 @@ export const signInWithEmailOrUsername = async (identifier: string, password: st
     
     if (!snapshot.exists()) {
       console.log('❌ Username not found in database');
+      // Intentar buscar todos los usernames para debug
+      console.log('🔍 Debug: Checking all usernames...');
+      const allUsernamesRef = ref(db, 'usernames');
+      const allSnapshot = await get(allUsernamesRef);
+      if (allSnapshot.exists()) {
+        console.log('🔍 Available usernames:', Object.keys(allSnapshot.val()));
+      } else {
+        console.log('❌ No usernames found in database at all');
+      }
       throw new Error("Usuario no encontrado");
     }
     

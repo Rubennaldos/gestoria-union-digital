@@ -9,6 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { BootstrapAdmin } from '@/components/auth/BootstrapAdmin';
 import { signInWithEmailOrUsername } from '@/services/auth';
 import { isBootstrapInitialized, seedAuthData } from '@/utils/seedAuthData';
+import { resetBootstrap } from '@/utils/resetBootstrap';
 import { useAuth } from '@/contexts/AuthContext';
 import { Shield, Mail, Lock, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -112,6 +113,26 @@ export default function Login() {
     });
   };
 
+  const handleResetBootstrap = async () => {
+    if (confirm('¿Estás seguro de que quieres resetear el sistema? Esto eliminará la configuración actual.')) {
+      try {
+        await resetBootstrap();
+        toast({
+          title: "Sistema reseteado",
+          description: "Puedes volver a configurar el administrador.",
+        });
+        setBootstrapComplete(false);
+      } catch (err) {
+        console.error('Error resetting bootstrap:', err);
+        toast({
+          title: "Error",
+          description: "No se pudo resetear el sistema.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   // Mostrar pantalla de bootstrap si no está inicializado
   if (bootstrapComplete === false) {
     return <BootstrapAdmin onComplete={handleBootstrapComplete} />;
@@ -198,6 +219,15 @@ export default function Login() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Iniciar Sesión
+              </Button>
+              
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full mt-2" 
+                onClick={handleResetBootstrap}
+              >
+                Resetear Sistema
               </Button>
             </form>
           </Form>
