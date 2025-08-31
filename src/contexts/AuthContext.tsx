@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+// src/contexts/AuthContext.tsx
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { User as FirebaseUser, onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { UserProfile, AuthUser } from '@/types/auth';
 import { getUserProfile, onUserProfile } from '@/services/rtdb';
@@ -15,15 +16,13 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
-  signOut: async () => {}
+  signOut: async () => {},
 });
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -31,69 +30,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Escucha de sesión Firebase
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      console.log('🔄 Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
-      
-      if (firebaseUser) {
-        console.log('👤 Firebase user UID:', firebaseUser.uid);
-        const authUser: AuthUser = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName
-        };
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+      try {
+        if (fbUser) {
+          const authUser: AuthUser = {
+            uid: fbUser.uid,
+            email: fbUser.email,
+            displayName: fbUser.displayName ?? undefined,
+          };
 
-        // Obtener perfil del usuario
-        try {
-          console.log('📖 Fetching user profile...');
-          const userProfile = await getUserProfile(firebaseUser.uid);
-          console.log('👤 User profile loaded:', userProfile);
+          // Carga perfil (si no existe, devolverá null)
+          const userProfile = await getUserProfile(fbUser.uid);
           setProfile(userProfile);
-          setUser({ ...authUser, profile: userProfile || undefined });
-        } catch (error) {
-          console.error('❌ Error loading user profile:', error);
+          setUser(userProfile ? { ...authUser, profile: userProfile } : authUser);
+        } else {
+          setUser(null);
           setProfile(null);
-          setUser(authUser);
         }
-      } else {
-        console.log('👋 No user logged in');
-        setUser(null);
-        setProfile(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribeAuth;
+    return () => unsubscribe();
   }, []);
 
-  // Suscribirse a cambios en el perfil del usuario
+  // Suscripción en tiempo real al perfil
   useEffect(() => {
     if (!user?.uid) return;
-
-    const unsubscribeProfile = onUserProfile(user.uid, (updatedProfile) => {
-      setProfile(updatedProfile);
-      if (user) {
-        setUser({ ...user, profile: updatedProfile || undefined });
-      }
+    const stop = onUserProfile(user.uid, (updated) => {
+      setProfile(updated);
+      setUser((u) => (u ? { ...u, profile: updated || undefined } : u));
     });
-
-    return unsubscribeProfile;
+    return () => stop && stop();
   }, [user?.uid]);
 
-  const signOutUser = async () => {
-    await auth.signOut();
+  const signOut = async () => {
+    await fbSignOut(auth);
   };
 
-  const value: AuthContextType = {
-    user,
-    profile,
-    loading,
-    signOut: signOutUser
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextType>(
+    () => ({ user, profile, loading, signOut }),
+    [user, profile, loading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
