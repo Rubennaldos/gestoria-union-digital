@@ -1,4 +1,12 @@
-import { ref, set, get, push, update, onValue, off } from "firebase/database";
+import {
+  ref,
+  set,
+  get,
+  push,
+  update,
+  onValue,
+  off,
+} from "firebase/database";
 import { db } from "@/config/firebase";
 import {
   UserProfile,
@@ -10,47 +18,49 @@ import {
   PermissionLevel,
   UpdateUserForm,
   CreateDelegationForm,
-  EffectivePermissions
+  EffectivePermissions,
 } from "@/types/auth";
 
-/* ────────────────────────────────
+/* ──────────────────────────────────────────────────────────
    Helpers
-   ──────────────────────────────── */
-const cleanUndefined = <T extends Record<string, any>>(obj: T): T => {
-  const out: Record<string, any> = {};
-  Object.entries(obj || {}).forEach(([k, v]) => {
-    if (v !== undefined) {
-      if (v && typeof v === "object" && !Array.isArray(v)) {
-        out[k] = cleanUndefined(v as any);
-      } else {
-        out[k] = v;
-      }
-    }
-  });
-  return out as T;
-};
+   ────────────────────────────────────────────────────────── */
+const lower = (v?: string | null) => (v || "").trim().toLowerCase();
 
-/* ────────────────────────────────
-   Users
-   ──────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   USER OPERATIONS
+   ────────────────────────────────────────────────────────── */
+
+/**
+ * Crea el perfil del usuario en RTDB.
+ * @param uid UID del usuario (Firebase Auth)
+ * @param userData Datos del perfil (incluye uid dentro del objeto)
+ * @param actorUid (opcional) UID del actor que crea el perfil (para auditoría)
+ */
 export const createUserProfile = async (
   uid: string,
-  userData: Omit<UserProfile, "uid"> & { uid: string }
+  userData: Omit<UserProfile, "uid"> & { uid: string },
+  actorUid?: string
 ) => {
   const userRef = ref(db, `users/${uid}`);
-  const data = cleanUndefined(userData);
-  await set(userRef, data);
+  const payload: UserProfile = {
+    ...userData,
+    email: lower(userData.email),
+    createdAt: userData.createdAt ?? Date.now(),
+    updatedAt: Date.now(),
+  };
+  await set(userRef, payload);
 
-  if (data.username) {
-    const usernameRef = ref(db, `usernames/${data.username}`);
-    await set(usernameRef, { uid, email: data.email });
+  // Si tiene username, crear mapping
+  if (payload.username) {
+    const usernameRef = ref(db, `usernames/${payload.username}`);
+    await set(usernameRef, { uid, email: payload.email });
   }
 
   await writeAuditLog({
-    actorUid: data.uid,
+    actorUid: actorUid || userData.uid,
     targetUid: uid,
     accion: "USUARIO_CREADO",
-    new: data
+    new: payload,
   });
 };
 
@@ -68,17 +78,24 @@ export const updateUserProfile = async (
   const userRef = ref(db, `users/${uid}`);
   const oldData = await getUserProfile(uid);
 
-  const changes = cleanUndefined(updates);
-  await update(userRef, changes);
+  const normalized: UpdateUserForm = {
+    ...updates,
+    email: updates.email ? lower(updates.email) : undefined,
+    updatedAt: Date.now(),
+  };
 
-  // Si cambió el username, actualizar mapping
-  if (changes.username && oldData?.username !== changes.username) {
+  await update(userRef, normalized);
+
+  // Si cambió username, actualizar mapping
+  if (normalized.username && oldData?.username !== normalized.username) {
+    // Remover username anterior
     if (oldData?.username) {
       const oldUsernameRef = ref(db, `usernames/${oldData.username}`);
       await set(oldUsernameRef, null);
     }
-    const newUsernameRef = ref(db, `usernames/${changes.username}`);
-    await set(newUsernameRef, { uid, email: oldData?.email });
+    // Crear nuevo mapping
+    const newUsernameRef = ref(db, `usernames/${normalized.username}`);
+    await set(newUsernameRef, { uid, email: oldData?.email ?? "" });
   }
 
   await writeAuditLog({
@@ -86,7 +103,7 @@ export const updateUserProfile = async (
     targetUid: uid,
     accion: "USUARIO_ACTUALIZADO",
     old: oldData || undefined,
-    new: changes
+    new: normalized,
   });
 };
 
@@ -108,18 +125,24 @@ export const listUsers = async (filters?: {
 
   if (!snapshot.exists()) return [];
 
-  let users: UserProfile[] = Object.values(snapshot.val() as Record<string, UserProfile>);
+  let users: UserProfile[] = Object.values(
+    snapshot.val() as Record<string, UserProfile>
+  );
 
   if (filters) {
-    if (filters.roleId) users = users.filter((u) => u.roleId === filters.roleId);
-    if (filters.activo !== undefined) users = users.filter((u) => u.activo === filters.activo);
+    if (filters.roleId) {
+      users = users.filter((u) => u.roleId === filters.roleId);
+    }
+    if (filters.activo !== undefined) {
+      users = users.filter((u) => u.activo === filters.activo);
+    }
     if (filters.search) {
       const s = filters.search.toLowerCase();
       users = users.filter(
         (u) =>
-          u.displayName?.toLowerCase().includes(s) ||
-          u.email?.toLowerCase().includes(s) ||
-          u.username?.toLowerCase().includes(s)
+          u.displayName.toLowerCase().includes(s) ||
+          u.email.toLowerCase().includes(s) ||
+          (u.username || "").toLowerCase().includes(s)
       );
     }
   }
@@ -127,9 +150,10 @@ export const listUsers = async (filters?: {
   return users;
 };
 
-/* ────────────────────────────────
-   Permissions
-   ──────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   PERMISSIONS
+   ────────────────────────────────────────────────────────── */
+
 export const setPermission = async (
   uid: string,
   moduleId: string,
@@ -147,7 +171,7 @@ export const setPermission = async (
     accion: "PERMISO_CAMBIADO",
     moduloId: moduleId,
     old: oldLevel,
-    new: level
+    new: level,
   });
 };
 
@@ -171,9 +195,9 @@ export const applyMirrorPermissions = async (
   mirrorConfig: Permission,
   actorUid: string
 ) => {
-  const updates: Record<string, PermissionLevel> = {};
+  const updates: { [key: string]: PermissionLevel } = {};
   for (const [moduleId, level] of Object.entries(mirrorConfig)) {
-    updates[`permissions/${uid}/${moduleId}`] = level as PermissionLevel;
+    updates[`permissions/${uid}/${moduleId}`] = level;
   }
   await update(ref(db), updates);
 
@@ -181,61 +205,69 @@ export const applyMirrorPermissions = async (
     actorUid,
     targetUid: uid,
     accion: "PERMISOS_ESPEJO_APLICADOS",
-    new: mirrorConfig
+    new: mirrorConfig,
   });
 };
 
-export const getEffectivePermissions = async (uid: string): Promise<EffectivePermissions> => {
-  const base = await getUserPermissions(uid);
+export const getEffectivePermissions = async (
+  uid: string
+): Promise<EffectivePermissions> => {
+  const basePermissions = await getUserPermissions(uid);
   const delegation = await getActiveDelegation(uid);
-  if (!delegation) return base;
 
-  const effective: EffectivePermissions = { ...base };
+  if (!delegation) return basePermissions;
+
+  // Aplicar delegación: solo elevamos, nunca reducimos
+  const effective: EffectivePermissions = { ...basePermissions };
   if (delegation.modules) {
     for (const [moduleId, level] of Object.entries(delegation.modules)) {
-      const cur = effective[moduleId] || "none";
-      if (
-        cur === "none" ||
-        level === "admin" ||
-        (level === "approve" && cur !== "admin") ||
-        (level === "write" && !["admin", "approve"].includes(cur)) ||
-        (level === "read" && cur === "none")
-      ) {
+      const current = effective[moduleId] || "none";
+      const rank: PermissionLevel[] = ["none", "read", "write", "approve", "admin"];
+      if (rank.indexOf(level) > rank.indexOf(current)) {
         effective[moduleId] = level;
       }
     }
   }
+
   return effective;
 };
 
-/* ────────────────────────────────
-   Delegations
-   ──────────────────────────────── */
-export const setDelegation = async (delegationData: CreateDelegationForm, actorUid: string) => {
+/* ──────────────────────────────────────────────────────────
+   DELEGATIONS
+   ────────────────────────────────────────────────────────── */
+
+export const setDelegation = async (
+  delegationData: CreateDelegationForm,
+  actorUid: string
+) => {
   const delegationRef = ref(db, `delegations/${delegationData.targetUid}`);
   const delegation: Delegation = {
     uid: delegationData.targetUid,
     ...delegationData,
-    grantedByUid: actorUid
+    grantedByUid: actorUid,
   };
-  await set(delegationRef, cleanUndefined(delegation));
+
+  await set(delegationRef, delegation);
 
   await writeAuditLog({
     actorUid,
     targetUid: delegationData.targetUid,
     accion: "DELEGACION_CREADA",
-    new: delegation
+    new: delegation,
   });
 };
 
-export const getActiveDelegation = async (uid: string): Promise<Delegation | null> => {
+export const getActiveDelegation = async (
+  uid: string
+): Promise<Delegation | null> => {
   const delegationRef = ref(db, `delegations/${uid}`);
   const snapshot = await get(delegationRef);
   if (!snapshot.exists()) return null;
 
   const delegation = snapshot.val() as Delegation;
   const now = Date.now();
-  if (now >= (delegation.startTs || 0) && now <= (delegation.endTs || 0)) {
+
+  if (now >= delegation.startTs && now <= delegation.endTs) {
     return delegation;
   }
   return null;
@@ -251,40 +283,46 @@ export const revokeDelegation = async (uid: string, actorUid: string) => {
     actorUid,
     targetUid: uid,
     accion: "DELEGACION_REVOCADA",
-    old: oldDelegation || undefined
+    old: oldDelegation,
   });
 };
 
-/* ────────────────────────────────
-   Roles & Modules
-   ──────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   ROLES & MODULES
+   ────────────────────────────────────────────────────────── */
+
 export const listRoles = async (): Promise<Role[]> => {
   const rolesRef = ref(db, "roles");
   const snapshot = await get(rolesRef);
-  return snapshot.exists() ? (Object.values(snapshot.val()) as Role[]) : [];
+  const roles: Role[] = snapshot.exists()
+    ? Object.values(snapshot.val() as Record<string, Role>)
+    : [];
+  // Ordenar si tienen "orden"
+  return roles.sort((a, b) => (a as any).orden - (b as any).orden);
 };
 
 export const listModules = async (): Promise<Module[]> => {
   const modulesRef = ref(db, "modules");
   const snapshot = await get(modulesRef);
   const modules: Module[] = snapshot.exists()
-    ? (Object.values(snapshot.val()) as Module[])
+    ? Object.values(snapshot.val() as Record<string, Module>)
     : [];
-  return modules.sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+  return modules.sort((a, b) => a.orden - b.orden);
 };
 
-/* ────────────────────────────────
-   Audit
-   ──────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   AUDIT
+   ────────────────────────────────────────────────────────── */
+
 export const writeAuditLog = async (entry: Omit<AuditLog, "id" | "ts">) => {
   const logsRef = ref(db, "auditLogs");
   const newLogRef = push(logsRef);
 
-  const auditEntry: AuditLog = cleanUndefined({
+  const auditEntry: AuditLog = {
     ...entry,
     id: newLogRef.key!,
-    ts: Date.now()
-  } as AuditLog);
+    ts: Date.now(),
+  };
 
   await set(newLogRef, auditEntry);
 };
@@ -301,51 +339,65 @@ export const listAuditLogs = async (filters?: {
 
   if (!snapshot.exists()) return [];
 
-  let logs: AuditLog[] = Object.values(snapshot.val() as Record<string, AuditLog>);
-  logs.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  let logs: AuditLog[] = Object.values(
+    snapshot.val() as Record<string, AuditLog>
+  );
+
+  logs.sort((a, b) => b.ts - a.ts);
 
   if (filters) {
     if (filters.actorUid) logs = logs.filter((l) => l.actorUid === filters.actorUid);
     if (filters.targetUid) logs = logs.filter((l) => l.targetUid === filters.targetUid);
     if (filters.moduloId) logs = logs.filter((l) => l.moduloId === filters.moduloId);
-    if (filters.startTs) logs = logs.filter((l) => (l.ts || 0) >= filters.startTs!);
-    if (filters.endTs) logs = logs.filter((l) => (l.ts || 0) <= filters.endTs!);
+    if (filters.startTs) logs = logs.filter((l) => l.ts >= (filters.startTs as number));
+    if (filters.endTs) logs = logs.filter((l) => l.ts <= (filters.endTs as number));
   }
 
   return logs;
 };
 
-/* ────────────────────────────────
-   Bootstrap
-   ──────────────────────────────── */
+/* ──────────────────────────────────────────────────────────
+   BOOTSTRAP
+   ────────────────────────────────────────────────────────── */
+
 export const isBootstrapInitialized = async (): Promise<boolean> => {
   const bootstrapRef = ref(db, "bootstrap/initialized");
   const snapshot = await get(bootstrapRef);
-  return snapshot.exists() ? (snapshot.val() as boolean) : false;
+  return snapshot.exists() ? Boolean(snapshot.val()) : false;
 };
 
 export const setBootstrapInitialized = async () => {
-  const bootstrapRef = ref(db, "bootstrap/initialized");
-  await set(bootstrapRef, true);
+  const bootstrapRef = ref(db, "bootstrap");
+  await update(bootstrapRef, {
+    initialized: true,
+    initializedAt: Date.now(),
+  });
 };
 
-/* ────────────────────────────────
-   Subscriptions (con unsubscribe)
-   ──────────────────────────────── */
-export const onPermissions = (uid: string, callback: (permissions: Permission) => void) => {
+/* ──────────────────────────────────────────────────────────
+   REAL-TIME SUBSCRIPTIONS (con desuscripción limpia)
+   ────────────────────────────────────────────────────────── */
+
+export const onPermissions = (
+  uid: string,
+  callback: (permissions: Permission) => void
+) => {
   const permRef = ref(db, `permissions/${uid}`);
   const handler = (snapshot: any) => {
     callback(snapshot.exists() ? (snapshot.val() as Permission) : {});
   };
   onValue(permRef, handler);
-  return () => off(permRef, "value", handler);
+  return () => off(permRef, "value", handler as any);
 };
 
-export const onUserProfile = (uid: string, callback: (profile: UserProfile | null) => void) => {
+export const onUserProfile = (
+  uid: string,
+  callback: (profile: UserProfile | null) => void
+) => {
   const userRef = ref(db, `users/${uid}`);
   const handler = (snapshot: any) => {
     callback(snapshot.exists() ? (snapshot.val() as UserProfile) : null);
   };
   onValue(userRef, handler);
-  return () => off(userRef, "value", handler);
+  return () => off(userRef, "value", handler as any);
 };
