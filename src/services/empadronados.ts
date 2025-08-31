@@ -471,3 +471,26 @@ export const isNumeroPadronUnique = async (
     return false;
   }
 };
+
+export const obtenerEmpadronadoPorAuthUid = async (authUid: string): Promise<Empadronado | null> => {
+  try {
+    const empadronadosRef = ref(db, EMPADRONADOS_PATH);
+    const empadronadosQuery = query(empadronadosRef, orderByChild('authUid'), equalTo(authUid));
+    const snapshot = await get(empadronadosQuery);
+    
+    if (!snapshot.exists()) return null;
+    
+    let empadronado: Empadronado | null = null;
+    snapshot.forEach((child) => {
+      empadronado = {
+        id: child.key!,
+        ...child.val()
+      };
+    });
+    
+    return empadronado;
+  } catch (error) {
+    console.error("Error getting empadronado by authUid:", error);
+    return null;
+  }
+};

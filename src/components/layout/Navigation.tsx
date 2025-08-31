@@ -1,4 +1,4 @@
-import { Home, Calendar, DollarSign, Shield, MoreHorizontal } from "lucide-react";
+import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -6,7 +6,7 @@ const navigationItems = [
   { icon: Home, label: "Inicio", href: "/" },
   { icon: Calendar, label: "Sesiones", href: "/sesiones" },
   { icon: DollarSign, label: "Cobranzas", href: "/cobranzas" },
-  { icon: Shield, label: "Seguridad", href: "/seguridad" },
+  { icon: Users, label: "Portal", href: "/portal-asociado" },
   { icon: MoreHorizontal, label: "Más", href: "/modulos" },
 ];
 

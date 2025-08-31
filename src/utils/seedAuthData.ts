@@ -18,57 +18,74 @@ export const seedRoles = async () => {
     presidencia: {
       id: 'presidencia',
       nombre: 'Presidencia',
-      descripcion: 'Presidente de la Junta Vecinal'
+      descripcion: 'Presidente de la Junta Vecinal',
+      orden: 1
     },
     vicepresidencia: {
       id: 'vicepresidencia',
       nombre: 'Vicepresidencia',
-      descripcion: 'Vicepresidente de la Junta Vecinal'
+      descripcion: 'Vicepresidente de la Junta Vecinal',
+      orden: 2
     },
     economia: {
       id: 'economia',
       nombre: 'Economía',
-      descripcion: 'Responsable de finanzas y tesorería'
+      descripcion: 'Responsable de finanzas y tesorería',
+      orden: 3
     },
     seguridad: {
       id: 'seguridad',
       nombre: 'Seguridad',
-      descripcion: 'Coordinador de seguridad vecinal'
+      descripcion: 'Coordinador de seguridad vecinal',
+      orden: 4
     },
     actas_archivos: {
       id: 'actas_archivos',
       nombre: 'Actas y Archivos',
-      descripcion: 'Secretario de actas y archivo'
+      descripcion: 'Secretario de actas y archivo',
+      orden: 5
     },
     fiscal: {
       id: 'fiscal',
       nombre: 'Fiscal',
-      descripcion: 'Órgano de control y fiscalización'
+      descripcion: 'Órgano de control y fiscalización',
+      orden: 6
     },
     deportes: {
       id: 'deportes',
       nombre: 'Deportes',
-      descripcion: 'Coordinador de actividades deportivas'
+      descripcion: 'Coordinador de actividades deportivas',
+      orden: 7
     },
     comunicaciones: {
       id: 'comunicaciones',
       nombre: 'Comunicaciones',
-      descripcion: 'Responsable de comunicación vecinal'
+      descripcion: 'Responsable de comunicación vecinal',
+      orden: 8
     },
     salud_medioambiente: {
       id: 'salud_medioambiente',
       nombre: 'Salud y Medio Ambiente',
-      descripcion: 'Coordinador de salud y medio ambiente'
+      descripcion: 'Coordinador de salud y medio ambiente',
+      orden: 9
     },
     educacion_cultura: {
       id: 'educacion_cultura',
       nombre: 'Educación y Cultura',
-      descripcion: 'Responsable de educación y cultura'
+      descripcion: 'Responsable de educación y cultura',
+      orden: 10
     },
     vocal: {
       id: 'vocal',
       nombre: 'Vocal',
-      descripcion: 'Vocal de la Junta Vecinal'
+      descripcion: 'Vocal de la Junta Vecinal',
+      orden: 11
+    },
+    asociado: {
+      id: 'asociado',
+      nombre: 'Asociado',
+      descripcion: 'Empadronado con acceso al portal',
+      orden: 12
     }
   };
 

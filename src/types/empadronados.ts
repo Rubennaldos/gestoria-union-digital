@@ -38,16 +38,6 @@ export interface Empadronado {
   updatedAt: number;
   creadoPor: string; // uid del usuario que lo creó
   modificadoPor?: string; // uid del último usuario que lo modificó
-}
-
-export interface Empadronado {
-  id: string;
-  numeroPadron: string;
-  dni: string;
-  nombre: string;
-  apellidos: string;
-  // ...
-  habilitado?: boolean;
 
   /** NUEVO: vínculo con cuenta del sistema */
   authUid?: string;        // UID de Firebase Auth si tiene cuenta

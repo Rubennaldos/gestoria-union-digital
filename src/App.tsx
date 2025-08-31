@@ -23,6 +23,7 @@ import Cobranzas from "./pages/Cobranzas";
 import Sanciones from "./pages/Sanciones";
 import Deportes from "./pages/Deportes";
 import Patrimonio from "./pages/Patrimonio";
+import PortalAsociado from "./pages/PortalAsociado";
 
 const queryClient = new QueryClient();
 
@@ -145,6 +146,17 @@ const App: React.FC = () => {
                     </ProtectedRoute>
                   }
                 />
+                
+                {/* Portal del Asociado */}
+                <Route
+                  path="/portal-asociado"
+                  element={
+                    <ProtectedRoute>
+                      <PortalAsociado />
+                    </ProtectedRoute>
+                  }
+                />
+                
                 {/* Alias de usuarios hacia admin/users (mismo control de rol) */}
                 <Route
                   path="/usuarios"
