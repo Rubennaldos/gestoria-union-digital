@@ -9,6 +9,7 @@ interface AuthzContextType {
   loading: boolean;
   can: (moduleId: string, level: PermissionLevel) => boolean;
   isPresidencia: boolean;
+  isAdministrador: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -18,6 +19,7 @@ const AuthzContext = createContext<AuthzContextType>({
   loading: true,
   can: () => false,
   isPresidencia: false,
+  isAdministrador: false,
   refresh: async () => {}
 });
 
@@ -44,6 +46,7 @@ export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [loading, setLoading] = useState(true);
 
   const isPresidencia = profile?.roleId === 'presidencia';
+  const isAdministrador = profile?.roleId === 'administrador';
 
   const loadPermissions = async () => {
     if (!user?.uid) {
@@ -86,8 +89,8 @@ export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [user?.uid]);
 
   const can = (moduleId: string, requiredLevel: PermissionLevel): boolean => {
-    // Presidencia siempre tiene acceso total
-    if (isPresidencia) return true;
+    // Presidencia y Administrador siempre tienen acceso total
+    if (isPresidencia || isAdministrador) return true;
 
     const userLevel = permissions[moduleId] || 'none';
     const userLevelValue = PERMISSION_HIERARCHY[userLevel];
@@ -102,6 +105,7 @@ export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loading,
     can,
     isPresidencia,
+    isAdministrador: isAdministrador,
     refresh: loadPermissions
   };
 
