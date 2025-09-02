@@ -558,6 +558,7 @@ const Empadronados: React.FC = () => {
                 <TableHead>Padrón</TableHead>
                 <TableHead>Nombre Completo</TableHead>
                 <TableHead>DNI</TableHead>
+                <TableHead>Email Acceso</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Vivienda</TableHead>
                 <TableHead>Vive</TableHead>
@@ -577,6 +578,34 @@ const Empadronados: React.FC = () => {
                     </div>
                   </TableCell>
                   <TableCell>{empadronado.dni}</TableCell>
+                  <TableCell>
+                    {empadronado.emailAcceso ? (
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-green-600">
+                          {empadronado.emailAcceso}
+                        </div>
+                        <Badge variant="secondary" className="text-xs">
+                          Cuenta activa
+                        </Badge>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Sin acceso</div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedEmpadronado(empadronado);
+                            setCrearAccesoOpen(true);
+                          }}
+                          className="h-6 text-xs"
+                        >
+                          <KeyRound className="h-3 w-3 mr-1" />
+                          Crear acceso
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={empadronado.habilitado ? "default" : "secondary"}>
                       {empadronado.habilitado ? "Habilitado" : "Deshabilitado"}
