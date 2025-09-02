@@ -140,9 +140,8 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Quick Actions and Alerts - Mobile Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <QuickActions />
+        {/* Alerts Widget */}
+        <div className="max-w-2xl">
           <AlertsWidget />
         </div>
 
