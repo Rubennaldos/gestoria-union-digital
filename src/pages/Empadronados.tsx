@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, Download, KeyRound, Settings, Check, X, FileSpreadsheet, Upload } from 'lucide-react';
+import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, EyeOff, Download, KeyRound, Settings, Check, X, FileSpreadsheet, Upload } from 'lucide-react';
 import { generateEmpadronadosTemplate } from '@/utils/excelTemplate';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
@@ -55,6 +55,9 @@ const CrearAccesoEmpadronadoModal: React.FC<CrearAccesoProps> = ({ open, onOpenC
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('jpusap2024');
+  const [confirmPassword, setConfirmPassword] = useState('jpusap2024');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -63,17 +66,24 @@ const CrearAccesoEmpadronadoModal: React.FC<CrearAccesoProps> = ({ open, onOpenC
       setEmail(s.email);
       setUsername(s.username);
       setPassword(s.password);
+      setConfirmPassword(s.password);
+      setShowPassword(false);
+      setShowConfirm(false);
     }
   }, [open, empadronado]);
 
   const crear = async () => {
     if (!empadronado) return;
-    if (!email.trim() || !username.trim() || !password.trim()) {
-      toast({ title: 'Faltan datos', description: 'Completa email, usuario y contraseña.', variant: 'destructive' });
+    if (!email.trim() || !username.trim() || !password.trim() || !confirmPassword.trim()) {
+      toast({ title: 'Faltan datos', description: 'Completa email, usuario y contraseñas.', variant: 'destructive' });
       return;
     }
     if (password.length < 6) {
       toast({ title: 'Contraseña muy corta', description: 'Mínimo 6 caracteres.', variant: 'destructive' });
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast({ title: 'Las contraseñas no coinciden', description: 'Revisa los campos de contraseña.', variant: 'destructive' });
       return;
     }
 
@@ -138,7 +148,47 @@ const CrearAccesoEmpadronadoModal: React.FC<CrearAccesoProps> = ({ open, onOpenC
 
             <div className="space-y-2">
               <Label>Contraseña temporal</Label>
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="••••••••" />
+              <div className="relative">
+                <Input
+                  className="pr-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Confirmar contraseña</Label>
+              <div className="relative">
+                <Input
+                  className="pr-10"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  type={showConfirm ? 'text' : 'password'}
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                  aria-label={showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'}
+                >
+                  {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {confirmPassword && password !== confirmPassword && (
+                <p className="text-xs text-destructive">Las contraseñas no coinciden.</p>
+              )}
               <p className="text-xs text-muted-foreground">Recomienda cambiarla en el primer inicio de sesión.</p>
             </div>
 
@@ -1086,6 +1136,14 @@ const Empadronados: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de crear acceso */}
+      <CrearAccesoEmpadronadoModal
+        open={crearAccesoOpen}
+        onOpenChange={setCrearAccesoOpen}
+        empadronado={selectedEmpadronado}
+        onCreated={loadData}
+      />
 
       {/* Modal de gestionar permisos */}
       <GestionarPermisosModal
