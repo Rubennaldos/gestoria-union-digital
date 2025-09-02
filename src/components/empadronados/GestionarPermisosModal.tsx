@@ -15,12 +15,14 @@ interface GestionarPermisosModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   empadronado: Empadronado | null;
+  onAccountCreated?: () => void;
 }
 
 export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
   open,
   onOpenChange,
-  empadronado
+  empadronado,
+  onAccountCreated
 }) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -115,11 +117,18 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
 
       toast({
         title: "Cuenta creada",
-        description: "Se creó la cuenta. Ahora puedes configurar los permisos."
+        description: "Se creó la cuenta. Configurando permisos..."
       });
 
-      // Recargar datos para obtener el nuevo authUid
-      await loadData();
+      // Notificar al componente padre para recargar datos
+      if (onAccountCreated) {
+        onAccountCreated();
+      }
+
+      // Esperar un momento para que se actualicen los datos
+      setTimeout(async () => {
+        await loadData();
+      }, 1000);
     } catch (error: any) {
       const msg = String(error?.message || '');
       let friendly = 'No se pudo crear el acceso.';
@@ -165,7 +174,7 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
           <div className="space-y-3">
             <Label className="text-lg font-semibold">Permisos por Módulo</Label>
             
-            {!empadronado.authUid && (
+            {!empadronado.authUid && !empadronado.emailAcceso && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <KeyRound className="h-4 w-4 text-orange-600" />
@@ -195,7 +204,7 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
               <div className="space-y-3">
                 {modules.map((module) => {
                   const currentLevel = userPermissions[module.id] || 'none';
-                  const isDisabled = !empadronado.authUid;
+                  const isDisabled = !empadronado.authUid && !empadronado.emailAcceso;
                   
                   return (
                     <div key={module.id} className={`border rounded-lg p-4 ${isDisabled ? 'opacity-50' : ''}`}>

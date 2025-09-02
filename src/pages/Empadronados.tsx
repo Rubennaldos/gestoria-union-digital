@@ -1069,6 +1069,7 @@ const Empadronados: React.FC = () => {
         open={gestionarPermisosOpen}
         onOpenChange={setGestionarPermisosOpen}
         empadronado={selectedEmpadronado}
+        onAccountCreated={loadData}
       />
     </div>
   );
