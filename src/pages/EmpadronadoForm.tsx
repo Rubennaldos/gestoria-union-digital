@@ -31,6 +31,7 @@ const EmpadronadoForm: React.FC = () => {
     parentezco: '',
     cumpleanos: ''
   });
+  const [isMinor, setIsMinor] = useState(false);
   const [newPhone, setNewPhone] = useState('');
   const [newVehicle, setNewVehicle] = useState<Vehicle>({
     placa: '',
@@ -301,11 +302,21 @@ const EmpadronadoForm: React.FC = () => {
 
   const addFamilyMember = () => {
     if (newFamilyMember.nombre.trim() && newFamilyMember.apellidos.trim()) {
+      const memberToAdd = isMinor 
+        ? { 
+            nombre: newFamilyMember.nombre,
+            apellidos: newFamilyMember.apellidos,
+            parentezco: newFamilyMember.parentezco || 'Menor de edad',
+            cumpleanos: 'Menor de edad'
+          }
+        : { ...newFamilyMember };
+        
       setFormData(prev => ({
         ...prev,
-        miembrosFamilia: [...(prev.miembrosFamilia || []), { ...newFamilyMember }]
+        miembrosFamilia: [...(prev.miembrosFamilia || []), memberToAdd]
       }));
       setNewFamilyMember({ nombre: '', apellidos: '', parentezco: '', cumpleanos: '' });
+      setIsMinor(false);
     }
   };
 
@@ -527,30 +538,43 @@ const EmpadronadoForm: React.FC = () => {
             <CardDescription>Agregar otros miembros que viven en la familia</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-              <Input
-                value={newFamilyMember.nombre}
-                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, nombre: e.target.value }))}
-                placeholder="Nombre"
-              />
-              <Input
-                value={newFamilyMember.apellidos}
-                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, apellidos: e.target.value }))}
-                placeholder="Apellidos"
-              />
-              <Input
-                value={newFamilyMember.parentezco}
-                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, parentezco: e.target.value }))}
-                placeholder="Parentezco"
-              />
-              <Input
-                value={newFamilyMember.cumpleanos}
-                onChange={(e) => setNewFamilyMember(prev => ({ ...prev, cumpleanos: e.target.value }))}
-                placeholder="DD/MM/YYYY"
-              />
-              <Button type="button" variant="outline" onClick={addFamilyMember}>
-                <Plus className="h-4 w-4" />
-              </Button>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="isMinor"
+                  checked={isMinor}
+                  onCheckedChange={setIsMinor}
+                />
+                <Label htmlFor="isMinor">Es menor de edad (omitir algunos datos)</Label>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                <Input
+                  value={newFamilyMember.nombre}
+                  onChange={(e) => setNewFamilyMember(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Nombre"
+                />
+                <Input
+                  value={newFamilyMember.apellidos}
+                  onChange={(e) => setNewFamilyMember(prev => ({ ...prev, apellidos: e.target.value }))}
+                  placeholder="Apellidos"
+                />
+                <Input
+                  value={newFamilyMember.parentezco}
+                  onChange={(e) => setNewFamilyMember(prev => ({ ...prev, parentezco: e.target.value }))}
+                  placeholder="Parentezco"
+                  disabled={isMinor}
+                />
+                <Input
+                  value={newFamilyMember.cumpleanos}
+                  onChange={(e) => setNewFamilyMember(prev => ({ ...prev, cumpleanos: e.target.value }))}
+                  placeholder="DD/MM/YYYY"
+                  disabled={isMinor}
+                />
+                <Button type="button" variant="outline" onClick={addFamilyMember}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             {formData.miembrosFamilia && formData.miembrosFamilia.length > 0 && (
