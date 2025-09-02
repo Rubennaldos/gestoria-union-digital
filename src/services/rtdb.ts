@@ -127,6 +127,20 @@ export const getUserPermissions = async (uid: string): Promise<Permission> => {
   return snapshot.exists() ? snapshot.val() : {};
 };
 
+export const setUserPermissions = async (uid: string, permissions: Permission, actorUid?: string) => {
+  const permRef = ref(db, `permissions/${uid}`);
+  await set(permRef, permissions);
+  
+  if (actorUid) {
+    await writeAuditLog({
+      actorUid,
+      targetUid: uid,
+      accion: "PERMISOS_ACTUALIZADOS",
+      new: permissions
+    });
+  }
+};
+
 export const applyMirrorPermissions = async (uid: string, mirrorConfig: Permission, actorUid: string) => {
   const updates: { [key: string]: PermissionLevel } = {};
   

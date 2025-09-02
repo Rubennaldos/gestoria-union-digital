@@ -13,11 +13,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, Download, KeyRound } from 'lucide-react';
+import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, Download, KeyRound, Settings, Check, X } from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
 import { useAuth } from '@/contexts/AuthContext';
 import { createUserAndProfile } from '@/services/auth';
+import { listModules, getUserPermissions, getUserProfile, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
+import { Module, UserProfile, Permission, PermissionLevel } from '@/types/auth';
 
 // ─────────────────────────────────────────────────────────────
 // Modal local para crear acceso (Auth + Perfil RTDB) desde padrón
@@ -175,10 +177,58 @@ const Empadronados: React.FC = () => {
   const [filterEtapa, setFilterEtapa] = useState('');
 
   const [crearAccesoOpen, setCrearAccesoOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [userPermissions, setUserPermissions] = useState<Permission>({});
+  const [editingPermissions, setEditingPermissions] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    loadData();
+    loadModules();
+  }, []);
+
+  const loadModules = async () => {
+    try {
+      const modulesData = await listModules();
+      setModules(modulesData);
+    } catch (error) {
+      console.error('Error loading modules:', error);
+    }
+  };
+
+  const loadUserPermissions = async (authUid?: string) => {
+    if (!authUid) return;
+    try {
+      const permissions = await getUserPermissions(authUid);
+      setUserPermissions(permissions || {});
+    } catch (error) {
+      console.error('Error loading user permissions:', error);
+      setUserPermissions({});
+    }
+  };
+
+  const saveUserPermissions = async (authUid?: string) => {
+    if (!authUid) return;
+    try {
+      await savePermissionsToRTDB(authUid, userPermissions, user?.uid || 'system');
+      toast({
+        title: "Éxito",
+        description: "Permisos actualizados correctamente"
+      });
+      setEditingPermissions(false);
+    } catch (error) {
+      toast({
+        title: "Error", 
+        description: "No se pudieron actualizar los permisos",
+        variant: "destructive"
+      });
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -673,7 +723,108 @@ const Empadronados: React.FC = () => {
                                   </div>
                                 </div>
 
-                                <Separator />
+                                 <Separator />
+
+                                 {/* Acceso al Sistema */}
+                                 {selectedEmpadronado && (
+                                   <div>
+                                     <h4 className="font-semibold mb-3">Acceso al Sistema</h4>
+                                     <div className="space-y-4">
+                                       {selectedEmpadronado.emailAcceso ? (
+                                         <div className="space-y-3">
+                                           <div className="grid grid-cols-2 gap-4 text-sm">
+                                             <div>
+                                               <Label className="text-muted-foreground">Email de Acceso</Label>
+                                               <p className="font-medium text-green-600">{selectedEmpadronado.emailAcceso}</p>
+                                             </div>
+                                             <div>
+                                               <Label className="text-muted-foreground">Estado</Label>
+                                               <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
+                                             </div>
+                                           </div>
+                                           
+                                           {/* Permisos de Módulos */}
+                                           <div className="border rounded-lg p-4">
+                                             <div className="flex items-center justify-between mb-3">
+                                               <Label className="font-medium">Permisos de Módulos</Label>
+                                               <Button
+                                                 size="sm"
+                                                 variant="outline"
+                                                 onClick={() => {
+                                                   setEditingPermissions(!editingPermissions);
+                                                   if (!editingPermissions) {
+                                                     loadUserPermissions(selectedEmpadronado.authUid);
+                                                   }
+                                                 }}
+                                               >
+                                                 <Settings className="h-3 w-3 mr-1" />
+                                                 {editingPermissions ? 'Cancelar' : 'Editar'}
+                                               </Button>
+                                             </div>
+                                             
+                                             <div className="grid grid-cols-2 gap-2 text-xs">
+                                               {modules.map((module) => (
+                                                 <div key={module.id} className="flex items-center justify-between p-2 rounded border">
+                                                   <span>{module.nombre}</span>
+                                                   {editingPermissions ? (
+                                                      <Select
+                                                        value={userPermissions[module.id] || 'none'}
+                                                        onValueChange={(value: PermissionLevel) => 
+                                                          setUserPermissions(prev => ({ ...prev, [module.id]: value }))
+                                                        }
+                                                      >
+                                                       <SelectTrigger className="w-20 h-6">
+                                                         <SelectValue />
+                                                       </SelectTrigger>
+                                                        <SelectContent>
+                                                          <SelectItem value="none">Sin acceso</SelectItem>
+                                                          <SelectItem value="read">Lectura</SelectItem>
+                                                          <SelectItem value="write">Escritura</SelectItem>
+                                                          <SelectItem value="admin">Admin</SelectItem>
+                                                        </SelectContent>
+                                                     </Select>
+                                                   ) : (
+                                                      <Badge 
+                                                        variant={userPermissions[module.id] === 'none' || !userPermissions[module.id] ? 'outline' : 'secondary'}
+                                                        className="text-xs"
+                                                      >
+                                                        {userPermissions[module.id] || 'Sin acceso'}
+                                                     </Badge>
+                                                   )}
+                                                 </div>
+                                               ))}
+                                             </div>
+                                             
+                                             {editingPermissions && (
+                                               <div className="flex justify-end gap-2 mt-3">
+                                                 <Button size="sm" variant="outline" onClick={() => setEditingPermissions(false)}>
+                                                   Cancelar
+                                                 </Button>
+                                                 <Button size="sm" onClick={() => saveUserPermissions(selectedEmpadronado.authUid)}>
+                                                   Guardar Permisos
+                                                 </Button>
+                                               </div>
+                                             )}
+                                           </div>
+                                         </div>
+                                       ) : (
+                                         <div className="text-center py-4 border-2 border-dashed rounded-lg">
+                                           <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                           <p className="text-sm text-muted-foreground mb-3">No tiene acceso al sistema</p>
+                                           <Button
+                                             size="sm"
+                                             onClick={() => setCrearAccesoOpen(true)}
+                                           >
+                                             <KeyRound className="h-3 w-3 mr-1" />
+                                             Crear Acceso
+                                           </Button>
+                                         </div>
+                                       )}
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 <Separator />
 
                                 {/* Contacto */}
                                 <div>
