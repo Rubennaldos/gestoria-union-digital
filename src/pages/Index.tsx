@@ -5,10 +5,9 @@ import {
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { ModuleCard } from "@/components/ui/module-card";
-import { QuickActions } from "@/components/dashboard/QuickActions";
-import { AlertsWidget } from "@/components/dashboard/AlertsWidget";
-import { SeedDataButton } from "@/components/ui/seedDataButton";
 import { useAuthz } from "@/contexts/AuthzContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { SeedDataButton } from "@/components/ui/seedDataButton";
 import { useEffect, useState } from "react";
 import { listModules } from "@/services/rtdb";
 import { Module } from "@/types/auth";
@@ -75,6 +74,7 @@ const moduleRoutes: Record<string, string> = {
 
 const Index = () => {
   const { can, loading: authLoading } = useAuthz();
+  const { user, profile } = useAuth();
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -140,9 +140,14 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Alerts Widget */}
-        <div className="max-w-2xl">
-          <AlertsWidget />
+        {/* Welcome Message */}
+        <div className="bg-card border rounded-lg p-6 text-center">
+          <h2 className="text-xl font-semibold text-foreground mb-2">
+            Bienvenido: {profile?.displayName || user?.displayName || user?.email || 'Usuario'}
+          </h2>
+          <p className="text-muted-foreground">
+            Sistema de Gestión - Junta Directiva
+          </p>
         </div>
 
         {/* Modules Grid */}
