@@ -17,6 +17,7 @@ import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthz } from '@/contexts/AuthzContext';
 import { createUserAndProfile } from '@/services/auth';
 import { listModules, getUserPermissions, getUserProfile, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { Module, UserProfile, Permission, PermissionLevel } from '@/types/auth';
@@ -187,6 +188,7 @@ const Empadronados: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { canDeleteWithoutAuth, isPresidente } = useAuthz();
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -316,10 +318,20 @@ const Empadronados: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!selectedEmpadronado || deletePassword !== 'admin123' || !deleteMotivo.trim()) {
+    if (!selectedEmpadronado || !deleteMotivo.trim()) {
       toast({
         title: "Error",
-        description: "Verifique la clave de presidencia y el motivo",
+        description: "Debe especificar un motivo para la eliminación",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Solo verificar contraseña si no es Presidente
+    if (!canDeleteWithoutAuth && deletePassword !== 'admin123') {
+      toast({
+        title: "Error",
+        description: "Verifique la clave de presidencia",
         variant: "destructive"
       });
       return;
@@ -984,25 +996,28 @@ const Empadronados: React.FC = () => {
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
-                              Se requiere autorización de presidencia.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
+                           <AlertDialogHeader>
+                             <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
+                             <AlertDialogDescription>
+                               Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
+                               {!canDeleteWithoutAuth && " Se requiere autorización de presidencia."}
+                               {canDeleteWithoutAuth && " Como Presidente, puede eliminar directamente."}
+                             </AlertDialogDescription>
+                           </AlertDialogHeader>
                           
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="delete-password">Clave de Presidencia</Label>
-                              <Input
-                                id="delete-password"
-                                type="password"
-                                value={deletePassword}
-                                onChange={(e) => setDeletePassword(e.target.value)}
-                                placeholder="Ingrese la clave"
-                              />
-                            </div>
+                           <div className="space-y-4">
+                             {!canDeleteWithoutAuth && (
+                               <div>
+                                 <Label htmlFor="delete-password">Clave de Presidencia</Label>
+                                 <Input
+                                   id="delete-password"
+                                   type="password"
+                                   value={deletePassword}
+                                   onChange={(e) => setDeletePassword(e.target.value)}
+                                   placeholder="Ingrese la clave"
+                                 />
+                               </div>
+                             )}
                             
                             <div>
                               <Label htmlFor="delete-motivo">Motivo de Eliminación</Label>

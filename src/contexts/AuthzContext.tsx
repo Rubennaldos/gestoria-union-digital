@@ -10,6 +10,9 @@ interface AuthzContextType {
   can: (moduleId: string, level: PermissionLevel) => boolean;
   isPresidencia: boolean;
   isAdministrador: boolean;
+  isPresidente: boolean;
+  canDeleteWithoutAuth: boolean;
+  canChangeRoles: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -20,6 +23,9 @@ const AuthzContext = createContext<AuthzContextType>({
   can: () => false,
   isPresidencia: false,
   isAdministrador: false,
+  isPresidente: false,
+  canDeleteWithoutAuth: false,
+  canChangeRoles: false,
   refresh: async () => {}
 });
 
@@ -47,6 +53,7 @@ export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const isPresidencia = profile?.roleId === 'presidencia';
   const isAdministrador = profile?.roleId === 'administrador';
+  const isPresidente = profile?.roleId === 'presidencia'; // Presidente es el admin general
 
   const loadPermissions = async () => {
     if (!user?.uid) {
@@ -89,8 +96,8 @@ export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [user?.uid]);
 
   const can = (moduleId: string, requiredLevel: PermissionLevel): boolean => {
-    // Presidencia y Administrador siempre tienen acceso total
-    if (isPresidencia || isAdministrador) return true;
+    // Presidente (presidencia) tiene acceso total a todo como administrador general
+    if (isPresidente || isAdministrador) return true;
 
     const userLevel = permissions[moduleId] || 'none';
     const userLevelValue = PERMISSION_HIERARCHY[userLevel];
@@ -105,7 +112,10 @@ export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     loading,
     can,
     isPresidencia,
-    isAdministrador: isAdministrador,
+    isAdministrador,
+    isPresidente,
+    canDeleteWithoutAuth: isPresidente, // Solo el Presidente puede eliminar sin autorización
+    canChangeRoles: isPresidente, // Solo el Presidente puede cambiar roles
     refresh: loadPermissions
   };
 

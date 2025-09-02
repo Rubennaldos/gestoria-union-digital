@@ -17,8 +17,8 @@ export const seedRoles = async () => {
   const roles: Record<string, Role> = {
     presidencia: {
       id: 'presidencia',
-      nombre: 'Presidencia',
-      descripcion: 'Presidente de la Junta Vecinal',
+      nombre: 'Presidente',
+      descripcion: 'Presidente de la Junta Vecinal - Administrador General del Sistema',
       orden: 1
     },
     vicepresidencia: {
