@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Settings } from 'lucide-react';
+import { Settings, KeyRound } from 'lucide-react';
 import { Empadronado } from '@/types/empadronados';
 import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { useAuth } from '@/contexts/AuthContext';
+import { createUserAndProfile } from '@/services/auth';
 
 interface GestionarPermisosModalProps {
   open: boolean;
@@ -26,24 +27,26 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
   const [modules, setModules] = useState<Module[]>([]);
   const [userPermissions, setUserPermissions] = useState<Permission>({});
   const [loading, setLoading] = useState(false);
+  const [creatingAccount, setCreatingAccount] = useState(false);
 
   useEffect(() => {
-    if (open && empadronado?.authUid) {
+    if (open) {
       loadData();
     }
   }, [open, empadronado]);
 
   const loadData = async () => {
-    if (!empadronado?.authUid) return;
-    
     setLoading(true);
     try {
-      const [modulesData, permissions] = await Promise.all([
-        listModules(),
-        getUserPermissions(empadronado.authUid)
-      ]);
+      const modulesData = await listModules();
       setModules(modulesData);
-      setUserPermissions(permissions || {});
+      
+      if (empadronado?.authUid) {
+        const permissions = await getUserPermissions(empadronado.authUid);
+        setUserPermissions(permissions || {});
+      } else {
+        setUserPermissions({});
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -85,6 +88,53 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
     }
   };
 
+  const createAccountAndSetPermissions = async () => {
+    if (!empadronado) return;
+    
+    setCreatingAccount(true);
+    try {
+      // Crear credenciales sugeridas
+      const baseUser = empadronado.numeroPadron?.trim()
+        ? `emp-${empadronado.numeroPadron.trim().toLowerCase()}`
+        : `emp-${empadronado.nombre.toLowerCase().replace(/\s+/g, '-')}`;
+      const email = `${baseUser}@jpusap.com`;
+      const password = (empadronado.dni && empadronado.dni.length >= 6) ? empadronado.dni : 'jpusap2024';
+
+      // Crear la cuenta
+      await createUserAndProfile({
+        displayName: `${empadronado.nombre} ${empadronado.apellidos}`,
+        email: email.trim().toLowerCase(),
+        username: baseUser.trim().toLowerCase(),
+        phone: empadronado.telefonos?.[0]?.numero || '',
+        roleId: 'asociado',
+        activo: true,
+        password,
+        empadronadoId: empadronado.id,
+        tipoUsuario: 'asociado'
+      });
+
+      toast({
+        title: "Cuenta creada",
+        description: "Se creó la cuenta. Ahora puedes configurar los permisos."
+      });
+
+      // Recargar datos para obtener el nuevo authUid
+      await loadData();
+    } catch (error: any) {
+      const msg = String(error?.message || '');
+      let friendly = 'No se pudo crear el acceso.';
+      if (msg.includes('email-already-in-use')) friendly = 'El email ya está registrado.';
+      if (msg.includes('ya está en uso')) friendly = msg;
+      toast({
+        title: "Error",
+        description: friendly,
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
   if (!empadronado) return null;
 
   return (
@@ -112,64 +162,85 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
             </div>
           )}
 
-          {empadronado.authUid && (
-            <div className="space-y-3">
-              <Label className="text-lg font-semibold">Permisos por Módulo</Label>
-              
-              {loading ? (
-                <div className="space-y-3">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-                  ))}
+          <div className="space-y-3">
+            <Label className="text-lg font-semibold">Permisos por Módulo</Label>
+            
+            {!empadronado.authUid && (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <KeyRound className="h-4 w-4 text-orange-600" />
+                  <span className="text-sm font-medium text-orange-800">Cuenta requerida</span>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {modules.map((module) => {
-                    const currentLevel = userPermissions[module.id] || 'none';
-                    return (
-                      <div key={module.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <span className="font-medium">{module.nombre}</span>
-                          </div>
-                          <Badge variant={
-                            currentLevel === 'none' ? 'outline' :
-                            currentLevel === 'read' ? 'secondary' :
-                            currentLevel === 'write' ? 'default' : 'destructive'
-                          }>
-                            {currentLevel === 'none' ? 'Sin acceso' :
-                             currentLevel === 'read' ? 'Lectura' :
-                             currentLevel === 'write' ? 'Escritura' : 'Admin'}
-                          </Badge>
+                <p className="text-sm text-orange-700 mb-3">
+                  Para asignar permisos, primero debes crear una cuenta de acceso para este empadronado.
+                </p>
+                <Button 
+                  size="sm" 
+                  onClick={createAccountAndSetPermissions}
+                  disabled={creatingAccount}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  {creatingAccount ? 'Creando cuenta...' : 'Crear Cuenta de Acceso'}
+                </Button>
+              </div>
+            )}
+            
+            {loading ? (
+              <div className="space-y-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {modules.map((module) => {
+                  const currentLevel = userPermissions[module.id] || 'none';
+                  const isDisabled = !empadronado.authUid;
+                  
+                  return (
+                    <div key={module.id} className={`border rounded-lg p-4 ${isDisabled ? 'opacity-50' : ''}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <span className="font-medium">{module.nombre}</span>
                         </div>
-                        
-                        <div className="grid grid-cols-4 gap-2">
-                          {[
-                            { value: 'none', label: 'Sin Acceso', color: 'bg-muted hover:bg-muted/80' },
-                            { value: 'read', label: 'Lectura', color: 'bg-blue-500 hover:bg-blue-600 text-white' },
-                            { value: 'write', label: 'Escritura', color: 'bg-green-500 hover:bg-green-600 text-white' },
-                            { value: 'admin', label: 'Admin', color: 'bg-purple-500 hover:bg-purple-600 text-white' }
-                          ].map((option) => (
-                            <button
-                              key={option.value}
-                              onClick={() => handlePermissionChange(module.id, option.value as PermissionLevel)}
-                              className={`text-sm px-3 py-2 rounded-md border transition-all ${
-                                currentLevel === option.value
-                                  ? option.color
-                                  : 'bg-background hover:bg-muted border-border'
-                              }`}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
-                        </div>
+                        <Badge variant={
+                          currentLevel === 'none' ? 'outline' :
+                          currentLevel === 'read' ? 'secondary' :
+                          currentLevel === 'write' ? 'default' : 'destructive'
+                        }>
+                          {currentLevel === 'none' ? 'Sin acceso' :
+                           currentLevel === 'read' ? 'Lectura' :
+                           currentLevel === 'write' ? 'Escritura' : 'Admin'}
+                        </Badge>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      
+                      <div className="grid grid-cols-4 gap-2">
+                        {[
+                          { value: 'none', label: 'Sin Acceso', color: 'bg-muted hover:bg-muted/80' },
+                          { value: 'read', label: 'Lectura', color: 'bg-blue-500 hover:bg-blue-600 text-white' },
+                          { value: 'write', label: 'Escritura', color: 'bg-green-500 hover:bg-green-600 text-white' },
+                          { value: 'admin', label: 'Admin', color: 'bg-purple-500 hover:bg-purple-600 text-white' }
+                        ].map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => !isDisabled && handlePermissionChange(module.id, option.value as PermissionLevel)}
+                            disabled={isDisabled}
+                            className={`text-sm px-3 py-2 rounded-md border transition-all ${
+                              currentLevel === option.value && !isDisabled
+                                ? option.color
+                                : 'bg-background hover:bg-muted border-border'
+                            } ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
