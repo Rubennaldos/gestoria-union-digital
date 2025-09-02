@@ -12,16 +12,8 @@ import { SeedDataButton } from "@/components/ui/seedDataButton";
 // TODO: Los módulos deberían mostrar badges dinámicos basados en datos reales
 const modules = [
   {
-    title: "Usuarios y Permisos",
-    description: "Gestión de usuarios, roles y niveles de acceso",
-    icon: Users,
-    href: "/usuarios",
-    color: "primary" as const,
-    restricted: true
-  },
-  {
     title: "Padrón y Delegados", 
-    description: "Registro de asociados por etapas",
+    description: "Registro de asociados, gestión de usuarios y permisos",
     icon: UserCheck,
     href: "/padron",
     color: "secondary" as const
