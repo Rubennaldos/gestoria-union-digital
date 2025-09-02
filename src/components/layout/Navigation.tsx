@@ -1,6 +1,9 @@
-import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users, LogOut } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { signOutUser } from "@/services/auth";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const navigationItems = [
   { icon: Home, label: "Inicio", href: "/" },
@@ -40,6 +43,26 @@ export const BottomNavigation = () => {
 };
 
 export const TopNavigation = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente"
+      });
+      navigate('/login');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error al cerrar sesión",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full bg-card border-b border-border backdrop-blur-sm">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -51,6 +74,15 @@ export const TopNavigation = () => {
             <span className="text-sm text-muted-foreground">Usuario:</span>
             <span className="text-sm font-medium">Administrador</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            className="flex items-center space-x-2"
+          >
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Cerrar Sesión</span>
+          </Button>
         </div>
       </div>
     </header>

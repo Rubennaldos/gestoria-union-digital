@@ -268,10 +268,11 @@ const EmpadronadoForm: React.FC = () => {
             description: "Empadronado y cuenta de usuario creados correctamente"
           });
         } catch (userError) {
+          console.error('Error creando cuenta de usuario:', userError);
           // El empadronado se creó pero la cuenta falló
           toast({
             title: "Advertencia",
-            description: "Empadronado creado, pero hubo un error al crear la cuenta de usuario",
+            description: `Empadronado creado, pero hubo un error al crear la cuenta de usuario: ${userError.message}`,
             variant: "destructive"
           });
         }
