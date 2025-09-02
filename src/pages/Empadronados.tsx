@@ -743,69 +743,101 @@ const Empadronados: React.FC = () => {
                                              </div>
                                            </div>
                                            
-                                           {/* Permisos de Módulos */}
-                                           <div className="border rounded-lg p-4">
-                                             <div className="flex items-center justify-between mb-3">
-                                               <Label className="font-medium">Permisos de Módulos</Label>
-                                               <Button
-                                                 size="sm"
-                                                 variant="outline"
-                                                 onClick={() => {
-                                                   setEditingPermissions(!editingPermissions);
-                                                   if (!editingPermissions) {
-                                                     loadUserPermissions(selectedEmpadronado.authUid);
-                                                   }
-                                                 }}
-                                               >
-                                                 <Settings className="h-3 w-3 mr-1" />
-                                                 {editingPermissions ? 'Cancelar' : 'Editar'}
-                                               </Button>
-                                             </div>
-                                             
-                                             <div className="grid grid-cols-2 gap-2 text-xs">
-                                               {modules.map((module) => (
-                                                 <div key={module.id} className="flex items-center justify-between p-2 rounded border">
-                                                   <span>{module.nombre}</span>
-                                                   {editingPermissions ? (
-                                                      <Select
-                                                        value={userPermissions[module.id] || 'none'}
-                                                        onValueChange={(value: PermissionLevel) => 
-                                                          setUserPermissions(prev => ({ ...prev, [module.id]: value }))
-                                                        }
-                                                      >
-                                                       <SelectTrigger className="w-20 h-6">
-                                                         <SelectValue />
-                                                       </SelectTrigger>
-                                                        <SelectContent>
-                                                          <SelectItem value="none">Sin acceso</SelectItem>
-                                                          <SelectItem value="read">Lectura</SelectItem>
-                                                          <SelectItem value="write">Escritura</SelectItem>
-                                                          <SelectItem value="admin">Admin</SelectItem>
-                                                        </SelectContent>
-                                                     </Select>
-                                                   ) : (
-                                                      <Badge 
-                                                        variant={userPermissions[module.id] === 'none' || !userPermissions[module.id] ? 'outline' : 'secondary'}
-                                                        className="text-xs"
-                                                      >
-                                                        {userPermissions[module.id] || 'Sin acceso'}
-                                                     </Badge>
-                                                   )}
-                                                 </div>
-                                               ))}
-                                             </div>
-                                             
-                                             {editingPermissions && (
-                                               <div className="flex justify-end gap-2 mt-3">
-                                                 <Button size="sm" variant="outline" onClick={() => setEditingPermissions(false)}>
-                                                   Cancelar
-                                                 </Button>
-                                                 <Button size="sm" onClick={() => saveUserPermissions(selectedEmpadronado.authUid)}>
-                                                   Guardar Permisos
-                                                 </Button>
-                                               </div>
-                                             )}
-                                           </div>
+                                            {/* Permisos de Módulos */}
+                                            <div className="border rounded-lg p-4">
+                                              <div className="flex items-center justify-between mb-3">
+                                                <Label className="font-medium">Permisos de Módulos</Label>
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={() => {
+                                                    setEditingPermissions(!editingPermissions);
+                                                    if (!editingPermissions) {
+                                                      loadUserPermissions(selectedEmpadronado.authUid);
+                                                      loadModules();
+                                                    }
+                                                  }}
+                                                >
+                                                  <Settings className="h-3 w-3 mr-1" />
+                                                  {editingPermissions ? 'Cancelar' : 'Editar'}
+                                                </Button>
+                                              </div>
+                                              
+                                              {editingPermissions ? (
+                                                <div className="space-y-3">
+                                                  {modules.map((module) => {
+                                                    const nivelActual = userPermissions[module.id] || 'none';
+                                                    return (
+                                                      <div key={module.id} className="border rounded-lg p-3 bg-muted/20">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                          <span className="font-medium text-sm">{module.nombre}</span>
+                                                          <Badge variant={
+                                                            nivelActual === 'none' ? 'outline' :
+                                                            nivelActual === 'read' ? 'secondary' :
+                                                            nivelActual === 'write' ? 'default' : 'destructive'
+                                                          }>
+                                                            {nivelActual === 'none' ? 'Sin acceso' :
+                                                             nivelActual === 'read' ? 'Lectura' :
+                                                             nivelActual === 'write' ? 'Escritura' : 'Admin'}
+                                                          </Badge>
+                                                        </div>
+                                                        <div className="grid grid-cols-4 gap-1">
+                                                          {[
+                                                            { valor: 'none', label: 'No', color: 'bg-muted text-muted-foreground' },
+                                                            { valor: 'read', label: 'Leer', color: 'bg-blue-500 text-white' },
+                                                            { valor: 'write', label: 'Escribir', color: 'bg-green-500 text-white' },
+                                                            { valor: 'admin', label: 'Admin', color: 'bg-purple-500 text-white' }
+                                                          ].map((opcion) => (
+                                                            <button
+                                                              key={opcion.valor}
+                                                              onClick={() => setUserPermissions(prev => ({
+                                                                ...prev,
+                                                                [module.id]: opcion.valor as PermissionLevel
+                                                              }))}
+                                                              className={`text-xs px-2 py-1 rounded transition-all ${
+                                                                nivelActual === opcion.valor
+                                                                  ? opcion.color
+                                                                  : 'bg-background border border-border hover:bg-muted text-muted-foreground'
+                                                              }`}
+                                                            >
+                                                              {opcion.label}
+                                                            </button>
+                                                          ))}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                  <div className="flex justify-end gap-2 mt-4">
+                                                    <Button size="sm" variant="outline" onClick={() => setEditingPermissions(false)}>
+                                                      Cancelar
+                                                    </Button>
+                                                    <Button size="sm" onClick={() => saveUserPermissions(selectedEmpadronado.authUid)}>
+                                                      Guardar Permisos
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div className="space-y-2">
+                                                  {modules.map((module) => {
+                                                    const nivel = userPermissions[module.id] || 'none';
+                                                    return (
+                                                      <div key={module.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                                                        <span className="text-sm">{module.nombre}</span>
+                                                        <Badge variant={
+                                                          nivel === 'none' ? 'outline' :
+                                                          nivel === 'read' ? 'secondary' :
+                                                          nivel === 'write' ? 'default' : 'destructive'
+                                                        }>
+                                                          {nivel === 'none' ? 'Sin acceso' :
+                                                           nivel === 'read' ? 'Lectura' :
+                                                           nivel === 'write' ? 'Escritura' : 'Admin'}
+                                                        </Badge>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              )}
+                                            </div>
                                          </div>
                                        ) : (
                                          <div className="text-center py-4 border-2 border-dashed rounded-lg">
