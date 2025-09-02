@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Plus, X, Home } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
@@ -43,9 +43,13 @@ const EmpadronadoForm: React.FC = () => {
   const [userAccountData, setUserAccountData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     username: '',
     roleId: 'asociado'
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const [roles, setRoles] = useState<Role[]>([]);
   
   // Form state
@@ -173,6 +177,10 @@ const EmpadronadoForm: React.FC = () => {
       if (!userAccountData.email.trim()) newErrors.userEmail = 'El email es requerido para crear la cuenta';
       if (!userAccountData.password.trim()) newErrors.userPassword = 'La contraseña es requerida para crear la cuenta';
       if (userAccountData.password.length < 6) newErrors.userPassword = 'La contraseña debe tener al menos 6 caracteres';
+      if (!userAccountData.confirmPassword.trim()) newErrors.userPasswordConfirm = 'Confirma la contraseña';
+      if (userAccountData.password && userAccountData.confirmPassword && userAccountData.password !== userAccountData.confirmPassword) {
+        newErrors.userPasswordConfirm = 'Las contraseñas no coinciden';
+      }
       
       // Validar formato de email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -268,7 +276,7 @@ const EmpadronadoForm: React.FC = () => {
             title: "Éxito",
             description: "Empadronado y cuenta de usuario creados correctamente"
           });
-        } catch (userError) {
+        } catch (userError: any) {
           console.error('Error creando cuenta de usuario:', userError);
           // El empadronado se creó pero la cuenta falló
           toast({
@@ -800,13 +808,22 @@ const EmpadronadoForm: React.FC = () => {
                 <Switch
                   id="createUserAccount"
                   checked={createUserAccount}
-                  onCheckedChange={setCreateUserAccount}
+                  onCheckedChange={(checked) => {
+                    setCreateUserAccount(checked);
+                    if (!checked) {
+                      setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
+                      setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '' }));
+                      setShowPassword(false);
+                      setShowConfirm(false);
+                    }
+                  }}
                 />
                 <Label htmlFor="createUserAccount">Crear cuenta de acceso al sistema</Label>
               </div>
 
               {createUserAccount && (
                 <div className="space-y-4 pt-4 border-t">
+                  {/* Email + Password */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="userEmail">Email de acceso *</Label>
@@ -822,18 +839,53 @@ const EmpadronadoForm: React.FC = () => {
 
                     <div>
                       <Label htmlFor="userPassword">Contraseña *</Label>
-                      <Input
-                        id="userPassword"
-                        type="password"
-                        value={userAccountData.password}
-                        onChange={(e) => setUserAccountData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Mínimo 6 caracteres"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="userPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          value={userAccountData.password}
+                          onChange={(e) => setUserAccountData(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Mínimo 6 caracteres"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                          aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                       {errors.userPassword && <p className="text-sm text-destructive mt-1">{errors.userPassword}</p>}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Confirm + Username + Role */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="userPasswordConfirm">Confirmar contraseña *</Label>
+                      <div className="relative">
+                        <Input
+                          id="userPasswordConfirm"
+                          type={showConfirm ? 'text' : 'password'}
+                          value={userAccountData.confirmPassword}
+                          onChange={(e) => setUserAccountData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Repite la contraseña"
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirm(v => !v)}
+                          className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                          aria-label={showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'}
+                        >
+                          {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {errors.userPasswordConfirm && <p className="text-sm text-destructive mt-1">{errors.userPasswordConfirm}</p>}
+                    </div>
+
                     <div>
                       <Label htmlFor="username">Nombre de usuario (opcional)</Label>
                       <Input
