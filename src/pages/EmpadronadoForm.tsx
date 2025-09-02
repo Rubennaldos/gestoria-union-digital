@@ -72,11 +72,11 @@ const EmpadronadoForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    // Cargar roles siempre
+    loadRoles();
+    
     if (isEditing && id) {
       loadEmpadronado();
-    } else {
-      // Solo para creación, cargar roles
-      loadRoles();
     }
   }, [id, isEditing]);
 
@@ -242,14 +242,18 @@ const EmpadronadoForm: React.FC = () => {
       if (isEditing && id) {
         success = await updateEmpadronado(id, submitData, 'admin-user');
         empadronadoId = id;
+        console.log('Empadronado actualizado:', id);
       } else {
+        console.log('Creando empadronado con datos:', submitData);
         empadronadoId = await createEmpadronado(submitData, 'admin-user');
         success = Boolean(empadronadoId);
+        console.log('Empadronado creado con ID:', empadronadoId, 'Success:', success);
       }
 
       // Si se creó el empadronado exitosamente y está habilitada la creación de cuenta
       if (success && createUserAccount && !isEditing && empadronadoId) {
         try {
+          console.log('Creando cuenta para empadronado:', empadronadoId, userAccountData);
           await createAccountForEmpadronado(empadronadoId, {
             email: userAccountData.email.trim(),
             password: userAccountData.password,
@@ -257,6 +261,7 @@ const EmpadronadoForm: React.FC = () => {
             username: userAccountData.username.trim() || undefined,
             roleId: userAccountData.roleId
           });
+          console.log('Cuenta creada exitosamente');
           
           toast({
             title: "Éxito",
