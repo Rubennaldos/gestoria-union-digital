@@ -126,7 +126,18 @@ const Index = () => {
               Sistema de Gestión - Junta Directiva
             </p>
           </div>
-          <SeedDataButton />
+          <div className="flex gap-2">
+            <SeedDataButton />
+            <button 
+              onClick={async () => {
+                await import("@/utils/seedAuthData").then(m => m.seedAuthData());
+                window.location.reload();
+              }}
+              className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+            >
+              Recargar Módulos
+            </button>
+          </div>
         </div>
 
         {/* Quick Actions and Alerts - Mobile Grid */}
