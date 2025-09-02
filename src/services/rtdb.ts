@@ -15,8 +15,13 @@ import {
 
 // User operations
 export const createUserProfile = async (uid: string, userData: Omit<UserProfile, 'uid'> & { uid: string }) => {
+  // Filtrar campos undefined para evitar errores en Firebase RTDB
+  const cleanUserData = Object.fromEntries(
+    Object.entries(userData).filter(([_, value]) => value !== undefined)
+  );
+  
   const userRef = ref(db, `users/${uid}`);
-  await set(userRef, userData);
+  await set(userRef, cleanUserData);
   
   // Si tiene username, crear mapping
   if (userData.username) {

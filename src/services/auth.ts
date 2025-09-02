@@ -135,15 +135,20 @@ export const createUserAndProfile = async (userData: CreateUserForm): Promise<st
 
   try {
     console.log("💾 Creando perfil en RTDB...");
-    await createUserProfile(uid, {
+    
+    // Preparar datos de perfil filtrando valores undefined
+    const profileData = {
       ...restProfile,
       email,
-      username: username || undefined,
+      username: username || null, // Usar null en lugar de undefined
       roleId,
       uid,
       createdAt: Date.now(),
-      empadronadoId: empadronadoId || undefined,
-    });
+      empadronadoId: empadronadoId || null, // Usar null en lugar de undefined
+      phone: restProfile.phone || null, // Asegurar que phone sea null si está vacío
+    };
+    
+    await createUserProfile(uid, profileData);
 
     // Vincular al padrón si corresponde
     if (empadronadoId) {
