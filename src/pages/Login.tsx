@@ -54,8 +54,10 @@ export default function Login() {
 
   // Si ya está logueado, redirigimos a donde quería ir o /inicio
   useEffect(() => {
+    console.log('🔍 Login: useEffect - user:', user?.email, 'profile:', profile?.roleId);
     if (!user) return;
     const from = (location.state as any)?.from?.pathname || '/inicio';
+    console.log('➡️ Login: Redirecting to:', from);
     navigate(from, { replace: true });
   }, [user, location.state, navigate]);
 
@@ -85,10 +87,12 @@ export default function Login() {
   }, []);
 
   const onSubmit = async (data: LoginForm) => {
+    console.log('🔐 Login: Attempting login with:', data.identifier);
     setLoading(true);
     setError(null);
     try {
-      await signInWithEmailOrUsername(data.identifier, data.password);
+      const result = await signInWithEmailOrUsername(data.identifier, data.password);
+      console.log('✅ Login: Success, result:', result.user.uid);
       toast({ title: 'Inicio de sesión exitoso', description: 'Bienvenido al sistema.' });
       // La redirección ocurre en el useEffect de arriba
     } catch (err: any) {

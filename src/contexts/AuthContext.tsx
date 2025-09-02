@@ -33,6 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Escucha de sesión Firebase
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
+      console.log('🔍 AuthContext: Firebase user changed:', fbUser?.email, fbUser?.uid);
       try {
         if (fbUser) {
           const authUser: AuthUser = {
@@ -41,14 +42,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             displayName: fbUser.displayName ?? undefined,
           };
 
+          console.log('📋 AuthContext: Loading user profile for UID:', fbUser.uid);
           // Carga perfil (si no existe, devolverá null)
           const userProfile = await getUserProfile(fbUser.uid);
+          console.log('👤 AuthContext: User profile loaded:', userProfile);
+          
           setProfile(userProfile);
           setUser(userProfile ? { ...authUser, profile: userProfile } : authUser);
+          console.log('✅ AuthContext: User state updated');
         } else {
+          console.log('🚪 AuthContext: User signed out');
           setUser(null);
           setProfile(null);
         }
+      } catch (error) {
+        console.error('❌ AuthContext: Error in auth state change:', error);
       } finally {
         setLoading(false);
       }
