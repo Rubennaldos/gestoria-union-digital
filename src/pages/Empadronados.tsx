@@ -675,18 +675,16 @@ const Empadronados: React.FC = () => {
                             <Eye className="h-4 w-4" />
                           </Button>
                         </SheetTrigger>
-                        {empadronado.emailAcceso && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEmpadronado(empadronado);
-                              setGestionarPermisosOpen(true);
-                            }}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedEmpadronado(empadronado);
+                            setGestionarPermisosOpen(true);
+                          }}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
                         <SheetContent className="w-[600px] sm:w-[800px]">
                           {selectedEmpadronado && (
                             <>
@@ -1065,14 +1063,6 @@ const Empadronados: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
-      {/* Modal de crear acceso */}
-      <CrearAccesoEmpadronadoModal
-        open={crearAccesoOpen}
-        onOpenChange={setCrearAccesoOpen}
-        empadronado={selectedEmpadronado}
-        onCreated={loadData}
-      />
 
       {/* Modal de gestionar permisos */}
       <GestionarPermisosModal
