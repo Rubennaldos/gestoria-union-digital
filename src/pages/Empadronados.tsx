@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createUserAndProfile } from '@/services/auth';
 import { listModules, getUserPermissions, getUserProfile, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { Module, UserProfile, Permission, PermissionLevel } from '@/types/auth';
+import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
 
 // ─────────────────────────────────────────────────────────────
 // Modal local para crear acceso (Auth + Perfil RTDB) desde padrón
@@ -177,6 +178,7 @@ const Empadronados: React.FC = () => {
   const [filterEtapa, setFilterEtapa] = useState('');
 
   const [crearAccesoOpen, setCrearAccesoOpen] = useState(false);
+  const [gestionarPermisosOpen, setGestionarPermisosOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userPermissions, setUserPermissions] = useState<Permission>({});
@@ -628,7 +630,7 @@ const Empadronados: React.FC = () => {
                     </div>
                   </TableCell>
                   <TableCell>{empadronado.dni}</TableCell>
-                  <TableCell>
+                   <TableCell>
                     {empadronado.emailAcceso ? (
                       <div className="space-y-1">
                         <div className="text-sm font-medium text-green-600">
@@ -639,21 +641,7 @@ const Empadronados: React.FC = () => {
                         </Badge>
                       </div>
                     ) : (
-                      <div className="space-y-1">
-                        <div className="text-sm text-muted-foreground">Sin acceso</div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedEmpadronado(empadronado);
-                            setCrearAccesoOpen(true);
-                          }}
-                          className="h-6 text-xs"
-                        >
-                          <KeyRound className="h-3 w-3 mr-1" />
-                          Crear acceso
-                        </Button>
-                      </div>
+                      <div className="text-sm text-muted-foreground">Sin acceso</div>
                     )}
                   </TableCell>
                   <TableCell>
@@ -675,7 +663,7 @@ const Empadronados: React.FC = () => {
                       {empadronado.vive ? "Sí" : "No"}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                   <TableCell>
                     <div className="flex gap-1">
                       <Sheet>
                         <SheetTrigger asChild>
@@ -687,6 +675,18 @@ const Empadronados: React.FC = () => {
                             <Eye className="h-4 w-4" />
                           </Button>
                         </SheetTrigger>
+                        {empadronado.emailAcceso && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedEmpadronado(empadronado);
+                              setGestionarPermisosOpen(true);
+                            }}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        )}
                         <SheetContent className="w-[600px] sm:w-[800px]">
                           {selectedEmpadronado && (
                             <>
@@ -839,19 +839,12 @@ const Empadronados: React.FC = () => {
                                               )}
                                             </div>
                                          </div>
-                                       ) : (
-                                         <div className="text-center py-4 border-2 border-dashed rounded-lg">
-                                           <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                           <p className="text-sm text-muted-foreground mb-3">No tiene acceso al sistema</p>
-                                           <Button
-                                             size="sm"
-                                             onClick={() => setCrearAccesoOpen(true)}
-                                           >
-                                             <KeyRound className="h-3 w-3 mr-1" />
-                                             Crear Acceso
-                                           </Button>
-                                         </div>
-                                       )}
+                                        ) : (
+                                          <div className="text-center py-4 border-2 border-dashed rounded-lg">
+                                            <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                            <p className="text-sm text-muted-foreground">No tiene acceso al sistema</p>
+                                          </div>
+                                        )}
                                      </div>
                                    </div>
                                  )}
@@ -1079,6 +1072,13 @@ const Empadronados: React.FC = () => {
         onOpenChange={setCrearAccesoOpen}
         empadronado={selectedEmpadronado}
         onCreated={loadData}
+      />
+
+      {/* Modal de gestionar permisos */}
+      <GestionarPermisosModal
+        open={gestionarPermisosOpen}
+        onOpenChange={setGestionarPermisosOpen}
+        empadronado={selectedEmpadronado}
       />
     </div>
   );
