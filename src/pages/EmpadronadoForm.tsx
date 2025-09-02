@@ -13,6 +13,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Plus, X, Home } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique } from '@/services/empadronados';
+import { createAccountForEmpadronado } from '@/services/auth';
+import { listRoles } from '@/services/rtdb';
+import { Role } from '@/types/auth';
 
 const EmpadronadoForm: React.FC = () => {
   const { id } = useParams();
@@ -33,6 +36,16 @@ const EmpadronadoForm: React.FC = () => {
     placa: '',
     tipo: 'vehiculo'
   });
+
+  // Estado para la creación de cuenta de usuario
+  const [createUserAccount, setCreateUserAccount] = useState(false);
+  const [userAccountData, setUserAccountData] = useState({
+    email: '',
+    password: '',
+    username: '',
+    roleId: 'asociado'
+  });
+  const [roles, setRoles] = useState<Role[]>([]);
   
   // Form state
   const [formData, setFormData] = useState<CreateEmpadronadoForm>({
@@ -61,8 +74,20 @@ const EmpadronadoForm: React.FC = () => {
   useEffect(() => {
     if (isEditing && id) {
       loadEmpadronado();
+    } else {
+      // Solo para creación, cargar roles
+      loadRoles();
     }
   }, [id, isEditing]);
+
+  const loadRoles = async () => {
+    try {
+      const rolesData = await listRoles();
+      setRoles(rolesData);
+    } catch (error) {
+      console.error('Error loading roles:', error);
+    }
+  };
 
   const loadEmpadronado = async () => {
     if (!id) return;
@@ -142,6 +167,19 @@ const EmpadronadoForm: React.FC = () => {
       }
     }
 
+    // Validar datos de cuenta de usuario si está habilitada
+    if (createUserAccount && !isEditing) {
+      if (!userAccountData.email.trim()) newErrors.userEmail = 'El email es requerido para crear la cuenta';
+      if (!userAccountData.password.trim()) newErrors.userPassword = 'La contraseña es requerida para crear la cuenta';
+      if (userAccountData.password.length < 6) newErrors.userPassword = 'La contraseña debe tener al menos 6 caracteres';
+      
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (userAccountData.email && !emailRegex.test(userAccountData.email)) {
+        newErrors.userEmail = 'El formato del email no es válido';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -199,18 +237,47 @@ const EmpadronadoForm: React.FC = () => {
       };
 
       let success = false;
+      let empadronadoId = '';
+      
       if (isEditing && id) {
         success = await updateEmpadronado(id, submitData, 'admin-user');
+        empadronadoId = id;
       } else {
-        const newId = await createEmpadronado(submitData, 'admin-user');
-        success = Boolean(newId);
+        empadronadoId = await createEmpadronado(submitData, 'admin-user');
+        success = Boolean(empadronadoId);
       }
 
-      if (success) {
+      // Si se creó el empadronado exitosamente y está habilitada la creación de cuenta
+      if (success && createUserAccount && !isEditing && empadronadoId) {
+        try {
+          await createAccountForEmpadronado(empadronadoId, {
+            email: userAccountData.email.trim(),
+            password: userAccountData.password,
+            displayName: `${formData.nombre} ${formData.apellidos}`,
+            username: userAccountData.username.trim() || undefined,
+            roleId: userAccountData.roleId
+          });
+          
+          toast({
+            title: "Éxito",
+            description: "Empadronado y cuenta de usuario creados correctamente"
+          });
+        } catch (userError) {
+          // El empadronado se creó pero la cuenta falló
+          toast({
+            title: "Advertencia",
+            description: "Empadronado creado, pero hubo un error al crear la cuenta de usuario",
+            variant: "destructive"
+          });
+        }
+      } else if (success) {
         toast({
           title: "Éxito",
           description: isEditing ? "Empadronado actualizado correctamente" : "Empadronado creado correctamente"
         });
+      }
+
+      if (success) {
         navigate('/padron');
       } else {
         throw new Error('Error en la operación');
@@ -681,6 +748,95 @@ const EmpadronadoForm: React.FC = () => {
             />
           </CardContent>
         </Card>
+
+        {/* Cuenta de Usuario - Solo para nuevos empadronados */}
+        {!isEditing && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Cuenta de Usuario del Sistema</CardTitle>
+              <CardDescription>Crear automáticamente una cuenta para que el asociado pueda acceder al sistema</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="createUserAccount"
+                  checked={createUserAccount}
+                  onCheckedChange={setCreateUserAccount}
+                />
+                <Label htmlFor="createUserAccount">Crear cuenta de acceso al sistema</Label>
+              </div>
+
+              {createUserAccount && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="userEmail">Email de acceso *</Label>
+                      <Input
+                        id="userEmail"
+                        type="email"
+                        value={userAccountData.email}
+                        onChange={(e) => setUserAccountData(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="juan.garcia@ejemplo.com"
+                      />
+                      {errors.userEmail && <p className="text-sm text-destructive mt-1">{errors.userEmail}</p>}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="userPassword">Contraseña *</Label>
+                      <Input
+                        id="userPassword"
+                        type="password"
+                        value={userAccountData.password}
+                        onChange={(e) => setUserAccountData(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Mínimo 6 caracteres"
+                      />
+                      {errors.userPassword && <p className="text-sm text-destructive mt-1">{errors.userPassword}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="username">Nombre de usuario (opcional)</Label>
+                      <Input
+                        id="username"
+                        value={userAccountData.username}
+                        onChange={(e) => setUserAccountData(prev => ({ ...prev, username: e.target.value }))}
+                        placeholder="juan.garcia"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="roleId">Rol del usuario</Label>
+                      <Select 
+                        value={userAccountData.roleId} 
+                        onValueChange={(value) => setUserAccountData(prev => ({ ...prev, roleId: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              {role.nombre}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <strong>Información:</strong> Se creará automáticamente una cuenta de usuario vinculada a este empadronado. 
+                      El asociado podrá usar estas credenciales para acceder al Portal del Asociado y gestionar sus visitas, 
+                      pagos y demás servicios.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Botones de acción */}
         <div className="flex gap-4 justify-end">
