@@ -197,10 +197,10 @@ const EmpadronadoForm: React.FC = () => {
         ...formData,
         // Limpiar campos completamente - solo incluir si tienen valor
         ...(formData.miembrosFamilia?.filter(miembro => 
-          miembro.nombre?.trim() && miembro.apellidos?.trim()
+          (miembro.nombre?.trim() && miembro.apellidos?.trim()) || miembro.nombre === 'Menor de edad'
         ).length > 0 && {
           miembrosFamilia: formData.miembrosFamilia.filter(miembro => 
-            miembro.nombre?.trim() && miembro.apellidos?.trim()
+            (miembro.nombre?.trim() && miembro.apellidos?.trim()) || miembro.nombre === 'Menor de edad'
           ).map(miembro => ({
             nombre: miembro.nombre.trim(),
             apellidos: miembro.apellidos.trim(),
@@ -301,22 +301,31 @@ const EmpadronadoForm: React.FC = () => {
   };
 
   const addFamilyMember = () => {
-    if (newFamilyMember.nombre.trim() && newFamilyMember.apellidos.trim()) {
-      const memberToAdd = isMinor 
-        ? { 
-            nombre: newFamilyMember.nombre,
-            apellidos: newFamilyMember.apellidos,
-            parentezco: newFamilyMember.parentezco || 'Menor de edad',
-            cumpleanos: 'Menor de edad'
-          }
-        : { ...newFamilyMember };
-        
-      setFormData(prev => ({
-        ...prev,
-        miembrosFamilia: [...(prev.miembrosFamilia || []), memberToAdd]
-      }));
-      setNewFamilyMember({ nombre: '', apellidos: '', parentezco: '', cumpleanos: '' });
-      setIsMinor(false);
+    if (isMinor) {
+      // Para menores de edad solo requerimos parentezco y cumpleaños
+      if (newFamilyMember.parentezco.trim() && newFamilyMember.cumpleanos.trim()) {
+        const memberToAdd = {
+          nombre: 'Menor de edad',
+          apellidos: '',
+          parentezco: newFamilyMember.parentezco,
+          cumpleanos: newFamilyMember.cumpleanos
+        };
+        setFormData(prev => ({
+          ...prev,
+          miembrosFamilia: [...(prev.miembrosFamilia || []), memberToAdd]
+        }));
+        setNewFamilyMember({ nombre: '', apellidos: '', parentezco: '', cumpleanos: '' });
+        setIsMinor(false);
+      }
+    } else {
+      // Para mayores de edad requerimos nombre y apellidos
+      if (newFamilyMember.nombre.trim() && newFamilyMember.apellidos.trim()) {
+        setFormData(prev => ({
+          ...prev,
+          miembrosFamilia: [...(prev.miembrosFamilia || []), { ...newFamilyMember }]
+        }));
+        setNewFamilyMember({ nombre: '', apellidos: '', parentezco: '', cumpleanos: '' });
+      }
     }
   };
 
@@ -553,23 +562,23 @@ const EmpadronadoForm: React.FC = () => {
                   value={newFamilyMember.nombre}
                   onChange={(e) => setNewFamilyMember(prev => ({ ...prev, nombre: e.target.value }))}
                   placeholder="Nombre"
+                  disabled={isMinor}
                 />
                 <Input
                   value={newFamilyMember.apellidos}
                   onChange={(e) => setNewFamilyMember(prev => ({ ...prev, apellidos: e.target.value }))}
                   placeholder="Apellidos"
+                  disabled={isMinor}
                 />
                 <Input
                   value={newFamilyMember.parentezco}
                   onChange={(e) => setNewFamilyMember(prev => ({ ...prev, parentezco: e.target.value }))}
                   placeholder="Parentezco"
-                  disabled={isMinor}
                 />
                 <Input
                   value={newFamilyMember.cumpleanos}
                   onChange={(e) => setNewFamilyMember(prev => ({ ...prev, cumpleanos: e.target.value }))}
                   placeholder="DD/MM/YYYY"
-                  disabled={isMinor}
                 />
                 <Button type="button" variant="outline" onClick={addFamilyMember}>
                   <Plus className="h-4 w-4" />
