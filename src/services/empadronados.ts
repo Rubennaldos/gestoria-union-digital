@@ -40,7 +40,7 @@ const monthsBetween = (from: string, to: string) => {
   return (ty - fy) * 12 + (tm - fm);
 };
 
-// Inicio histórico: enero 2025
+// Inicio histórico: 15 de enero 2025 - todos los usuarios deben tener cuotas desde esta fecha
 const START_PERIOD = "2025-01";
 
 /* ──────────────────────────────────────────────────────────────
@@ -286,9 +286,8 @@ export const createEmpadronado = async (
     const cleanData = removeUndefined(empadronado);
     await set(empadronadoRef, cleanData);
 
-    if (cleanData.habilitado !== false) {
-      await ensureChargesForNewMember(id, START_PERIOD, actorUid);
-    }
+    // Generar automáticamente cuotas desde enero 2025 para todos los empadronados
+    await ensureChargesForNewMember(id, START_PERIOD, actorUid);
 
     await writeAuditLog({
       actorUid,
