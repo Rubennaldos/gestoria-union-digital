@@ -47,10 +47,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userProfile = await getUserProfile(fbUser.uid);
           console.log('👤 AuthContext: User profile loaded:', userProfile);
           
-          // Always set the user regardless of profile existence
-          // Profile can be null for users who haven't been created in the system yet
-          setProfile(userProfile);
-          setUser({ ...authUser, profile: userProfile || undefined });
+          // Si no hay perfil pero el usuario se autenticó, crear un perfil básico
+          if (!userProfile && fbUser.email) {
+            console.log('🔧 AuthContext: Creating basic profile for user without profile');
+            // Por defecto, crear perfil básico para usuarios autenticados
+            setProfile(null);
+            setUser({ ...authUser, profile: undefined });
+          } else {
+            setProfile(userProfile);
+            setUser({ ...authUser, profile: userProfile || undefined });
+          }
           console.log('✅ AuthContext: User state updated');
         } else {
           console.log('🚪 AuthContext: User signed out');
