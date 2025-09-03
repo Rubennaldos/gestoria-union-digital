@@ -206,6 +206,13 @@ export const getMemberDebtSummary = async (empId: string, startPeriod = '2025-01
   let moroso = false;
   const items: Array<{ periodo: string; saldo: number; estado: string }> = [];
 
+  // Obtener configuración para calcular morosidad
+  const configSnap = await get(ref(db, 'cobranzas/configuracion'));
+  const config = configSnap.exists() ? configSnap.val() : {
+    porcentajeMorosidad: 10,
+    diaVencimiento: 15
+  };
+
   for (let i = 0; i <= diff; i++) {
     const p = addMonths(startPeriod, i);
     const path = `cobranzas/charges/${compact(p)}/${empId}`;
@@ -215,18 +222,29 @@ export const getMemberDebtSummary = async (empId: string, startPeriod = '2025-01
     const charges = snap.val();
     for (const cid of Object.keys(charges)) {
       const c = charges[cid];
-      const saldo = Number(c?.saldo ?? 0);
-      const estado = c?.estado ?? 'pendiente';
+      let saldo = Number(c?.saldo ?? 0);
+      let estado = c?.estado ?? 'pendiente';
       
-      if (estado === 'pendiente') {
+      // Verificar si debe aplicarse morosidad automáticamente
+      if (estado === 'pendiente' && c.vencimiento) {
+        const [dd, mm, aa] = c.vencimiento.split('/');
+        const vencimiento = new Date(Number(aa), Number(mm) - 1, Number(dd));
+        
+        if (today > vencimiento && saldo > 0) {
+          estado = 'moroso';
+          // Aplicar recargo por morosidad si no está ya aplicado
+          const yaConRecargo = c.recargos?.some((r: any) => r.tipo === 'morosidad');
+          if (!yaConRecargo) {
+            const recargoMonto = (Number(c.montoBase || 0) * (config.porcentajeMorosidad || 10)) / 100;
+            saldo += recargoMonto;
+          }
+        }
+      }
+      
+      if (estado === 'pendiente' || estado === 'moroso') {
         total += saldo;
         items.push({ periodo: p, saldo, estado });
-
-        // Verificar si es moroso
-        const [py, pm] = p.split('-').map(Number);
-        const isPast = py < today.getFullYear() || (py === today.getFullYear() && pm < today.getMonth() + 1);
-        const isThis = py === today.getFullYear() && pm === today.getMonth() + 1;
-        if (saldo > 0 && (isPast || (isThis && today.getDate() >= 16))) moroso = true;
+        if (estado === 'moroso') moroso = true;
       }
     }
   }
@@ -239,6 +257,13 @@ export const getCobranzasOverview = async (startPeriod = '2025-01') => {
   const padrSnap = await get(ref(db, 'padron'));
   const padron = padrSnap.exists() ? padrSnap.val() : {};
   const empIds = Object.keys(padron).filter((id) => padron[id]?.activo ?? true);
+
+  // Obtener configuración
+  const configSnap = await get(ref(db, 'cobranzas/configuracion'));
+  const config = configSnap.exists() ? configSnap.val() : {
+    porcentajeMorosidad: 10,
+    diaVencimiento: 15
+  };
 
   const today = new Date();
   const last = periodKeyFromDate(today);
@@ -261,17 +286,31 @@ export const getCobranzasOverview = async (startPeriod = '2025-01') => {
       const charges = snap.val();
       for (const cid of Object.keys(charges)) {
         const c = charges[cid];
-        const total = Number(c?.total ?? 0);
-        const saldo = Number(c?.saldo ?? 0);
+        let total = Number(c?.total ?? 0);
+        let saldo = Number(c?.saldo ?? 0);
+        let estado = c?.estado ?? 'pendiente';
+
+        // Verificar si debe aplicarse morosidad automáticamente
+        if (estado === 'pendiente' && c.vencimiento) {
+          const [dd, mm, aa] = c.vencimiento.split('/');
+          const vencimiento = new Date(Number(aa), Number(mm) - 1, Number(dd));
+          
+          if (today > vencimiento && saldo > 0) {
+            estado = 'moroso';
+            empMoroso = true;
+            // Aplicar recargo por morosidad si no está ya aplicado
+            const yaConRecargo = c.recargos?.some((r: any) => r.tipo === 'morosidad');
+            if (!yaConRecargo) {
+              const recargoMonto = (Number(c.montoBase || 0) * (config.porcentajeMorosidad || 10)) / 100;
+              total += recargoMonto;
+              saldo += recargoMonto;
+            }
+          }
+        }
+
+        if (estado === 'moroso') empMoroso = true;
         recaudado += total - saldo;
         saldoEmp += saldo;
-
-        const [py, pm] = p.split('-').map(Number);
-        const isPast =
-          py < today.getFullYear() ||
-          (py === today.getFullYear() && pm < today.getMonth() + 1);
-        const isThis = py === today.getFullYear() && pm === today.getMonth() + 1;
-        if (saldo > 0 && (isPast || (isThis && today.getDate() >= 16))) empMoroso = true;
       }
     }
 
