@@ -5,15 +5,25 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // importantísimo para GitHub Pages (ruta del repo)
+  base: mode === "production" ? "/gestoria-union-digital/" : "/",
+
   server: {
     host: "::",
     port: 8080,
   },
+
+  // si publicas desde la carpeta /docs de la rama main
+  build: {
+    outDir: "docs",
+    emptyOutDir: true,
+  },
+
   plugins: [
     react(),
-    mode === 'development' &&
-    componentTagger(),
+    mode === "development" && componentTagger(),
   ].filter(Boolean),
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
