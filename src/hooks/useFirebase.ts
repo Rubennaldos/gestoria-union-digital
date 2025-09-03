@@ -198,35 +198,37 @@ export const generateChargesFrom = async (startPeriod = '2025-01') => {
 
 // ---- Resumen de deuda por asociado ----
 export const getMemberDebtSummary = async (empId: string, startPeriod = '2025-01') => {
-  const today = new Date();
-  const last = periodKeyFromDate(today);
-  const diff = monthsBetween(startPeriod, last);
+  // Buscar en cobranzas/pagos donde realmente se guardan los pagos
+  const pagosSnap = await get(ref(db, 'cobranzas/pagos'));
+  if (!pagosSnap.exists()) return { total: 0, moroso: false, items: [] };
 
+  const todosPagos = pagosSnap.val();
+  const today = new Date();
+  
   let total = 0;
   let moroso = false;
   const items: Array<{ periodo: string; saldo: number; estado: string }> = [];
 
-  for (let i = 0; i <= diff; i++) {
-    const p = addMonths(startPeriod, i);
-    const path = `cobranzas/charges/${compact(p)}/${empId}`;
-    const snap = await get(ref(db, path));
-    if (!snap.exists()) continue;
+  // Filtrar pagos del empadronado
+  for (const pagoId of Object.keys(todosPagos)) {
+    const pago = todosPagos[pagoId];
+    if (pago.empadronadoId !== empId) continue;
 
-    const charges = snap.val();
-    for (const cid of Object.keys(charges)) {
-      const c = charges[cid];
-      const saldo = Number(c?.saldo ?? 0);
-      const estado = c?.estado ?? 'pendiente';
+    const saldo = Number(pago?.monto ?? 0);
+    const estado = pago?.estado ?? 'pendiente';
+    
+    // Solo contar deudas pendientes
+    if (estado === 'pendiente') {
       total += saldo;
-      items.push({ periodo: p, saldo, estado });
+      const periodo = `${pago.año}-${String(pago.mes).padStart(2, '0')}`;
+      items.push({ periodo, saldo, estado });
 
-      // Moroso si tiene saldo en periodos pasados o en el actual con día >= 16
-      const [py, pm] = p.split('-').map(Number);
-      const isPast =
-        py < today.getFullYear() ||
-        (py === today.getFullYear() && pm < today.getMonth() + 1);
-      const isThis = py === today.getFullYear() && pm === today.getMonth() + 1;
-      if (saldo > 0 && (isPast || (isThis && today.getDate() >= 16))) moroso = true;
+      // Verificar si es moroso por fecha de vencimiento
+      const [day, month, year] = pago.fechaVencimiento.split('/').map(Number);
+      const vencimiento = new Date(year, month - 1, day);
+      if (today > vencimiento && saldo > 0) {
+        moroso = true;
+      }
     }
   }
 
