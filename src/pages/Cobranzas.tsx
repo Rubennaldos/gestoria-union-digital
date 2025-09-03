@@ -27,14 +27,19 @@ import {
   obtenerPagos,
   obtenerEgresos,
   obtenerPagosPorEmpadronado,
+  obtenerConfiguracion,
+  actualizarConfiguracion,
 } from "@/services/cobranzas";
-import { EstadisticasCobranzas, Pago, Egreso } from "@/types/cobranzas";
+import { EstadisticasCobranzas, Pago, Egreso, ConfiguracionCobranzas } from "@/types/cobranzas";
 import { getEmpadronados } from "@/services/empadronados";
 import { Empadronado } from "@/types/empadronados";
 import { RegistrarPagoModal } from "@/components/cobranzas/RegistrarPagoModal";
 import { DeclaracionJuradaModal } from "@/components/cobranzas/DeclaracionJuradaModal";
 import { SancionModal } from "@/components/cobranzas/SancionModal";
 import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadronadoModal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 /* Helpers para fechas y morosidad en UI */
 const parseEs = (s?: string | null) => {
@@ -63,6 +68,8 @@ const Cobranzas = () => {
   const [pagosEmpadronados, setPagosEmpadronados] = useState<Record<string, Pago[]>>({});
   const [loading, setLoading] = useState(true);
   const [autoInitHecho, setAutoInitHecho] = useState(false);
+  const [configuracion, setConfiguracion] = useState<ConfiguracionCobranzas | null>(null);
+  const [guardandoConfig, setGuardandoConfig] = useState(false);
 
   const [filtro, setFiltro] = useState<Filtro>("todos");
 
@@ -81,12 +88,15 @@ const Cobranzas = () => {
     try {
       setLoading(true);
 
-      const [stats, pagosList, egresosList, empadronadosList] = await Promise.all([
+      const [stats, pagosList, egresosList, empadronadosList, config] = await Promise.all([
         generarEstadisticas(),
         obtenerPagos(),
         obtenerEgresos(),
         getEmpadronados(),
+        obtenerConfiguracion(),
       ]);
+
+      setConfiguracion(config);
 
       // Autogenera cargos desde enero si recién se instala
       if (!autoInitHecho && empadronadosList.length > 0 && pagosList.length === 0) {
@@ -198,6 +208,35 @@ const Cobranzas = () => {
         return true;
     }
   });
+
+  const guardarConfiguracion = async () => {
+    if (!configuracion) return;
+    
+    try {
+      setGuardandoConfig(true);
+      await actualizarConfiguracion(configuracion);
+      toast({
+        title: "Configuración guardada",
+        description: "Los cambios se han guardado correctamente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la configuración",
+        variant: "destructive",
+      });
+    } finally {
+      setGuardandoConfig(false);
+    }
+  };
+
+  const actualizarCampoConfig = (campo: keyof ConfiguracionCobranzas, valor: any) => {
+    if (!configuracion) return;
+    setConfiguracion({
+      ...configuracion,
+      [campo]: valor,
+    });
+  };
 
   if (loading) {
     return (
@@ -518,10 +557,180 @@ const Cobranzas = () => {
 
           <TabsContent value="configuracion">
             <Card>
-              <div className="p-4 text-center py-8">
-                <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Configuración disponible próximamente</p>
-                <p className="text-sm text-muted-foreground">Aquí podrás configurar montos, fechas y porcentajes</p>
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold">Configuración de Cobranzas</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Configure los parámetros del sistema de cobranzas
+                    </p>
+                  </div>
+                  <Button onClick={guardarConfiguracion} disabled={guardandoConfig}>
+                    {guardandoConfig ? "Guardando..." : "Guardar Cambios"}
+                  </Button>
+                </div>
+
+                {configuracion && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Monto Mensual */}
+                    <div className="space-y-2">
+                      <Label htmlFor="montoMensual">Monto Mensual (S/)</Label>
+                      <Input
+                        id="montoMensual"
+                        type="number"
+                        step="0.01"
+                        value={configuracion.montoMensual}
+                        onChange={(e) => actualizarCampoConfig('montoMensual', parseFloat(e.target.value) || 0)}
+                        placeholder="50.00"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Cuota mensual que se cobrará a cada asociado
+                      </p>
+                    </div>
+
+                    {/* Día de Cierre */}
+                    <div className="space-y-2">
+                      <Label htmlFor="diaCierre">Día de Cierre del Mes</Label>
+                      <Input
+                        id="diaCierre"
+                        type="number"
+                        min="1"
+                        max="28"
+                        value={configuracion.diaCierre}
+                        onChange={(e) => actualizarCampoConfig('diaCierre', parseInt(e.target.value) || 15)}
+                        placeholder="15"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Día del mes en que se ejecuta el cierre mensual
+                      </p>
+                    </div>
+
+                    {/* Día de Vencimiento */}
+                    <div className="space-y-2">
+                      <Label htmlFor="diaVencimiento">Día de Vencimiento</Label>
+                      <Input
+                        id="diaVencimiento"
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={configuracion.diaVencimiento}
+                        onChange={(e) => actualizarCampoConfig('diaVencimiento', parseInt(e.target.value) || 15)}
+                        placeholder="15"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Día del mes en que vencen los pagos
+                      </p>
+                    </div>
+
+                    {/* Días para Pronto Pago */}
+                    <div className="space-y-2">
+                      <Label htmlFor="diasProntoPago">Días para Pronto Pago</Label>
+                      <Input
+                        id="diasProntoPago"
+                        type="number"
+                        min="1"
+                        max="15"
+                        value={configuracion.diasProntoPago}
+                        onChange={(e) => actualizarCampoConfig('diasProntoPago', parseInt(e.target.value) || 3)}
+                        placeholder="3"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Días desde inicio del mes para aplicar descuento por pronto pago
+                      </p>
+                    </div>
+
+                    {/* Porcentaje Pronto Pago */}
+                    <div className="space-y-2">
+                      <Label htmlFor="porcentajeProntoPago">Descuento Pronto Pago (%)</Label>
+                      <Input
+                        id="porcentajeProntoPago"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="50"
+                        value={configuracion.porcentajeProntoPago}
+                        onChange={(e) => actualizarCampoConfig('porcentajeProntoPago', parseFloat(e.target.value) || 0)}
+                        placeholder="5.0"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Porcentaje de descuento para pagos por pronto pago
+                      </p>
+                    </div>
+
+                    {/* Porcentaje Morosidad */}
+                    <div className="space-y-2">
+                      <Label htmlFor="porcentajeMorosidad">Recargo por Morosidad (%)</Label>
+                      <Input
+                        id="porcentajeMorosidad"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        value={configuracion.porcentajeMorosidad}
+                        onChange={(e) => actualizarCampoConfig('porcentajeMorosidad', parseFloat(e.target.value) || 0)}
+                        placeholder="10.0"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Porcentaje de recargo para pagos vencidos
+                      </p>
+                    </div>
+
+                    {/* Porcentaje Sanción */}
+                    <div className="space-y-2">
+                      <Label htmlFor="porcentajeSancion">Recargo por Sanción (%)</Label>
+                      <Input
+                        id="porcentajeSancion"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        value={configuracion.porcentajeSancion}
+                        onChange={(e) => actualizarCampoConfig('porcentajeSancion', parseFloat(e.target.value) || 0)}
+                        placeholder="15.0"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Porcentaje de recargo por sanciones aplicadas
+                      </p>
+                    </div>
+
+                    {/* Serie de Comprobantes */}
+                    <div className="space-y-2">
+                      <Label htmlFor="serieComprobantes">Serie de Comprobantes</Label>
+                      <Input
+                        id="serieComprobantes"
+                        type="text"
+                        value={configuracion.serieComprobantes}
+                        onChange={(e) => actualizarCampoConfig('serieComprobantes', e.target.value)}
+                        placeholder="B001"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Serie para generar comprobantes de pago
+                      </p>
+                    </div>
+
+                    {/* Sede */}
+                    <div className="space-y-2">
+                      <Label htmlFor="sede">Sede</Label>
+                      <Input
+                        id="sede"
+                        type="text"
+                        value={configuracion.sede}
+                        onChange={(e) => actualizarCampoConfig('sede', e.target.value)}
+                        placeholder="Sede Principal"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Nombre de la sede de la organización
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {!configuracion && (
+                  <div className="text-center py-8">
+                    <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Cargando configuración...</p>
+                  </div>
+                )}
               </div>
             </Card>
           </TabsContent>
