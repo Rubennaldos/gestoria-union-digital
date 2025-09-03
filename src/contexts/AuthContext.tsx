@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { User as FirebaseUser, onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { UserProfile, AuthUser } from '@/types/auth';
-import { getUserProfile, onUserProfile } from '@/services/rtdb';
+import { getUserProfile, onUserProfile, createUserProfile } from '@/services/rtdb';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -49,10 +49,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           // Si no hay perfil pero el usuario se autenticó, crear un perfil básico
           if (!userProfile && fbUser.email) {
-            console.log('🔧 AuthContext: Creating basic profile for user without profile');
-            // Por defecto, crear perfil básico para usuarios autenticados
-            setProfile(null);
-            setUser({ ...authUser, profile: undefined });
+            console.log('🔧 AuthContext: Creating basic profile for authenticated user without profile');
+            const basicProfile = {
+              uid: fbUser.uid,
+              email: fbUser.email,
+              displayName: fbUser.displayName || fbUser.email.split('@')[0],
+              activo: true,
+              fechaCreacion: new Date().toISOString().split('T')[0],
+              roleId: 'usuario', // Rol básico
+              etapa: 'Etapa 1'
+            };
+            
+            // Crear perfil en la base de datos
+            await createUserProfile(fbUser.uid, basicProfile);
+            setProfile(basicProfile);
+            setUser({ ...authUser, profile: basicProfile });
           } else {
             setProfile(userProfile);
             setUser({ ...authUser, profile: userProfile || undefined });
