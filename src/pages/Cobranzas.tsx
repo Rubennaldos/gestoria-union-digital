@@ -79,6 +79,35 @@ const Cobranzas = () => {
   const [sancionModal, setSancionModal] = useState<{ open: boolean; empadronadoId?: string }>({ open: false });
   const [detalleModal, setDetalleModal] = useState<{ open: boolean; empadronado?: Empadronado }>({ open: false });
 
+  const guardarConfiguracion = async () => {
+    if (!configuracion) return;
+    
+    try {
+      setGuardandoConfig(true);
+      await actualizarConfiguracion(configuracion);
+      toast({
+        title: "Configuración guardada",
+        description: "Los cambios se han guardado correctamente",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la configuración",
+        variant: "destructive",
+      });
+    } finally {
+      setGuardandoConfig(false);
+    }
+  };
+
+  const actualizarCampoConfig = (campo: keyof ConfiguracionCobranzas, valor: any) => {
+    if (!configuracion) return;
+    setConfiguracion({
+      ...configuracion,
+      [campo]: valor,
+    });
+  };
+
   useEffect(() => {
     cargarDatos(); // hará autogeneración si faltan cargos
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -209,34 +238,6 @@ const Cobranzas = () => {
     }
   });
 
-  const guardarConfiguracion = async () => {
-    if (!configuracion) return;
-    
-    try {
-      setGuardandoConfig(true);
-      await actualizarConfiguracion(configuracion);
-      toast({
-        title: "Configuración guardada",
-        description: "Los cambios se han guardado correctamente",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo guardar la configuración",
-        variant: "destructive",
-      });
-    } finally {
-      setGuardandoConfig(false);
-    }
-  };
-
-  const actualizarCampoConfig = (campo: keyof ConfiguracionCobranzas, valor: any) => {
-    if (!configuracion) return;
-    setConfiguracion({
-      ...configuracion,
-      [campo]: valor,
-    });
-  };
 
   if (loading) {
     return (
