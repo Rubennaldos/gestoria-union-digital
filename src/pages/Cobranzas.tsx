@@ -108,6 +108,28 @@ const Cobranzas = () => {
     });
   };
 
+  // Función para generar pagos desde enero 2025
+  const generarPagosHistoricos = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      await generarPagosDesdeEnero(user.uid);
+      toast({
+        title: "Éxito",
+        description: "Se generaron todas las cuotas desde enero 2025",
+      });
+      await cargarDatos(true);
+    } catch (error) {
+      toast({
+        title: "Error", 
+        description: "No se pudieron generar las cuotas históricas",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     cargarDatos(); // hará autogeneración si faltan cargos
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -281,6 +303,10 @@ const Cobranzas = () => {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button onClick={generarPagosHistoricos} disabled={loading}>
+              <Calendar className="h-4 w-4 mr-2" />
+              Generar Desde Enero 2025
+            </Button>
             <Button onClick={ejecutarCierre}>
               <Calendar className="h-4 w-4 mr-2" />
               Ejecutar Cierre
