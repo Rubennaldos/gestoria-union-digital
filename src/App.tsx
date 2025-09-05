@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom"; // 👈 sin BrowserRouter
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthzProvider } from "@/contexts/AuthzContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -33,149 +33,148 @@ const App: React.FC = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <AuthzProvider>
-              <Routes>
-                {/* Redirigir raíz a /inicio (ruta protegida) */}
-                <Route path="/" element={<Navigate to="/inicio" replace />} />
+        {/* 👇 NINGÚN Router aquí. El Router va en main.tsx */}
+        <AuthProvider>
+          <AuthzProvider>
+            <Routes>
+              {/* Redirigir raíz a /inicio (ruta protegida) */}
+              <Route path="/" element={<Navigate to="/inicio" replace />} />
 
-                {/* Login público */}
-                <Route path="/login" element={<Login />} />
+              {/* Login público */}
+              <Route path="/login" element={<Login />} />
 
-                {/* Inicio protegido */}
-                <Route
-                  path="/inicio"
-                  element={
-                    <ProtectedRoute>
-                      <Index />
-                    </ProtectedRoute>
-                  }
-                />
+              {/* Inicio protegido */}
+              <Route
+                path="/inicio"
+                element={
+                  <ProtectedRoute>
+                    <Index />
+                  </ProtectedRoute>
+                }
+              />
 
-                {/* Admin (solo rol presidencia; super admin por email pasa igual) */}
-                <Route
-                  path="/admin/users"
-                  element={
-                    <ProtectedRoute requireRole="presidencia">
-                      <Users />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/users/new"
-                  element={
-                    <ProtectedRoute requireRole="presidencia">
-                      <UserNew />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/users/:uid/permissions"
-                  element={
-                    <ProtectedRoute requireRole="presidencia">
-                      <UserPermissions />
-                    </ProtectedRoute>
-                  }
-                />
+              {/* Admin (solo rol presidencia; super admin por email pasa igual) */}
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute requireRole="presidencia">
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users/new"
+                element={
+                  <ProtectedRoute requireRole="presidencia">
+                    <UserNew />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users/:uid/permissions"
+                element={
+                  <ProtectedRoute requireRole="presidencia">
+                    <UserPermissions />
+                  </ProtectedRoute>
+                }
+              />
 
-                {/* Padrones */}
-                <Route
-                  path="/padron"
-                  element={
-                    <ProtectedRoute>
-                      <Empadronados />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/padron/nuevo"
-                  element={
-                    <ProtectedRoute>
-                      <EmpadronadoForm />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/padron/editar/:id"
-                  element={
-                    <ProtectedRoute>
-                      <EmpadronadoForm />
-                    </ProtectedRoute>
-                  }
-                />
+              {/* Padrones */}
+              <Route
+                path="/padron"
+                element={
+                  <ProtectedRoute>
+                    <Empadronados />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/padron/nuevo"
+                element={
+                  <ProtectedRoute>
+                    <EmpadronadoForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/padron/editar/:id"
+                element={
+                  <ProtectedRoute>
+                    <EmpadronadoForm />
+                  </ProtectedRoute>
+                }
+              />
 
-                {/* Módulos protegidos */}
-                <Route
-                  path="/sesiones"
-                  element={
-                    <ProtectedRoute>
-                      <Sesiones />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/cobranzas"
-                  element={
-                    <ProtectedRoute>
-                      <Cobranzas />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/sanciones"
-                  element={
-                    <ProtectedRoute>
-                      <Sanciones />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/deportes"
-                  element={
-                    <ProtectedRoute>
-                      <Deportes />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/patrimonio"
-                  element={
-                    <ProtectedRoute>
-                      <Patrimonio />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                {/* Portal del Asociado */}
-                <Route
-                  path="/portal-asociado"
-                  element={
-                    <ProtectedRoute>
-                      <PortalAsociado />
-                    </ProtectedRoute>
-                  }
-                />
-                
-                {/* Alias de usuarios hacia admin/users (mismo control de rol) */}
-                <Route
-                  path="/usuarios"
-                  element={
-                    <ProtectedRoute requireRole="presidencia">
-                      <Users />
-                    </ProtectedRoute>
-                  }
-                />
+              {/* Módulos protegidos */}
+              <Route
+                path="/sesiones"
+                element={
+                  <ProtectedRoute>
+                    <Sesiones />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cobranzas"
+                element={
+                  <ProtectedRoute>
+                    <Cobranzas />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/sanciones"
+                element={
+                  <ProtectedRoute>
+                    <Sanciones />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/deportes"
+                element={
+                  <ProtectedRoute>
+                    <Deportes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/patrimonio"
+                element={
+                  <ProtectedRoute>
+                    <Patrimonio />
+                  </ProtectedRoute>
+                }
+              />
 
-                {/* Bootstrap inicial público */}
-                <Route path="/bootstrap" element={<AdminCreator />} />
+              {/* Portal del Asociado */}
+              <Route
+                path="/portal-asociado"
+                element={
+                  <ProtectedRoute>
+                    <PortalAsociado />
+                  </ProtectedRoute>
+                }
+              />
 
-                {/* 404 */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AuthzProvider>
-          </AuthProvider>
-        </BrowserRouter>
+              {/* Alias de usuarios hacia admin/users (mismo control de rol) */}
+              <Route
+                path="/usuarios"
+                element={
+                  <ProtectedRoute requireRole="presidencia">
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Bootstrap inicial público */}
+              <Route path="/bootstrap" element={<AdminCreator />} />
+
+              {/* 404 */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthzProvider>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
