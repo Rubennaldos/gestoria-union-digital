@@ -1,21 +1,26 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import path from "path";
 import { componentTagger } from "lovable-tagger";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 
-// https://vitejs.dev/config/
+// __dirname seguro en ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 export default defineConfig(({ mode }) => ({
-  // 👇 muy importante: para GitHub Pages usa el nombre exacto de tu repo
+  // ✅ En build (GitHub Pages) usa el subpath exacto del repo
   base: mode === "production" ? "/gestoria-union-digital/" : "/",
 
   server: {
-    host: true, // accesible en red local
+    host: "::", // accesible en LAN (IPv4/IPv6)
     port: 8080,
   },
 
   build: {
-    outDir: "dist",      // carpeta de salida
-    emptyOutDir: true,   // limpia antes de generar
+    outDir: "dist",
+    emptyOutDir: true,
+    // sourcemap: true, // opcional
   },
 
   plugins: [
@@ -25,7 +30,7 @@ export default defineConfig(({ mode }) => ({
 
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": resolve(__dirname, "src"),
     },
   },
 }));
