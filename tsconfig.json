@@ -9,6 +9,12 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+
+    // ✅ añade tipos y resolución para que Vite/Node estén disponibles
+    "types": ["vite/client", "node"],
+    "moduleResolution": "Bundler", // (alternativa aceptable: "NodeNext")
+
+    // lo que ya tenías
     "noImplicitAny": false,
     "noUnusedParameters": false,
     "skipLibCheck": true,
