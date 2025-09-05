@@ -5,18 +5,17 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  // importantísimo para GitHub Pages (ruta del repo)
+  // 👇 muy importante: para GitHub Pages usa el nombre exacto de tu repo
   base: mode === "production" ? "/gestoria-union-digital/" : "/",
 
   server: {
-    host: "::",
+    host: true, // accesible en red local
     port: 8080,
   },
 
-  // GitHub Pages build configuration
   build: {
-    outDir: "dist",
-    emptyOutDir: true,
+    outDir: "dist",      // carpeta de salida
+    emptyOutDir: true,   // limpia antes de generar
   },
 
   plugins: [
