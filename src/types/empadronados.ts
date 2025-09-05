@@ -40,19 +40,6 @@ export interface Empadronado {
   modificadoPor?: string; // uid del último usuario que lo modificó
 }
 
-export interface Empadronado {
-  id: string;
-  numeroPadron: string;
-  dni: string;
-  nombre: string;
-  apellidos: string;
-  // ...
-  habilitado?: boolean;
-
-  /** NUEVO: vínculo con cuenta del sistema */
-  authUid?: string;        // UID de Firebase Auth si tiene cuenta
-  emailAcceso?: string;    // email con el que accede
-}
 
 export interface CreateEmpadronadoForm {
   numeroPadron: string;
