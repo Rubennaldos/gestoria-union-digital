@@ -13,9 +13,9 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
 
-  // si publicas desde la carpeta /docs de la rama main
+  // GitHub Pages build configuration
   build: {
-    outDir: "docs",
+    outDir: "dist",
     emptyOutDir: true,
   },
 
