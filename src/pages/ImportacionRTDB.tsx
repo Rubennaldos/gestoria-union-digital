@@ -7,12 +7,14 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, Users, Phone, Car, UserCheck } from 'lucide-react';
+import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, Users, Phone, Car, UserCheck, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { generateTemplate, parseExcelFile, PersonaProcessed, ValidationError } from '@/lib/excelImport';
 import { getDatabase, ref, update } from 'firebase/database';
 
 const ImportacionRTDB: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [loading, setLoading] = useState(false);
@@ -229,6 +231,12 @@ const ImportacionRTDB: React.FC = () => {
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="space-y-2">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/empadronados')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Atrás
+          </Button>
+        </div>
         <h1 className="text-3xl font-bold tracking-tight">Importación Masiva (RTDB)</h1>
         <p className="text-muted-foreground">
           Importa múltiples empadronados desde un archivo Excel con estructura específica
