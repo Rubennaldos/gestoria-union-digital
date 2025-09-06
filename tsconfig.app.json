@@ -2,36 +2,31 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker", "WebWorker.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
 
-    /* Modo bundler para Vite */
-    "moduleResolution": "bundler",
+    /* Bundler mode */
+    "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting/estrictos (ajustados a tu proyecto) */
+    /* Linting */
     "strict": false,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noImplicitAny": false,
     "noFallthroughCasesInSwitch": false,
 
-    /* Alias @ -> src */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
 
-    /* Tipos necesarios para Vite (import.meta, etc.) */
     "types": ["vite/client"]
   },
-
-  /* Archivos incluidos de la app */
-  "include": ["src", "vite-env.d.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src", "env.d.ts"]
 }
