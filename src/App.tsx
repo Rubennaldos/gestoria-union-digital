@@ -19,6 +19,7 @@ import UserNew from "./pages/admin/UserNew";
 import UserPermissions from "./pages/admin/UserPermissions";
 import Empadronados from "./pages/Empadronados";
 import EmpadronadoForm from "./pages/EmpadronadoForm";
+import ImportacionRTDB from "./pages/ImportacionRTDB";
 import Cobranzas from "./pages/Cobranzas";
 import Sanciones from "./pages/Sanciones";
 import Deportes from "./pages/Deportes";
@@ -101,6 +102,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <EmpadronadoForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/importacion"
+                element={
+                  <ProtectedRoute>
+                    <ImportacionRTDB />
                   </ProtectedRoute>
                 }
               />

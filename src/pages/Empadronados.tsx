@@ -483,6 +483,13 @@ const Empadronados: React.FC = () => {
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Descargar Template Excel
           </Button>
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/importacion')}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Importar Excel
+          </Button>
           <Button onClick={() => navigate('/padron/nuevo')}>
             <UserPlus className="h-4 w-4 mr-2" />
             Nuevo Empadronado
