@@ -13,6 +13,7 @@ import { AdminCreator } from "@/components/auth/AdminCreator";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Sesiones from "./pages/Sesiones";
+import PagosCuotas from "./pages/PagosCuotas";
 import NotFound from "./pages/NotFound";
 import Users from "./pages/admin/Users";
 import UserNew from "./pages/admin/UserNew";
@@ -130,6 +131,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Cobranzas />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pagos-cuotas"
+                element={
+                  <ProtectedRoute>
+                    <PagosCuotas />
                   </ProtectedRoute>
                 }
               />

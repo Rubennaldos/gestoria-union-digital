@@ -37,6 +37,8 @@ import { RegistrarPagoModal } from "@/components/cobranzas/RegistrarPagoModal";
 import { DeclaracionJuradaModal } from "@/components/cobranzas/DeclaracionJuradaModal";
 import { SancionModal } from "@/components/cobranzas/SancionModal";
 import { DetalleEmpadronadoModal } from "@/components/cobranzas/DetalleEmpadronadoModal";
+import { PlantillaPagosMasivos } from "@/components/cobranzas/PlantillaPagosMasivos";
+import { BandejaPagosEconomia } from "@/components/cobranzas/BandejaPagosEconomia";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -429,10 +431,11 @@ const Cobranzas = () => {
 
         {/* Contenido Principal */}
         <Tabs defaultValue="empadronados" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="empadronados">Asociados</TabsTrigger>
             <TabsTrigger value="pagos">Pagos Recientes</TabsTrigger>
-            <TabsTrigger value="egresos">Egresos</TabsTrigger>
+            <TabsTrigger value="masivos">Pagos Masivos</TabsTrigger>
+            <TabsTrigger value="economia">Bandeja Economía</TabsTrigger>
             <TabsTrigger value="configuracion">Configuración</TabsTrigger>
           </TabsList>
 
@@ -549,6 +552,14 @@ const Cobranzas = () => {
                 </div>
               </div>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="masivos">
+            <PlantillaPagosMasivos />
+          </TabsContent>
+
+          <TabsContent value="economia">
+            <BandejaPagosEconomia />
           </TabsContent>
 
           <TabsContent value="egresos">
