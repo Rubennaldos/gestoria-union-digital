@@ -81,11 +81,17 @@ export const seedRoles = async () => {
       descripcion: 'Vocal de la Junta Vecinal',
       orden: 11
     },
+    seguridad_portico: {
+      id: 'seguridad_portico',
+      nombre: 'Seguridad Pórtico',
+      descripcion: 'Encargado de seguridad del pórtico principal',
+      orden: 12
+    },
     asociado: {
       id: 'asociado',
       nombre: 'Asociado',
       descripcion: 'Empadronado con acceso al portal',
-      orden: 12
+      orden: 13
     }
   };
 
@@ -125,7 +131,7 @@ export const seedModules = async () => {
     },
     seguridad: {
       id: 'seguridad',
-      nombre: 'Seguridad',
+      nombre: 'Seguridad Pórtico Principal',
       icon: 'Shield',
       orden: 5,
       requiereAprobacion: false

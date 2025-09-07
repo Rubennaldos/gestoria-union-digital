@@ -26,6 +26,7 @@ import Deportes from "./pages/Deportes";
 import Patrimonio from "./pages/Patrimonio";
 import PortalAsociado from "./pages/PortalAsociado";
 import Acceso from "./pages/Acceso";
+import Seguridad from "./pages/Seguridad";
 
 const queryClient = new QueryClient();
 
@@ -173,6 +174,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Acceso />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Seguridad Pórtico */}
+              <Route
+                path="/seguridad"
+                element={
+                  <ProtectedRoute>
+                    <Seguridad />
                   </ProtectedRoute>
                 }
               />

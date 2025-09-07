@@ -29,7 +29,8 @@ const moduleIcons: Record<string, any> = {
   "plan-anual": BarChart3,
   auditoria: Search,
   obras: Building,
-  "portal-asociado": UserCircle
+  "portal-asociado": UserCircle,
+  acceso: UserCheck
 };
 
 // Mapa de colores para los módulos
@@ -49,7 +50,8 @@ const moduleColors: Record<string, "primary" | "warning" | "success" | "secondar
   "plan-anual": "primary",
   auditoria: "warning",
   obras: "secondary",
-  "portal-asociado": "primary"
+  "portal-asociado": "primary",
+  acceso: "secondary"
 };
 
 // Mapa de rutas para los módulos
@@ -69,7 +71,8 @@ const moduleRoutes: Record<string, string> = {
   "plan-anual": "/plan-anual",
   auditoria: "/auditoria",
   obras: "/obras",
-  "portal-asociado": "/portal-asociado"
+  "portal-asociado": "/portal-asociado",
+  acceso: "/acceso"
 };
 
 const Index = () => {

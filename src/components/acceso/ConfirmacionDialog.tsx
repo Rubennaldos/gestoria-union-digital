@@ -5,14 +5,18 @@ interface ConfirmacionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   titulo: string;
-  contenido: React.ReactNode;
+  mensaje?: string;
+  contenido?: React.ReactNode;
+  onConfirmar?: () => void;
 }
 
 export function ConfirmacionDialog({ 
   open, 
   onOpenChange, 
   titulo, 
-  contenido 
+  mensaje,
+  contenido,
+  onConfirmar
 }: ConfirmacionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -22,16 +26,35 @@ export function ConfirmacionDialog({
         </DialogHeader>
         
         <div className="py-4">
+          {mensaje && <p className="text-center text-muted-foreground">{mensaje}</p>}
           {contenido}
         </div>
         
-        <div className="flex justify-center">
-          <Button 
-            onClick={() => onOpenChange(false)}
-            className="w-full"
-          >
-            Entendido
-          </Button>
+        <div className="flex gap-2">
+          {onConfirmar ? (
+            <>
+              <Button 
+                onClick={() => onOpenChange(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={onConfirmar}
+                className="flex-1"
+              >
+                Confirmar
+              </Button>
+            </>
+          ) : (
+            <Button 
+              onClick={() => onOpenChange(false)}
+              className="w-full"
+            >
+              Entendido
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
