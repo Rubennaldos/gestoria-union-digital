@@ -12,13 +12,15 @@ import { crearMaestroObra } from "@/services/acceso";
 interface NuevoMaestroObraModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreado: () => void;
+  onCreado?: () => void;
+  onMaestroCreado?: (maestroId: string) => void;
 }
 
 export function NuevoMaestroObraModal({ 
   open, 
   onOpenChange, 
-  onCreado 
+  onCreado,
+  onMaestroCreado
 }: NuevoMaestroObraModalProps) {
   const [formData, setFormData] = useState({
     nombre: '',
@@ -62,7 +64,7 @@ export function NuevoMaestroObraModal({
     }
 
     try {
-      await crearMaestroObra({
+      const maestroId = await crearMaestroObra({
         nombre: formData.nombre,
         apellidos: formData.apellidos,
         telefono: formData.telefono,
@@ -73,7 +75,12 @@ export function NuevoMaestroObraModal({
       });
 
       setEnviado(true);
-      onCreado();
+      
+      // Llamar ambos callbacks si existen
+      onCreado?.();
+      if (maestroId && onMaestroCreado) {
+        onMaestroCreado(maestroId);
+      }
 
       toast({
         title: "Solicitud enviada",
