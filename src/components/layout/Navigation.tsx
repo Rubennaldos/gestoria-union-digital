@@ -5,8 +5,9 @@ import { signOutUser } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
+/** 👇 Rutas seguras para HashRouter (NO usar "/") */
 const navigationItems = [
-  { icon: Home, label: "Inicio", href: "/" },
+  { icon: Home, label: "Inicio", href: "/inicio" },          // <- antes era "/"
   { icon: Calendar, label: "Sesiones", href: "/sesiones" },
   { icon: DollarSign, label: "Cobranzas", href: "/cobranzas" },
   { icon: Users, label: "Portal", href: "/portal-asociado" },
@@ -20,7 +21,11 @@ export const BottomNavigation = () => {
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 md:hidden">
       <div className="flex items-center justify-around px-2 py-1">
         {navigationItems.map((item) => {
-          const isActive = location.pathname === item.href;
+          // activo si la ruta coincide o si estás en una subruta de ese item
+          const isActive =
+            location.pathname === item.href ||
+            (item.href !== "/inicio" && location.pathname.startsWith(item.href));
+
           return (
             <Link
               key={item.href}
@@ -28,7 +33,7 @@ export const BottomNavigation = () => {
               className={cn(
                 "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-[60px]",
                 isActive
-                  ? "text-primary bg-primary-light"
+                  ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
             >
@@ -51,14 +56,14 @@ export const TopNavigation = () => {
       await signOutUser();
       toast({
         title: "Sesión cerrada",
-        description: "Has cerrado sesión exitosamente"
+        description: "Has cerrado sesión exitosamente",
       });
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
       toast({
         title: "Error",
         description: "Error al cerrar sesión",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
@@ -67,7 +72,10 @@ export const TopNavigation = () => {
     <header className="sticky top-0 z-40 w-full bg-card border-b border-border backdrop-blur-sm">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold text-primary">Gestoria Digital</h1>
+          {/* 👇 Logo/Marca siempre vuelve a /inicio (NO a "/") */}
+          <Link to="/inicio" className="text-xl font-bold text-primary hover:underline">
+            Gestoria Digital
+          </Link>
         </div>
         <div className="flex items-center space-x-4">
           <div className="hidden md:flex items-center space-x-2">
