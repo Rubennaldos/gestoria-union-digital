@@ -105,9 +105,30 @@ const PagosCuotas = () => {
     try {
       setLoading(true);
       
-      // Obtener empadronado vinculado al usuario autenticado
-      const { obtenerEmpadronadoPorAuthUid } = await import('@/services/empadronados');
-      const miEmpadronado = await obtenerEmpadronadoPorAuthUid(user?.uid || '');
+      // Primero intentar obtener empadronado vinculado por authUid
+      const { obtenerEmpadronadoPorAuthUid, getEmpadronados, linkAuthToEmpadronado } = await import('@/services/empadronados');
+      let miEmpadronado = await obtenerEmpadronadoPorAuthUid(user?.uid || '');
+
+      // Si no está vinculado, buscar por email y vincular automáticamente
+      if (!miEmpadronado && user?.email) {
+        console.log('🔍 Buscando empadronado por email:', user.email);
+        const empadronados = await getEmpadronados();
+        const empadronadoPorEmail = empadronados.find(emp => 
+          emp.emailAcceso?.toLowerCase() === user.email?.toLowerCase()
+        );
+
+        if (empadronadoPorEmail) {
+          console.log('🔗 Vinculando usuario a empadronado:', empadronadoPorEmail.id);
+          // Vincular automáticamente
+          await linkAuthToEmpadronado(empadronadoPorEmail.id, user.uid, user.email);
+          miEmpadronado = empadronadoPorEmail;
+          
+          toast({
+            title: "✅ Cuenta vinculada",
+            description: "Tu cuenta ha sido vinculada automáticamente a tu registro de empadronado",
+          });
+        }
+      }
 
       if (!miEmpadronado) {
         toast({
