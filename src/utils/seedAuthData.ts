@@ -220,6 +220,13 @@ export const seedModules = async () => {
       icon: 'Vote',
       orden: 17,
       requiereAprobacion: true
+    },
+    acceso: {
+      id: 'acceso',
+      nombre: 'Control de Acceso',
+      icon: 'Users',
+      orden: 18,
+      requiereAprobacion: false
     }
   };
 

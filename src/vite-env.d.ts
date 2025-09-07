@@ -1,2 +1,4 @@
 /// <reference types="vite/client" />
-/// <reference lib="webworker" />
+
+// @ts-ignore
+declare var Worker: any;
