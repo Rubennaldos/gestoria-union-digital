@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? "/gestoria-union-digital/" : "/",
+  base: "/",
   server: { host: "::", port: 8080 },
   build: {
     outDir: "dist",
