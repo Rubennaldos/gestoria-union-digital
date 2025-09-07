@@ -1,7 +1,7 @@
 import { 
   Users, FileText, Calendar, DollarSign, Shield, MessageSquare,
   Trophy, Heart, GraduationCap, Vote, Package, BarChart3,
-  UserCheck, Search, Gavel, Building, UserCircle
+  UserCheck, Search, Gavel, Building, UserCircle, CreditCard
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { ModuleCard } from "@/components/ui/module-card";
@@ -30,7 +30,8 @@ const moduleIcons: Record<string, any> = {
   auditoria: Search,
   obras: Building,
   "portal-asociado": UserCircle,
-  acceso: UserCheck
+  acceso: UserCheck,
+  pagosCuotas: CreditCard
 };
 
 // Mapa de colores para los módulos
@@ -51,7 +52,8 @@ const moduleColors: Record<string, "primary" | "warning" | "success" | "secondar
   auditoria: "warning",
   obras: "secondary",
   "portal-asociado": "primary",
-  acceso: "secondary"
+  acceso: "secondary",
+  pagosCuotas: "success"
 };
 
 // Mapa de rutas para los módulos
@@ -72,7 +74,8 @@ const moduleRoutes: Record<string, string> = {
   auditoria: "/auditoria",
   obras: "/obras",
   "portal-asociado": "/portal-asociado",
-  acceso: "/acceso"
+  acceso: "/acceso",
+  pagosCuotas: "/pagos-cuotas"
 };
 
 const Index = () => {

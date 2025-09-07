@@ -233,6 +233,13 @@ export const seedModules = async () => {
       icon: 'Vote',
       orden: 18,
       requiereAprobacion: true
+    },
+    pagosCuotas: {
+      id: 'pagosCuotas',
+      nombre: 'Pagos de Cuotas',
+      icon: 'CreditCard',
+      orden: 19,
+      requiereAprobacion: false
     }
   };
 
