@@ -1,2 +1,5 @@
 /// <reference types="vite/client" />
-/// <reference lib="webworker" />
+
+// Temporary fix for Worker type issue
+interface Worker {}
+declare var Worker: any;
