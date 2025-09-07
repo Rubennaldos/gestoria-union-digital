@@ -78,12 +78,13 @@ const PagosCuotas = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [empadronado, setEmpadronado] = useState<Empadronado | null>(null);
+  const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [cuotas, setCuotas] = useState<Pago[]>([]);
   const [cuotasSeleccionadas, setCuotasSeleccionadas] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [procesandoPago, setProcesandoPago] = useState(false);
   const [historialPagos, setHistorialPagos] = useState<PagoSolicitud[]>([]);
+  const [pagosEmpadronados, setPagosEmpadronados] = useState<Record<string, Pago[]>>({});
   
   // Formulario de pago
   const [metodoPago, setMetodoPago] = useState<string>("");
@@ -105,39 +106,55 @@ const PagosCuotas = () => {
     try {
       setLoading(true);
       
-      // Obtener empadronado actual por uid o buscar por datos del usuario
-      const empadronados = await getEmpadronados();
-      const miEmpadronado = empadronados.find(emp => 
-        emp.id === user?.uid || emp.dni === user?.uid
+      // Obtener TODOS los empadronados (excepto rol seguridad)
+      const todosEmpadronados = await getEmpadronados();
+      
+      // Filtrar empadronados excluyendo rol seguridad
+      const empadronadosFiltrados = todosEmpadronados.filter(emp => 
+        emp.habilitado !== false && 
+        // Excluir usuarios con rol de seguridad/pórtico
+        !emp.observaciones?.toLowerCase().includes('seguridad') &&
+        !emp.observaciones?.toLowerCase().includes('pórtico')
       );
 
-      if (!miEmpadronado) {
-        toast({
-          title: "Usuario no encontrado",
-          description: "No se encontró tu registro como asociado",
-          variant: "destructive"
-        });
-        return;
+      setEmpadronados(empadronadosFiltrados);
+
+      // Cargar deudas de TODOS los empadronados
+      const todasLasCuotas: Pago[] = [];
+      const mapaPagosEmpadronados: Record<string, Pago[]> = {};
+
+      for (const emp of empadronadosFiltrados) {
+        try {
+          const pagosEmp = await obtenerPagosPorEmpadronado(emp.id);
+          const cuotasPendientes = pagosEmp.filter(c => 
+            c.estado === 'pendiente' || c.estado === 'moroso'
+          );
+          
+          mapaPagosEmpadronados[emp.id] = cuotasPendientes;
+          
+          // Agregar información del empadronado a cada cuota
+          const cuotasConInfo = cuotasPendientes.map(cuota => ({
+            ...cuota,
+            empadronadoNombre: `${emp.nombre} ${emp.apellidos}`,
+            numeroPadron: emp.numeroPadron
+          }));
+          
+          todasLasCuotas.push(...cuotasConInfo);
+        } catch (error) {
+          console.warn(`Error cargando pagos para ${emp.nombre}:`, error);
+        }
       }
 
-      setEmpadronado(miEmpadronado);
-
-      // Obtener mis cuotas pendientes
-      const misCuotas = await obtenerPagosPorEmpadronado(miEmpadronado.id);
-      const cuotasPendientes = misCuotas.filter(c => 
-        c.estado === 'pendiente' || c.estado === 'moroso'
-      );
-      
-      setCuotas(cuotasPendientes);
+      setCuotas(todasLasCuotas);
+      setPagosEmpadronados(mapaPagosEmpadronados);
 
       // Cargar historial de pagos (simulado por ahora)
-      // En una implementación real, esto vendría de Firebase
       setHistorialPagos([]);
 
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudieron cargar tus datos",
+        description: "No se pudieron cargar los datos de deudas",
         variant: "destructive"
       });
     } finally {
@@ -215,7 +232,7 @@ const PagosCuotas = () => {
       // Simular subida de comprobante y registro del pago
       const solicitudPago: PagoSolicitud = {
         id: `pago_${Date.now()}`,
-        empadronadoId: empadronado?.id || '',
+        empadronadoId: "multiple", // Múltiples empadronados
         cuotasSeleccionadas: Array.from(cuotasSeleccionadas),
         totalMonto: calcularTotalSeleccionado(),
         metodoPago,
@@ -257,26 +274,28 @@ const PagosCuotas = () => {
 
   const obtenerEstadoGeneral = () => {
     const deudaTotal = cuotas.reduce((total, c) => total + c.monto, 0);
+    const totalEmpadronados = empadronados.length;
+    const empadronadosConDeuda = new Set(cuotas.map(c => c.empadronadoId)).size;
     const tieneMorosos = cuotas.some(c => c.estado === 'moroso');
     
     if (deudaTotal === 0) {
       return {
         emoji: "😊",
-        mensaje: "¡Esta urbanización crece cada día gracias a ti!",
+        mensaje: `Todos los ${totalEmpadronados} asociados están al día`,
         color: "text-green-600",
         bgColor: "bg-green-50"
       };
     } else if (tieneMorosos) {
       return {
         emoji: "😔",
-        mensaje: "Vamos, la urbanización también depende de ti",
+        mensaje: `${empadronadosConDeuda} asociados tienen deudas pendientes`,
         color: "text-red-600", 
         bgColor: "bg-red-50"
       };
     } else {
       return {
         emoji: "⏰",
-        mensaje: "Recuerda pagar antes del vencimiento",
+        mensaje: `${empadronadosConDeuda} asociados con pagos pendientes`,
         color: "text-yellow-600",
         bgColor: "bg-yellow-50"
       };
@@ -288,7 +307,7 @@ const PagosCuotas = () => {
       <div className="min-h-screen bg-background pb-20 md:pb-0 flex items-center justify-center">
         <div className="text-center">
           <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-pulse" />
-          <p className="text-muted-foreground">Cargando tus cuotas...</p>
+          <p className="text-muted-foreground">Cargando deudas de todos los asociados...</p>
         </div>
       </div>
     );
@@ -316,8 +335,8 @@ const PagosCuotas = () => {
             </Button>
             <div className="h-6 w-px bg-border" />
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Mis Cuotas</h1>
-              <p className="text-muted-foreground">Gestiona tus pagos de manera fácil</p>
+              <h1 className="text-2xl font-bold text-foreground">Panel de Deudas</h1>
+              <p className="text-muted-foreground">Gestión de deudas de todos los asociados</p>
             </div>
           </div>
         </div>
@@ -328,13 +347,13 @@ const PagosCuotas = () => {
             <div className="text-center">
               <div className="text-6xl mb-4">{estadoGeneral.emoji}</div>
               <h2 className={`text-xl font-bold ${estadoGeneral.color} mb-2`}>
-                {empadronado?.nombre} {empadronado?.apellidos}
+                Resumen General de Deudas
               </h2>
               <p className={`${estadoGeneral.color} text-lg`}>
                 {estadoGeneral.mensaje}
               </p>
               <div className="mt-4 flex justify-center gap-4 text-sm text-muted-foreground">
-                <span>Padrón: {empadronado?.numeroPadron}</span>
+                <span>Total: S/ {cuotas.reduce((sum, c) => sum + c.monto, 0).toFixed(2)}</span>
                 <span>•</span>
                 <span>{cuotas.length} cuotas pendientes</span>
               </div>
@@ -347,7 +366,7 @@ const PagosCuotas = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Cuotas Pendientes
+              Todas las Deudas Pendientes
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -355,83 +374,118 @@ const PagosCuotas = () => {
               <div className="text-center py-8">
                 <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4" />
                 <h3 className="text-lg font-semibold text-green-600 mb-2">
-                  ¡Felicitaciones!
+                  ¡Excelente!
                 </h3>
                 <p className="text-muted-foreground">
-                  Estás al día con todos tus pagos
+                  Todos los asociados están al día con sus pagos
                 </p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {cuotas.map((cuota) => {
-                  const mora = calcularMora(cuota);
-                  const descuento = calcularDescuentoProntoPago(cuota);
-                  const montoFinal = cuota.monto + mora - descuento;
-                  const seleccionada = cuotasSeleccionadas.has(cuota.id);
-
-                  return (
-                    <div
-                      key={cuota.id}
-                      className={`p-4 border rounded-lg transition-all ${
-                        seleccionada ? 'border-primary bg-primary/5' : 'border-border'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          checked={seleccionada}
-                          onCheckedChange={(checked) => 
-                            handleSeleccionarCuota(cuota.id, !!checked)
-                          }
-                          className="mt-1"
-                        />
-                        
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold">
-                              {new Date(cuota.año, cuota.mes - 1).toLocaleDateString('es-PE', {
-                                month: 'long',
-                                year: 'numeric'
-                              })}
+              ) : (
+                <div className="space-y-3">
+                  {/* Agrupar cuotas por empadronado */}
+                  {Object.entries(
+                    cuotas.reduce((grupos, cuota) => {
+                      const empId = cuota.empadronadoId;
+                      if (!grupos[empId]) {
+                        grupos[empId] = [];
+                      }
+                      grupos[empId].push(cuota);
+                      return grupos;
+                    }, {} as Record<string, Pago[]>)
+                  ).map(([empadronadoId, cuotasEmpadronado]) => {
+                    const empadronado = empadronados.find(e => e.id === empadronadoId);
+                    const deudaTotalEmp = cuotasEmpadronado.reduce((total, c) => total + c.monto, 0);
+                    
+                    return (
+                      <div key={empadronadoId} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-semibold text-lg">
+                              {empadronado?.nombre} {empadronado?.apellidos}
                             </h4>
-                            <Badge variant={cuota.estado === 'moroso' ? 'destructive' : 'secondary'}>
-                              {cuota.estado === 'moroso' ? 'Moroso' : 'Pendiente'}
-                            </Badge>
+                            <p className="text-sm text-muted-foreground">
+                              Padrón: {empadronado?.numeroPadron} • Total: S/ {deudaTotalEmp.toFixed(2)}
+                            </p>
                           </div>
-                          
-                          <div className="text-sm space-y-1">
-                            <div className="flex justify-between">
-                              <span>Monto base:</span>
-                              <span>S/ {cuota.montoOriginal.toFixed(2)}</span>
-                            </div>
-                            
-                            {mora > 0 && (
-                              <div className="flex justify-between text-red-600">
-                                <span>Mora:</span>
-                                <span>+ S/ {mora.toFixed(2)}</span>
+                          <Badge variant="destructive" className="text-sm">
+                            {cuotasEmpadronado.length} cuota(s)
+                          </Badge>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {cuotasEmpadronado.map((cuota) => {
+                            const mora = calcularMora(cuota);
+                            const descuento = calcularDescuentoProntoPago(cuota);
+                            const montoFinal = cuota.monto + mora - descuento;
+                            const seleccionada = cuotasSeleccionadas.has(cuota.id);
+
+                            return (
+                              <div
+                                key={cuota.id}
+                                className={`p-3 border rounded transition-all ml-4 ${
+                                  seleccionada ? 'border-primary bg-primary/5' : 'border-border'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <Checkbox
+                                    checked={seleccionada}
+                                    onCheckedChange={(checked) => 
+                                      handleSeleccionarCuota(cuota.id, !!checked)
+                                    }
+                                    className="mt-1"
+                                  />
+                                  
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h5 className="font-medium">
+                                        {new Date(cuota.año, cuota.mes - 1).toLocaleDateString('es-PE', {
+                                          month: 'long',
+                                          year: 'numeric'
+                                        })}
+                                      </h5>
+                                      <Badge variant={cuota.estado === 'moroso' ? 'destructive' : 'secondary'}>
+                                        {cuota.estado === 'moroso' ? 'Moroso' : 'Pendiente'}
+                                      </Badge>
+                                    </div>
+                                    
+                                    <div className="text-sm space-y-1">
+                                      <div className="flex justify-between">
+                                        <span>Monto base:</span>
+                                        <span>S/ {cuota.montoOriginal.toFixed(2)}</span>
+                                      </div>
+                                      
+                                      {mora > 0 && (
+                                        <div className="flex justify-between text-red-600">
+                                          <span>Mora:</span>
+                                          <span>+ S/ {mora.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      
+                                      {descuento > 0 && (
+                                        <div className="flex justify-between text-green-600">
+                                          <span>Descuento pronto pago:</span>
+                                          <span>- S/ {descuento.toFixed(2)}</span>
+                                        </div>
+                                      )}
+                                      
+                                      <div className="flex justify-between font-semibold border-t pt-1">
+                                        <span>Total:</span>
+                                        <span>S/ {montoFinal.toFixed(2)}</span>
+                                      </div>
+                                      
+                                      <div className="text-xs text-muted-foreground">
+                                        Vence: {cuota.fechaVencimiento}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                            
-                            {descuento > 0 && (
-                              <div className="flex justify-between text-green-600">
-                                <span>Descuento pronto pago:</span>
-                                <span>- S/ {descuento.toFixed(2)}</span>
-                              </div>
-                            )}
-                            
-                            <div className="flex justify-between font-semibold border-t pt-1">
-                              <span>Total:</span>
-                              <span>S/ {montoFinal.toFixed(2)}</span>
-                            </div>
-                            
-                            <div className="text-xs text-muted-foreground">
-                              Vence: {cuota.fechaVencimiento}
-                            </div>
-                          </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             )}
           </CardContent>
