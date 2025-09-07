@@ -25,6 +25,7 @@ import Sanciones from "./pages/Sanciones";
 import Deportes from "./pages/Deportes";
 import Patrimonio from "./pages/Patrimonio";
 import PortalAsociado from "./pages/PortalAsociado";
+import Acceso from "./pages/Acceso";
 
 const queryClient = new QueryClient();
 
@@ -162,6 +163,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <PortalAsociado />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Control de Acceso */}
+              <Route
+                path="/acceso"
+                element={
+                  <ProtectedRoute>
+                    <Acceso />
                   </ProtectedRoute>
                 }
               />
