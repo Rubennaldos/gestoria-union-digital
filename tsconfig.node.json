@@ -1,17 +1,16 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM", "WebWorker", "DOM.Iterable"],
     "module": "ESNext",
+    "skipLibCheck": true,
 
-    /* Bundler mode (Vite) */
+    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
+    "moduleDetection": "force",
     "noEmit": true,
-
-    /* Tipos de Node para path, process, __dirname, etc. */
-    "types": ["node"],
 
     /* Linting */
     "strict": true,
@@ -19,9 +18,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
 
-    /* (Opcional) ayuda con imports por defecto en libs CJS */
-    "allowSyntheticDefaultImports": true
+    "types": ["node"]
   },
-  "include": ["vite.config.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["vite.config.ts"]
 }
