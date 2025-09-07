@@ -105,16 +105,14 @@ const PagosCuotas = () => {
     try {
       setLoading(true);
       
-      // Obtener empadronado actual por uid o buscar por datos del usuario
-      const empadronados = await getEmpadronados();
-      const miEmpadronado = empadronados.find(emp => 
-        emp.id === user?.uid || emp.dni === user?.uid
-      );
+      // Obtener empadronado vinculado al usuario autenticado
+      const { obtenerEmpadronadoPorAuthUid } = await import('@/services/empadronados');
+      const miEmpadronado = await obtenerEmpadronadoPorAuthUid(user?.uid || '');
 
       if (!miEmpadronado) {
         toast({
-          title: "Usuario no encontrado",
-          description: "No se encontró tu registro como asociado",
+          title: "Usuario no vinculado",
+          description: "Tu cuenta no está vinculada a un registro de empadronado. Contacta al administrador.",
           variant: "destructive"
         });
         return;
