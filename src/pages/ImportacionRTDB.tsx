@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, Users, Phone, Car, UserCheck, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { generateTemplate, parseExcelFile, PersonaProcessed, ValidationError } from '@/lib/excelImport';
+import { generateEmpadronadosTemplate } from '@/utils/excelTemplate';
 import { getDatabase, ref, update } from 'firebase/database';
 
 const ImportacionRTDB: React.FC = () => {
@@ -24,25 +25,15 @@ const ImportacionRTDB: React.FC = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [fileName, setFileName] = useState('');
   
-  // Descargar plantilla
+  // Descargar plantilla mejorada
   const handleDownloadTemplate = () => {
     try {
-      const templateBuffer = generateTemplate();
-      const blob = new Blob([templateBuffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'plantilla-importacion-empadronados.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Usar la nueva plantilla mejorada
+      generateEmpadronadosTemplate();
       
       toast({
         title: "Plantilla descargada",
-        description: "Completa la plantilla siguiendo las instrucciones incluidas"
+        description: "Nueva plantilla con soporte para múltiples terrenos y mejores instrucciones"
       });
     } catch (error) {
       toast({
