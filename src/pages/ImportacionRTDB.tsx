@@ -25,15 +25,26 @@ const ImportacionRTDB: React.FC = () => {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [fileName, setFileName] = useState('');
   
-  // Descargar plantilla mejorada
+  // Descargar plantilla original mejorada
   const handleDownloadTemplate = () => {
     try {
-      // Usar la nueva plantilla mejorada
-      generateEmpadronadosTemplate();
+      // Usar la plantilla original con los campos nuevos
+      const templateBuffer = generateTemplate();
+      const blob = new Blob([templateBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla-importacion-empadronados.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       
       toast({
         title: "Plantilla descargada",
-        description: "Nueva plantilla con soporte para múltiples terrenos y mejores instrucciones"
+        description: "Plantilla con soporte para múltiples terrenos y # de padrón"
       });
     } catch (error) {
       toast({

@@ -8,11 +8,18 @@ dayjs.extend(customParseFormat);
 // Tipos para el parseo
 export type PersonaRaw = {
   persona_id: string;
+  numero_padron: string;
   nombres: string;
   apellidos: string;
   manzana: string;
   lote: string;
   etapa: string;
+  manzana2?: string;
+  lote2?: string;
+  etapa2?: string;
+  manzana3?: string;
+  lote3?: string;
+  etapa3?: string;
   habilitado: string;
   observaciones: string;
 };
@@ -39,11 +46,18 @@ export type MiembroRaw = {
 
 export type PersonaProcessed = {
   persona_id: string;
+  numero_padron: string;
   nombres: string;
   apellidos: string;
   manzana: string;
   lote: string;
   etapa: string;
+  manzana2?: string;
+  lote2?: string;
+  etapa2?: string;
+  manzana3?: string;
+  lote3?: string;
+  etapa3?: string;
   habilitado: boolean;
   observaciones: string;
   telefonos: string[];
@@ -141,7 +155,7 @@ export const parseExcelFile = (fileBuffer: ArrayBuffer): {
     }
     
     const firstPerson = personasRaw[0];
-    const requiredColumns = ['persona_id', 'nombres', 'apellidos'];
+    const requiredColumns = ['persona_id', 'numero_padron', 'nombres', 'apellidos'];
     for (const col of requiredColumns) {
       if (!(col in firstPerson)) {
         errors.push({
@@ -275,11 +289,18 @@ export const parseExcelFile = (fileBuffer: ArrayBuffer): {
     for (const [personaId, persona] of personasMap) {
       data.push({
         persona_id: personaId,
+        numero_padron: String(persona.numero_padron || '').trim(),
         nombres: String(persona.nombres || '').trim(),
         apellidos: String(persona.apellidos || '').trim(),
         manzana: String(persona.manzana || '').trim(),
         lote: String(persona.lote || '').trim(),
         etapa: String(persona.etapa || '').trim(),
+        manzana2: String(persona.manzana2 || '').trim(),
+        lote2: String(persona.lote2 || '').trim(),
+        etapa2: String(persona.etapa2 || '').trim(),
+        manzana3: String(persona.manzana3 || '').trim(),
+        lote3: String(persona.lote3 || '').trim(),
+        etapa3: String(persona.etapa3 || '').trim(),
         habilitado: normalizeBoolean(String(persona.habilitado || '')),
         observaciones: String(persona.observaciones || '').trim(),
         telefonos: telefonosMap.get(personaId) || [],
@@ -306,27 +327,41 @@ export const parseExcelFile = (fileBuffer: ArrayBuffer): {
 export const generateTemplate = (): ArrayBuffer => {
   const wb = XLSX.utils.book_new();
   
-  // Hoja Personas
+  // Hoja Personas con campos nuevos
   const personasData = [
     {
       persona_id: 'P001',
+      numero_padron: 'P001',
       nombres: 'Juan Carlos',
       apellidos: 'Pérez García',
       manzana: 'A',
       lote: '15',
       etapa: '1',
+      manzana2: 'B',
+      lote2: '20',
+      etapa2: '2',
+      manzana3: '',
+      lote3: '',
+      etapa3: '',
       habilitado: 'SI',
-      observaciones: 'Ejemplo de persona'
+      observaciones: 'Ejemplo de persona con 2 terrenos'
     },
     {
       persona_id: 'P002',
+      numero_padron: 'P002',
       nombres: 'María Elena',
       apellidos: 'Rodríguez López',
       manzana: 'B',
       lote: '22',
       etapa: '2',
+      manzana2: '',
+      lote2: '',
+      etapa2: '',
+      manzana3: '',
+      lote3: '',
+      etapa3: '',
       habilitado: 'NO',
-      observaciones: ''
+      observaciones: 'Solo tiene 1 terreno'
     }
   ];
   
@@ -369,7 +404,7 @@ export const generateTemplate = (): ArrayBuffer => {
   const wsVehiculos = XLSX.utils.json_to_sheet(vehiculosData);
   const wsMiembros = XLSX.utils.json_to_sheet(miembrosData);
   
-  // Agregar hoja de instrucciones
+  // Agregar hoja de instrucciones mejoradas
   const instrucciones = [
     ['INSTRUCCIONES PARA USO DE LA PLANTILLA'],
     [''],
@@ -380,24 +415,32 @@ export const generateTemplate = (): ArrayBuffer => {
     ['   - MiembrosFamilia: Familiares (puede tener múltiples por persona)'],
     [''],
     ['2. COLUMNAS OBLIGATORIAS:'],
-    ['   Personas: persona_id, nombres, apellidos'],
+    ['   Personas: persona_id, numero_padron, nombres, apellidos'],
     ['   Telefonos: persona_id, telefono'],
     ['   Vehiculos: persona_id, placa, tipo'],
     ['   MiembrosFamilia: persona_id, nombre, apellidos, parentesco, fecha_nac, menor'],
     [''],
-    ['3. FORMATOS ESPECIALES:'],
-    ['   - habilitado: SI/NO (se convierte a verdadero/falso)'],
+    ['3. MÚLTIPLES TERRENOS:'],
+    ['   - Un asociado puede tener hasta 3 terrenos'],
+    ['   - Terreno 1: manzana, lote, etapa (obligatorios si tiene terreno)'],
+    ['   - Terreno 2: manzana2, lote2, etapa2 (opcionales)'],
+    ['   - Terreno 3: manzana3, lote3, etapa3 (opcionales)'],
+    ['   - Dejar vacías las columnas adicionales si solo tiene un terreno'],
+    [''],
+    ['4. FORMATOS ESPECIALES:'],
+    ['   - habilitado: SI/NO (SI=Puede usar servicios, NO=Suspendido por morosidad/sanciones)'],
     ['   - menor: SI/NO (se convierte a verdadero/falso)'],
     ['   - fecha_nac: DD/MM/YYYY (ej: 15/03/1985)'],
     ['   - tipo vehiculo: vehiculo, moto, etc.'],
     [''],
-    ['4. NOTAS IMPORTANTES:'],
+    ['5. NOTAS IMPORTANTES:'],
     ['   - persona_id debe ser único y aparecer en todas las hojas'],
+    ['   - numero_padron es el # de padrón del asociado (puede ser igual al persona_id)'],
     ['   - Los campos vacíos son permitidos excepto los obligatorios'],
     ['   - Se eliminan espacios al inicio y final automáticamente'],
     ['   - Se eliminan teléfonos duplicados automáticamente'],
     [''],
-    ['5. EJEMPLOS DE DATOS:'],
+    ['6. EJEMPLOS DE DATOS:'],
     ['   Ver las otras hojas para ejemplos de formato correcto']
   ];
   
