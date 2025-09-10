@@ -8,13 +8,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  base: "/",
+  base: "/gestoria-union-digital/", // 👈 nombre EXACTO del repo
   server: { host: "::", port: 8080 },
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-    sourcemap: true, // útil para ver errores legibles; puedes quitarlo luego
-  },
+  build: { outDir: "dist", emptyOutDir: true, sourcemap: true },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: { alias: { "@": resolve(__dirname, "src") } },
 }));
