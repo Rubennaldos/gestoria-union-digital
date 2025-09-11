@@ -12,9 +12,115 @@ import {
 import { Empadronado } from '@/types/empadronados';
 
 /* ──────────────────────────────────────────────────────────
-   Helpers de periodos/fechas
+   Helpers de periodos/fechas - SISTEMA DE QUINCENAS
    ────────────────────────────────────────────────────────── */
 const pad2 = (n: number) => String(n).padStart(2, '0');
+
+// Fecha de corte para el sistema (15 de enero 2025)
+const FECHA_CORTE_SISTEMA = new Date(2025, 0, 15); // 15/01/2025
+
+// Constantes para quincenas
+const PRIMERA_QUINCENA_CIERRE = 14;
+const SEGUNDA_QUINCENA_CIERRE_28 = 28;
+const SEGUNDA_QUINCENA_CIERRE_30 = 30;
+const SEGUNDA_QUINCENA_CIERRE_31 = 31;
+
+// Helper para obtener el último día del mes
+const getLastDayOfMonth = (year: number, month: number): number => {
+  return new Date(year, month, 0).getDate();
+};
+
+// Helper para determinar si una quincena está cerrada
+const isQuincenaCerrada = (year: number, month: number, quincena: 1 | 2, fechaReferencia: Date = new Date()): boolean => {
+  const hoy = fechaReferencia;
+  const añoActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth() + 1;
+  const diaActual = hoy.getDate();
+  
+  // Si es un mes futuro, la quincena no está cerrada
+  if (year > añoActual || (year === añoActual && month > mesActual)) {
+    return false;
+  }
+  
+  // Si es un mes pasado, ambas quincenas están cerradas
+  if (year < añoActual || (year === añoActual && month < mesActual)) {
+    return true;
+  }
+  
+  // Si es el mes actual, verificar según la quincena
+  if (year === añoActual && month === mesActual) {
+    if (quincena === 1) {
+      return diaActual >= PRIMERA_QUINCENA_CIERRE; // Cierra el 14
+    } else {
+      const ultimoDiaMes = getLastDayOfMonth(year, month);
+      return diaActual >= ultimoDiaMes; // Cierra el último día del mes
+    }
+  }
+  
+  return false;
+};
+
+// Calcular quincenas desde fecha de ingreso
+const calcularQuincenasDesdeIngreso = (fechaIngreso: string, fechaReferencia: Date = new Date()): { año: number, mes: number, quincena: 1 | 2 }[] => {
+  const [dia, mes, año] = fechaIngreso.split('/').map(Number);
+  const fechaIngresoDate = new Date(año, mes - 1, dia);
+  
+  let fechaInicio: Date;
+  
+  // Aplicar reglas de inicio
+  if (fechaIngresoDate < FECHA_CORTE_SISTEMA) {
+    // Si ingresó antes del corte, empezar desde 15/01/2025
+    fechaInicio = FECHA_CORTE_SISTEMA;
+  } else {
+    // Si ingresó después del corte
+    if (dia >= 1 && dia <= 14) {
+      // Si ingresó en días 1-14, ese mes cuenta
+      fechaInicio = new Date(año, mes - 1, 1);
+    } else {
+      // Si ingresó en días 15+, empieza el mes siguiente
+      fechaInicio = new Date(año, mes, 1);
+    }
+  }
+  
+  const quincenas: { año: number, mes: number, quincena: 1 | 2 }[] = [];
+  const fechaActual = new Date(fechaInicio);
+  
+  // Generar quincenas desde fecha de inicio hasta fecha de referencia
+  while (fechaActual <= fechaReferencia) {
+    const añoActual = fechaActual.getFullYear();
+    const mesActual = fechaActual.getMonth() + 1;
+    
+    // Primera quincena (1-14, cierra el 14)
+    if (isQuincenaCerrada(añoActual, mesActual, 1, fechaReferencia)) {
+      quincenas.push({ año: añoActual, mes: mesActual, quincena: 1 });
+    }
+    
+    // Segunda quincena (15-último día, cierra el último día)
+    if (isQuincenaCerrada(añoActual, mesActual, 2, fechaReferencia)) {
+      quincenas.push({ año: añoActual, mes: mesActual, quincena: 2 });
+    }
+    
+    // Avanzar al siguiente mes
+    fechaActual.setMonth(fechaActual.getMonth() + 1);
+  }
+  
+  return quincenas;
+};
+
+// Helper para formatear fecha en formato DD/MM/YYYY
+const toEsDate = (y: number, m: number, day: number) => {
+  const d = new Date(y, m - 1, day);
+  const dd = pad2(d.getDate());
+  const mm = pad2(d.getMonth() + 1);
+  return `${dd}/${mm}/${d.getFullYear()}`;
+};
+
+// Helper para calcular el monto total adeudado
+const calcularMontoQuincenas = (numeroQuincenas: number, montoPorQuincena: number = 50): number => {
+  return numeroQuincenas * montoPorQuincena;
+};
+
+// Mantener funciones legacy para compatibilidad
 const periodFromYM = (y: number, m: number) => `${y}-${pad2(m)}`; // "2025-08"
 const periodCompact = (period: string) => period.replace('-', ''); // "202508"
 const nowPeriod = () => {
@@ -31,12 +137,6 @@ const monthsBetween = (from: string, to: string) => {
   const [ty, tm] = to.split('-').map(Number);
   return (ty - fy) * 12 + (tm - fm);
 };
-const toEsDate = (y: number, m: number, day: number) => {
-  const d = new Date(y, m - 1, day);
-  const dd = pad2(d.getDate());
-  const mm = pad2(d.getMonth() + 1);
-  return `${dd}/${mm}/${d.getFullYear()}`;
-};
 
 /* ──────────────────────────────────────────────────────────
    Configuración (con defaults)
@@ -48,6 +148,8 @@ export const obtenerConfiguracion = async (): Promise<ConfiguracionCobranzas> =>
   if (!snapshot.exists()) {
     const configDefault: ConfiguracionCobranzas = {
       montoMensual: 50,
+      montoQuincenal: 25,      // S/ 25 por quincena
+      sistemaQuincenas: true,  // Activar sistema de quincenas por defecto
       diaVencimiento: 15,
       diaCierre: 14,
       diasProntoPago: 3,
@@ -84,7 +186,87 @@ const getEmpadronadoById = async (id: string): Promise<Empadronado | null> => {
 };
 
 /* ──────────────────────────────────────────────────────────
-   CHARGES: cobranzas/charges/YYYYMM/{empId}/{chargeId}
+   SISTEMA DE QUINCENAS - NUEVAS FUNCIONES
+   ────────────────────────────────────────────────────────── */
+
+// Generar pagos basados en quincenas desde fecha de ingreso
+export const generarPagosQuincenasEmpadronado = async (empadronado: Empadronado): Promise<number> => {
+  if (!empadronado.fechaIngreso) {
+    console.warn(`Empadronado ${empadronado.id} no tiene fecha de ingreso`);
+    return 0;
+  }
+
+  const cfg = await obtenerConfiguracion();
+  // Convertir timestamp a fecha DD/MM/YYYY
+  const fechaIngresoStr = new Date(empadronado.fechaIngreso).toLocaleDateString('es-ES');
+  const quincenas = calcularQuincenasDesdeIngreso(fechaIngresoStr, new Date());
+  const montoPorQuincena = cfg.montoMensual / 2; // S/ 25 por quincena si mensual es S/ 50
+  
+  let pagosCreados = 0;
+
+  for (const { año, mes, quincena } of quincenas) {
+    const pagoId = `${empadronado.id}_${año}_${mes}_Q${quincena}`;
+    const pagoRef = ref(db, `cobranzas/pagos/${pagoId}`);
+    
+    // Verificar si ya existe
+    const existePago = await get(pagoRef);
+    if (existePago.exists()) continue;
+
+    // Calcular fecha de vencimiento (siempre el 15 del mes siguiente)
+    let mesVencimiento = mes + 1;
+    let añoVencimiento = año;
+    if (mesVencimiento > 12) {
+      mesVencimiento = 1;
+      añoVencimiento++;
+    }
+    
+    const fechaVencimiento = toEsDate(añoVencimiento, mesVencimiento, 15);
+
+    const nuevoPago: Pago = {
+      id: pagoId,
+      empadronadoId: empadronado.id,
+      numeroPadron: empadronado.numeroPadron || '',
+      mes,
+      año,
+      quincena, // Agregar campo quincena
+      monto: montoPorQuincena,
+      montoOriginal: montoPorQuincena,
+      fechaVencimiento,
+      estado: 'pendiente',
+      descuentos: [],
+      recargos: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      creadoPor: 'sistema'
+    };
+
+    await set(pagoRef, nuevoPago);
+    pagosCreados++;
+  }
+
+  return pagosCreados;
+};
+
+// Generar pagos para todos los empadronados activos
+export const generarPagosQuincenasTodos = async (): Promise<{ procesados: number; pagosCreados: number }> => {
+  const empadronados = await obtenerEmpadronados();
+  const activos = empadronados.filter(emp => emp?.habilitado !== false);
+  
+  let totalPagosCreados = 0;
+  
+  for (const empadronado of activos) {
+    const pagosCreados = await generarPagosQuincenasEmpadronado(empadronado);
+    totalPagosCreados += pagosCreados;
+  }
+  
+  return {
+    procesados: activos.length,
+    pagosCreados: totalPagosCreados
+  };
+};
+
+/* ──────────────────────────────────────────────────────────
+   CHARGES: cobranzas/charges/YYYYMM/{empId}/{chargeId} (LEGACY)
    ────────────────────────────────────────────────────────── */
 const ensureChargeForPeriod = async (emp: Empadronado, period: string) => {
   const cfg = await obtenerConfiguracion();

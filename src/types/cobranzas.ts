@@ -16,6 +16,7 @@ export interface Pago {
   numeroPadron: string;
   mes: number; // 1-12
   año: number;
+  quincena?: 1 | 2; // Para el sistema de quincenas
   monto: number; // monto final (descuentos/recargos aplicados)
   montoOriginal: number; // monto base de la cuota
   fechaVencimiento: string; // DD/MM/YYYY
@@ -101,6 +102,8 @@ export interface Egreso {
 
 export interface ConfiguracionCobranzas {
   montoMensual: number;
+  montoQuincenal?: number;     // Para el sistema de quincenas
+  sistemaQuincenas?: boolean;  // Flag para activar sistema de quincenas
   diaVencimiento: number;      // 15
   diaCierre: number;           // 14
   diasProntoPago: number;      // 3

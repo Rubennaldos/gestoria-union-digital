@@ -24,6 +24,7 @@ import {
   generarEstadisticas,
   ejecutarCierreMensual,
   generarPagosDesdeEnero,
+  generarPagosQuincenasTodos,
   obtenerPagos,
   obtenerEgresos,
   obtenerPagosPorEmpadronado,
@@ -126,6 +127,29 @@ const Cobranzas = () => {
       toast({
         title: "Error", 
         description: "No se pudieron generar las cuotas históricas",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para generar pagos usando sistema de quincenas
+  const generarPagosQuincenas = async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      const resultado = await generarPagosQuincenasTodos();
+      toast({
+        title: "✅ Pagos de Quincenas Generados",
+        description: `Se procesaron ${resultado.procesados} empadronados y se crearon ${resultado.pagosCreados} pagos de quincenas según las reglas establecidas.`,
+      });
+      await cargarDatos(true);
+    } catch (error) {
+      console.error('Error al generar pagos de quincenas:', error);
+      toast({
+        title: "Error", 
+        description: "No se pudieron generar los pagos de quincenas",
         variant: "destructive",
       });
     } finally {
@@ -658,7 +682,61 @@ const Cobranzas = () => {
                 </div>
 
                 {configuracion && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-8">
+                    {/* Sistema de Quincenas */}
+                    <div className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">Sistema de Quincenas</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Generar pagos basados en quincenas desde fecha de ingreso según reglas establecidas
+                          </p>
+                        </div>
+                        <Switch
+                          checked={configuracion.sistemaQuincenas ?? true}
+                          onCheckedChange={(checked) => actualizarCampoConfig('sistemaQuincenas', checked)}
+                        />
+                      </div>
+                      
+                      {configuracion.sistemaQuincenas && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="montoQuincenal">Monto por Quincena (S/)</Label>
+                            <Input
+                              id="montoQuincenal"
+                              type="number"
+                              step="0.01"
+                              value={configuracion.montoQuincenal ?? configuracion.montoMensual / 2}
+                              onChange={(e) => actualizarCampoConfig('montoQuincenal', parseFloat(e.target.value) || 0)}
+                              placeholder="25.00"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Monto que se cobrará por cada quincena
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-end">
+                            <Button 
+                              onClick={generarPagosQuincenas}
+                              disabled={loading}
+                              className="w-full"
+                            >
+                              {loading ? "Generando..." : "Generar Pagos por Quincenas"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <p><strong>Reglas:</strong></p>
+                        <p>• Si ingreso antes del 15/01/2025: cobrar desde 15/01/2025</p>
+                        <p>• Si ingreso ≥ 15/01/2025 y día 1-14: ese mes cuenta</p>
+                        <p>• Si ingreso ≥ 15/01/2025 y día 15+: empieza mes siguiente</p>
+                        <p>• Solo se cobran quincenas concluidas (1ª cierra día 14, 2ª cierra último día del mes)</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Monto Mensual */}
                     <div className="space-y-2">
                       <Label htmlFor="montoMensual">Monto Mensual (S/)</Label>
@@ -671,7 +749,7 @@ const Cobranzas = () => {
                         placeholder="50.00"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Cuota mensual que se cobrará a cada asociado
+                        Cuota mensual que se cobrará a cada asociado (sistema legacy)
                       </p>
                     </div>
 
@@ -809,6 +887,7 @@ const Cobranzas = () => {
                         Nombre de la sede de la organización
                       </p>
                     </div>
+                  </div>
                   </div>
                 )}
 
