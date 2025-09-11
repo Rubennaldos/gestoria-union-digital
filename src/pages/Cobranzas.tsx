@@ -44,6 +44,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
+/* Config/cálculo compartido con el modal */
+import { useBillingConfig } from "@/contexts/BillingConfigContext";
+import { calcularDeuda } from "@/lib/cobranzas/debt";
+
 /* Helpers para fechas y morosidad en UI */
 const parseEs = (s?: string | null) => {
   if (!s) return null;
@@ -59,6 +63,58 @@ const esMorosoUI = (p: Pago) => {
 };
 
 type Filtro = "todos" | "morosos" | "pendientes" | "aldia";
+
+/* Asegurar fecha ISO para el motor de deuda */
+function ensureISO(v: string | number | undefined): string {
+  if (!v) return new Date().toISOString().slice(0, 10);
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (typeof v === "string" && /^\d{8}$/.test(v)) return `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+  if (typeof v === "number") { const d = new Date(v); return d.toISOString().slice(0, 10); }
+  return new Date().toISOString().slice(0, 10);
+}
+
+/* Subcomponente: deuda “oficial” (mismo cálculo del modal) */
+function DebtInline({ emp }: { emp: Empadronado }) {
+  const cfg = useBillingConfig();
+  const iso = ensureISO((emp as any).fechaIngreso);
+  const d: any = calcularDeuda({ fechaIngresoISO: iso }, cfg);
+
+  const total = Number(d?.monto ?? 0);
+  const quincenas = Number(d?.quincenas ?? 0);
+  const moroso = quincenas > 0;
+
+  return (
+    <div className="flex items-center space-x-3">
+      <div className="text-right">
+        <p className="text-sm font-medium">Deuda Total: S/ {total.toFixed(2)}</p>
+        <p className="text-xs text-muted-foreground">{quincenas} pagos generados</p>
+      </div>
+      <Badge variant={moroso ? "destructive" : "secondary"}>
+        {moroso ? "Moroso" : "Al día"}
+      </Badge>
+    </div>
+  );
+}
+
+/* 🔁 Recalcular KPIs desde el mapa de pagos por empadronado */
+function recomputeKPIsFromMap(pagosMap: Record<string, Pago[]>) {
+  let pendiente = 0;
+  const morososSet = new Set<string>();
+
+  Object.entries(pagosMap).forEach(([empId, arr]) => {
+    let tieneMoroso = false;
+    for (const p of arr) {
+      const v = parseEs(p.fechaVencimiento);
+      const vencido = v ? v.getTime() < Date.now() : false;
+      const moroso = p.estado === "moroso" || (vencido && (p.estado === "pendiente" || p.estado === "sancionado"));
+      if (moroso) tieneMoroso = true;
+      if (p.estado === "pendiente" || moroso) pendiente += Number(p.monto || 0);
+    }
+    if (tieneMoroso) morososSet.add(empId);
+  });
+
+  return { totalPendiente: pendiente, totalMorosos: morososSet.size };
+}
 
 const Cobranzas = () => {
   const { user } = useAuth();
@@ -85,7 +141,6 @@ const Cobranzas = () => {
 
   const guardarConfiguracion = async () => {
     if (!configuracion) return;
-    
     try {
       setGuardandoConfig(true);
       await actualizarConfiguracion(configuracion);
@@ -112,7 +167,7 @@ const Cobranzas = () => {
     });
   };
 
-  // Función para generar pagos desde enero 2025
+  // Generar pagos desde enero 2025
   const generarPagosHistoricos = async () => {
     if (!user) return;
     try {
@@ -125,7 +180,7 @@ const Cobranzas = () => {
       await cargarDatos(true);
     } catch (error) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "No se pudieron generar las cuotas históricas",
         variant: "destructive",
       });
@@ -134,7 +189,7 @@ const Cobranzas = () => {
     }
   };
 
-  // Función para generar pagos usando sistema de quincenas
+  // Generar pagos de quincenas
   const generarPagosQuincenas = async () => {
     if (!user) return;
     try {
@@ -146,9 +201,9 @@ const Cobranzas = () => {
       });
       await cargarDatos(true);
     } catch (error) {
-      console.error('Error al generar pagos de quincenas:', error);
+      console.error("Error al generar pagos de quincenas:", error);
       toast({
-        title: "Error", 
+        title: "Error",
         description: "No se pudieron generar los pagos de quincenas",
         variant: "destructive",
       });
@@ -208,47 +263,44 @@ const Cobranzas = () => {
       const cargarPagosEnLotes = async () => {
         setLoadingPagos(true);
         const pagosMap: Record<string, Pago[]> = {};
-        const batchSize = 10; // Procesar 10 empadronados a la vez (optimizado)
-        
+        const batchSize = 10; // Procesar 10 empadronados a la vez
+
         for (let i = 0; i < empadronadosList.length; i += batchSize) {
           const lote = empadronadosList.slice(i, i + batchSize);
           const promesasLote = lote.map(async (emp) => {
             const pagosEmp = await obtenerPagosPorEmpadronado(emp.id);
             return { empId: emp.id, pagos: pagosEmp };
           });
-          
+
           const resultadosLote = await Promise.all(promesasLote);
           resultadosLote.forEach(({ empId, pagos }) => {
             pagosMap[empId] = pagos;
           });
-          
+
           // Actualizar estado parcialmente para mostrar progreso
-          setPagosEmpadronados(prev => ({ ...prev, ...pagosMap }));
-          
-          // Pequeña pausa para no bloquear la UI
+          setPagosEmpadronados((prev) => ({ ...prev, ...pagosMap }));
+
+          // Pequeña pausa
           if (i + batchSize < empadronadosList.length) {
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await new Promise((resolve) => setTimeout(resolve, 5));
           }
         }
-        
+
         setLoadingPagos(false);
         return pagosMap;
       };
 
-      // Cargar pagos en background sin bloquear la UI
+      // Cargar pagos en background
       const pagosMap = await cargarPagosEnLotes();
 
-      // --- KPI UI basados en vencimientos (no dependemos solo del estado "moroso") ---
+      // KPI inicial (se actualizarán en vivo con el useEffect de abajo)
       let deudaPendiente = 0;
       const morososSet = new Set<string>();
-
       Object.entries(pagosMap).forEach(([empId, arr]) => {
         let tieneMoroso = false;
         for (const p of arr) {
           const moroso = esMorosoUI(p);
           if (moroso) tieneMoroso = true;
-
-          // Deuda pendiente = sumamos montos de pendientes o morosos (vencidos o no)
           if (p.estado === "pendiente" || moroso) deudaPendiente += Number(p.monto || 0);
         }
         if (tieneMoroso) morososSet.add(empId);
@@ -256,9 +308,9 @@ const Cobranzas = () => {
 
       const statsAjustadas: EstadisticasCobranzas = {
         totalEmpadronados: stats.totalEmpadronados,
-        totalRecaudado: stats.totalRecaudado,   // mes actual
-        totalPendiente: deudaPendiente,        // acumulado todos los periodos
-        totalMorosos: morososSet.size,         // asociados con al menos un periodo moroso
+        totalRecaudado: stats.totalRecaudado, // mes actual
+        totalPendiente: deudaPendiente,       // acumulado
+        totalMorosos: morososSet.size,        // socios con periodo moroso
         tasaCobranza: stats.tasaCobranza,
         ingresosMes: stats.ingresosMes,
         egresosMes: stats.egresosMes,
@@ -318,6 +370,12 @@ const Cobranzas = () => {
     }
   });
 
+  /* 🔁 Ajuste automático de KPIs cuando se actualiza pagosEmpadronados */
+  useEffect(() => {
+    if (!estadisticas) return;
+    const { totalPendiente, totalMorosos } = recomputeKPIsFromMap(pagosEmpadronados);
+    setEstadisticas(prev => (prev ? { ...prev, totalPendiente, totalMorosos } : prev));
+  }, [pagosEmpadronados]); // importante
 
   if (loading) {
     return (
@@ -372,7 +430,7 @@ const Cobranzas = () => {
           </div>
         </div>
 
-        {/* Estadísticas (cards clicables para filtrar) */}
+        {/* Estadísticas */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card
             className="border-success/20 bg-success/5 cursor-pointer"
@@ -487,15 +545,17 @@ const Cobranzas = () => {
 
         {/* Contenido Principal */}
         <Tabs defaultValue="empadronados" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          {/* Opción A: 6 columnas y trigger de Egresos */}
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="empadronados">Asociados</TabsTrigger>
             <TabsTrigger value="pagos">Pagos Recientes</TabsTrigger>
             <TabsTrigger value="masivos">Pagos Masivos</TabsTrigger>
             <TabsTrigger value="economia">Bandeja Economía</TabsTrigger>
+            <TabsTrigger value="egresos">Egresos</TabsTrigger>
             <TabsTrigger value="configuracion">Configuración</TabsTrigger>
           </TabsList>
 
-            <TabsContent value="empadronados">
+          <TabsContent value="empadronados">
             <Card>
               <div className="p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -518,11 +578,8 @@ const Cobranzas = () => {
                   ) : (
                     <div className="grid gap-4">
                       {empadronadosFiltrados.map((emp) => {
-                        const deudaTotal = calcularDeudaTotal(emp.id);
-                        const estado = obtenerEstadoEmpadronado(emp.id);
-                        const cantidadPagos = pagosEmpadronados[emp.id]?.length || 0;
-                        const tienePagosDetalle = !!pagosEmpadronados[emp.id];
-
+                        // const deudaTotal = calcularDeudaTotal(emp.id);
+                        // const estado = obtenerEstadoEmpadronado(emp.id);
                         return (
                           <div
                             key={emp.id}
@@ -539,32 +596,8 @@ const Cobranzas = () => {
                             </div>
 
                             <div className="flex items-center space-x-3">
-                              <div className="text-right">
-                                {tienePagosDetalle ? (
-                                  <>
-                                    <p className="text-sm font-medium">Deuda Total: S/ {deudaTotal.toFixed(2)}</p>
-                                    <p className="text-xs text-muted-foreground">{cantidadPagos} pagos generados</p>
-                                  </>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <DollarSign className="h-3 w-3 animate-spin" />
-                                    Cargando detalles...
-                                  </div>
-                                )}
-                              </div>
-
-                              <Badge
-                                variant={
-                                  !tienePagosDetalle ? "outline" :
-                                  estado === "al_dia"
-                                    ? "default"
-                                    : estado === "moroso"
-                                    ? "destructive"
-                                    : "secondary"
-                                }
-                              >
-                                {estado === "al_dia" ? "Al día" : estado === "moroso" ? "Moroso" : "Pendiente"}
-                              </Badge>
+                              {/* Deuda oficial */}
+                              <DebtInline emp={emp} />
 
                               <Button
                                 variant="outline"
@@ -694,10 +727,10 @@ const Cobranzas = () => {
                         </div>
                         <Switch
                           checked={configuracion.sistemaQuincenas ?? true}
-                          onCheckedChange={(checked) => actualizarCampoConfig('sistemaQuincenas', checked)}
+                          onCheckedChange={(checked) => actualizarCampoConfig("sistemaQuincenas", checked)}
                         />
                       </div>
-                      
+
                       {configuracion.sistemaQuincenas && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -707,26 +740,22 @@ const Cobranzas = () => {
                               type="number"
                               step="0.01"
                               value={configuracion.montoQuincenal ?? configuracion.montoMensual / 2}
-                              onChange={(e) => actualizarCampoConfig('montoQuincenal', parseFloat(e.target.value) || 0)}
+                              onChange={(e) => actualizarCampoConfig("montoQuincenal", parseFloat(e.target.value) || 0)}
                               placeholder="25.00"
                             />
                             <p className="text-xs text-muted-foreground">
                               Monto que se cobrará por cada quincena
                             </p>
                           </div>
-                          
+
                           <div className="flex items-end">
-                            <Button 
-                              onClick={generarPagosQuincenas}
-                              disabled={loading}
-                              className="w-full"
-                            >
+                            <Button onClick={generarPagosQuincenas} disabled={loading} className="w-full">
                               {loading ? "Generando..." : "Generar Pagos por Quincenas"}
                             </Button>
                           </div>
                         </div>
                       )}
-                      
+
                       <div className="text-xs text-muted-foreground space-y-1">
                         <p><strong>Reglas:</strong></p>
                         <p>• Si ingreso antes del 15/01/2025: cobrar desde 15/01/2025</p>
@@ -735,159 +764,159 @@ const Cobranzas = () => {
                         <p>• Solo se cobran quincenas concluidas (1ª cierra día 14, 2ª cierra último día del mes)</p>
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Monto Mensual */}
-                    <div className="space-y-2">
-                      <Label htmlFor="montoMensual">Monto Mensual (S/)</Label>
-                      <Input
-                        id="montoMensual"
-                        type="number"
-                        step="0.01"
-                        value={configuracion.montoMensual}
-                        onChange={(e) => actualizarCampoConfig('montoMensual', parseFloat(e.target.value) || 0)}
-                        placeholder="50.00"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Cuota mensual que se cobrará a cada asociado (sistema legacy)
-                      </p>
-                    </div>
+                      {/* Monto Mensual */}
+                      <div className="space-y-2">
+                        <Label htmlFor="montoMensual">Monto Mensual (S/)</Label>
+                        <Input
+                          id="montoMensual"
+                          type="number"
+                          step="0.01"
+                          value={configuracion.montoMensual}
+                          onChange={(e) => actualizarCampoConfig("montoMensual", parseFloat(e.target.value) || 0)}
+                          placeholder="50.00"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Cuota mensual que se cobrará a cada asociado (sistema legacy)
+                        </p>
+                      </div>
 
-                    {/* Día de Cierre */}
-                    <div className="space-y-2">
-                      <Label htmlFor="diaCierre">Día de Cierre del Mes</Label>
-                      <Input
-                        id="diaCierre"
-                        type="number"
-                        min="1"
-                        max="28"
-                        value={configuracion.diaCierre}
-                        onChange={(e) => actualizarCampoConfig('diaCierre', parseInt(e.target.value) || 15)}
-                        placeholder="15"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Día del mes en que se ejecuta el cierre mensual
-                      </p>
-                    </div>
+                      {/* Día de Cierre */}
+                      <div className="space-y-2">
+                        <Label htmlFor="diaCierre">Día de Cierre del Mes</Label>
+                        <Input
+                          id="diaCierre"
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={configuracion.diaCierre}
+                          onChange={(e) => actualizarCampoConfig("diaCierre", parseInt(e.target.value) || 15)}
+                          placeholder="15"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Día del mes en que se ejecuta el cierre mensual
+                        </p>
+                      </div>
 
-                    {/* Día de Vencimiento */}
-                    <div className="space-y-2">
-                      <Label htmlFor="diaVencimiento">Día de Vencimiento</Label>
-                      <Input
-                        id="diaVencimiento"
-                        type="number"
-                        min="1"
-                        max="31"
-                        value={configuracion.diaVencimiento}
-                        onChange={(e) => actualizarCampoConfig('diaVencimiento', parseInt(e.target.value) || 15)}
-                        placeholder="15"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Día del mes en que vencen los pagos
-                      </p>
-                    </div>
+                      {/* Día de Vencimiento */}
+                      <div className="space-y-2">
+                        <Label htmlFor="diaVencimiento">Día de Vencimiento</Label>
+                        <Input
+                          id="diaVencimiento"
+                          type="number"
+                          min="1"
+                          max="31"
+                          value={configuracion.diaVencimiento}
+                          onChange={(e) => actualizarCampoConfig("diaVencimiento", parseInt(e.target.value) || 15)}
+                          placeholder="15"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Día del mes en que vencen los pagos
+                        </p>
+                      </div>
 
-                    {/* Días para Pronto Pago */}
-                    <div className="space-y-2">
-                      <Label htmlFor="diasProntoPago">Días para Pronto Pago</Label>
-                      <Input
-                        id="diasProntoPago"
-                        type="number"
-                        min="1"
-                        max="15"
-                        value={configuracion.diasProntoPago}
-                        onChange={(e) => actualizarCampoConfig('diasProntoPago', parseInt(e.target.value) || 3)}
-                        placeholder="3"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Días desde inicio del mes para aplicar descuento por pronto pago
-                      </p>
-                    </div>
+                      {/* Días para Pronto Pago */}
+                      <div className="space-y-2">
+                        <Label htmlFor="diasProntoPago">Días para Pronto Pago</Label>
+                        <Input
+                          id="diasProntoPago"
+                          type="number"
+                          min="1"
+                          max="15"
+                          value={configuracion.diasProntoPago}
+                          onChange={(e) => actualizarCampoConfig("diasProntoPago", parseInt(e.target.value) || 3)}
+                          placeholder="3"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Días desde inicio del mes para aplicar descuento por pronto pago
+                        </p>
+                      </div>
 
-                    {/* Porcentaje Pronto Pago */}
-                    <div className="space-y-2">
-                      <Label htmlFor="porcentajeProntoPago">Descuento Pronto Pago (%)</Label>
-                      <Input
-                        id="porcentajeProntoPago"
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="50"
-                        value={configuracion.porcentajeProntoPago}
-                        onChange={(e) => actualizarCampoConfig('porcentajeProntoPago', parseFloat(e.target.value) || 0)}
-                        placeholder="5.0"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Porcentaje de descuento para pagos por pronto pago
-                      </p>
-                    </div>
+                      {/* Porcentaje Pronto Pago */}
+                      <div className="space-y-2">
+                        <Label htmlFor="porcentajeProntoPago">Descuento Pronto Pago (%)</Label>
+                        <Input
+                          id="porcentajeProntoPago"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="50"
+                          value={configuracion.porcentajeProntoPago}
+                          onChange={(e) => actualizarCampoConfig("porcentajeProntoPago", parseFloat(e.target.value) || 0)}
+                          placeholder="5.0"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Porcentaje de descuento para pagos por pronto pago
+                        </p>
+                      </div>
 
-                    {/* Porcentaje Morosidad */}
-                    <div className="space-y-2">
-                      <Label htmlFor="porcentajeMorosidad">Recargo por Morosidad (%)</Label>
-                      <Input
-                        id="porcentajeMorosidad"
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="100"
-                        value={configuracion.porcentajeMorosidad}
-                        onChange={(e) => actualizarCampoConfig('porcentajeMorosidad', parseFloat(e.target.value) || 0)}
-                        placeholder="10.0"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Porcentaje de recargo para pagos vencidos
-                      </p>
-                    </div>
+                      {/* Porcentaje Morosidad */}
+                      <div className="space-y-2">
+                        <Label htmlFor="porcentajeMorosidad">Recargo por Morosidad (%)</Label>
+                        <Input
+                          id="porcentajeMorosidad"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={configuracion.porcentajeMorosidad}
+                          onChange={(e) => actualizarCampoConfig("porcentajeMorosidad", parseFloat(e.target.value) || 0)}
+                          placeholder="10.0"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Porcentaje de recargo para pagos vencidos
+                        </p>
+                      </div>
 
-                    {/* Porcentaje Sanción */}
-                    <div className="space-y-2">
-                      <Label htmlFor="porcentajeSancion">Recargo por Sanción (%)</Label>
-                      <Input
-                        id="porcentajeSancion"
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="100"
-                        value={configuracion.porcentajeSancion}
-                        onChange={(e) => actualizarCampoConfig('porcentajeSancion', parseFloat(e.target.value) || 0)}
-                        placeholder="15.0"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Porcentaje de recargo por sanciones aplicadas
-                      </p>
-                    </div>
+                      {/* Porcentaje Sanción */}
+                      <div className="space-y-2">
+                        <Label htmlFor="porcentajeSancion">Recargo por Sanción (%)</Label>
+                        <Input
+                          id="porcentajeSancion"
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          value={configuracion.porcentajeSancion}
+                          onChange={(e) => actualizarCampoConfig("porcentajeSancion", parseFloat(e.target.value) || 0)}
+                          placeholder="15.0"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Porcentaje de recargo por sanciones aplicadas
+                        </p>
+                      </div>
 
-                    {/* Serie de Comprobantes */}
-                    <div className="space-y-2">
-                      <Label htmlFor="serieComprobantes">Serie de Comprobantes</Label>
-                      <Input
-                        id="serieComprobantes"
-                        type="text"
-                        value={configuracion.serieComprobantes}
-                        onChange={(e) => actualizarCampoConfig('serieComprobantes', e.target.value)}
-                        placeholder="B001"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Serie para generar comprobantes de pago
-                      </p>
-                    </div>
+                      {/* Serie de Comprobantes */}
+                      <div className="space-y-2">
+                        <Label htmlFor="serieComprobantes">Serie de Comprobantes</Label>
+                        <Input
+                          id="serieComprobantes"
+                          type="text"
+                          value={configuracion.serieComprobantes}
+                          onChange={(e) => actualizarCampoConfig("serieComprobantes", e.target.value)}
+                          placeholder="B001"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Serie para generar comprobantes de pago
+                        </p>
+                      </div>
 
-                    {/* Sede */}
-                    <div className="space-y-2">
-                      <Label htmlFor="sede">Sede</Label>
-                      <Input
-                        id="sede"
-                        type="text"
-                        value={configuracion.sede}
-                        onChange={(e) => actualizarCampoConfig('sede', e.target.value)}
-                        placeholder="Sede Principal"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Nombre de la sede de la organización
-                      </p>
+                      {/* Sede */}
+                      <div className="space-y-2">
+                        <Label htmlFor="sede">Sede</Label>
+                        <Input
+                          id="sede"
+                          type="text"
+                          value={configuracion.sede}
+                          onChange={(e) => actualizarCampoConfig("sede", e.target.value)}
+                          placeholder="Sede Principal"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Nombre de la sede de la organización
+                        </p>
+                      </div>
                     </div>
-                  </div>
                   </div>
                 )}
 

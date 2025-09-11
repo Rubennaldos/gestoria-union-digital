@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,10 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Receipt, CreditCard, FileText, User, Link2, Copy } from "lucide-react";
 import { Empadronado } from "@/types/empadronados";
 import { Pago, MetodoPago } from "@/types/cobranzas";
-import { getMemberDebtSummary } from "@/hooks/useFirebase";
 import { toast } from "sonner";
 
-// ⬇️ NUEVO: config viva + cálculo de deuda
 import { useBillingConfig } from "@/contexts/BillingConfigContext";
 import { calcularDeuda } from "@/lib/cobranzas/debt";
 
@@ -21,54 +19,50 @@ interface DetalleEmpadronadoModalProps {
   onRegistrarPago: (pago: Pago) => void;
 }
 
-export const DetalleEmpadronadoModal = ({ 
-  open, 
-  onOpenChange, 
-  empadronado, 
-  onRegistrarPago 
+export const DetalleEmpadronadoModal = ({
+  open,
+  onOpenChange,
+  empadronado,
+  onRegistrarPago,
 }: DetalleEmpadronadoModalProps) => {
-  const [deudaData, setDeudaData] = useState<{
-    total: number;
-    moroso: boolean;
-    items: Array<{periodo: string; saldo: number; estado: string}>;
-  }>({ total: 0, moroso: false, items: [] });
-
+  const cfg = useBillingConfig();
   const [loading, setLoading] = useState(false);
 
-  // ⬇️ NUEVO: lee config centralizada
-  const cfg = useBillingConfig();
+  // 1) Deuda oficial según reglas (independiente del shape de retorno)
+  const deudaCalc = useMemo(() => {
+    if (!empadronado) return { monto: 0, quincenas: 0 } as any;
+    const fechaIngresoISO = ensureISO((empadronado as any).fechaIngreso);
+    // No imponemos tipo fuerte aquí para ser compatibles con tu debt.ts actual
+    return calcularDeuda({ fechaIngresoISO }, cfg) as any;
+  }, [empadronado, cfg]);
 
-  // ⬇️ NUEVO: calcula deuda “oficial” según reglas (para el header)
-  const deudaCalc = (() => {
-    if (!empadronado) return { monto: 0, quincenas: 0, detalle: "" };
-    const fechaIngresoISO = ensureISO(empadronado.fechaIngreso as any);
-    return calcularDeuda({ fechaIngresoISO }, cfg);
-  })();
+  // 2) Adaptador de forma: usa breakdown|items|detalle (el que exista)
+  const deudaItems = useMemo(() => {
+    const raw: any[] =
+      (deudaCalc && (deudaCalc.breakdown || deudaCalc.items || deudaCalc.detalle)) || [];
+
+    // Normalizamos a la forma que pinta la UI
+    return raw.map((b: any) => ({
+      periodo: String(b.periodo ?? b.period ?? b.mes ?? ""), // "YYYY-MM"
+      saldo: Number(b.monto ?? b.importe ?? 0),
+      estado: b.vencido ? "moroso" : "pendiente",
+    }));
+  }, [deudaCalc]);
 
   useEffect(() => {
-    if (empadronado && open) {
-      cargarDeuda();
+    if (open && empadronado) {
+      setLoading(true);
+      const t = setTimeout(() => setLoading(false), 100);
+      return () => clearTimeout(t);
     }
-  }, [empadronado, open]);
+  }, [open, empadronado]);
 
-  const cargarDeuda = async () => {
-    if (!empadronado) return;
-    setLoading(true);
-    try {
-      // Mantengo tu resumen por periodo para el detalle de abajo
-      const resumen = await getMemberDebtSummary(empadronado.id);
-      setDeudaData(resumen);
-    } catch (error) {
-      console.error("Error cargando deuda:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!empadronado) return null;
 
-  const generarLinkCompartir = () => {
-    if (!empadronado) return "";
-    return `${window.location.origin}/consulta-deuda?dni=${empadronado.dni}&padron=${empadronado.numeroPadron}`;
-  };
+  const esMoroso = Number(deudaCalc?.quincenas ?? 0) > 0;
+
+  const generarLinkCompartir = () =>
+    `${window.location.origin}/consulta-deuda?dni=${empadronado.dni}&padron=${empadronado.numeroPadron}`;
 
   const copiarLink = () => {
     navigator.clipboard.writeText(generarLinkCompartir());
@@ -79,14 +73,14 @@ export const DetalleEmpadronadoModal = ({
     const [year, month] = periodo.split("-").map(Number);
     const pagoData: Pago = {
       id: "",
-      empadronadoId: empadronado!.id,
-      numeroPadron: empadronado!.numeroPadron,
+      empadronadoId: empadronado.id,
+      numeroPadron: empadronado.numeroPadron,
       año: year,
       mes: month,
-      monto: monto,
+      monto,
       montoOriginal: monto,
       estado: "pendiente",
-      fechaVencimiento: "15/" + String(month).padStart(2, "0") + "/" + year,
+      fechaVencimiento: `${String(cfg.vencimientoDia).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`,
       metodoPago: "efectivo" as MetodoPago,
       descuentos: [],
       recargos: [],
@@ -96,10 +90,6 @@ export const DetalleEmpadronadoModal = ({
     };
     onRegistrarPago(pagoData);
   };
-
-  if (!empadronado) return null;
-
-  const esMoroso = deudaCalc.quincenas > 0; // ⬅️ NUEVO
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,13 +125,11 @@ export const DetalleEmpadronadoModal = ({
               <div>
                 <p className="text-sm text-muted-foreground">Ubicación</p>
                 <p className="font-medium">
-                  {empadronado.manzana && empadronado.lote
-                    ? `Mz. ${empadronado.manzana} Lt. ${empadronado.lote}`
-                    : "No especificada"}
+                  {empadronado.manzana && empadronado.lote ? `Mz. ${empadronado.manzana} Lt. ${empadronado.lote}` : "No especificada"}
                 </p>
               </div>
 
-              {/* ⬇️ NUEVO: Estado con las reglas actuales */}
+              {/* Estado según lógica oficial */}
               <div>
                 <p className="text-sm text-muted-foreground">Estado</p>
                 <div className="flex gap-2">
@@ -154,15 +142,11 @@ export const DetalleEmpadronadoModal = ({
                 </div>
               </div>
 
-              {/* ⬇️ NUEVO: Total calculado con la config viva */}
+              {/* Total oficial */}
               <div>
                 <p className="text-sm text-muted-foreground">Deuda Total</p>
-                <p
-                  className={`font-bold text-lg ${
-                    deudaCalc.monto > 0 ? "text-destructive" : "text-green-600"
-                  }`}
-                >
-                  S/ {deudaCalc.monto.toFixed(2)}
+                <p className={`font-bold text-lg ${Number(deudaCalc?.monto ?? 0) > 0 ? "text-destructive" : "text-green-600"}`}>
+                  S/ {Number(deudaCalc?.monto ?? 0).toFixed(2)}
                 </p>
               </div>
             </CardContent>
@@ -195,7 +179,7 @@ export const DetalleEmpadronadoModal = ({
             </CardContent>
           </Card>
 
-          {/* Tabs de contenido */}
+          {/* Tabs */}
           <Tabs defaultValue="deuda">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="deuda">Estado de Cuenta</TabsTrigger>
@@ -205,9 +189,7 @@ export const DetalleEmpadronadoModal = ({
             <TabsContent value="deuda" className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Estado de Cuenta</h3>
-                <p className="text-sm text-muted-foreground">
-                  Total de periodos: {deudaData.items.length}
-                </p>
+                <p className="text-sm text-muted-foreground">Total de periodos: {deudaItems.length}</p>
               </div>
 
               {loading ? (
@@ -215,7 +197,7 @@ export const DetalleEmpadronadoModal = ({
                   <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-spin" />
                   <p className="text-muted-foreground">Cargando estado de cuenta...</p>
                 </div>
-              ) : deudaData.items.length === 0 ? (
+              ) : deudaItems.length === 0 ? (
                 <div className="text-center py-8">
                   <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No hay deudas registradas</p>
@@ -223,26 +205,16 @@ export const DetalleEmpadronadoModal = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {deudaData.items.map((item, index) => {
-                    const [year, month] = item.periodo.split("-").map(Number);
-                    const fechaVenc = `15/${String(month).padStart(2, "0")}/${year}`;
+                  {deudaItems.map((item, index) => {
+                    const [year, month] = String(item.periodo).split("-").map(Number);
+                    const fechaVenc = `${String(cfg.vencimientoDia).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
 
                     return (
                       <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="font-medium">
-                              Periodo {String(month).padStart(2, "0")}/{year}
-                            </p>
-                            <Badge
-                              variant={
-                                item.estado === "pagado"
-                                  ? "default"
-                                  : item.estado === "moroso"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                            >
+                            <p className="font-medium">Periodo {String(month).padStart(2, "0")}/{year}</p>
+                            <Badge variant={item.estado === "moroso" ? "destructive" : "secondary"}>
                               {item.estado}
                             </Badge>
                           </div>
@@ -251,21 +223,15 @@ export const DetalleEmpadronadoModal = ({
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="text-right">
-                            <p className="font-bold">S/ {item.saldo.toFixed(2)}</p>
+                            <p className="font-bold">S/ {Number(item.saldo).toFixed(2)}</p>
                             {item.estado === "moroso" && (
                               <p className="text-xs text-destructive">Incluye recargo por morosidad</p>
                             )}
                           </div>
-                          {item.estado !== "pagado" && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleRegistrarPago(item.periodo, item.saldo)}
-                              className="ml-2"
-                            >
-                              <CreditCard className="h-4 w-4 mr-1" />
-                              Pagar
-                            </Button>
-                          )}
+                          <Button size="sm" onClick={() => handleRegistrarPago(item.periodo, item.saldo)} className="ml-2">
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pagar
+                          </Button>
                         </div>
                       </div>
                     );
