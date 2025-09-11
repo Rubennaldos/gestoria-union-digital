@@ -69,6 +69,7 @@ const Cobranzas = () => {
   const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [pagosEmpadronados, setPagosEmpadronados] = useState<Record<string, Pago[]>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingPagos, setLoadingPagos] = useState(false);
   const [autoInitHecho, setAutoInitHecho] = useState(false);
   const [configuracion, setConfiguracion] = useState<ConfiguracionCobranzas | null>(null);
   const [guardandoConfig, setGuardandoConfig] = useState(false);
@@ -141,6 +142,7 @@ const Cobranzas = () => {
     try {
       setLoading(true);
 
+      // Cargar datos básicos primero (más rápido)
       const [stats, pagosList, egresosList, empadronadosList, config] = await Promise.all([
         generarEstadisticas(),
         obtenerPagos(),
@@ -150,10 +152,17 @@ const Cobranzas = () => {
       ]);
 
       setConfiguracion(config);
+      setPagos(pagosList.slice(0, 10));
+      setEgresos(egresosList.slice(0, 10));
+      setEmpadronados(empadronadosList);
+
+      // Mostrar interfaz rápidamente antes de cargar pagos detallados
+      setLoading(false);
 
       // Autogenera cargos desde enero si recién se instala
       if (!autoInitHecho && empadronadosList.length > 0 && pagosList.length === 0) {
         try {
+          setLoading(true);
           await generarPagosDesdeEnero(user?.uid || "system");
           setAutoInitHecho(true);
           toast({
@@ -166,20 +175,44 @@ const Cobranzas = () => {
           }
         } catch {
           // seguimos sin romper
+        } finally {
+          setLoading(false);
         }
       }
 
-      setPagos(pagosList.slice(0, 10));
-      setEgresos(egresosList.slice(0, 10));
-      setEmpadronados(empadronadosList);
+      // Cargar pagos por empadronado en lotes pequeños (lazy loading)
+      const cargarPagosEnLotes = async () => {
+        setLoadingPagos(true);
+        const pagosMap: Record<string, Pago[]> = {};
+        const batchSize = 10; // Procesar 10 empadronados a la vez (optimizado)
+        
+        for (let i = 0; i < empadronadosList.length; i += batchSize) {
+          const lote = empadronadosList.slice(i, i + batchSize);
+          const promesasLote = lote.map(async (emp) => {
+            const pagosEmp = await obtenerPagosPorEmpadronado(emp.id);
+            return { empId: emp.id, pagos: pagosEmp };
+          });
+          
+          const resultadosLote = await Promise.all(promesasLote);
+          resultadosLote.forEach(({ empId, pagos }) => {
+            pagosMap[empId] = pagos;
+          });
+          
+          // Actualizar estado parcialmente para mostrar progreso
+          setPagosEmpadronados(prev => ({ ...prev, ...pagosMap }));
+          
+          // Pequeña pausa para no bloquear la UI
+          if (i + batchSize < empadronadosList.length) {
+            await new Promise(resolve => setTimeout(resolve, 5));
+          }
+        }
+        
+        setLoadingPagos(false);
+        return pagosMap;
+      };
 
-      // Cargar pagos por empadronado y calcular KPI reales (morosos por vencimiento)
-      const pagosMap: Record<string, Pago[]> = {};
-      for (const emp of empadronadosList) {
-        const pagosEmp = await obtenerPagosPorEmpadronado(emp.id);
-        pagosMap[emp.id] = pagosEmp;
-      }
-      setPagosEmpadronados(pagosMap);
+      // Cargar pagos en background sin bloquear la UI
+      const pagosMap = await cargarPagosEnLotes();
 
       // --- KPI UI basados en vencimientos (no dependemos solo del estado "moroso") ---
       let deudaPendiente = 0;
@@ -215,7 +248,6 @@ const Cobranzas = () => {
         description: "No se pudieron cargar los datos de cobranzas",
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -439,12 +471,18 @@ const Cobranzas = () => {
             <TabsTrigger value="configuracion">Configuración</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="empadronados">
+            <TabsContent value="empadronados">
             <Card>
               <div className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <UserCheck className="h-5 w-5" />
                   <span className="font-semibold">Lista de Asociados y Estado de Pagos</span>
+                  {loadingPagos && (
+                    <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+                      <DollarSign className="h-4 w-4 animate-spin" />
+                      Cargando detalles de pagos...
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -459,6 +497,7 @@ const Cobranzas = () => {
                         const deudaTotal = calcularDeudaTotal(emp.id);
                         const estado = obtenerEstadoEmpadronado(emp.id);
                         const cantidadPagos = pagosEmpadronados[emp.id]?.length || 0;
+                        const tienePagosDetalle = !!pagosEmpadronados[emp.id];
 
                         return (
                           <div
@@ -477,12 +516,22 @@ const Cobranzas = () => {
 
                             <div className="flex items-center space-x-3">
                               <div className="text-right">
-                                <p className="text-sm font-medium">Deuda Total: S/ {deudaTotal.toFixed(2)}</p>
-                                <p className="text-xs text-muted-foreground">{cantidadPagos} pagos generados</p>
+                                {tienePagosDetalle ? (
+                                  <>
+                                    <p className="text-sm font-medium">Deuda Total: S/ {deudaTotal.toFixed(2)}</p>
+                                    <p className="text-xs text-muted-foreground">{cantidadPagos} pagos generados</p>
+                                  </>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                    <DollarSign className="h-3 w-3 animate-spin" />
+                                    Cargando detalles...
+                                  </div>
+                                )}
                               </div>
 
                               <Badge
                                 variant={
+                                  !tienePagosDetalle ? "outline" :
                                   estado === "al_dia"
                                     ? "default"
                                     : estado === "moroso"

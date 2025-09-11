@@ -232,6 +232,9 @@ export const crearPago = async (
   };
   await set(nuevoPagoRef, pago);
 
+  // Invalidar cache para forzar recarga
+  invalidarCachePagos();
+
   return nuevoPagoRef.key!;
 };
 
@@ -242,14 +245,26 @@ export const obtenerPagos = async (): Promise<Pago[]> => {
   return pagos.sort((a, b) => b.updatedAt - a.updatedAt);
 };
 
+// Cache para pagos ya consultados
+let pagosCacheGlobal: Pago[] | null = null;
+let ultimaActualizacionPagos = 0;
+
 export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise<Pago[]> => {
+  // Optimización: usar cache de pagos para evitar consultas repetidas
+  const ahora = Date.now();
+  if (!pagosCacheGlobal || ahora - ultimaActualizacionPagos > 30000) { // Cache por 30 segundos
+    pagosCacheGlobal = await obtenerPagos();
+    ultimaActualizacionPagos = ahora;
+  }
+
+  // Solo consultar charges para este empadronado específico
   const chargesRoot = ref(db, 'cobranzas/charges');
   const chargesSnap = await get(chargesRoot);
   if (!chargesSnap.exists()) return [];
 
   const periods = chargesSnap.val();
   const items: Pago[] = [];
-  const pagosEmp = (await obtenerPagos()).filter((p) => p.empadronadoId === empadronadoId);
+  const pagosEmp = pagosCacheGlobal.filter((p) => p.empadronadoId === empadronadoId);
 
   Object.keys(periods).forEach((yyyymm) => {
     const node = periods[yyyymm]?.[empadronadoId];
@@ -286,6 +301,12 @@ export const obtenerPagosPorEmpadronado = async (empadronadoId: string): Promise
   return items.sort((a, b) => b.año - a.año || b.mes - a.mes);
 };
 
+// Función para limpiar cache cuando se modifiquen pagos
+export const invalidarCachePagos = () => {
+  pagosCacheGlobal = null;
+  ultimaActualizacionPagos = 0;
+};
+
 export const actualizarPago = async (pagoId: string, updates: Partial<Pago>, userUid: string): Promise<void> => {
   const pagoRef = ref(db, `cobranzas/pagos/${pagoId}`);
   await update(pagoRef, {
@@ -293,6 +314,8 @@ export const actualizarPago = async (pagoId: string, updates: Partial<Pago>, use
     updatedAt: Date.now(),
     pagadoPor: userUid,
   });
+  // Invalidar cache para forzar recarga
+  invalidarCachePagos();
 };
 
 /* ──────────────────────────────────────────────────────────
