@@ -50,10 +50,12 @@ const isQuincenaCerrada = (year: number, month: number, quincena: 1 | 2, fechaRe
   // Si es el mes actual, verificar según la quincena
   if (year === añoActual && month === mesActual) {
     if (quincena === 1) {
-      return diaActual >= PRIMERA_QUINCENA_CIERRE; // Cierra el 14
+      // Primera quincena cierra el día 14
+      return diaActual > PRIMERA_QUINCENA_CIERRE; // Mayor a 14 (cerró el 14)
     } else {
+      // Segunda quincena cierra el último día del mes
       const ultimoDiaMes = getLastDayOfMonth(year, month);
-      return diaActual >= ultimoDiaMes; // Cierra el último día del mes
+      return diaActual > ultimoDiaMes; // Solo si ya pasó el último día
     }
   }
   
@@ -62,23 +64,34 @@ const isQuincenaCerrada = (year: number, month: number, quincena: 1 | 2, fechaRe
 
 // Calcular quincenas desde fecha de ingreso
 const calcularQuincenasDesdeIngreso = (fechaIngreso: string, fechaReferencia: Date = new Date()): { año: number, mes: number, quincena: 1 | 2 }[] => {
+  console.log(`🔍 Calculando quincenas - Fecha ingreso: ${fechaIngreso}, Fecha referencia: ${fechaReferencia.toLocaleDateString('es-ES')}`);
+  
   const [dia, mes, año] = fechaIngreso.split('/').map(Number);
   const fechaIngresoDate = new Date(año, mes - 1, dia);
   
   let fechaInicio: Date;
   
-  // Aplicar reglas de inicio
+  // Aplicar reglas de inicio según las especificaciones
   if (fechaIngresoDate < FECHA_CORTE_SISTEMA) {
-    // Si ingresó antes del corte, empezar desde 15/01/2025
-    fechaInicio = FECHA_CORTE_SISTEMA;
+    // Si ingresó antes del 15/01/2025, empezar desde el 15/01/2025
+    fechaInicio = new Date(2025, 0, 15); // 15/01/2025
+    console.log(`📅 Ingreso antes del corte (${fechaIngreso}) - Inicio desde: 15/01/2025`);
   } else {
-    // Si ingresó después del corte
+    // Si ingresó después o en el corte del sistema (≥ 15/01/2025)
     if (dia >= 1 && dia <= 14) {
       // Si ingresó en días 1-14, ese mes cuenta
       fechaInicio = new Date(año, mes - 1, 1);
+      console.log(`📅 Ingreso días 1-14 (${fechaIngreso}) - Inicio desde: 01/${mes.toString().padStart(2, '0')}/${año}`);
     } else {
       // Si ingresó en días 15+, empieza el mes siguiente
-      fechaInicio = new Date(año, mes, 1);
+      let siguienteMes = mes + 1;
+      let siguienteAño = año;
+      if (siguienteMes > 12) {
+        siguienteMes = 1;
+        siguienteAño++;
+      }
+      fechaInicio = new Date(siguienteAño, siguienteMes - 1, 1);
+      console.log(`📅 Ingreso días 15+ (${fechaIngreso}) - Inicio desde: 01/${siguienteMes.toString().padStart(2, '0')}/${siguienteAño}`);
     }
   }
   
@@ -90,20 +103,29 @@ const calcularQuincenasDesdeIngreso = (fechaIngreso: string, fechaReferencia: Da
     const añoActual = fechaActual.getFullYear();
     const mesActual = fechaActual.getMonth() + 1;
     
+    // Solo generar si el mes está completo o las quincenas están cerradas
+    
     // Primera quincena (1-14, cierra el 14)
     if (isQuincenaCerrada(añoActual, mesActual, 1, fechaReferencia)) {
       quincenas.push({ año: añoActual, mes: mesActual, quincena: 1 });
+      console.log(`✅ Quincena 1 cerrada: ${mesActual}/${añoActual}`);
+    } else {
+      console.log(`⏳ Quincena 1 aún no cerrada: ${mesActual}/${añoActual}`);
     }
     
     // Segunda quincena (15-último día, cierra el último día)
     if (isQuincenaCerrada(añoActual, mesActual, 2, fechaReferencia)) {
       quincenas.push({ año: añoActual, mes: mesActual, quincena: 2 });
+      console.log(`✅ Quincena 2 cerrada: ${mesActual}/${añoActual}`);
+    } else {
+      console.log(`⏳ Quincena 2 aún no cerrada: ${mesActual}/${añoActual}`);
     }
     
     // Avanzar al siguiente mes
     fechaActual.setMonth(fechaActual.getMonth() + 1);
   }
   
+  console.log(`📊 Total quincenas calculadas: ${quincenas.length}`, quincenas);
   return quincenas;
 };
 
@@ -197,10 +219,22 @@ export const generarPagosQuincenasEmpadronado = async (empadronado: Empadronado)
   }
 
   const cfg = await obtenerConfiguracion();
+  
+  // Si no está activado el sistema de quincenas, no generar
+  if (!cfg.sistemaQuincenas) {
+    console.log(`Sistema de quincenas desactivado para ${empadronado.id}`);
+    return 0;
+  }
+
   // Convertir timestamp a fecha DD/MM/YYYY
   const fechaIngresoStr = new Date(empadronado.fechaIngreso).toLocaleDateString('es-ES');
+  console.log(`Calculando quincenas para ${empadronado.numeroPadron} - Fecha ingreso: ${fechaIngresoStr}`);
+  
   const quincenas = calcularQuincenasDesdeIngreso(fechaIngresoStr, new Date());
-  const montoPorQuincena = cfg.montoMensual / 2; // S/ 25 por quincena si mensual es S/ 50
+  console.log(`Quincenas calculadas para ${empadronado.numeroPadron}:`, quincenas.length);
+  
+  // Usar el monto configurado para quincenas
+  const montoPorQuincena = cfg.montoQuincenal || (cfg.montoMensual / 2);
   
   let pagosCreados = 0;
 
@@ -220,7 +254,7 @@ export const generarPagosQuincenasEmpadronado = async (empadronado: Empadronado)
       añoVencimiento++;
     }
     
-    const fechaVencimiento = toEsDate(añoVencimiento, mesVencimiento, 15);
+    const fechaVencimiento = toEsDate(añoVencimiento, mesVencimiento, cfg.diaVencimiento);
 
     const nuevoPago: Pago = {
       id: pagoId,
@@ -234,7 +268,7 @@ export const generarPagosQuincenasEmpadronado = async (empadronado: Empadronado)
       fechaVencimiento,
       estado: 'pendiente',
       descuentos: [],
-      recargos: [],
+      recargos: [], // Sin recargos al crear - solo se aplican después de vencimiento
       createdAt: Date.now(),
       updatedAt: Date.now(),
       creadoPor: 'sistema'
@@ -242,26 +276,70 @@ export const generarPagosQuincenasEmpadronado = async (empadronado: Empadronado)
 
     await set(pagoRef, nuevoPago);
     pagosCreados++;
+    console.log(`Pago creado: ${pagoId} - Monto: S/ ${montoPorQuincena}`);
   }
 
+  console.log(`Total pagos creados para ${empadronado.numeroPadron}: ${pagosCreados}`);
   return pagosCreados;
 };
 
+// Limpiar pagos incorrectos de quincenas (que tengan recargos o montos incorrectos)
+export const limpiarPagosQuincenasIncorrectos = async (): Promise<number> => {
+  const cfg = await obtenerConfiguracion();
+  const pagosRef = ref(db, 'cobranzas/pagos');
+  const snapshot = await get(pagosRef);
+  
+  if (!snapshot.exists()) return 0;
+  
+  const pagos = snapshot.val();
+  let pagosEliminados = 0;
+  
+  for (const [pagoId, pago] of Object.entries(pagos)) {
+    const p = pago as Pago;
+    
+    // Eliminar pagos de quincenas que tengan recargos al momento de creación
+    // o montos incorrectos
+    if (p.quincena && (
+      (p.recargos && p.recargos.length > 0) || // Tiene recargos incorrectos
+      p.monto !== (cfg.montoQuincenal || cfg.montoMensual / 2) || // Monto incorrecto
+      p.estado === 'moroso' // Estado incorrecto al crear
+    )) {
+      await remove(ref(db, `cobranzas/pagos/${pagoId}`));
+      pagosEliminados++;
+      console.log(`🗑️ Eliminado pago incorrecto: ${pagoId}`);
+    }
+  }
+  
+  return pagosEliminados;
+};
+
 // Generar pagos para todos los empadronados activos
-export const generarPagosQuincenasTodos = async (): Promise<{ procesados: number; pagosCreados: number }> => {
+export const generarPagosQuincenasTodos = async (): Promise<{ procesados: number; pagosCreados: number; pagosLimpiados: number }> => {
+  console.log('🚀 Iniciando generación masiva de pagos de quincenas...');
+  
+  // Primero limpiar pagos incorrectos
+  const pagosLimpiados = await limpiarPagosQuincenasIncorrectos();
+  console.log(`🧹 Pagos limpiados: ${pagosLimpiados}`);
+  
   const empadronados = await obtenerEmpadronados();
-  const activos = empadronados.filter(emp => emp?.habilitado !== false);
+  const activos = empadronados.filter(emp => emp?.habilitado !== false && emp?.fechaIngreso);
+  
+  console.log(`👥 Empadronados activos a procesar: ${activos.length}`);
   
   let totalPagosCreados = 0;
   
   for (const empadronado of activos) {
+    console.log(`\n📋 Procesando: ${empadronado.numeroPadron} - ${empadronado.nombre} ${empadronado.apellidos}`);
     const pagosCreados = await generarPagosQuincenasEmpadronado(empadronado);
     totalPagosCreados += pagosCreados;
   }
   
+  console.log(`\n✅ Proceso completado - Total pagos creados: ${totalPagosCreados}`);
+  
   return {
     procesados: activos.length,
-    pagosCreados: totalPagosCreados
+    pagosCreados: totalPagosCreados,
+    pagosLimpiados
   };
 };
 

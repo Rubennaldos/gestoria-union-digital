@@ -142,7 +142,7 @@ const Cobranzas = () => {
       const resultado = await generarPagosQuincenasTodos();
       toast({
         title: "✅ Pagos de Quincenas Generados",
-        description: `Se procesaron ${resultado.procesados} empadronados y se crearon ${resultado.pagosCreados} pagos de quincenas según las reglas establecidas.`,
+        description: `Se procesaron ${resultado.procesados} empadronados, se crearon ${resultado.pagosCreados} pagos nuevos y se limpiaron ${resultado.pagosLimpiados} pagos incorrectos.`,
       });
       await cargarDatos(true);
     } catch (error) {
