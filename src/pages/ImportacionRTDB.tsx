@@ -153,10 +153,10 @@ const ImportacionRTDB: React.FC = () => {
           // Convertir a formato RTDB
           const empadronadoData = {
             id: persona.persona_id,
-            numeroPadron: persona.persona_id,
+            numeroPadron: persona.numero_padron || persona.persona_id,
             nombre: persona.nombres,
             apellidos: persona.apellidos,
-            dni: '', // No viene en el Excel, dejar vacío
+            dni: persona.dni || '', // Usar DNI del Excel si existe
             familia: `${persona.nombres} ${persona.apellidos}`,
             manzana: persona.manzana,
             lote: persona.lote,

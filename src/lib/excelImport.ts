@@ -11,6 +11,7 @@ export type PersonaRaw = {
   numero_padron: string;
   nombres: string;
   apellidos: string;
+  dni?: string; // Agregar DNI
   manzana: string;
   lote: string;
   etapa: string;
@@ -49,6 +50,7 @@ export type PersonaProcessed = {
   numero_padron: string;
   nombres: string;
   apellidos: string;
+  dni?: string; // Agregar DNI
   manzana: string;
   lote: string;
   etapa: string;
@@ -292,6 +294,7 @@ export const parseExcelFile = (fileBuffer: ArrayBuffer): {
         numero_padron: String(persona.numero_padron || '').trim(),
         nombres: String(persona.nombres || '').trim(),
         apellidos: String(persona.apellidos || '').trim(),
+        dni: String(persona.dni || '').trim(), // Agregar DNI desde el Excel
         manzana: String(persona.manzana || '').trim(),
         lote: String(persona.lote || '').trim(),
         etapa: String(persona.etapa || '').trim(),
@@ -334,6 +337,7 @@ export const generateTemplate = (): ArrayBuffer => {
       numero_padron: 'P001',
       nombres: 'Juan Carlos',
       apellidos: 'Pérez García',
+      dni: '12345678',
       manzana: 'A',
       lote: '15',
       etapa: '1',
@@ -351,6 +355,7 @@ export const generateTemplate = (): ArrayBuffer => {
       numero_padron: 'P002',
       nombres: 'María Elena',
       apellidos: 'Rodríguez López',
+      dni: '87654321',
       manzana: 'B',
       lote: '22',
       etapa: '2',
@@ -420,27 +425,30 @@ export const generateTemplate = (): ArrayBuffer => {
     ['   Vehiculos: persona_id, placa, tipo'],
     ['   MiembrosFamilia: persona_id, nombre, apellidos, parentesco, fecha_nac, menor'],
     [''],
-    ['3. MÚLTIPLES TERRENOS:'],
+    ['3. COLUMNAS OPCIONALES PERO RECOMENDADAS:'],
+    ['   Personas: dni (documento de identidad de 8 dígitos)'],
+    [''],
+    ['4. MÚLTIPLES TERRENOS:'],
     ['   - Un asociado puede tener hasta 3 terrenos'],
     ['   - Terreno 1: manzana, lote, etapa (obligatorios si tiene terreno)'],
     ['   - Terreno 2: manzana2, lote2, etapa2 (opcionales)'],
     ['   - Terreno 3: manzana3, lote3, etapa3 (opcionales)'],
     ['   - Dejar vacías las columnas adicionales si solo tiene un terreno'],
     [''],
-    ['4. FORMATOS ESPECIALES:'],
+    ['5. FORMATOS ESPECIALES:'],
     ['   - habilitado: SI/NO (SI=Puede usar servicios, NO=Suspendido por morosidad/sanciones)'],
     ['   - menor: SI/NO (se convierte a verdadero/falso)'],
     ['   - fecha_nac: DD/MM/YYYY (ej: 15/03/1985)'],
     ['   - tipo vehiculo: vehiculo, moto, etc.'],
     [''],
-    ['5. NOTAS IMPORTANTES:'],
+    ['6. NOTAS IMPORTANTES:'],
     ['   - persona_id debe ser único y aparecer en todas las hojas'],
     ['   - numero_padron es el # de padrón del asociado (puede ser igual al persona_id)'],
     ['   - Los campos vacíos son permitidos excepto los obligatorios'],
     ['   - Se eliminan espacios al inicio y final automáticamente'],
     ['   - Se eliminan teléfonos duplicados automáticamente'],
     [''],
-    ['6. EJEMPLOS DE DATOS:'],
+    ['7. EJEMPLOS DE DATOS:'],
     ['   Ver las otras hojas para ejemplos de formato correcto']
   ];
   
