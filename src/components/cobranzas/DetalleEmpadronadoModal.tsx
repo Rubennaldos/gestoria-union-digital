@@ -4,11 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Receipt, CreditCard, FileText, User, Download, Link2, Copy } from "lucide-react";
+import { Receipt, CreditCard, FileText, User, Link2, Copy } from "lucide-react";
 import { Empadronado } from "@/types/empadronados";
 import { Pago, MetodoPago } from "@/types/cobranzas";
 import { getMemberDebtSummary } from "@/hooks/useFirebase";
 import { toast } from "sonner";
+
+// ⬇️ NUEVO: config viva + cálculo de deuda
+import { useBillingConfig } from "@/contexts/BillingConfigContext";
+import { calcularDeuda } from "@/lib/cobranzas/debt";
 
 interface DetalleEmpadronadoModalProps {
   open: boolean;
@@ -23,8 +27,23 @@ export const DetalleEmpadronadoModal = ({
   empadronado, 
   onRegistrarPago 
 }: DetalleEmpadronadoModalProps) => {
-  const [deudaData, setDeudaData] = useState<{total: number; moroso: boolean; items: Array<{periodo: string; saldo: number; estado: string}>}>({total: 0, moroso: false, items: []});
+  const [deudaData, setDeudaData] = useState<{
+    total: number;
+    moroso: boolean;
+    items: Array<{periodo: string; saldo: number; estado: string}>;
+  }>({ total: 0, moroso: false, items: [] });
+
   const [loading, setLoading] = useState(false);
+
+  // ⬇️ NUEVO: lee config centralizada
+  const cfg = useBillingConfig();
+
+  // ⬇️ NUEVO: calcula deuda “oficial” según reglas (para el header)
+  const deudaCalc = (() => {
+    if (!empadronado) return { monto: 0, quincenas: 0, detalle: "" };
+    const fechaIngresoISO = ensureISO(empadronado.fechaIngreso as any);
+    return calcularDeuda({ fechaIngresoISO }, cfg);
+  })();
 
   useEffect(() => {
     if (empadronado && open) {
@@ -34,20 +53,20 @@ export const DetalleEmpadronadoModal = ({
 
   const cargarDeuda = async () => {
     if (!empadronado) return;
-    
     setLoading(true);
     try {
+      // Mantengo tu resumen por periodo para el detalle de abajo
       const resumen = await getMemberDebtSummary(empadronado.id);
       setDeudaData(resumen);
     } catch (error) {
-      console.error('Error cargando deuda:', error);
+      console.error("Error cargando deuda:", error);
     } finally {
       setLoading(false);
     }
   };
 
   const generarLinkCompartir = () => {
-    if (!empadronado) return '';
+    if (!empadronado) return "";
     return `${window.location.origin}/consulta-deuda?dni=${empadronado.dni}&padron=${empadronado.numeroPadron}`;
   };
 
@@ -57,28 +76,30 @@ export const DetalleEmpadronadoModal = ({
   };
 
   const handleRegistrarPago = (periodo: string, monto: number) => {
-    const [year, month] = periodo.split('-').map(Number);
+    const [year, month] = periodo.split("-").map(Number);
     const pagoData: Pago = {
-      id: '',
+      id: "",
       empadronadoId: empadronado!.id,
       numeroPadron: empadronado!.numeroPadron,
       año: year,
       mes: month,
       monto: monto,
       montoOriginal: monto,
-      estado: 'pendiente',
-      fechaVencimiento: '15/' + String(month).padStart(2, '0') + '/' + year,
-      metodoPago: 'efectivo' as MetodoPago,
+      estado: "pendiente",
+      fechaVencimiento: "15/" + String(month).padStart(2, "0") + "/" + year,
+      metodoPago: "efectivo" as MetodoPago,
       descuentos: [],
       recargos: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      creadoPor: 'admin'
+      creadoPor: "admin",
     };
     onRegistrarPago(pagoData);
   };
 
   if (!empadronado) return null;
+
+  const esMoroso = deudaCalc.quincenas > 0; // ⬅️ NUEVO
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -99,7 +120,9 @@ export const DetalleEmpadronadoModal = ({
             <CardContent className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Nombre Completo</p>
-                <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
+                <p className="font-medium">
+                  {empadronado.nombre} {empadronado.apellidos}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">DNI</p>
@@ -112,26 +135,34 @@ export const DetalleEmpadronadoModal = ({
               <div>
                 <p className="text-sm text-muted-foreground">Ubicación</p>
                 <p className="font-medium">
-                  {empadronado.manzana && empadronado.lote 
-                    ? `Mz. ${empadronado.manzana} Lt. ${empadronado.lote}` 
-                    : 'No especificada'}
+                  {empadronado.manzana && empadronado.lote
+                    ? `Mz. ${empadronado.manzana} Lt. ${empadronado.lote}`
+                    : "No especificada"}
                 </p>
               </div>
+
+              {/* ⬇️ NUEVO: Estado con las reglas actuales */}
               <div>
                 <p className="text-sm text-muted-foreground">Estado</p>
                 <div className="flex gap-2">
                   <Badge variant={empadronado.habilitado ? "default" : "secondary"}>
                     {empadronado.habilitado ? "Habilitado" : "No habilitado"}
                   </Badge>
-                  {deudaData.moroso && (
-                    <Badge variant="destructive">Moroso</Badge>
-                  )}
+                  <Badge variant={esMoroso ? "destructive" : "default"}>
+                    {esMoroso ? "Moroso" : "Al día"}
+                  </Badge>
                 </div>
               </div>
+
+              {/* ⬇️ NUEVO: Total calculado con la config viva */}
               <div>
                 <p className="text-sm text-muted-foreground">Deuda Total</p>
-                <p className={`font-bold text-lg ${deudaData.total > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                  S/ {deudaData.total.toFixed(2)}
+                <p
+                  className={`font-bold text-lg ${
+                    deudaCalc.monto > 0 ? "text-destructive" : "text-green-600"
+                  }`}
+                >
+                  S/ {deudaCalc.monto.toFixed(2)}
                 </p>
               </div>
             </CardContent>
@@ -147,10 +178,10 @@ export const DetalleEmpadronadoModal = ({
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                <input 
-                  type="text" 
-                  value={generarLinkCompartir()} 
-                  readOnly 
+                <input
+                  type="text"
+                  value={generarLinkCompartir()}
+                  readOnly
                   className="flex-1 p-2 border rounded text-sm bg-muted"
                 />
                 <Button onClick={copiarLink} variant="outline" size="sm">
@@ -193,43 +224,41 @@ export const DetalleEmpadronadoModal = ({
               ) : (
                 <div className="space-y-3">
                   {deudaData.items.map((item, index) => {
-                    const [year, month] = item.periodo.split('-').map(Number);
-                    const fechaVenc = `15/${String(month).padStart(2, '0')}/${year}`;
-                    
+                    const [year, month] = item.periodo.split("-").map(Number);
+                    const fechaVenc = `15/${String(month).padStart(2, "0")}/${year}`;
+
                     return (
                       <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-medium">
-                              Periodo {String(month).padStart(2, '0')}/{year}
+                              Periodo {String(month).padStart(2, "0")}/{year}
                             </p>
-                            <Badge variant={
-                              item.estado === 'pagado' ? 'default' : 
-                              item.estado === 'moroso' ? 'destructive' : 
-                              'secondary'
-                            }>
+                            <Badge
+                              variant={
+                                item.estado === "pagado"
+                                  ? "default"
+                                  : item.estado === "moroso"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                            >
                               {item.estado}
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            Vencimiento: {fechaVenc}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Cuota mensual
-                          </p>
+                          <p className="text-sm text-muted-foreground">Vencimiento: {fechaVenc}</p>
+                          <p className="text-xs text-muted-foreground">Cuota mensual</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="text-right">
                             <p className="font-bold">S/ {item.saldo.toFixed(2)}</p>
-                            {item.estado === 'moroso' && (
-                              <p className="text-xs text-destructive">
-                                Incluye recargo por morosidad
-                              </p>
+                            {item.estado === "moroso" && (
+                              <p className="text-xs text-destructive">Incluye recargo por morosidad</p>
                             )}
                           </div>
-                          {item.estado !== 'pagado' && (
-                            <Button 
-                              size="sm" 
+                          {item.estado !== "pagado" && (
+                            <Button
+                              size="sm"
                               onClick={() => handleRegistrarPago(item.periodo, item.saldo)}
                               className="ml-2"
                             >
@@ -253,7 +282,9 @@ export const DetalleEmpadronadoModal = ({
               <div className="text-center py-8">
                 <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">Funcionalidad en desarrollo</p>
-                <p className="text-sm text-muted-foreground">Los comprobantes se mostrarán aquí una vez que se implementen los pagos</p>
+                <p className="text-sm text-muted-foreground">
+                  Los comprobantes se mostrarán aquí una vez que se implementen los pagos
+                </p>
               </div>
             </TabsContent>
           </Tabs>
@@ -262,3 +293,16 @@ export const DetalleEmpadronadoModal = ({
     </Dialog>
   );
 };
+
+/** Asegura "YYYY-MM-DD" sin romper tus datos actuales */
+function ensureISO(v: string | number): string {
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (typeof v === "string" && /^\d{8}$/.test(v)) {
+    return `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}`;
+  }
+  if (typeof v === "number") {
+    const d = new Date(v);
+    return d.toISOString().slice(0, 10);
+  }
+  return new Date().toISOString().slice(0, 10);
+}
