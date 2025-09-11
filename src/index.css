@@ -3,31 +3,30 @@
 @tailwind utilities;
 
 /* Banking-style design system for Gestoria Union Digital */
-
 @layer base {
   :root {
     /* BCP Banking colors - Deep blue and orange */
-    --background: 0 0% 98%; /* Almost white */
-    --foreground: 220 26% 14%; /* Dark blue-gray */
+    --background: 0 0% 98%;             /* Almost white */
+    --foreground: 220 26% 14%;          /* Dark blue-gray */
 
     /* Card system */
-    --card: 0 0% 100%; /* Pure white */
+    --card: 0 0% 100%;                  /* Pure white */
     --card-foreground: 220 26% 14%;
     --card-hover: 210 40% 98%;
 
     /* Primary - BCP Deep Blue */
-    --primary: 220 91% 18%; /* Deep BCP blue */
+    --primary: 220 91% 18%;
     --primary-foreground: 0 0% 100%;
     --primary-hover: 220 91% 15%;
     --primary-light: 220 91% 85%;
 
     /* Secondary - Light blue tones */
-    --secondary: 220 60% 95%; /* Very light blue */
+    --secondary: 220 60% 95%;
     --secondary-foreground: 220 91% 18%;
     --secondary-hover: 220 60% 90%;
 
     /* BCP Orange accents */
-    --warning: 25 95% 53%; /* BCP orange */
+    --warning: 25 95% 53%;
     --warning-foreground: 0 0% 100%;
     --warning-light: 25 95% 94%;
 
@@ -58,9 +57,14 @@
     --nav-secondary: 220 26% 14%;
     --nav-accent: 25 95% 53%;
 
+    /* Popover (faltaban en :root) */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 26% 14%;
+
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(213 94% 19%), hsl(213 94% 16%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(248 250 252));
+    /* Corregido: HSL inválido -> usa RGB válido o un HSL real */
+    --gradient-card: linear-gradient(145deg, rgb(248 250 252), rgb(245 247 250));
     --gradient-alert: linear-gradient(135deg, hsl(32 95% 44%), hsl(32 95% 40%));
 
     /* Shadows */
@@ -73,20 +77,14 @@
 
     --radius: 0.75rem;
 
+    /* Sidebar palette */
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -118,6 +116,7 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -127,9 +126,7 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }

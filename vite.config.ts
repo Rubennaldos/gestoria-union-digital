@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  // 👇 clave: assets relativos en producción; absoluto en dev
+  // 👇 CLAVE: relativo en producción para que funcione en Lovable y en GitHub Pages
   base: mode === "production" ? "./" : "/",
   server: { host: "::", port: 8080 },
   build: { outDir: "dist", emptyOutDir: true, sourcemap: true },
