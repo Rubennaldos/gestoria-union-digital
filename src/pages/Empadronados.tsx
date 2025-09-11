@@ -17,6 +17,7 @@ import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye
 import { generateEmpadronadosTemplate } from '@/utils/excelTemplate';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
+import { ActualizacionMasivaModal } from '@/components/empadronados/ActualizacionMasivaModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthz } from '@/contexts/AuthzContext';
 import { createUserAndProfile } from '@/services/auth';
@@ -235,6 +236,7 @@ const Empadronados: React.FC = () => {
   const [modules, setModules] = useState<Module[]>([]);
   const [userPermissions, setUserPermissions] = useState<Permission>({});
   const [editingPermissions, setEditingPermissions] = useState(false);
+  const [actualizacionMasivaOpen, setActualizacionMasivaOpen] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -482,6 +484,13 @@ const Empadronados: React.FC = () => {
           >
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Descargar Template Excel
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setActualizacionMasivaOpen(true)}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Actualización Masiva
           </Button>
           <Button 
             variant="outline"
@@ -1158,6 +1167,13 @@ const Empadronados: React.FC = () => {
         onOpenChange={setGestionarPermisosOpen}
         empadronado={selectedEmpadronado}
         onAccountCreated={loadData}
+      />
+
+      {/* Modal de actualización masiva */}
+      <ActualizacionMasivaModal
+        open={actualizacionMasivaOpen}
+        onOpenChange={setActualizacionMasivaOpen}
+        onComplete={loadData}
       />
     </div>
   );
