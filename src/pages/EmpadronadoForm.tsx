@@ -100,6 +100,7 @@ const EmpadronadoForm: React.FC = () => {
     setLoadingData(true);
     try {
       const empadronado = await getEmpadronado(id);
+      console.log('Empadronado cargado:', empadronado); // Debug log
       if (empadronado) {
         setFormData({
           numeroPadron: empadronado.numeroPadron,
@@ -110,7 +111,9 @@ const EmpadronadoForm: React.FC = () => {
           miembrosFamilia: empadronado.miembrosFamilia || [],
           vehiculos: empadronado.vehiculos || [],
           habilitado: empadronado.habilitado,
-          telefonos: empadronado.telefonos || [{ numero: '' }],
+          telefonos: empadronado.telefonos && empadronado.telefonos.length > 0 
+            ? empadronado.telefonos 
+            : [{ numero: '' }],
           fechaIngreso: empadronado.fechaIngreso,
           manzana: empadronado.manzana || '',
           lote: empadronado.lote || '',
@@ -121,6 +124,7 @@ const EmpadronadoForm: React.FC = () => {
           cumpleanos: empadronado.cumpleanos,
           observaciones: empadronado.observaciones || ''
         });
+        console.log('Teléfonos cargados:', empadronado.telefonos); // Debug para teléfonos
       } else {
         toast({
           title: "Error",
@@ -173,7 +177,7 @@ const EmpadronadoForm: React.FC = () => {
     }
 
     // Validar datos de cuenta de usuario si está habilitada
-    if (createUserAccount && !isEditing) {
+    if (createUserAccount) {
       if (!userAccountData.email.trim()) newErrors.userEmail = 'El email es requerido para crear la cuenta';
       if (!userAccountData.password.trim()) newErrors.userPassword = 'La contraseña es requerida para crear la cuenta';
       if (userAccountData.password.length < 6) newErrors.userPassword = 'La contraseña debe tener al menos 6 caracteres';
@@ -259,8 +263,8 @@ const EmpadronadoForm: React.FC = () => {
         console.log('Empadronado creado con ID:', empadronadoId, 'Success:', success);
       }
 
-      // Si se creó el empadronado exitosamente y está habilitada la creación de cuenta
-      if (success && createUserAccount && !isEditing && empadronadoId) {
+      // Si se creó/actualizó el empadronado exitosamente y está habilitada la creación de cuenta
+      if (success && createUserAccount && empadronadoId) {
         try {
           console.log('Creando cuenta para empadronado:', empadronadoId, userAccountData);
           await createAccountForEmpadronado(empadronadoId, {
@@ -274,14 +278,16 @@ const EmpadronadoForm: React.FC = () => {
           
           toast({
             title: "Éxito",
-            description: "Empadronado y cuenta de usuario creados correctamente"
+            description: isEditing 
+              ? "Empadronado actualizado y cuenta de usuario creada correctamente"
+              : "Empadronado y cuenta de usuario creados correctamente"
           });
         } catch (userError: any) {
           console.error('Error creando cuenta de usuario:', userError);
           // El empadronado se creó pero la cuenta falló
           toast({
             title: "Advertencia",
-            description: `Empadronado creado, pero hubo un error al crear la cuenta de usuario: ${userError.message}`,
+            description: `${isEditing ? 'Empadronado actualizado' : 'Empadronado creado'}, pero hubo un error al crear la cuenta de usuario: ${userError.message}`,
             variant: "destructive"
           });
         }
@@ -796,138 +802,145 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Cuenta de Usuario - Solo para nuevos empadronados */}
-        {!isEditing && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Cuenta de Usuario del Sistema</CardTitle>
-              <CardDescription>Crear automáticamente una cuenta para que el asociado pueda acceder al sistema</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="createUserAccount"
-                  checked={createUserAccount}
-                  onCheckedChange={(checked) => {
-                    setCreateUserAccount(checked);
-                    if (!checked) {
-                      setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
-                      setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '' }));
-                      setShowPassword(false);
-                      setShowConfirm(false);
-                    }
-                  }}
-                />
-                <Label htmlFor="createUserAccount">Crear cuenta de acceso al sistema</Label>
-              </div>
+        {/* Cuenta de Usuario del Sistema */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Cuenta de Usuario del Sistema</CardTitle>
+            <CardDescription>
+              {isEditing 
+                ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
+                : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="createUserAccount"
+                checked={createUserAccount}
+                onCheckedChange={(checked) => {
+                  setCreateUserAccount(checked);
+                  if (!checked) {
+                    setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
+                    setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '' }));
+                    setShowPassword(false);
+                    setShowConfirm(false);
+                  }
+                }}
+              />
+              <Label htmlFor="createUserAccount">
+                {isEditing ? "Crear cuenta de acceso" : "Crear cuenta de acceso al sistema"}
+              </Label>
+            </div>
 
-              {createUserAccount && (
-                <div className="space-y-4 pt-4 border-t">
-                  {/* Email + Password */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="userEmail">Email de acceso *</Label>
-                      <Input
-                        id="userEmail"
-                        type="email"
-                        value={userAccountData.email}
-                        onChange={(e) => setUserAccountData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="juan.garcia@ejemplo.com"
-                      />
-                      {errors.userEmail && <p className="text-sm text-destructive mt-1">{errors.userEmail}</p>}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="userPassword">Contraseña *</Label>
-                      <div className="relative">
-                        <Input
-                          id="userPassword"
-                          type={showPassword ? 'text' : 'password'}
-                          value={userAccountData.password}
-                          onChange={(e) => setUserAccountData(prev => ({ ...prev, password: e.target.value }))}
-                          placeholder="Mínimo 6 caracteres"
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(v => !v)}
-                          className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
-                          aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.userPassword && <p className="text-sm text-destructive mt-1">{errors.userPassword}</p>}
-                    </div>
+            {createUserAccount && (
+              <div className="space-y-4 pt-4 border-t">
+                {/* Email + Password */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="userEmail">Email de acceso *</Label>
+                    <Input
+                      id="userEmail"
+                      type="email"
+                      value={userAccountData.email}
+                      onChange={(e) => setUserAccountData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="juan.garcia@ejemplo.com"
+                    />
+                    {errors.userEmail && <p className="text-sm text-destructive mt-1">{errors.userEmail}</p>}
                   </div>
 
-                  {/* Confirm + Username + Role */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="userPasswordConfirm">Confirmar contraseña *</Label>
-                      <div className="relative">
-                        <Input
-                          id="userPasswordConfirm"
-                          type={showConfirm ? 'text' : 'password'}
-                          value={userAccountData.confirmPassword}
-                          onChange={(e) => setUserAccountData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          placeholder="Repite la contraseña"
-                          className="pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirm(v => !v)}
-                          className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
-                          aria-label={showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'}
-                        >
-                          {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.userPasswordConfirm && <p className="text-sm text-destructive mt-1">{errors.userPasswordConfirm}</p>}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="username">Nombre de usuario (opcional)</Label>
+                  <div>
+                    <Label htmlFor="userPassword">Contraseña *</Label>
+                    <div className="relative">
                       <Input
-                        id="username"
-                        value={userAccountData.username}
-                        onChange={(e) => setUserAccountData(prev => ({ ...prev, username: e.target.value }))}
-                        placeholder="juan.garcia"
+                        id="userPassword"
+                        type={showPassword ? 'text' : 'password'}
+                        value={userAccountData.password}
+                        onChange={(e) => setUserAccountData(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Mínimo 6 caracteres"
+                        className="pr-10"
                       />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="roleId">Rol del usuario</Label>
-                      <Select 
-                        value={userAccountData.roleId} 
-                        onValueChange={(value) => setUserAccountData(prev => ({ ...prev, roleId: value }))}
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(v => !v)}
+                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {roles.map((role) => (
-                            <SelectItem key={role.id} value={role.id}>
-                              {role.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
-                  </div>
-
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-800">
-                      <strong>Información:</strong> Se creará automáticamente una cuenta de usuario vinculada a este empadronado. 
-                      El asociado podrá usar estas credenciales para acceder al Portal del Asociado y gestionar sus visitas, 
-                      pagos y demás servicios.
-                    </p>
+                    {errors.userPassword && <p className="text-sm text-destructive mt-1">{errors.userPassword}</p>}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+
+                {/* Confirm + Username + Role */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="userPasswordConfirm">Confirmar contraseña *</Label>
+                    <div className="relative">
+                      <Input
+                        id="userPasswordConfirm"
+                        type={showConfirm ? 'text' : 'password'}
+                        value={userAccountData.confirmPassword}
+                        onChange={(e) => setUserAccountData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        placeholder="Repite la contraseña"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirm(v => !v)}
+                        className="absolute inset-y-0 right-2 flex items-center text-muted-foreground"
+                        aria-label={showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'}
+                      >
+                        {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {errors.userPasswordConfirm && <p className="text-sm text-destructive mt-1">{errors.userPasswordConfirm}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="username">Nombre de usuario (opcional)</Label>
+                    <Input
+                      id="username"
+                      value={userAccountData.username}
+                      onChange={(e) => setUserAccountData(prev => ({ ...prev, username: e.target.value }))}
+                      placeholder="juan.garcia"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="roleId">Rol del usuario</Label>
+                    <Select 
+                      value={userAccountData.roleId} 
+                      onValueChange={(value) => setUserAccountData(prev => ({ ...prev, roleId: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <strong>Información:</strong> {isEditing 
+                      ? "Se creará una nueva cuenta de usuario vinculada a este empadronado existente."
+                      : "Se creará automáticamente una cuenta de usuario vinculada a este empadronado."
+                    } El asociado podrá usar estas credenciales para acceder al Portal del Asociado y gestionar sus visitas, 
+                    pagos y demás servicios.
+                  </p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Botones de acción */}
         <div className="flex gap-4 justify-end">

@@ -164,8 +164,10 @@ const ImportacionRTDB: React.FC = () => {
             habilitado: persona.habilitado,
             observaciones: persona.observaciones,
             
-            // Arrays de objetos
-            telefonos: persona.telefonos.map(tel => ({ numero: tel })),
+            // Arrays de objetos - asegurar que telefonos tenga formato correcto
+            telefonos: persona.telefonos && persona.telefonos.length > 0 
+              ? persona.telefonos.map(tel => ({ numero: tel }))
+              : [],
             vehiculos: persona.vehiculos.map(veh => ({ 
               placa: veh.placa, 
               tipo: veh.tipo 
