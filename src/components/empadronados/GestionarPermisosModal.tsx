@@ -90,59 +90,6 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
     }
   };
 
-  const createAccountAndSetPermissions = async () => {
-    if (!empadronado) return;
-    
-    setCreatingAccount(true);
-    try {
-      // Crear credenciales sugeridas
-      const baseUser = empadronado.numeroPadron?.trim()
-        ? `emp-${empadronado.numeroPadron.trim().toLowerCase()}`
-        : `emp-${empadronado.nombre.toLowerCase().replace(/\s+/g, '-')}`;
-      const email = `${baseUser}@jpusap.com`;
-      const password = (empadronado.dni && empadronado.dni.length >= 6) ? empadronado.dni : 'jpusap2024';
-
-      // Crear la cuenta
-      await createUserAndProfile({
-        displayName: `${empadronado.nombre} ${empadronado.apellidos}`,
-        email: email.trim().toLowerCase(),
-        username: baseUser.trim().toLowerCase(),
-        phone: empadronado.telefonos?.[0]?.numero || '',
-        roleId: 'asociado',
-        activo: true,
-        password,
-        empadronadoId: empadronado.id,
-        tipoUsuario: 'asociado'
-      });
-
-      toast({
-        title: "Cuenta creada",
-        description: "Se creó la cuenta. Configurando permisos..."
-      });
-
-      // Notificar al componente padre para recargar datos
-      if (onAccountCreated) {
-        onAccountCreated();
-      }
-
-      // Esperar un momento para que se actualicen los datos
-      setTimeout(async () => {
-        await loadData();
-      }, 1000);
-    } catch (error: any) {
-      const msg = String(error?.message || '');
-      let friendly = 'No se pudo crear el acceso.';
-      if (msg.includes('email-already-in-use')) friendly = 'El email ya está registrado.';
-      if (msg.includes('ya está en uso')) friendly = msg;
-      toast({
-        title: "Error",
-        description: friendly,
-        variant: "destructive"
-      });
-    } finally {
-      setCreatingAccount(false);
-    }
-  };
 
   if (!empadronado) return null;
 
@@ -180,17 +127,9 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
                   <KeyRound className="h-4 w-4 text-orange-600" />
                   <span className="text-sm font-medium text-orange-800">Cuenta requerida</span>
                 </div>
-                <p className="text-sm text-orange-700 mb-3">
-                  Para asignar permisos, primero debes crear una cuenta de acceso para este empadronado.
+                <p className="text-sm text-orange-700">
+                  Para asignar permisos, este empadronado debe tener una cuenta de acceso. Puedes crearla desde la sección "Cuenta de Usuario del Sistema" en el formulario de edición del empadronado.
                 </p>
-                <Button 
-                  size="sm" 
-                  onClick={createAccountAndSetPermissions}
-                  disabled={creatingAccount}
-                  className="bg-orange-600 hover:bg-orange-700"
-                >
-                  {creatingAccount ? 'Creando cuenta...' : 'Crear Cuenta de Acceso'}
-                </Button>
               </div>
             )}
             
