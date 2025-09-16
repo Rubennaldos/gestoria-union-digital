@@ -1,138 +1,141 @@
-import { ref, push, set, get, query, orderByChild, equalTo } from "firebase/database";
+import {
+  ref,
+  push,
+  set,
+  update,
+  get,
+  child,
+  serverTimestamp,
+  query,
+  orderByChild,
+  equalTo,
+} from "firebase/database";
 import { db } from "@/config/firebase";
-import { 
-  RegistroVisita, 
-  RegistroTrabajadores, 
-  RegistroProveedor, 
-  MaestroObra, 
-  FavoritoUsuario 
+import {
+  RegistroVisita,
+  RegistroTrabajadores,
+  RegistroProveedor,
+  FavoritoUsuario,
 } from "@/types/acceso";
 
-// Servicios para Visitas
-export const registrarVisita = async (visita: Omit<RegistroVisita, "id">) => {
-  const visitasRef = ref(db, "acceso/visitas");
-  const nuevaVisitaRef = push(visitasRef);
-  await set(nuevaVisitaRef, {
-    ...visita,
-    id: nuevaVisitaRef.key,
-  });
-  return nuevaVisitaRef.key;
+// Helpers para timestamps que pueden/no pueden existir en los types
+function tsFrom(obj: any): number {
+  const v = obj?.createdAt ?? obj?.fechaCreacion ?? 0;
+  return typeof v === "number" ? v : 0;
+}
+
+type TipoAcceso = "visitante" | "trabajador" | "proveedor";
+
+type BaseRegistro = {
+  porticoId: string;
+  estado?: "pendiente" | "autorizado" | "denegado";
+  estadoPortico?: string;
+  createdAt?: any; // no tipamos estricto para no chocar con tus types
 };
 
-export const obtenerVisitasPorEmpadronado = async (empadronadoId: string) => {
-  const visitasRef = ref(db, "acceso/visitas");
-  const q = query(visitasRef, orderByChild("empadronadoId"), equalTo(empadronadoId));
-  const snapshot = await get(q);
-  
-  if (snapshot.exists()) {
-    return Object.values(snapshot.val()) as RegistroVisita[];
-  }
-  return [];
-};
+function buildBase(porticoId: string, estado: BaseRegistro["estado"] = "pendiente") {
+  return {
+    porticoId,
+    estado,
+    estadoPortico: `${estado}#${porticoId}`,
+    createdAt: serverTimestamp(),
+  };
+}
 
-// Servicios para Trabajadores
-export const registrarTrabajadores = async (registro: Omit<RegistroTrabajadores, "id">) => {
-  const trabajadoresRef = ref(db, "acceso/trabajadores");
-  const nuevoRegistroRef = push(trabajadoresRef);
-  await set(nuevoRegistroRef, {
-    ...registro,
-    id: nuevoRegistroRef.key,
-  });
-  return nuevoRegistroRef.key;
-};
+export async function registrarVisita(
+  data: Omit<RegistroVisita, "estado" | "estadoPortico" | "createdAt"> & { porticoId: string }
+) {
+  const id = push(child(ref(db), "acceso/visitas")).key as string;
+  const base = buildBase(data.porticoId, "pendiente");
 
-export const obtenerTrabajadoresPorEmpadronado = async (empadronadoId: string) => {
-  const trabajadoresRef = ref(db, "acceso/trabajadores");
-  const q = query(trabajadoresRef, orderByChild("empadronadoId"), equalTo(empadronadoId));
-  const snapshot = await get(q);
-  
-  if (snapshot.exists()) {
-    return Object.values(snapshot.val()) as RegistroTrabajadores[];
-  }
-  return [];
-};
+  // Evitamos conflicto con tus types usando any
+  const payload: any = { ...(data as any), ...base };
 
-// Servicios para Maestros de Obra
-export const crearMaestroObra = async (maestro: Omit<MaestroObra, "id">) => {
-  const maestrosRef = ref(db, "acceso/maestros-obra");
-  const nuevoMaestroRef = push(maestrosRef);
-  await set(nuevoMaestroRef, {
-    ...maestro,
-    id: nuevoMaestroRef.key,
-  });
-  return nuevoMaestroRef.key;
-};
+  const updates: Record<string, unknown> = {};
+  updates[`acceso/visitas/${id}`] = payload;
+  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = {
+    id,
+    nombre: (data as any).visitantes?.[0]?.nombre ?? "",
+    dni: (data as any).visitantes?.[0]?.dni ?? "",
+    createdAt: base.createdAt,
+    tipo: "visitante",
+  };
 
-export const obtenerMaestrosObra = async () => {
-  const maestrosRef = ref(db, "acceso/maestros-obra");
-  const snapshot = await get(maestrosRef);
-  
-  if (snapshot.exists()) {
-    return Object.values(snapshot.val()) as MaestroObra[];
-  }
-  return [];
-};
+  await update(ref(db), updates);
+  return id;
+}
 
-export const autorizarMaestroObra = async (maestroId: string, autorizado: boolean, autorizadoPor: string) => {
-  const maestroRef = ref(db, `acceso/maestros-obra/${maestroId}`);
-  await set(maestroRef, {
-    autorizado,
-    fechaAutorizacion: Date.now(),
-    autorizadoPor,
-  });
-};
+export async function registrarTrabajadores(
+  data: Omit<RegistroTrabajadores, "estado" | "estadoPortico" | "createdAt"> & { porticoId: string }
+) {
+  const id = push(child(ref(db), "acceso/trabajadores")).key as string;
+  const base = buildBase(data.porticoId, "pendiente");
+  const payload: any = { ...(data as any), ...base };
 
-// Servicios para Proveedores
-export const registrarProveedor = async (proveedor: Omit<RegistroProveedor, "id">) => {
-  const proveedoresRef = ref(db, "acceso/proveedores");
-  const nuevoProveedorRef = push(proveedoresRef);
-  await set(nuevoProveedorRef, {
-    ...proveedor,
-    id: nuevoProveedorRef.key,
-  });
-  return nuevoProveedorRef.key;
-};
+  const updates: Record<string, unknown> = {};
+  updates[`acceso/trabajadores/${id}`] = payload;
+  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = {
+    id,
+    createdAt: base.createdAt,
+    tipo: "trabajador",
+  };
 
-export const obtenerProveedoresPorEmpadronado = async (empadronadoId: string) => {
-  const proveedoresRef = ref(db, "acceso/proveedores");
-  const q = query(proveedoresRef, orderByChild("empadronadoId"), equalTo(empadronadoId));
-  const snapshot = await get(q);
-  
-  if (snapshot.exists()) {
-    return Object.values(snapshot.val()) as RegistroProveedor[];
-  }
-  return [];
-};
+  await update(ref(db), updates);
+  return id;
+}
 
-// Servicios para Favoritos
-export const guardarFavorito = async (favorito: Omit<FavoritoUsuario, "id">) => {
-  const favoritosRef = ref(db, "acceso/favoritos");
-  const nuevoFavoritoRef = push(favoritosRef);
-  await set(nuevoFavoritoRef, {
-    ...favorito,
-    id: nuevoFavoritoRef.key,
-  });
-  return nuevoFavoritoRef.key;
-};
+export async function registrarProveedor(
+  data: Omit<RegistroProveedor, "estado" | "estadoPortico" | "createdAt"> & { porticoId: string }
+) {
+  const id = push(child(ref(db), "acceso/proveedores")).key as string;
+  const base = buildBase(data.porticoId, "pendiente");
+  const payload: any = { ...(data as any), ...base };
 
-export const obtenerFavoritosPorUsuario = async (empadronadoId: string, tipo?: string) => {
-  const favoritosRef = ref(db, "acceso/favoritos");
-  const q = query(favoritosRef, orderByChild("empadronadoId"), equalTo(empadronadoId));
-  const snapshot = await get(q);
-  
-  if (snapshot.exists()) {
-    let favoritos = Object.values(snapshot.val()) as FavoritoUsuario[];
-    if (tipo) {
-      favoritos = favoritos.filter(f => f.tipo === tipo);
-    }
-    return favoritos;
-  }
-  return [];
-};
+  const updates: Record<string, unknown> = {};
+  updates[`acceso/proveedores/${id}`] = payload;
+  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = {
+    id,
+    createdAt: base.createdAt,
+    tipo: "proveedor",
+  };
 
-// Función para enviar mensaje WhatsApp simulado
-export const enviarMensajeWhatsApp = (mensaje: string) => {
-  const numeroVigilancia = "+51999999999"; // Número de prueba
-  const url = `https://wa.me/${numeroVigilancia}?text=${encodeURIComponent(mensaje)}`;
-  window.open(url, '_blank');
-};
+  await update(ref(db), updates);
+  return id;
+}
+
+export async function cambiarEstadoAcceso(
+  tipo: TipoAcceso,
+  id: string,
+  porticoId: string,
+  nuevo: "autorizado" | "denegado",
+  actor: string
+) {
+  const registroPath = `acceso/${
+    tipo === "visitante" ? "visitas" : tipo === "trabajador" ? "trabajadores" : "proveedores"
+  }/${id}`;
+
+  const updates: Record<string, unknown> = {};
+  updates[`${registroPath}/estado`] = nuevo;
+  updates[`${registroPath}/estadoPortico`] = `${nuevo}#${porticoId}`;
+  updates[`${registroPath}/fechaAutorizacion`] = Date.now();
+  updates[`${registroPath}/autorizadoPor`] = actor;
+
+  // sacar de pendientes del pórtico
+  updates[`seguridad/porticos/${porticoId}/pendientes/${id}`] = null;
+
+  await update(ref(db), updates);
+}
+
+export async function obtenerFavoritosPorUsuario(
+  empadronadoId: string,
+  tipo: TipoAcceso
+): Promise<FavoritoUsuario[]> {
+  const q = query(ref(db, "acceso/favoritos"), orderByChild("empadronadoId"), equalTo(empadronadoId));
+  const snap = await get(q);
+  if (!snap.exists()) return [];
+  const todos: FavoritoUsuario[] = Object.values(snap.val());
+
+  return todos
+    .filter((f: any) => f.tipo === tipo)
+    .sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
+}

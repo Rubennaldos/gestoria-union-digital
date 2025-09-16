@@ -7,36 +7,43 @@ import { obtenerFavoritosPorUsuario } from "@/services/acceso";
 import { FavoritoUsuario } from "@/types/acceso";
 
 interface BuscadorFavoritosProps {
-  tipo: 'visitante' | 'trabajador' | 'proveedor';
+  tipo: "visitante" | "trabajador" | "proveedor";
   onSeleccionar: (favorito: FavoritoUsuario) => void;
+  empadronadoId?: string; // <- sin hardcode
 }
 
-export function BuscadorFavoritos({ tipo, onSeleccionar }: BuscadorFavoritosProps) {
-  const [busqueda, setBusqueda] = useState('');
+function tsFrom(obj: any): number {
+  const v = obj?.createdAt ?? obj?.fechaCreacion ?? 0;
+  return typeof v === "number" ? v : 0;
+}
+
+export function BuscadorFavoritos({ tipo, onSeleccionar, empadronadoId }: BuscadorFavoritosProps) {
+  const [busqueda, setBusqueda] = useState("");
   const [favoritos, setFavoritos] = useState<FavoritoUsuario[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
 
   useEffect(() => {
     cargarFavoritos();
-  }, [tipo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipo, empadronadoId]);
 
   const cargarFavoritos = async () => {
     try {
-      const empadronadoId = "user123"; // ID del usuario actual
-      const favoritosData = await obtenerFavoritosPorUsuario(empadronadoId, tipo);
+      const id = empadronadoId || "user123";
+      const favoritosData = await obtenerFavoritosPorUsuario(id, tipo);
       setFavoritos(favoritosData);
     } catch (error) {
-      console.error('Error al cargar favoritos:', error);
+      console.error("Error al cargar favoritos:", error);
     }
   };
 
-  const favoritosFiltrados = favoritos.filter(favorito =>
-    favorito.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  const favoritosFiltrados = favoritos.filter((f: any) =>
+    (f.nombre || "").toLowerCase().includes(busqueda.toLowerCase())
   );
 
   const handleSeleccionar = (favorito: FavoritoUsuario) => {
     onSeleccionar(favorito);
-    setBusqueda('');
+    setBusqueda("");
     setMostrarResultados(false);
   };
 
@@ -62,7 +69,7 @@ export function BuscadorFavoritos({ tipo, onSeleccionar }: BuscadorFavoritosProp
       {mostrarResultados && favoritosFiltrados.length > 0 && (
         <Card className="absolute z-10 w-full p-2 max-h-40 overflow-y-auto bg-background border shadow-lg">
           <div className="space-y-1">
-            {favoritosFiltrados.map((favorito) => (
+            {favoritosFiltrados.map((favorito: any) => (
               <Button
                 key={favorito.id}
                 variant="ghost"
@@ -72,7 +79,7 @@ export function BuscadorFavoritos({ tipo, onSeleccionar }: BuscadorFavoritosProp
                 <div>
                   <p className="font-medium">{favorito.nombre}</p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(favorito.fechaCreacion).toLocaleDateString()}
+                    {new Date(tsFrom(favorito)).toLocaleDateString()}
                   </p>
                 </div>
               </Button>
@@ -83,9 +90,7 @@ export function BuscadorFavoritos({ tipo, onSeleccionar }: BuscadorFavoritosProp
 
       {mostrarResultados && busqueda.length > 0 && favoritosFiltrados.length === 0 && (
         <Card className="absolute z-10 w-full p-4 bg-background border shadow-lg">
-          <p className="text-sm text-muted-foreground text-center">
-            No se encontraron favoritos
-          </p>
+          <p className="text-sm text-muted-foreground text-center">No se encontraron favoritos</p>
         </Card>
       )}
     </div>
