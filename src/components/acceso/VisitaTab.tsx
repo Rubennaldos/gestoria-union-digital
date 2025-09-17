@@ -11,104 +11,115 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
-import { Visitante } from "@/types/acceso";
+import { Visitante, FavoritoUsuario } from "@/types/acceso";
 
 export function VisitaTab() {
-  const [tipoAcceso, setTipoAcceso] = useState<'vehicular' | 'peatonal'>('peatonal');
-  const [placa, setPlaca] = useState('');
+  const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
+  const [placa, setPlaca] = useState("");
   const [visitantes, setVisitantes] = useState<Visitante[]>([
-    { id: '1', nombre: '', dni: '' }
+    { id: "1", nombre: "", dni: "" },
   ]);
   const [menores, setMenores] = useState(0);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const { toast } = useToast();
 
+  // ───────── helpers UI ─────────
   const agregarVisitante = () => {
-    setVisitantes([...visitantes, { 
-      id: Date.now().toString(), 
-      nombre: '', 
-      dni: '' 
-    }]);
+    setVisitantes((prev) => [
+      ...prev,
+      { id: Date.now().toString(), nombre: "", dni: "" },
+    ]);
   };
 
-  const actualizarVisitante = (id: string, campo: 'nombre' | 'dni', valor: string) => {
-    setVisitantes(visitantes.map(v => 
-      v.id === id ? { ...v, [campo]: valor } : v
-    ));
+  const actualizarVisitante = (id: string, campo: "nombre" | "dni", valor: string) => {
+    setVisitantes((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, [campo]: valor } : v))
+    );
   };
 
   const eliminarVisitante = (id: string) => {
-    if (visitantes.length > 1) {
-      setVisitantes(visitantes.filter(v => v.id !== id));
-    }
+    setVisitantes((prev) => (prev.length > 1 ? prev.filter((v) => v.id !== id) : prev));
   };
 
   const validarFormulario = () => {
-    if (tipoAcceso === 'vehicular' && !placa.trim()) {
+    if (tipoAcceso === "vehicular" && !placa.trim()) {
       toast({
         title: "Error",
         description: "La placa es requerida para acceso vehicular",
-        variant: "destructive"
+        variant: "destructive",
       });
       return false;
     }
 
-    const visitantesValidos = visitantes.filter(v => v.nombre.trim() && v.dni.trim());
-    if (visitantesValidos.length === 0) {
+    const validos = visitantes.filter((v) => v.nombre.trim() && v.dni.trim());
+    if (validos.length === 0) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "Debe agregar al menos un visitante",
-        variant: "destructive"
+        variant: "destructive",
       });
       return false;
     }
-
     return true;
   };
 
+  // ───────── guardar & registrar ─────────
   const guardarYRegistrar = async () => {
     if (!validarFormulario()) return;
 
     try {
-      // Simular datos del usuario actual
+      // TODO: reemplazar por datos reales del usuario logueado
       const empadronadoId = "user123";
       const nombreUsuario = "Juan Pérez";
       const direccionUsuario = "Mz A Lt 15";
+      const telefonoVigilancia = ""; // “51999…”, si lo tienes
 
-      const registro = {
+      // normalizar visitantes
+      const visitantesLimpios = visitantes
+        .map((v) => ({
+          nombre: v.nombre.trim(),
+          dni: v.dni.trim(),
+        }))
+        .filter((v) => v.nombre && v.dni);
+
+      // TIPAMOS EXACTAMENTE EL OBJETO COMO EL 1er PARÁMETRO DE registrarVisita
+      const registro: Parameters<typeof registrarVisita>[0] = {
         empadronadoId,
-        tipoAcceso,
-        placa: tipoAcceso === 'vehicular' ? placa : undefined,
-        visitantes: visitantes.filter(v => v.nombre.trim() && v.dni.trim()),
-        menores,
-        fechaCreacion: Date.now(),
-        estado: 'pendiente' as const
+        tipoAcceso, // 'peatonal' | 'vehicular'
+        placa: tipoAcceso === "vehicular" ? placa.toUpperCase() : undefined,
+        visitantes: visitantesLimpios, // array de {nombre, dni}
+        menores: Number(menores || 0),
+        porticoId: "principal", // necesario para reflejar en Seguridad
       };
 
-      await registrarVisita(registro);
+      const id = await registrarVisita(registro);
 
-      // Generar mensaje WhatsApp
+      // —— Mensaje de WhatsApp
       const listaVisitantes = registro.visitantes
-        .map(v => `- ${v.nombre} (DNI: ${v.dni})`)
-        .join('\n');
-      
-      const mensajeMenores = menores > 0 ? `\n- ${menores} menor(es) de edad` : '';
-      
-      const mensaje = `Yo ${nombreUsuario} con dirección en ${direccionUsuario} autorizo el ingreso a las siguientes personas:\n\n${listaVisitantes}${mensajeMenores}\n\nDonde me comprometo que respetaré y respetarán los reglamentos internos de la urbanización San Antonio.`;
+        .map((v) => `• ${v.nombre} (DNI: ${v.dni})`)
+        .join("\n");
+      const mensajeMenores =
+        registro.menores > 0 ? `\n- ${registro.menores} menor(es) de edad` : "";
 
-      enviarMensajeWhatsApp(mensaje);
-      setMostrarConfirmacion(true);
+      const mensaje = `Yo ${nombreUsuario} con dirección ${direccionUsuario} autorizo el ingreso a:\n\n${listaVisitantes}${mensajeMenores}\n\nCódigo de solicitud: ${id}`;
 
-      toast({
-        title: "Registro exitoso",
-        description: "Se ha enviado la solicitud de autorización a vigilancia"
+      // la función exige { telefono, mensaje }
+      enviarMensajeWhatsApp({
+        telefono: telefonoVigilancia, // puede estar vacío; la función lo maneja
+        mensaje,
       });
 
-    } catch (error) {
+      setMostrarConfirmacion(true);
+      toast({
+        title: "Registro exitoso",
+        description: "Se ha enviado la solicitud de autorización a vigilancia",
+      });
+    } catch (error: any) {
+      console.error("guardarYRegistrar error:", error);
       toast({
         title: "Error",
-        description: "No se pudo registrar la visita",
-        variant: "destructive"
+        description: error?.message || "No se pudo registrar la visita",
+        variant: "destructive",
       });
     }
   };
@@ -122,13 +133,14 @@ export function VisitaTab() {
             Registro de Visitas
           </CardTitle>
         </CardHeader>
+
         <CardContent className="space-y-6">
           {/* Tipo de acceso */}
           <div className="space-y-3">
             <Label className="text-base font-medium">Tipo de Acceso</Label>
-            <RadioGroup 
-              value={tipoAcceso} 
-              onValueChange={(value) => setTipoAcceso(value as 'vehicular' | 'peatonal')}
+            <RadioGroup
+              value={tipoAcceso}
+              onValueChange={(value) => setTipoAcceso(value as "vehicular" | "peatonal")}
               className="flex gap-6"
             >
               <div className="flex items-center space-x-2">
@@ -148,8 +160,8 @@ export function VisitaTab() {
             </RadioGroup>
           </div>
 
-          {/* Placa (solo para vehicular) */}
-          {tipoAcceso === 'vehicular' && (
+          {/* Placa (solo vehicular) */}
+          {tipoAcceso === "vehicular" && (
             <div className="space-y-2">
               <Label htmlFor="placa">Placa del Vehículo *</Label>
               <Input
@@ -165,10 +177,13 @@ export function VisitaTab() {
           <Separator />
 
           {/* Buscador de favoritos */}
-          <BuscadorFavoritos 
+          <BuscadorFavoritos
             tipo="visitante"
-            onSeleccionar={(favorito) => {
-              setVisitantes([favorito.datos]);
+            onSeleccionar={(favorito: FavoritoUsuario) => {
+              // Ajusta a tu shape: asumo favorito.datos = { nombre, dni }
+              const nom = (favorito as any)?.datos?.nombre ?? "";
+              const doc = (favorito as any)?.datos?.dni ?? "";
+              setVisitantes([{ id: Date.now().toString(), nombre: nom, dni: doc }]);
             }}
           />
 
@@ -190,14 +205,16 @@ export function VisitaTab() {
               </Button>
             </div>
 
-            {visitantes.map((visitante, index) => (
+            {visitantes.map((visitante) => (
               <Card key={visitante.id} className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Nombre Completo *</Label>
                     <Input
                       value={visitante.nombre}
-                      onChange={(e) => actualizarVisitante(visitante.id, 'nombre', e.target.value)}
+                      onChange={(e) =>
+                        actualizarVisitante(visitante.id, "nombre", e.target.value)
+                      }
                       placeholder="Nombre y apellidos"
                     />
                   </div>
@@ -205,7 +222,9 @@ export function VisitaTab() {
                     <Label>DNI o Documento *</Label>
                     <Input
                       value={visitante.dni}
-                      onChange={(e) => actualizarVisitante(visitante.id, 'dni', e.target.value)}
+                      onChange={(e) =>
+                        actualizarVisitante(visitante.id, "dni", e.target.value)
+                      }
                       placeholder="12345678"
                     />
                   </div>
@@ -247,28 +266,25 @@ export function VisitaTab() {
 
           <Separator />
 
-          {/* Botones de acción */}
+          {/* Botones */}
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               type="button"
               variant="outline"
               className="flex items-center gap-2 h-12"
               onClick={() => {
-                // TODO: Implementar guardar favorito
+                // TODO: Implementar guardar favorito real
                 toast({
                   title: "Favorito guardado",
-                  description: "Los datos se han guardado en favoritos"
+                  description: "Los datos se han guardado en favoritos",
                 });
               }}
             >
               <Star className="h-4 w-4" />
               Guardar Favorito
             </Button>
-            
-            <Button
-              onClick={guardarYRegistrar}
-              className="flex items-center gap-2 h-12 flex-1"
-            >
+
+            <Button onClick={guardarYRegistrar} className="flex items-center gap-2 h-12 flex-1">
               <Send className="h-4 w-4" />
               Guardar y Registrar Visita
             </Button>

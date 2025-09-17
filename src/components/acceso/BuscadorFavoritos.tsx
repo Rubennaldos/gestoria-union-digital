@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { FavoritoUsuario } from "@/types/acceso";
 interface BuscadorFavoritosProps {
   tipo: "visitante" | "trabajador" | "proveedor";
   onSeleccionar: (favorito: FavoritoUsuario) => void;
-  empadronadoId?: string; // <- sin hardcode
+  empadronadoId?: string; // sin hardcode
 }
 
 function tsFrom(obj: any): number {
@@ -17,10 +17,15 @@ function tsFrom(obj: any): number {
   return typeof v === "number" ? v : 0;
 }
 
-export function BuscadorFavoritos({ tipo, onSeleccionar, empadronadoId }: BuscadorFavoritosProps) {
+export function BuscadorFavoritos({
+  tipo,
+  onSeleccionar,
+  empadronadoId,
+}: BuscadorFavoritosProps) {
   const [busqueda, setBusqueda] = useState("");
   const [favoritos, setFavoritos] = useState<FavoritoUsuario[]>([]);
   const [mostrarResultados, setMostrarResultados] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     cargarFavoritos();
@@ -37,6 +42,24 @@ export function BuscadorFavoritos({ tipo, onSeleccionar, empadronadoId }: Buscad
     }
   };
 
+  // Cerrar dropdown con click fuera y con ESC
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setMostrarResultados(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMostrarResultados(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
   const favoritosFiltrados = favoritos.filter((f: any) =>
     (f.nombre || "").toLowerCase().includes(busqueda.toLowerCase())
   );
@@ -48,10 +71,10 @@ export function BuscadorFavoritos({ tipo, onSeleccionar, empadronadoId }: Buscad
   };
 
   return (
-    <div className="space-y-2 relative">
+    <div ref={wrapperRef} className="space-y-2 relative">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={busqueda}
             onChange={(e) => {
@@ -61,6 +84,7 @@ export function BuscadorFavoritos({ tipo, onSeleccionar, empadronadoId }: Buscad
             placeholder={`Buscar ${tipo}s favoritos...`}
             className="pl-10"
             onFocus={() => setMostrarResultados(busqueda.length > 0)}
+            onBlur={() => setTimeout(() => setMostrarResultados(false), 120)} // permite click en opción
           />
         </div>
         <Star className="h-5 w-5 text-yellow-500" />
@@ -90,7 +114,9 @@ export function BuscadorFavoritos({ tipo, onSeleccionar, empadronadoId }: Buscad
 
       {mostrarResultados && busqueda.length > 0 && favoritosFiltrados.length === 0 && (
         <Card className="absolute z-10 w-full p-4 bg-background border shadow-lg">
-          <p className="text-sm text-muted-foreground text-center">No se encontraron favoritos</p>
+          <p className="text-sm text-muted-foreground text-center">
+            No se encontraron favoritos
+          </p>
         </Card>
       )}
     </div>

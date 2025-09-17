@@ -1,34 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye, EyeOff, Download, KeyRound, Settings, Check, X, FileSpreadsheet, Upload } from 'lucide-react';
-import { generateEmpadronadosTemplate } from '@/utils/excelTemplate';
+import {
+  Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye,
+  Download, KeyRound, Settings, Upload
+} from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
 import { ActualizacionMasivaModal } from '@/components/empadronados/ActualizacionMasivaModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthz } from '@/contexts/AuthzContext';
-import { createUserAndProfile } from '@/services/auth';
-import { listModules, getUserPermissions, getUserProfile, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
-import { Module, UserProfile, Permission, PermissionLevel } from '@/types/auth';
+import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
+import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
 
+// >>> XLSX: exportar / importar plantilla de DNI + fechaIngreso
+import {
+  exportEmpadronadosTemplateXLSX,
+  importEmpadronadosXLSX
+} from '@/services/empadronadosBulk';
 
-// ─────────────────────────────────────────────────────────────
-// Página principal
-// ─────────────────────────────────────────────────────────────
 const Empadronados: React.FC = () => {
   const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [filteredEmpadronados, setFilteredEmpadronados] = useState<Empadronado[]>([]);
@@ -50,9 +55,7 @@ const Empadronados: React.FC = () => {
   const [filterLote, setFilterLote] = useState('');
   const [filterEtapa, setFilterEtapa] = useState('');
 
-  
   const [gestionarPermisosOpen, setGestionarPermisosOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [userPermissions, setUserPermissions] = useState<Permission>({});
   const [editingPermissions, setEditingPermissions] = useState(false);
@@ -61,7 +64,11 @@ const Empadronados: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { canDeleteWithoutAuth, isPresidente } = useAuthz();
+  const { canDeleteWithoutAuth } = useAuthz();
+
+  // XLSX: input de archivo
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [importing, setImporting] = useState(false);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -93,27 +100,16 @@ const Empadronados: React.FC = () => {
     if (!authUid) return;
     try {
       await savePermissionsToRTDB(authUid, userPermissions, user?.uid || 'system');
-      toast({
-        title: "Éxito",
-        description: "Permisos actualizados correctamente"
-      });
+      toast({ title: "Éxito", description: "Permisos actualizados correctamente" });
       setEditingPermissions(false);
     } catch (error) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "No se pudieron actualizar los permisos",
         variant: "destructive"
       });
     }
   };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [empadronados, searchTerm, filterStatus, filterVivienda, filterVive, filterManzana, filterLote, filterEtapa]);
 
   const loadData = async () => {
     setLoading(true);
@@ -134,6 +130,10 @@ const Empadronados: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    applyFilters();
+  }, [empadronados, searchTerm, filterStatus, filterVivienda, filterVive, filterManzana, filterLote, filterEtapa]);
 
   const applyFilters = () => {
     let filtered = [...empadronados];
@@ -200,7 +200,6 @@ const Empadronados: React.FC = () => {
       return;
     }
 
-    // Solo verificar contraseña si no es Presidente
     if (!canDeleteWithoutAuth && deletePassword !== 'admin123') {
       toast({
         title: "Error",
@@ -254,6 +253,40 @@ const Empadronados: React.FC = () => {
     }
   };
 
+  // ───────── XLSX: Export/Import ─────────
+  const onExportXLSX = async () => {
+    await exportEmpadronadosTemplateXLSX();
+    toast({ title: "Exportado", description: "Se descargó la plantilla Excel con instrucciones." });
+  };
+
+  const onClickImportXLSX = () => fileRef.current?.click();
+
+  const onFileSelected: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setImporting(true);
+    try {
+      const actorUid = user?.uid || 'admin';
+      const { ok, fail, errors } = await importEmpadronadosXLSX(f, actorUid);
+      toast({
+        title: "Importación completada",
+        description: `Actualizados: ${ok} — Errores: ${fail}`
+      });
+      if (errors.length) console.warn('Errores importación:', errors);
+      await loadData();
+    } catch (err: any) {
+      toast({
+        title: "Error al importar",
+        description: err?.message || "Revisa el archivo Excel",
+        variant: "destructive"
+      });
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+  // ───────────────────────────────────────
+
   if (loading) {
     return (
       <div className="p-6">
@@ -264,7 +297,6 @@ const Empadronados: React.FC = () => {
               <div key={i} className="h-24 bg-muted rounded"></div>
             ))}
           </div>
-          <div className="h-96 bg-muted rounded"></div>
         </div>
       </div>
     );
@@ -275,12 +307,7 @@ const Empadronados: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/')}
-            className="gap-2"
-          >
+          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
             <Home className="w-4 h-4" />
             Inicio
           </Button>
@@ -290,35 +317,30 @@ const Empadronados: React.FC = () => {
             <p className="text-muted-foreground">Gestión completa del registro de asociados</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-          >
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
             <Search className="h-4 w-4 mr-2" />
             Filtros
           </Button>
-          <Button 
-            variant="outline"
-            onClick={generateEmpadronadosTemplate}
-          >
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Descargar Template Excel
+
+          {/* XLSX: Exportar / Importar */}
+          <Button variant="outline" onClick={onExportXLSX}>
+            <Download className="h-4 w-4 mr-2" />
+            Exportar plantilla (Excel)
           </Button>
-          <Button 
-            variant="outline"
-            onClick={() => setActualizacionMasivaOpen(true)}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Actualización Masiva
-          </Button>
-          <Button 
-            variant="outline"
-            onClick={() => navigate('/importacion')}
-          >
+          <Button variant="outline" onClick={onClickImportXLSX} disabled={importing}>
             <Upload className="h-4 w-4 mr-2" />
-            Importar Excel
+            {importing ? 'Importando…' : 'Importar cambios (Excel)'}
           </Button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={onFileSelected}
+          />
+
           <Button onClick={() => navigate('/padron/nuevo')}>
             <UserPlus className="h-4 w-4 mr-2" />
             Nuevo Empadronado
@@ -335,12 +357,10 @@ const Empadronados: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.habilitados} habilitados
-            </p>
+            <p className="text-xs text-muted-foreground">{stats.habilitados} habilitados</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Residentes Activos</CardTitle>
@@ -348,9 +368,7 @@ const Empadronados: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.viven}</div>
-            <p className="text-xs text-muted-foreground">
-              Viven en la asociación
-            </p>
+            <p className="text-xs text-muted-foreground">Viven en la asociación</p>
           </CardContent>
         </Card>
 
@@ -374,9 +392,7 @@ const Empadronados: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.masculinos}M / {stats.femeninos}F</div>
-            <p className="text-xs text-muted-foreground">
-              Masculinos / Femeninos
-            </p>
+            <p className="text-xs text-muted-foreground">Masculinos / Femeninos</p>
           </CardContent>
         </Card>
       </div>
@@ -398,13 +414,11 @@ const Empadronados: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <Label>Estado</Label>
                 <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="habilitado">Habilitados</SelectItem>
@@ -416,9 +430,7 @@ const Empadronados: React.FC = () => {
               <div>
                 <Label>Vivienda</Label>
                 <Select value={filterVivienda} onValueChange={(value: any) => setFilterVivienda(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="construida">Construida</SelectItem>
@@ -431,9 +443,7 @@ const Empadronados: React.FC = () => {
               <div>
                 <Label>Residencia</Label>
                 <Select value={filterVive} onValueChange={(value: any) => setFilterVive(value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="si">Vive aquí</SelectItem>
@@ -446,32 +456,17 @@ const Empadronados: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
               <div>
                 <Label htmlFor="manzana">Manzana</Label>
-                <Input
-                  id="manzana"
-                  placeholder="Filtrar por manzana..."
-                  value={filterManzana}
-                  onChange={(e) => setFilterManzana(e.target.value)}
-                />
+                <Input id="manzana" placeholder="Filtrar por manzana..." value={filterManzana} onChange={(e) => setFilterManzana(e.target.value)} />
               </div>
 
               <div>
                 <Label htmlFor="lote">Lote</Label>
-                <Input
-                  id="lote"
-                  placeholder="Filtrar por lote..."
-                  value={filterLote}
-                  onChange={(e) => setFilterLote(e.target.value)}
-                />
+                <Input id="lote" placeholder="Filtrar por lote..." value={filterLote} onChange={(e) => setFilterLote(e.target.value)} />
               </div>
 
               <div>
                 <Label htmlFor="etapa">Etapa</Label>
-                <Input
-                  id="etapa"
-                  placeholder="Filtrar por etapa..."
-                  value={filterEtapa}
-                  onChange={(e) => setFilterEtapa(e.target.value)}
-                />
+                <Input id="etapa" placeholder="Filtrar por etapa..." value={filterEtapa} onChange={(e) => setFilterEtapa(e.target.value)} />
               </div>
 
               <div className="flex items-end">
@@ -501,7 +496,7 @@ const Empadronados: React.FC = () => {
         <p className="text-sm text-muted-foreground">
           Mostrando {filteredEmpadronados.length} de {stats.total} empadronados
         </p>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={onExportXLSX}>
           <Download className="h-4 w-4 mr-2" />
           Exportar
         </Button>
@@ -526,9 +521,7 @@ const Empadronados: React.FC = () => {
             <TableBody>
               {filteredEmpadronados.map((empadronado) => (
                 <TableRow key={empadronado.id}>
-                  <TableCell className="font-medium">
-                    {empadronado.numeroPadron}
-                  </TableCell>
+                  <TableCell className="font-medium">{empadronado.numeroPadron}</TableCell>
                   <TableCell>
                     <div>
                       <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
@@ -536,51 +529,45 @@ const Empadronados: React.FC = () => {
                     </div>
                   </TableCell>
                   <TableCell>{empadronado.dni}</TableCell>
-                   <TableCell>
+                  <TableCell>
                     {empadronado.emailAcceso ? (
                       <div className="space-y-1">
-                        <div className="text-sm font-medium text-green-600">
-                          {empadronado.emailAcceso}
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          Cuenta activa
-                        </Badge>
+                        <div className="text-sm font-medium text-green-600">{empadronado.emailAcceso}</div>
+                        <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
                       </div>
                     ) : (
                       <div className="text-sm text-muted-foreground">Sin acceso</div>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={empadronado.habilitado ? "default" : "secondary"}>
-                      {empadronado.habilitado ? "Habilitado" : "Deshabilitado"}
+                    <Badge variant={empadronado.habilitado ? 'default' : 'secondary'}>
+                      {empadronado.habilitado ? 'Habilitado' : 'Deshabilitado'}
                     </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       {getViviendaIcon(empadronado.estadoVivienda)}
                       <Badge className={getViviendaColor(empadronado.estadoVivienda)}>
-                        {empadronado.estadoVivienda === 'construida' ? 'Construida' :
-                         empadronado.estadoVivienda === 'construccion' ? 'En Construcción' : 'Solo Terreno'}
+                        {empadronado.estadoVivienda === 'construida' ? 'Construida'
+                          : empadronado.estadoVivienda === 'construccion' ? 'En Construcción'
+                            : 'Solo Terreno'}
                       </Badge>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={empadronado.vive ? "default" : "outline"}>
-                      {empadronado.vive ? "Sí" : "No"}
+                    <Badge variant={empadronado.vive ? 'default' : 'outline'}>
+                      {empadronado.vive ? 'Sí' : 'No'}
                     </Badge>
                   </TableCell>
-                   <TableCell>
+                  <TableCell>
                     <div className="flex gap-1">
                       <Sheet>
                         <SheetTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => setSelectedEmpadronado(empadronado)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => setSelectedEmpadronado(empadronado)}>
                             <Eye className="h-4 w-4" />
                           </Button>
                         </SheetTrigger>
+
                         <Button
                           variant="ghost"
                           size="sm"
@@ -591,18 +578,17 @@ const Empadronados: React.FC = () => {
                         >
                           <Settings className="h-4 w-4" />
                         </Button>
+
                         <SheetContent className="w-[600px] sm:w-[800px]">
                           {selectedEmpadronado && (
                             <>
                               <SheetHeader>
-                                <SheetTitle>
-                                  {selectedEmpadronado.nombre} {selectedEmpadronado.apellidos}
-                                </SheetTitle>
+                                <SheetTitle>{selectedEmpadronado.nombre} {selectedEmpadronado.apellidos}</SheetTitle>
                                 <SheetDescription>
                                   Padrón N° {selectedEmpadronado.numeroPadron} - {selectedEmpadronado.familia}
                                 </SheetDescription>
                               </SheetHeader>
-                              
+
                               <div className="mt-6 space-y-6">
                                 {/* Información personal */}
                                 <div>
@@ -627,148 +613,144 @@ const Empadronados: React.FC = () => {
                                   </div>
                                 </div>
 
-                                 <Separator />
+                                <Separator />
 
-                                 {/* Acceso al Sistema */}
-                                 {selectedEmpadronado && (
-                                   <div>
-                                     <h4 className="font-semibold mb-3">Acceso al Sistema</h4>
-                                     <div className="space-y-4">
-                                       {selectedEmpadronado.emailAcceso ? (
-                                         <div className="space-y-3">
-                                           <div className="grid grid-cols-2 gap-4 text-sm">
-                                             <div>
-                                               <Label className="text-muted-foreground">Email de Acceso</Label>
-                                               <p className="font-medium text-green-600">{selectedEmpadronado.emailAcceso}</p>
-                                             </div>
-                                             <div>
-                                               <Label className="text-muted-foreground">Estado</Label>
-                                               <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
-                                             </div>
-                                           </div>
-                                           
-                                            {/* Permisos de Módulos */}
-                                            <div className="border rounded-lg p-4">
-                                              <div className="flex items-center justify-between mb-3">
-                                                <Label className="font-medium">Permisos de Módulos</Label>
-                                                <Button
-                                                  size="sm"
-                                                  variant="outline"
-                                                  onClick={() => {
-                                                    setEditingPermissions(!editingPermissions);
-                                                    if (!editingPermissions) {
-                                                      loadUserPermissions(selectedEmpadronado.authUid);
-                                                      loadModules();
-                                                    }
-                                                  }}
-                                                >
-                                                  <Settings className="h-3 w-3 mr-1" />
-                                                  {editingPermissions ? 'Cancelar' : 'Editar'}
-                                                </Button>
-                                              </div>
-                                              
-                                              {editingPermissions ? (
-                                                <div className="space-y-3">
-                                                  {modules.map((module) => {
-                                                    const nivelActual = userPermissions[module.id] || 'none';
-                                                    return (
-                                                      <div key={module.id} className="border rounded-lg p-3 bg-muted/20">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                          <span className="font-medium text-sm">{module.nombre}</span>
-                                                          <Badge variant={
-                                                            nivelActual === 'none' ? 'outline' :
-                                                            nivelActual === 'read' ? 'secondary' :
-                                                            nivelActual === 'write' ? 'default' : 'destructive'
-                                                          }>
-                                                            {nivelActual === 'none' ? 'Sin acceso' :
-                                                             nivelActual === 'read' ? 'Lectura' :
-                                                             nivelActual === 'write' ? 'Escritura' : 'Admin'}
-                                                          </Badge>
-                                                        </div>
-                                                        <div className="grid grid-cols-4 gap-1">
-                                                          {[
-                                                            { valor: 'none', label: 'No', color: 'bg-muted text-muted-foreground' },
-                                                            { valor: 'read', label: 'Leer', color: 'bg-blue-500 text-white' },
-                                                            { valor: 'write', label: 'Escribir', color: 'bg-green-500 text-white' },
-                                                            { valor: 'admin', label: 'Admin', color: 'bg-purple-500 text-white' }
-                                                          ].map((opcion) => (
-                                                            <button
-                                                              key={opcion.valor}
-                                                              onClick={() => setUserPermissions(prev => ({
-                                                                ...prev,
-                                                                [module.id]: opcion.valor as PermissionLevel
-                                                              }))}
-                                                              className={`text-xs px-2 py-1 rounded transition-all ${
-                                                                nivelActual === opcion.valor
-                                                                  ? opcion.color
-                                                                  : 'bg-background border border-border hover:bg-muted text-muted-foreground'
-                                                              }`}
-                                                            >
-                                                              {opcion.label}
-                                                            </button>
-                                                          ))}
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  })}
-                                                  <div className="flex justify-end gap-2 mt-4">
-                                                    <Button size="sm" variant="outline" onClick={() => setEditingPermissions(false)}>
-                                                      Cancelar
-                                                    </Button>
-                                                    <Button size="sm" onClick={() => saveUserPermissions(selectedEmpadronado.authUid)}>
-                                                      Guardar Permisos
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                <div className="space-y-2">
-                                                  {modules.map((module) => {
-                                                    const nivel = userPermissions[module.id] || 'none';
-                                                    return (
-                                                      <div key={module.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
-                                                        <span className="text-sm">{module.nombre}</span>
+                                {/* Acceso al Sistema */}
+                                {selectedEmpadronado && (
+                                  <div>
+                                    <h4 className="font-semibold mb-3">Acceso al Sistema</h4>
+                                    <div className="space-y-4">
+                                      {selectedEmpadronado.emailAcceso ? (
+                                        <div className="space-y-3">
+                                          <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                              <Label className="text-muted-foreground">Email de Acceso</Label>
+                                              <p className="font-medium text-green-600">{selectedEmpadronado.emailAcceso}</p>
+                                            </div>
+                                            <div>
+                                              <Label className="text-muted-foreground">Estado</Label>
+                                              <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
+                                            </div>
+                                          </div>
+
+                                          {/* Permisos de Módulos */}
+                                          <div className="border rounded-lg p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                              <Label className="font-medium">Permisos de Módulos</Label>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setEditingPermissions(!editingPermissions);
+                                                  if (!editingPermissions) {
+                                                    loadUserPermissions(selectedEmpadronado.authUid);
+                                                    loadModules();
+                                                  }
+                                                }}
+                                              >
+                                                <Settings className="h-3 w-3 mr-1" />
+                                                {editingPermissions ? 'Cancelar' : 'Editar'}
+                                              </Button>
+                                            </div>
+
+                                            {editingPermissions ? (
+                                              <div className="space-y-3">
+                                                {modules.map((module) => {
+                                                  const nivelActual = userPermissions[module.id] || 'none';
+                                                  return (
+                                                    <div key={module.id} className="border rounded-lg p-3 bg-muted/20">
+                                                      <div className="flex items-center justify-between mb-2">
+                                                        <span className="font-medium text-sm">{module.nombre}</span>
                                                         <Badge variant={
-                                                          nivel === 'none' ? 'outline' :
-                                                          nivel === 'read' ? 'secondary' :
-                                                          nivel === 'write' ? 'default' : 'destructive'
+                                                          nivelActual === 'none' ? 'outline'
+                                                            : nivelActual === 'read' ? 'secondary'
+                                                              : nivelActual === 'write' ? 'default' : 'destructive'
                                                         }>
-                                                          {nivel === 'none' ? 'Sin acceso' :
-                                                           nivel === 'read' ? 'Lectura' :
-                                                           nivel === 'write' ? 'Escritura' : 'Admin'}
+                                                          {nivelActual === 'none' ? 'Sin acceso'
+                                                            : nivelActual === 'read' ? 'Lectura'
+                                                              : nivelActual === 'write' ? 'Escritura' : 'Admin'}
                                                         </Badge>
                                                       </div>
-                                                    );
-                                                  })}
+                                                      <div className="grid grid-cols-4 gap-1">
+                                                        {[
+                                                          { valor: 'none', label: 'No', color: 'bg-muted text-muted-foreground' },
+                                                          { valor: 'read', label: 'Leer', color: 'bg-blue-500 text-white' },
+                                                          { valor: 'write', label: 'Escribir', color: 'bg-green-500 text-white' },
+                                                          { valor: 'admin', label: 'Admin', color: 'bg-purple-500 text-white' }
+                                                        ].map((opcion) => (
+                                                          <button
+                                                            key={opcion.valor}
+                                                            onClick={() => setUserPermissions(prev => ({
+                                                              ...prev,
+                                                              [module.id]: opcion.valor as PermissionLevel
+                                                            }))}
+                                                            className={`text-xs px-2 py-1 rounded transition-all ${
+                                                              nivelActual === opcion.valor
+                                                                ? opcion.color
+                                                                : 'bg-background border border-border hover:bg-muted text-muted-foreground'
+                                                            }`}
+                                                          >
+                                                            {opcion.label}
+                                                          </button>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                                <div className="flex justify-end gap-2 mt-4">
+                                                  <Button size="sm" variant="outline" onClick={() => setEditingPermissions(false)}>Cancelar</Button>
+                                                  <Button size="sm" onClick={() => saveUserPermissions(selectedEmpadronado.authUid)}>Guardar Permisos</Button>
                                                 </div>
-                                              )}
-                                            </div>
-                                         </div>
-                                        ) : (
-                                          <div className="text-center py-4 border-2 border-dashed rounded-lg">
-                                            <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                            <p className="text-sm text-muted-foreground">No tiene acceso al sistema</p>
+                                              </div>
+                                            ) : (
+                                              <div className="space-y-2">
+                                                {modules.map((module) => {
+                                                  const nivel = userPermissions[module.id] || 'none';
+                                                  return (
+                                                    <div key={module.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                                                      <span className="text-sm">{module.nombre}</span>
+                                                      <Badge variant={
+                                                        nivel === 'none' ? 'outline'
+                                                          : nivel === 'read' ? 'secondary'
+                                                            : nivel === 'write' ? 'default' : 'destructive'
+                                                      }>
+                                                        {nivel === 'none' ? 'Sin acceso'
+                                                          : nivel === 'read' ? 'Lectura'
+                                                            : nivel === 'write' ? 'Escritura' : 'Admin'}
+                                                      </Badge>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
                                           </div>
-                                        )}
-                                     </div>
-                                   </div>
-                                 )}
+                                        </div>
+                                      ) : (
+                                        <div className="text-center py-4 border-2 border-dashed rounded-lg">
+                                          <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                          <p className="text-sm text-muted-foreground">No tiene acceso al sistema</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
 
-                                 <Separator />
+                                <Separator />
 
                                 {/* Contacto */}
                                 <div>
                                   <h4 className="font-semibold mb-3">Contacto</h4>
                                   <div className="space-y-2 text-sm">
-                                     <div>
-                                       <Label className="text-muted-foreground">Dirección</Label>
-                                       <p>Mz. {selectedEmpadronado.manzana} Lt. {selectedEmpadronado.lote} {selectedEmpadronado.etapa ? `Etapa ${selectedEmpadronado.etapa}` : ''}</p>
-                                     </div>
-                                     {selectedEmpadronado.telefonos && selectedEmpadronado.telefonos.length > 0 && (
-                                       <div>
-                                         <Label className="text-muted-foreground">Teléfonos</Label>
-                                         <p>{selectedEmpadronado.telefonos.map(t => t.numero).filter(Boolean).join(', ')}</p>
-                                       </div>
-                                     )}
+                                    <div>
+                                      <Label className="text-muted-foreground">Dirección</Label>
+                                      <p>Mz. {selectedEmpadronado.manzana} Lt. {selectedEmpadronado.lote} {selectedEmpadronado.etapa ? `Etapa ${selectedEmpadronado.etapa}` : ''}</p>
+                                    </div>
+                                    {selectedEmpadronado.telefonos && selectedEmpadronado.telefonos.length > 0 && (
+                                      <div>
+                                        <Label className="text-muted-foreground">Teléfonos</Label>
+                                        <p>{selectedEmpadronado.telefonos.map(t => t.numero).filter(Boolean).join(', ')}</p>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -783,60 +765,59 @@ const Empadronados: React.FC = () => {
                                       <div className="flex items-center gap-2 mt-1">
                                         {getViviendaIcon(selectedEmpadronado.estadoVivienda)}
                                         <Badge className={getViviendaColor(selectedEmpadronado.estadoVivienda)}>
-                                          {selectedEmpadronado.estadoVivienda === 'construida' ? 'Construida' :
-                                           selectedEmpadronado.estadoVivienda === 'construccion' ? 'En Construcción' : 'Solo Terreno'}
+                                          {selectedEmpadronado.estadoVivienda === 'construida' ? 'Construida'
+                                            : selectedEmpadronado.estadoVivienda === 'construccion' ? 'En Construcción'
+                                              : 'Solo Terreno'}
                                         </Badge>
                                       </div>
                                     </div>
                                     <div>
                                       <Label className="text-muted-foreground">Vive aquí</Label>
                                       <div className="mt-1">
-                                        <Badge variant={selectedEmpadronado.vive ? "default" : "outline"}>
-                                          {selectedEmpadronado.vive ? "Sí" : "No"}
+                                        <Badge variant={selectedEmpadronado.vive ? 'default' : 'outline'}>
+                                          {selectedEmpadronado.vive ? 'Sí' : 'No'}
                                         </Badge>
                                       </div>
                                     </div>
-                                   </div>
-                                 </div>
+                                  </div>
+                                </div>
 
-                                 {/* Vehículos */}
-                                 {selectedEmpadronado.vehiculos && selectedEmpadronado.vehiculos.length > 0 && (
-                                   <>
-                                     <Separator />
-                                     <div>
-                                       <h4 className="font-semibold mb-3">Vehículos</h4>
-                                       <div className="space-y-2">
-                                         {selectedEmpadronado.vehiculos.map((vehiculo, index) => (
-                                           <div key={index} className="flex items-center gap-2">
-                                             <Badge variant="outline" className="text-xs">
-                                               {vehiculo.placa} ({vehiculo.tipo})
-                                             </Badge>
-                                           </div>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   </>
-                                 )}
+                                {/* Vehículos */}
+                                {selectedEmpadronado.vehiculos && selectedEmpadronado.vehiculos.length > 0 && (
+                                  <>
+                                    <Separator />
+                                    <div>
+                                      <h4 className="font-semibold mb-3">Vehículos</h4>
+                                      <div className="space-y-2">
+                                        {selectedEmpadronado.vehiculos.map((vehiculo, index) => (
+                                          <div key={index} className="flex items-center gap-2">
+                                            <Badge variant="outline" className="text-xs">
+                                              {vehiculo.placa} ({vehiculo.tipo})
+                                            </Badge>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
 
-                                 {/* Miembros de Familia */}
-                                 {selectedEmpadronado.miembrosFamilia && selectedEmpadronado.miembrosFamilia.length > 0 && (
-                                   <>
-                                     <Separator />
-                                     <div>
-                                       <h4 className="font-semibold mb-3">Miembros de Familia</h4>
-                                       <div className="space-y-2">
-                                         {selectedEmpadronado.miembrosFamilia.map((miembro, index) => (
-                                           <div key={index} className="border-l-2 border-muted pl-3">
-                                             <p className="font-medium">{miembro.nombre} {miembro.apellidos}</p>
-                                             <p className="text-muted-foreground text-xs">
-                                               {miembro.parentezco} • {miembro.cumpleanos}
-                                             </p>
-                                           </div>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   </>
-                                 )}
+                                {/* Miembros de Familia */}
+                                {selectedEmpadronado.miembrosFamilia && selectedEmpadronado.miembrosFamilia.length > 0 && (
+                                  <>
+                                    <Separator />
+                                    <div>
+                                      <h4 className="font-semibold mb-3">Miembros de Familia</h4>
+                                      <div className="space-y-2">
+                                        {selectedEmpadronado.miembrosFamilia.map((miembro, index) => (
+                                          <div key={index} className="border-l-2 border-muted pl-3">
+                                            <p className="font-medium">{miembro.nombre} {miembro.apellidos}</p>
+                                            <p className="text-muted-foreground text-xs">{miembro.parentezco} • {miembro.cumpleanos}</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
 
                                 {/* Observaciones */}
                                 {selectedEmpadronado.observaciones && (
@@ -854,19 +835,14 @@ const Empadronados: React.FC = () => {
                         </SheetContent>
                       </Sheet>
 
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => navigate(`/padron/editar/${empadronado.id}`)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/padron/editar/${empadronado.id}`)}>
                         <Edit3 className="h-4 w-4" />
                       </Button>
-                      
+
                       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                         <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => {
                               setSelectedEmpadronado(empadronado);
@@ -877,29 +853,29 @@ const Empadronados: React.FC = () => {
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
-                           <AlertDialogHeader>
-                             <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
-                             <AlertDialogDescription>
-                               Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
-                               {!canDeleteWithoutAuth && " Se requiere autorización de presidencia."}
-                               {canDeleteWithoutAuth && " Como Presidente, puede eliminar directamente."}
-                             </AlertDialogDescription>
-                           </AlertDialogHeader>
-                          
-                           <div className="space-y-4">
-                             {!canDeleteWithoutAuth && (
-                               <div>
-                                 <Label htmlFor="delete-password">Clave de Presidencia</Label>
-                                 <Input
-                                   id="delete-password"
-                                   type="password"
-                                   value={deletePassword}
-                                   onChange={(e) => setDeletePassword(e.target.value)}
-                                   placeholder="Ingrese la clave"
-                                 />
-                               </div>
-                             )}
-                            
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
+                              {!canDeleteWithoutAuth && " Se requiere autorización de presidencia."}
+                              {canDeleteWithoutAuth && " Como Presidente, puede eliminar directamente."}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+
+                          <div className="space-y-4">
+                            {!canDeleteWithoutAuth && (
+                              <div>
+                                <Label htmlFor="delete-password">Clave de Presidencia</Label>
+                                <Input
+                                  id="delete-password"
+                                  type="password"
+                                  value={deletePassword}
+                                  onChange={(e) => setDeletePassword(e.target.value)}
+                                  placeholder="Ingrese la clave"
+                                />
+                              </div>
+                            )}
+
                             <div>
                               <Label htmlFor="delete-motivo">Motivo de Eliminación</Label>
                               <Textarea
@@ -909,7 +885,7 @@ const Empadronados: React.FC = () => {
                                 placeholder="Describa el motivo de la eliminación"
                               />
                             </div>
-                            
+
                             <div>
                               <Label htmlFor="delete-pdf">Acta de Eliminación (PDF)</Label>
                               <Input
@@ -920,7 +896,7 @@ const Empadronados: React.FC = () => {
                               />
                             </div>
                           </div>
-                          
+
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
@@ -946,8 +922,7 @@ const Empadronados: React.FC = () => {
               <p className="text-muted-foreground mb-4">
                 {searchTerm || filterStatus !== 'all' || filterVivienda !== 'all' || filterVive !== 'all'
                   ? 'Intente modificar los filtros de búsqueda'
-                  : 'Comience agregando un nuevo empadronado'
-                }
+                  : 'Comience agregando un nuevo empadronado'}
               </p>
               {(!searchTerm && filterStatus === 'all' && filterVivienda === 'all' && filterVive === 'all') && (
                 <Button onClick={() => navigate('/padron/nuevo')}>
@@ -959,7 +934,6 @@ const Empadronados: React.FC = () => {
           )}
         </CardContent>
       </Card>
-
 
       {/* Modal de gestionar permisos */}
       <GestionarPermisosModal

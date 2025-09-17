@@ -1,3 +1,4 @@
+// src/services/empadronados.ts
 import {
   ref,
   push,
@@ -26,8 +27,7 @@ const EMPADRONADOS_PATH = "empadronados";
    Helpers de periodos / fechas
    ────────────────────────────────────────────────────────────── */
 const pad2 = (n: number) => String(n).padStart(2, "0");
-const periodKeyFromDate = (d: Date) =>
-  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // 2025-09
+const periodKeyFromDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // 2025-09
 const compact = (period: string) => period.replace("-", ""); // 2025-09 -> 202509
 const addMonths = (period: string, n: number) => {
   const [y, m] = period.split("-").map(Number);
@@ -40,7 +40,7 @@ const monthsBetween = (from: string, to: string) => {
   return (ty - fy) * 12 + (tm - fm);
 };
 
-// Inicio histórico: 15 de enero 2025 - todos los usuarios deben tener cuotas desde esta fecha
+// Inicio histórico (ajusta si cambia la política)
 const START_PERIOD = "2025-01";
 
 /* ──────────────────────────────────────────────────────────────
@@ -51,9 +51,8 @@ const getCobranzasConfig = async (): Promise<{
   diaVencimiento: number;
 }> => {
   const snap = await get(ref(db, "cobranzas/configuracion"));
-  if (!snap.exists()) {
-    return { montoMensual: 50, diaVencimiento: 15 };
-  }
+  if (!snap.exists()) return { montoMensual: 50, diaVencimiento: 15 };
+
   const cfg = snap.val() as any;
   return {
     montoMensual: Number(cfg.montoMensual ?? 50),
@@ -70,22 +69,18 @@ const ensurePagoForMemberPeriod = async (
   emp: Pick<Empadronado, "id" | "numeroPadron">,
   period: string,
   authorUid: string = "system"
-) => {
+): Promise<boolean> => {
   const y = Number(period.slice(0, 4));
   const m = Number(period.slice(5, 7));
   const yyyymm = compact(period);
 
-  // Índice de unicidad (si ya existe, no crea otro)
+  // Evitar duplicados por (empadronado, periodo)
   const lockRef = ref(db, `cobranzas/pagos_index/${emp.id}/${yyyymm}`);
-  const tx = await runTransaction(lockRef, (cur) =>
-    cur ? cur : { createdAt: Date.now() }
-  );
+  const tx = await runTransaction(lockRef, (cur) => (cur ? cur : { createdAt: Date.now() }));
   if (!tx.committed) return false;
 
   const { montoMensual, diaVencimiento } = await getCobranzasConfig();
-  const fechaVenc = new Date(y, m - 1, diaVencimiento).toLocaleDateString(
-    "es-PE"
-  );
+  const fechaVenc = new Date(y, m - 1, diaVencimiento).toLocaleDateString("es-PE");
 
   const pagosRef = ref(db, "cobranzas/pagos");
   const pagoRef = push(pagosRef);
@@ -95,7 +90,7 @@ const ensurePagoForMemberPeriod = async (
     empadronadoId: emp.id,
     numeroPadron: emp.numeroPadron || "",
     mes: m,
-    año: y,
+    año: y, // si tu type usa 'anio', cámbialo aquí y en el tipo Pago
     monto: montoMensual,
     montoOriginal: montoMensual,
     fechaVencimiento: fechaVenc,
@@ -116,7 +111,7 @@ export const ensureChargesForNewMember = async (
   empId: string,
   startPeriod: string = START_PERIOD,
   authorUid: string = "system"
-) => {
+): Promise<number> => {
   const empSnap = await get(ref(db, `${EMPADRONADOS_PATH}/${empId}`));
   if (!empSnap.exists()) return 0;
   const emp = empSnap.val() as Empadronado;
@@ -138,11 +133,11 @@ export const ensureChargesForNewMember = async (
   return created;
 };
 
-// Backfill para TODOS los empadronados (ejecutar una sola vez)
+// Backfill para TODOS los empadronados (ejecutar una sola vez si hace falta)
 export const backfillChargesForAllEmpadronados = async (
   startPeriod: string = START_PERIOD,
   authorUid: string = "system"
-) => {
+): Promise<number> => {
   const snap = await get(ref(db, EMPADRONADOS_PATH));
   if (!snap.exists()) return 0;
 
@@ -160,14 +155,12 @@ export const backfillChargesForAllEmpadronados = async (
 // Asegura solo la cuota del MES ACTUAL (con bloqueo de periodo)
 export const ensureCurrentMonthChargesForAll = async (
   authorUid: string = "system"
-) => {
+): Promise<number> => {
   const period = periodKeyFromDate(new Date());
   const yyyymm = compact(period);
   const periodLock = ref(db, `cobranzas/periods/${yyyymm}/generated`);
 
-  const tx = await runTransaction(periodLock, (cur) =>
-    cur ? cur : { at: Date.now() }
-  );
+  const tx = await runTransaction(periodLock, (cur) => (cur ? cur : { at: Date.now() }));
   if (!tx.committed) return 0;
 
   const snap = await get(ref(db, EMPADRONADOS_PATH));
@@ -193,8 +186,7 @@ export const ensureCurrentMonthChargesForAll = async (
    Utils
    ────────────────────────────────────────────────────────────── */
 const removeUndefined = (obj: any): any => {
-  if (Array.isArray(obj))
-    return obj.map(removeUndefined).filter((item) => item !== undefined);
+  if (Array.isArray(obj)) return obj.map(removeUndefined).filter((item) => item !== undefined);
   if (obj !== null && typeof obj === "object") {
     const cleanObj: any = {};
     Object.keys(obj).forEach((key) => {
@@ -209,11 +201,7 @@ const removeUndefined = (obj: any): any => {
 /* ──────────────────────────────────────────────────────────────
    Vinculación con usuarios del sistema
    ────────────────────────────────────────────────────────────── */
-export const linkAuthToEmpadronado = async (
-  empadronadoId: string,
-  uid: string,
-  email: string
-) => {
+export const linkAuthToEmpadronado = async (empadronadoId: string, uid: string, email: string) => {
   await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
     authUid: uid,
     emailAcceso: email,
@@ -233,27 +221,21 @@ export const unlinkAuthFromEmpadronado = async (empadronadoId: string) => {
    Búsqueda directa por DNI o Nº de padrón
    (usa índices .indexOn ["dni","numeroPadron"] en las reglas)
    ────────────────────────────────────────────────────────────── */
-export const findEmpadronadoByDniOrPadron = async (
-  term: string
-): Promise<Empadronado | null> => {
+export const findEmpadronadoByDniOrPadron = async (term: string): Promise<Empadronado | null> => {
   const t = (term || "").trim();
   if (!t) return null;
 
-  // 1) Buscar por número de padrón
-  let q = query(
-    ref(db, EMPADRONADOS_PATH),
-    orderByChild("numeroPadron"),
-    equalTo(t)
-  );
-  let snap = await get(q);
+  // 1) Por número de padrón
+  let q1 = query(ref(db, EMPADRONADOS_PATH), orderByChild("numeroPadron"), equalTo(t));
+  let snap = await get(q1);
   if (snap.exists()) {
     const v = snap.val();
     return (Object.values(v)[0] as Empadronado) ?? null;
   }
 
-  // 2) Buscar por DNI
-  q = query(ref(db, EMPADRONADOS_PATH), orderByChild("dni"), equalTo(t));
-  snap = await get(q);
+  // 2) Por DNI
+  let q2 = query(ref(db, EMPADRONADOS_PATH), orderByChild("dni"), equalTo(t));
+  snap = await get(q2);
   if (snap.exists()) {
     const v = snap.val();
     return (Object.values(v)[0] as Empadronado) ?? null;
@@ -266,7 +248,7 @@ export const findEmpadronadoByDniOrPadron = async (
    CRUD Empadronados
    ────────────────────────────────────────────────────────────── */
 
-// Crear empadronado → AUTOGENERA pagos desde 2025-01 (si está habilitado)
+// Crear empadronado → AUTOGENERA pagos desde START_PERIOD (si está habilitado)
 export const createEmpadronado = async (
   data: CreateEmpadronadoForm,
   actorUid: string
@@ -283,10 +265,9 @@ export const createEmpadronado = async (
       creadoPor: actorUid,
     };
 
-    const cleanData = removeUndefined(empadronado);
-    await set(empadronadoRef, cleanData);
+    await set(empadronadoRef, removeUndefined(empadronado));
 
-    // Generar automáticamente cuotas desde enero 2025 para todos los empadronados
+    // Genera cuotas históricas desde START_PERIOD
     await ensureChargesForNewMember(id, START_PERIOD, actorUid);
 
     await writeAuditLog({
@@ -317,9 +298,7 @@ export const getEmpadronados = async (): Promise<Empadronado[]> => {
 };
 
 // Obtener por ID
-export const getEmpadronado = async (
-  id: string
-): Promise<Empadronado | null> => {
+export const getEmpadronado = async (id: string): Promise<Empadronado | null> => {
   try {
     const snapshot = await get(ref(db, `${EMPADRONADOS_PATH}/${id}`));
     return snapshot.exists() ? (snapshot.val() as Empadronado) : null;
@@ -329,7 +308,7 @@ export const getEmpadronado = async (
   }
 };
 
-// Alias claro para otros módulos
+// Alias claro por si lo usas en otros módulos
 export const getEmpadronadoById = getEmpadronado;
 
 // Actualizar
@@ -394,23 +373,22 @@ export const deleteEmpadronado = async (
   }
 };
 
-// Buscar (cliente) — mantiene compatibilidad con tu UI
-export const searchEmpadronados = async (
-  searchTerm: string
-): Promise<Empadronado[]> => {
+// Buscar (cliente) — compatible con tu UI actual
+export const searchEmpadronados = async (searchTerm: string): Promise<Empadronado[]> => {
   try {
     const empadronados = await getEmpadronados();
     const term = (searchTerm || "").toLowerCase();
 
-    return empadronados.filter((e) => {
-      const hayMiembros = Array.isArray((e as any).miembrosFamilia);
+    return empadronados.filter((e: any) => {
+      const hayMiembros = Array.isArray(e?.miembrosFamilia);
       const matchMiembros =
         hayMiembros &&
-        (e as any).miembrosFamilia.some(
+        e.miembrosFamilia.some(
           (m: any) =>
             String(m?.nombre || "").toLowerCase().includes(term) ||
             String(m?.apellidos || "").toLowerCase().includes(term)
         );
+
       return (
         String(e.nombre || "").toLowerCase().includes(term) ||
         String(e.apellidos || "").toLowerCase().includes(term) ||
@@ -462,31 +440,27 @@ export const isNumeroPadronUnique = async (
 ): Promise<boolean> => {
   try {
     const empadronados = await getEmpadronados();
-    return !empadronados.some(
-      (e) => e.numeroPadron === numeroPadron && e.id !== excludeId
-    );
+    return !empadronados.some((e) => e.numeroPadron === numeroPadron && e.id !== excludeId);
   } catch (error) {
     console.error("Error checking numero padron:", error);
     return false;
   }
 };
 
+// Buscar empadronado por authUid (acceso rápido desde sesión)
 export const obtenerEmpadronadoPorAuthUid = async (authUid: string): Promise<Empadronado | null> => {
   try {
     const empadronadosRef = ref(db, EMPADRONADOS_PATH);
-    const empadronadosQuery = query(empadronadosRef, orderByChild('authUid'), equalTo(authUid));
+    const empadronadosQuery = query(empadronadosRef, orderByChild("authUid"), equalTo(authUid));
     const snapshot = await get(empadronadosQuery);
-    
+
     if (!snapshot.exists()) return null;
-    
+
     let empadronado: Empadronado | null = null;
     snapshot.forEach((child) => {
-      empadronado = {
-        id: child.key!,
-        ...child.val()
-      };
+      empadronado = { id: child.key!, ...(child.val() as Empadronado) };
     });
-    
+
     return empadronado;
   } catch (error) {
     console.error("Error getting empadronado by authUid:", error);
