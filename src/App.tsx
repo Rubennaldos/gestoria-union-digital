@@ -22,6 +22,7 @@ import Empadronados from "./pages/Empadronados";
 import EmpadronadoForm from "./pages/EmpadronadoForm";
 import ImportacionRTDB from "./pages/ImportacionRTDB";
 import Cobranzas from "./pages/Cobranzas";
+import CobranzasV2 from "./pages/CobranzasV2";
 import Sanciones from "./pages/Sanciones";
 import Deportes from "./pages/Deportes";
 import Patrimonio from "./pages/Patrimonio";
@@ -131,6 +132,14 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Cobranzas />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cobranzas-v2"
+                element={
+                  <ProtectedRoute>
+                    <CobranzasV2 />
                   </ProtectedRoute>
                 }
               />

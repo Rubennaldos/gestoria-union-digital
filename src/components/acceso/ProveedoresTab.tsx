@@ -62,11 +62,13 @@ export function ProveedoresTab() {
 
       // Tipado EXACTO del payload del servicio
       const registro: Parameters<typeof registrarProveedor>[0] = {
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         empadronadoId,
         tipoAcceso,
         placa: tipoAcceso === "vehicular" ? placa.toUpperCase() : undefined,
         empresa: nombreEmpresa,
         tipoServicio,
+        fechaCreacion: Date.now(),
         porticoId: "principal",
       };
 
