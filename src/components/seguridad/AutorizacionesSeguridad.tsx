@@ -7,15 +7,12 @@ import { Check, X, Clock, Users, UserCheck, Shield } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { cambiarEstadoAcceso } from "@/services/acceso";
-import { getEmpadronado } from "@/services/empadronados";
-import { Empadronado } from "@/types/empadronados";
 
 interface AutorizacionPendiente {
   id: string;
   tipo: "visitante" | "trabajador" | "proveedor";
   data: RegistroVisita | RegistroTrabajadores | RegistroProveedor;
   fechaCreacion: number;
-  empadronado?: Empadronado;
 }
 
 function tsFrom(obj: any): number {
@@ -33,7 +30,7 @@ export const AutorizacionesSeguridad = () => {
   const { data: proveedores } = useFirebaseData<Record<string, RegistroProveedor>>("acceso/proveedores");
 
   useEffect(() => {
-    const cargarAutorizaciones = async () => {
+    const cargarAutorizaciones = () => {
       setCargando(true);
       console.log("Cargando autorizaciones...");
       const pendientes: AutorizacionPendiente[] = [];
@@ -42,27 +39,13 @@ export const AutorizacionesSeguridad = () => {
         console.log("Procesando visitas:", Object.keys(visitas).length);
         for (const [id, v] of Object.entries(visitas)) {
           if ((v as any).estado === "pendiente") {
-            console.log(`Procesando visita ${id}, empadronadoId: ${v.empadronadoId}`);
-            try {
-              const empadronado = await getEmpadronado(v.empadronadoId);
-              console.log(`Empadronado obtenido para ${id}:`, empadronado?.nombre || "No encontrado");
-              pendientes.push({ 
-                id, 
-                tipo: "visitante", 
-                data: v, 
-                fechaCreacion: tsFrom(v),
-                empadronado: empadronado || undefined
-              });
-            } catch (error) {
-              console.error(`Error obteniendo empadronado para visita ${id}:`, error);
-              pendientes.push({ 
-                id, 
-                tipo: "visitante", 
-                data: v, 
-                fechaCreacion: tsFrom(v),
-                empadronado: undefined
-              });
-            }
+            console.log(`Procesando visita ${id}`);
+            pendientes.push({ 
+              id, 
+              tipo: "visitante", 
+              data: v, 
+              fechaCreacion: tsFrom(v)
+            });
           }
         }
       }
@@ -71,27 +54,13 @@ export const AutorizacionesSeguridad = () => {
         console.log("Procesando trabajadores:", Object.keys(trabajadores).length);
         for (const [id, t] of Object.entries(trabajadores)) {
           if ((t as any).estado === "pendiente") {
-            console.log(`Procesando trabajador ${id}, empadronadoId: ${t.empadronadoId}`);
-            try {
-              const empadronado = await getEmpadronado(t.empadronadoId);
-              console.log(`Empadronado obtenido para trabajador ${id}:`, empadronado?.nombre || "No encontrado");
-              pendientes.push({ 
-                id, 
-                tipo: "trabajador", 
-                data: t, 
-                fechaCreacion: tsFrom(t),
-                empadronado: empadronado || undefined
-              });
-            } catch (error) {
-              console.error(`Error obteniendo empadronado para trabajador ${id}:`, error);
-              pendientes.push({ 
-                id, 
-                tipo: "trabajador", 
-                data: t, 
-                fechaCreacion: tsFrom(t),
-                empadronado: undefined
-              });
-            }
+            console.log(`Procesando trabajador ${id}`);
+            pendientes.push({ 
+              id, 
+              tipo: "trabajador", 
+              data: t, 
+              fechaCreacion: tsFrom(t)
+            });
           }
         }
       }
@@ -100,27 +69,13 @@ export const AutorizacionesSeguridad = () => {
         console.log("Procesando proveedores:", Object.keys(proveedores).length);
         for (const [id, p] of Object.entries(proveedores)) {
           if ((p as any).estado === "pendiente") {
-            console.log(`Procesando proveedor ${id}, empadronadoId: ${p.empadronadoId}`);
-            try {
-              const empadronado = await getEmpadronado(p.empadronadoId);
-              console.log(`Empadronado obtenido para proveedor ${id}:`, empadronado?.nombre || "No encontrado");
-              pendientes.push({ 
-                id, 
-                tipo: "proveedor", 
-                data: p, 
-                fechaCreacion: tsFrom(p),
-                empadronado: empadronado || undefined
-              });
-            } catch (error) {
-              console.error(`Error obteniendo empadronado para proveedor ${id}:`, error);
-              pendientes.push({ 
-                id, 
-                tipo: "proveedor", 
-                data: p, 
-                fechaCreacion: tsFrom(p),
-                empadronado: undefined
-              });
-            }
+            console.log(`Procesando proveedor ${id}`);
+            pendientes.push({ 
+              id, 
+              tipo: "proveedor", 
+              data: p, 
+              fechaCreacion: tsFrom(p)
+            });
           }
         }
       }
@@ -232,33 +187,22 @@ export const AutorizacionesSeguridad = () => {
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium text-sm">Solicitado por:</span>
                       </div>
-                      {auth.empadronado ? (
+                      {(auth.data as any).vecinoSolicitante ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                           <div>
                             <span className="font-medium">Vecino:</span>
                             <p className="text-muted-foreground">
-                              {auth.empadronado.nombre} {auth.empadronado.apellidos}
+                              {(auth.data as any).vecinoSolicitante.nombre}
                             </p>
                           </div>
                           <div>
                             <span className="font-medium">Padrón:</span>
-                            <p className="text-muted-foreground">{auth.empadronado.numeroPadron}</p>
+                            <p className="text-muted-foreground">{(auth.data as any).vecinoSolicitante.numeroPadron}</p>
                           </div>
-                        </div>
-                      ) : cargando ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                          <span>Cargando información del vecino...</span>
                         </div>
                       ) : (
                         <div className="text-sm">
-                          <p className="text-destructive mb-2">⚠️ Vecino no encontrado</p>
-                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
-                            <div className="text-xs text-muted-foreground space-y-1">
-                              <p><span className="font-medium">ID Solicitante:</span> {(auth.data as any).empadronadoId}</p>
-                              <p className="text-yellow-700">El vecino puede haber sido eliminado o el ID es inválido</p>
-                            </div>
-                          </div>
+                          <p className="text-muted-foreground">Información del vecino no disponible</p>
                         </div>
                       )}
                     </div>
