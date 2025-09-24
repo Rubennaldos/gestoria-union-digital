@@ -251,7 +251,15 @@ export const AutorizacionesSeguridad = () => {
                           <span>Cargando información del vecino...</span>
                         </div>
                       ) : (
-                        <p className="text-sm text-destructive">Error: No se pudo cargar la información del vecino</p>
+                        <div className="text-sm">
+                          <p className="text-destructive mb-2">⚠️ Vecino no encontrado</p>
+                          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                            <div className="text-xs text-muted-foreground space-y-1">
+                              <p><span className="font-medium">ID Solicitante:</span> {(auth.data as any).empadronadoId}</p>
+                              <p className="text-yellow-700">El vecino puede haber sido eliminado o el ID es inválido</p>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
 
