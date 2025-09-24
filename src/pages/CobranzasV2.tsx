@@ -43,7 +43,9 @@ import {
   obtenerChargesV2,
   obtenerChargesPorEmpadronadoV2,
   crearEgresoV2,
-  registrarPagoV2
+  registrarPagoV2,
+  crearIngresoV2,
+  obtenerIngresosV2
 } from "@/services/cobranzas-v2";
 
 import { getEmpadronados } from "@/services/empadronados";

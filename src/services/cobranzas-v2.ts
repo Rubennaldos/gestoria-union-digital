@@ -507,6 +507,7 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
       }
     }
 
+    // Calcular tasa de cobranza
     const tasaCobranza = cargosMesTotal > 0 ? (cargosMesPagados / cargosMesTotal) * 100 : 0;
     const saldoMes = ingresosMes - egresosMes;
 
@@ -525,6 +526,38 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
   } catch (error) {
     console.error("Error generando estadísticas V2:", error);
     throw error;
+  }
+}
+
+// === INGRESOS ===
+export async function crearIngresoV2(ingreso: Omit<IngresoV2, 'id'>): Promise<IngresoV2> {
+  try {
+    const ingresoRef = push(ref(db, `${BASE_PATH}/ingresos`));
+    const nuevoIngreso: IngresoV2 = {
+      ...ingreso,
+      id: ingresoRef.key!
+    };
+    
+    await set(ingresoRef, nuevoIngreso);
+    return nuevoIngreso;
+  } catch (error) {
+    console.error("Error creando ingreso V2:", error);
+    throw error;
+  }
+}
+
+export async function obtenerIngresosV2(): Promise<IngresoV2[]> {
+  try {
+    const ingresosSnapshot = await get(ref(db, `${BASE_PATH}/ingresos`));
+    if (!ingresosSnapshot.exists()) {
+      return [];
+    }
+
+    const ingresosData = ingresosSnapshot.val();
+    return (Object.values(ingresosData) as IngresoV2[]).sort((a, b) => b.fecha - a.fecha);
+  } catch (error) {
+    console.error("Error obteniendo ingresos V2:", error);
+    return [];
   }
 }
 
@@ -552,19 +585,15 @@ export async function obtenerEgresosV2(): Promise<EgresoV2[]> {
       return [];
     }
 
-    const egresos: EgresoV2[] = [];
-    egresosSnapshot.forEach((child) => {
-      egresos.push(child.val());
-    });
-
-    return egresos.sort((a, b) => b.fecha - a.fecha);
+    const egresosData = egresosSnapshot.val();
+    return (Object.values(egresosData) as EgresoV2[]).sort((a, b) => b.fecha - a.fecha);
   } catch (error) {
     console.error("Error obteniendo egresos V2:", error);
     return [];
   }
 }
 
-// === OBTENER DATOS ===
+// === DATOS GENERALES ===
 export async function obtenerPagosV2(): Promise<PagoV2[]> {
   try {
     const pagosSnapshot = await get(ref(db, `${BASE_PATH}/pagos`));
@@ -572,12 +601,8 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
       return [];
     }
 
-    const pagos: PagoV2[] = [];
-    pagosSnapshot.forEach((child) => {
-      pagos.push(child.val());
-    });
-
-    return pagos.sort((a, b) => b.fechaPago - a.fechaPago);
+    const pagosData = pagosSnapshot.val();
+    return (Object.values(pagosData) as PagoV2[]).sort((a, b) => b.fechaPago - a.fechaPago);
   } catch (error) {
     console.error("Error obteniendo pagos V2:", error);
     return [];
@@ -591,30 +616,45 @@ export async function obtenerChargesV2(): Promise<ChargeV2[]> {
       return [];
     }
 
-    const charges: ChargeV2[] = [];
     const allCharges = chargesSnapshot.val();
-    
+    const chargesList: ChargeV2[] = [];
+
     for (const period in allCharges) {
       for (const empId in allCharges[period]) {
         for (const chargeId in allCharges[period][empId]) {
-          charges.push(allCharges[period][empId][chargeId]);
+          chargesList.push(allCharges[period][empId][chargeId]);
         }
       }
     }
 
-    return charges.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
+    return chargesList.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
   } catch (error) {
-    console.error("Error obteniendo cargos V2:", error);
+    console.error("Error obteniendo charges V2:", error);
     return [];
   }
 }
 
 export async function obtenerChargesPorEmpadronadoV2(empadronadoId: string): Promise<ChargeV2[]> {
   try {
-    const charges = await obtenerChargesV2();
-    return charges.filter(c => c.empadronadoId === empadronadoId);
+    const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+    if (!chargesSnapshot.exists()) {
+      return [];
+    }
+
+    const allCharges = chargesSnapshot.val();
+    const chargesList: ChargeV2[] = [];
+
+    for (const period in allCharges) {
+      if (allCharges[period][empadronadoId]) {
+        for (const chargeId in allCharges[period][empadronadoId]) {
+          chargesList.push(allCharges[period][empadronadoId][chargeId]);
+        }
+      }
+    }
+
+    return chargesList.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
   } catch (error) {
-    console.error("Error obteniendo cargos por empadronado V2:", error);
+    console.error("Error obteniendo charges por empadronado V2:", error);
     return [];
   }
 }
