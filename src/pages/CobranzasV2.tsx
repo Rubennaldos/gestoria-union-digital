@@ -45,7 +45,8 @@ import {
   crearEgresoV2,
   registrarPagoV2,
   crearIngresoV2,
-  obtenerIngresosV2
+  obtenerIngresosV2,
+  obtenerReporteDeudores
 } from "@/services/cobranzas-v2";
 
 import { getEmpadronados } from "@/services/empadronados";
@@ -401,6 +402,52 @@ export default function CobranzasV2() {
                 <UserCheck className="h-4 w-4 mr-2" />
                 Ejecutar Cierre
               </Button>
+
+              <Button 
+                onClick={async () => {
+                  try {
+                    const reporte = await obtenerReporteDeudores();
+                    
+                    if (reporte.length === 0) {
+                      toast({
+                        title: "Sin deudores",
+                        description: "No hay empadronados con deudas pendientes"
+                      });
+                      return;
+                    }
+
+                    // Crear CSV del reporte
+                    const csvHeaders = "Nombre,Apellidos,Padron,Deuda Total,Periodos Vencidos,Estado\n";
+                    const csvData = reporte.map(item => 
+                      `"${item.nombre}","${item.apellidos}","${item.numeroPadron}","${item.deudaTotal.toFixed(2)}","${item.periodosVencidos.join(', ')}","${item.esMoroso ? 'Moroso' : 'Pendiente'}"`
+                    ).join('\n');
+
+                    const blob = new Blob([csvHeaders + csvData], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `reporte_deudores_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+
+                    toast({
+                      title: "Reporte generado",
+                      description: `Se encontraron ${reporte.length} deudores`
+                    });
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Error generando el reporte",
+                      variant: "destructive"
+                    });
+                  }
+                }}
+                disabled={procesando}
+                variant="secondary"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Deudores
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -506,67 +553,354 @@ export default function CobranzasV2() {
 
           {/* Tab Pagos Recientes */}
           <TabsContent value="pagos">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-5 w-5" />
-                  Pagos Recientes ({pagos.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {pagos.slice(0, 20).map((pago) => {
-                    const emp = empadronados.find(e => e.id === pago.empadronadoId);
-                    
-                    return (
-                      <div key={pago.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">
-                            {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Período: {pago.periodo} | {formatearFecha(pago.fechaPago)}
-                          </div>
-                          {pago.descuentoProntoPago && (
-                            <div className="text-xs text-green-600">
-                              Descuento pronto pago: {formatearMoneda(pago.descuentoProntoPago)}
-                            </div>
-                          )}
-                        </div>
+            <div className="space-y-6">
+              {/* Formulario de registro de pagos */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Receipt className="h-5 w-5" />
+                    Registrar Nuevo Pago
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="empadronado-pago">Empadronado</Label>
+                      <Select
+                        value={nuevoPago.empadronadoId}
+                        onValueChange={(value) => setNuevoPago({...nuevoPago, empadronadoId: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar empadronado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {empadronados.map((emp) => (
+                            <SelectItem key={emp.id} value={emp.id}>
+                              {emp.nombre} {emp.apellidos} ({emp.numeroPadron})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="periodo-pago">Período (YYYYMM)</Label>
+                      <Input
+                        id="periodo-pago"
+                        placeholder="202501"
+                        value={nuevoPago.periodo}
+                        onChange={(e) => setNuevoPago({...nuevoPago, periodo: e.target.value})}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="monto-pago">Monto</Label>
+                      <Input
+                        id="monto-pago"
+                        type="number"
+                        step="0.01"
+                        value={nuevoPago.monto}
+                        onChange={(e) => setNuevoPago({...nuevoPago, monto: parseFloat(e.target.value) || 0})}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="metodo-pago">Método de Pago</Label>
+                      <Select
+                        value={nuevoPago.metodoPago}
+                        onValueChange={(value) => setNuevoPago({...nuevoPago, metodoPago: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="efectivo">Efectivo</SelectItem>
+                          <SelectItem value="transferencia">Transferencia</SelectItem>
+                          <SelectItem value="yape">Yape</SelectItem>
+                          <SelectItem value="plin">Plin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="numero-operacion">Número de Operación</Label>
+                      <Input
+                        id="numero-operacion"
+                        placeholder="Opcional"
+                        value={nuevoPago.numeroOperacion}
+                        onChange={(e) => setNuevoPago({...nuevoPago, numeroOperacion: e.target.value})}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="observaciones-pago">Observaciones</Label>
+                      <Input
+                        id="observaciones-pago"
+                        placeholder="Opcional"
+                        value={nuevoPago.observaciones}
+                        onChange={(e) => setNuevoPago({...nuevoPago, observaciones: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <Button onClick={async () => {
+                      if (!nuevoPago.empadronadoId || !nuevoPago.periodo || nuevoPago.monto <= 0) {
+                        toast({
+                          title: "Error",
+                          description: "Complete todos los campos requeridos",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      try {
+                        // Buscar el cargo correspondiente
+                        const chargesEmp = await obtenerChargesPorEmpadronadoV2(nuevoPago.empadronadoId);
+                        const cargo = chargesEmp.find(c => c.periodo === nuevoPago.periodo);
                         
-                        <div className="text-right">
-                          <div className="font-medium text-green-600">
-                            {formatearMoneda(pago.monto)}
+                        if (!cargo) {
+                          toast({
+                            title: "Error",
+                            description: "No se encontró cargo para este período",
+                            variant: "destructive"
+                          });
+                          return;
+                        }
+
+                        await registrarPagoV2(
+                          cargo.id,
+                          nuevoPago.monto,
+                          nuevoPago.metodoPago,
+                          nuevoPago.numeroOperacion || undefined,
+                          nuevoPago.observaciones || undefined
+                        );
+
+                        setNuevoPago({
+                          empadronadoId: '',
+                          periodo: '',
+                          monto: 0,
+                          metodoPago: 'efectivo',
+                          numeroOperacion: '',
+                          observaciones: ''
+                        });
+
+                        toast({
+                          title: "Pago registrado",
+                          description: "El pago se ha registrado correctamente"
+                        });
+
+                        await cargarDatos();
+                      } catch (error: any) {
+                        toast({
+                          title: "Error",
+                          description: error.message || "Error registrando el pago",
+                          variant: "destructive"
+                        });
+                      }
+                    }} disabled={procesando}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Registrar Pago
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Lista de pagos recientes */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Pagos Recientes ({pagos.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {pagos.slice(0, 20).map((pago) => {
+                      const emp = empadronados.find(e => e.id === pago.empadronadoId);
+                      
+                      return (
+                        <div key={pago.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex-1">
+                            <div className="font-medium">
+                              {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Período: {pago.periodo} | {formatearFecha(pago.fechaPago)}
+                            </div>
+                            {pago.descuentoProntoPago && (
+                              <div className="text-xs text-green-600">
+                                Descuento pronto pago: {formatearMoneda(pago.descuentoProntoPago)}
+                              </div>
+                            )}
                           </div>
-                          <Badge variant="outline">
-                            {pago.metodoPago}
-                          </Badge>
+                          
+                          <div className="text-right">
+                            <div className="font-medium text-green-600">
+                              {formatearMoneda(pago.monto)}
+                            </div>
+                            <Badge variant="outline">
+                              {pago.metodoPago}
+                            </Badge>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Tab Bandeja Economía */}
           <TabsContent value="bandeja">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Bandeja Economía
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center p-8 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Funcionalidad de bandeja economía por implementar</p>
-                  <p className="text-sm">Similar al módulo actual de cobranzas</p>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {/* Resumen financiero */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Ingresos del Mes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {estadisticas ? formatearMoneda(estadisticas.ingresosMes) : 'S/ 0.00'}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Egresos del Mes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-red-600">
+                      {estadisticas ? formatearMoneda(estadisticas.egresosMes) : 'S/ 0.00'}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Saldo del Mes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${
+                      estadisticas && estadisticas.saldoMes >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {estadisticas ? formatearMoneda(estadisticas.saldoMes) : 'S/ 0.00'}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tabla de movimientos */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Movimientos Recientes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* Ingresos recientes */}
+                    {pagos.slice(0, 5).map((pago) => {
+                      const emp = empadronados.find(e => e.id === pago.empadronadoId);
+                      
+                      return (
+                        <div key={`pago-${pago.id}`} className="flex items-center justify-between p-3 border rounded-lg bg-green-50">
+                          <div className="flex items-center gap-3">
+                            <ArrowUpCircle className="h-5 w-5 text-green-600" />
+                            <div>
+                              <div className="font-medium">
+                                Pago - {emp ? `${emp.nombre} ${emp.apellidos}` : 'N/A'}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {formatearFecha(pago.fechaPago)} | Período: {pago.periodo}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium text-green-600">
+                              +{formatearMoneda(pago.monto)}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {pago.metodoPago}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Egresos recientes */}
+                    {egresos.slice(0, 5).map((egreso) => (
+                      <div key={`egreso-${egreso.id}`} className="flex items-center justify-between p-3 border rounded-lg bg-red-50">
+                        <div className="flex items-center gap-3">
+                          <ArrowDownCircle className="h-5 w-5 text-red-600" />
+                          <div>
+                            <div className="font-medium">{egreso.concepto}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatearFecha(egreso.fecha)} | {egreso.categoria}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium text-red-600">
+                            -{formatearMoneda(egreso.monto)}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {egreso.metodoPago}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+
+                    {pagos.length === 0 && egresos.length === 0 && (
+                      <div className="text-center p-8 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No hay movimientos registrados</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Acciones rápidas */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Acciones Rápidas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="outline" onClick={() => {
+                      // Navegar al tab de pagos
+                      const tabsTrigger = document.querySelector('[value="pagos"]') as HTMLElement;
+                      tabsTrigger?.click();
+                    }}>
+                      <Receipt className="h-4 w-4 mr-2" />
+                      Registrar Pago
+                    </Button>
+
+                    <Button variant="outline" onClick={() => {
+                      // Navegar al tab de egresos
+                      const tabsTrigger = document.querySelector('[value="egresos"]') as HTMLElement;
+                      tabsTrigger?.click();
+                    }}>
+                      <ArrowDownCircle className="h-4 w-4 mr-2" />
+                      Registrar Egreso
+                    </Button>
+
+                    <Button variant="outline" onClick={() => {
+                      // Actualizar estadísticas
+                      cargarDatos();
+                    }}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Actualizar Datos
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Tab Egresos */}

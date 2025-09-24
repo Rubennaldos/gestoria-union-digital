@@ -658,3 +658,78 @@ export async function obtenerChargesPorEmpadronadoV2(empadronadoId: string): Pro
     return [];
   }
 }
+
+// === REPORTES Y FUNCIONES ADICIONALES ===
+export async function obtenerReporteDeudores(): Promise<{
+  empadronadoId: string;
+  nombre: string;
+  apellidos: string;
+  numeroPadron: string;
+  deudaTotal: number;
+  periodosVencidos: string[];
+  esMoroso: boolean;
+}[]> {
+  try {
+    const empadronados = await getEmpadronados();
+    const empadronadosActivos = empadronados.filter(e => e.habilitado);
+    const charges = await obtenerChargesV2();
+    
+    const reporte = empadronadosActivos.map(emp => {
+      const chargesEmp = charges.filter(c => c.empadronadoId === emp.id);
+      const deudaTotal = chargesEmp.reduce((total, charge) => total + charge.saldo, 0);
+      const periodosVencidos = chargesEmp
+        .filter(c => c.saldo > 0 && Date.now() > c.fechaVencimiento)
+        .map(c => c.periodo);
+      const esMoroso = chargesEmp.some(c => c.esMoroso);
+      
+      return {
+        empadronadoId: emp.id,
+        nombre: emp.nombre,
+        apellidos: emp.apellidos,
+        numeroPadron: emp.numeroPadron,
+        deudaTotal,
+        periodosVencidos,
+        esMoroso
+      };
+    }).filter(reporte => reporte.deudaTotal > 0); // Solo los que tienen deuda
+    
+    return reporte.sort((a, b) => b.deudaTotal - a.deudaTotal);
+  } catch (error) {
+    console.error("Error obteniendo reporte de deudores V2:", error);
+    return [];
+  }
+}
+
+export async function obtenerEstadoCuentaEmpadronado(empadronadoId: string): Promise<{
+  empadronado: any;
+  charges: ChargeV2[];
+  pagos: PagoV2[];
+  deudaTotal: number;
+  ultimoPago?: PagoV2;
+}> {
+  try {
+    const empadronados = await getEmpadronados();
+    const empadronado = empadronados.find(e => e.id === empadronadoId);
+    
+    if (!empadronado) {
+      throw new Error("Empadronado no encontrado");
+    }
+    
+    const charges = await obtenerChargesPorEmpadronadoV2(empadronadoId);
+    const allPagos = await obtenerPagosV2();
+    const pagos = allPagos.filter(p => p.empadronadoId === empadronadoId);
+    const deudaTotal = charges.reduce((total, charge) => total + charge.saldo, 0);
+    const ultimoPago = pagos[0]; // Ya están ordenados por fecha
+    
+    return {
+      empadronado,
+      charges,
+      pagos,
+      deudaTotal,
+      ultimoPago
+    };
+  } catch (error) {
+    console.error("Error obteniendo estado de cuenta V2:", error);
+    throw error;
+  }
+}
