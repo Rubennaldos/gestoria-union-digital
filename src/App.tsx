@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Routes, Route, Navigate } from "react-router-dom"; // 👈 sin BrowserRouter
+import { Routes, Route, Navigate } from "react-router-dom"; // 👈 el Router está en main.tsx
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthzProvider } from "@/contexts/AuthzContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -42,11 +42,12 @@ const App: React.FC = () => {
         <AuthProvider>
           <AuthzProvider>
             <Routes>
-              {/* Redirigir raíz a /inicio (ruta protegida) */}
+              {/* Raíz → /inicio */}
               <Route path="/" element={<Navigate to="/inicio" replace />} />
 
-              {/* Login público */}
+              {/* Público */}
               <Route path="/login" element={<Login />} />
+              <Route path="/bootstrap" element={<AdminCreator />} />
 
               {/* Inicio protegido */}
               <Route
@@ -58,7 +59,7 @@ const App: React.FC = () => {
                 }
               />
 
-              {/* Admin (solo rol presidencia; super admin por email pasa igual) */}
+              {/* Admin (rol presidencia) */}
               <Route
                 path="/admin/users"
                 element={
@@ -135,14 +136,19 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+
+              {/* 🔧 CORREGIDO: usamos /cobranzas_v2 */}
               <Route
-                path="/cobranzas-v2"
+                path="/cobranzas_v2"
                 element={
                   <ProtectedRoute>
                     <CobranzasV2 />
                   </ProtectedRoute>
                 }
               />
+              {/* Compat: si alguien entra a /cobranzas-v2, lo mando a /cobranzas_v2 */}
+              <Route path="/cobranzas-v2" element={<Navigate to="/cobranzas_v2" replace />} />
+
               <Route
                 path="/pagos-cuotas"
                 element={
@@ -206,7 +212,7 @@ const App: React.FC = () => {
                 }
               />
 
-              {/* Alias de usuarios hacia admin/users (mismo control de rol) */}
+              {/* Alias de /usuarios hacia admin/users */}
               <Route
                 path="/usuarios"
                 element={
@@ -215,9 +221,6 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
-
-              {/* Bootstrap inicial público */}
-              <Route path="/bootstrap" element={<AdminCreator />} />
 
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
