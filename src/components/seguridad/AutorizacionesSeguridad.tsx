@@ -7,12 +7,15 @@ import { Check, X, Clock, Users, UserCheck, Shield } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { cambiarEstadoAcceso } from "@/services/acceso";
+import { getEmpadronado } from "@/services/empadronados";
+import { Empadronado } from "@/types/empadronados";
 
 interface AutorizacionPendiente {
   id: string;
   tipo: "visitante" | "trabajador" | "proveedor";
   data: RegistroVisita | RegistroTrabajadores | RegistroProveedor;
   fechaCreacion: number;
+  empadronado?: Empadronado;
 }
 
 function tsFrom(obj: any): number {
@@ -29,34 +32,59 @@ export const AutorizacionesSeguridad = () => {
   const { data: proveedores } = useFirebaseData<Record<string, RegistroProveedor>>("acceso/proveedores");
 
   useEffect(() => {
-    const pendientes: AutorizacionPendiente[] = [];
+    const cargarAutorizaciones = async () => {
+      const pendientes: AutorizacionPendiente[] = [];
 
-    if (visitas) {
-      Object.entries(visitas).forEach(([id, v]) => {
-        if ((v as any).estado === "pendiente") {
-          pendientes.push({ id, tipo: "visitante", data: v, fechaCreacion: tsFrom(v) });
+      if (visitas) {
+        for (const [id, v] of Object.entries(visitas)) {
+          if ((v as any).estado === "pendiente") {
+            const empadronado = await getEmpadronado(v.empadronadoId);
+            pendientes.push({ 
+              id, 
+              tipo: "visitante", 
+              data: v, 
+              fechaCreacion: tsFrom(v),
+              empadronado: empadronado || undefined
+            });
+          }
         }
-      });
-    }
+      }
 
-    if (trabajadores) {
-      Object.entries(trabajadores).forEach(([id, t]) => {
-        if ((t as any).estado === "pendiente") {
-          pendientes.push({ id, tipo: "trabajador", data: t, fechaCreacion: tsFrom(t) });
+      if (trabajadores) {
+        for (const [id, t] of Object.entries(trabajadores)) {
+          if ((t as any).estado === "pendiente") {
+            const empadronado = await getEmpadronado(t.empadronadoId);
+            pendientes.push({ 
+              id, 
+              tipo: "trabajador", 
+              data: t, 
+              fechaCreacion: tsFrom(t),
+              empadronado: empadronado || undefined
+            });
+          }
         }
-      });
-    }
+      }
 
-    if (proveedores) {
-      Object.entries(proveedores).forEach(([id, p]) => {
-        if ((p as any).estado === "pendiente") {
-          pendientes.push({ id, tipo: "proveedor", data: p, fechaCreacion: tsFrom(p) });
+      if (proveedores) {
+        for (const [id, p] of Object.entries(proveedores)) {
+          if ((p as any).estado === "pendiente") {
+            const empadronado = await getEmpadronado(p.empadronadoId);
+            pendientes.push({ 
+              id, 
+              tipo: "proveedor", 
+              data: p, 
+              fechaCreacion: tsFrom(p),
+              empadronado: empadronado || undefined
+            });
+          }
         }
-      });
-    }
+      }
 
-    pendientes.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
-    setAutorizaciones(pendientes);
+      pendientes.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
+      setAutorizaciones(pendientes);
+    };
+
+    cargarAutorizaciones();
   }, [visitas, trabajadores, proveedores]);
 
   const manejarAutorizacion = async (
@@ -150,7 +178,31 @@ export const AutorizacionesSeguridad = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
+                    {/* Información del vecino solicitante */}
+                    <div className="bg-muted/50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">Solicitado por:</span>
+                      </div>
+                      {auth.empadronado ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="font-medium">Vecino:</span>
+                            <p className="text-muted-foreground">
+                              {auth.empadronado.nombre} {auth.empadronado.apellidos}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Padrón:</span>
+                            <p className="text-muted-foreground">{auth.empadronado.numeroPadron}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Cargando información del vecino...</p>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="font-medium">Tipo de Acceso:</span>
@@ -165,25 +217,50 @@ export const AutorizacionesSeguridad = () => {
 
                       {auth.tipo === "visitante" && (
                         <>
-                          <div>
+                          <div className="md:col-span-2">
                             <span className="font-medium">Visitantes:</span>
-                            <p className="text-muted-foreground">
-                              {(auth.data as RegistroVisita).visitantes.length} personas
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium">Menores:</span>
-                            <p className="text-muted-foreground">{(auth.data as RegistroVisita).menores}</p>
+                            <div className="mt-2 space-y-1">
+                              {(auth.data as RegistroVisita).visitantes.map((visitante, index) => (
+                                <div key={index} className="text-muted-foreground flex items-center gap-2">
+                                  <span className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-xs">
+                                    {index + 1}
+                                  </span>
+                                  <span>{visitante.nombre}</span>
+                                  <span className="text-xs">({visitante.dni})</span>
+                                  {visitante.esMenor && (
+                                    <Badge variant="outline" className="text-xs">Menor</Badge>
+                                  )}
+                                </div>
+                              ))}
+                              {(auth.data as RegistroVisita).menores > 0 && (
+                                <div className="text-muted-foreground flex items-center gap-2 mt-2">
+                                  <span className="text-xs font-medium">
+                                    + {(auth.data as RegistroVisita).menores} menores adicionales
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </>
                       )}
 
                       {auth.tipo === "trabajador" && (
-                        <div>
+                        <div className="md:col-span-2">
                           <span className="font-medium">Trabajadores:</span>
-                          <p className="text-muted-foreground">
-                            {(auth.data as RegistroTrabajadores).trabajadores.length} personas
-                          </p>
+                          <div className="mt-2 space-y-1">
+                            {(auth.data as RegistroTrabajadores).trabajadores.map((trabajador, index) => (
+                              <div key={index} className="text-muted-foreground flex items-center gap-2">
+                                <span className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-xs">
+                                  {index + 1}
+                                </span>
+                                <span>{trabajador.nombre}</span>
+                                <span className="text-xs">({trabajador.dni})</span>
+                                {trabajador.esMaestroObra && (
+                                  <Badge variant="outline" className="text-xs">Maestro de Obra</Badge>
+                                )}
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )}
 
