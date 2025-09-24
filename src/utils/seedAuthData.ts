@@ -240,6 +240,13 @@ export const seedModules = async () => {
       icon: 'CreditCard',
       orden: 19,
       requiereAprobacion: false
+    },
+    cobranzas_v2: {
+      id: 'cobranzas_v2',
+      nombre: 'Cobranzas V2 (Mensual)',
+      icon: 'Calculator',
+      orden: 20,
+      requiereAprobacion: true
     }
   };
 
