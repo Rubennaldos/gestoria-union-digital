@@ -137,11 +137,12 @@ export default function DetalleEmpadronadoModalV2({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[95vh] w-[95vw] overflow-y-auto p-3 sm:p-6">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
-            Detalle de Asociado - Sistema V2
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
+            <span className="hidden sm:inline">Detalle de Asociado - Sistema V2</span>
+            <span className="sm:hidden">Detalle Asociado V2</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -151,22 +152,22 @@ export default function DetalleEmpadronadoModalV2({
             <CardHeader>
               <CardTitle className="text-lg">Información Personal</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <Label className="text-sm font-medium">Nombre Completo</Label>
-                <p className="text-sm">{empadronado.nombre} {empadronado.apellidos}</p>
+                <Label className="text-xs sm:text-sm font-medium">Nombre Completo</Label>
+                <p className="text-xs sm:text-sm truncate">{empadronado.nombre} {empadronado.apellidos}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium">DNI</Label>
-                <p className="text-sm">{empadronado.dni}</p>
+                <Label className="text-xs sm:text-sm font-medium">DNI</Label>
+                <p className="text-xs sm:text-sm">{empadronado.dni}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium">Número de Padrón</Label>
-                <p className="text-sm">{empadronado.numeroPadron}</p>
+                <Label className="text-xs sm:text-sm font-medium">Número de Padrón</Label>
+                <p className="text-xs sm:text-sm">{empadronado.numeroPadron}</p>
               </div>
               <div>
-                <Label className="text-sm font-medium">Estado</Label>
-                <Badge variant={empadronado.habilitado ? "default" : "secondary"}>
+                <Label className="text-xs sm:text-sm font-medium">Estado</Label>
+                <Badge variant={empadronado.habilitado ? "default" : "secondary"} className="text-xs">
                   {empadronado.habilitado ? "Habilitado" : "Deshabilitado"}
                 </Badge>
               </div>
@@ -184,14 +185,14 @@ export default function DetalleEmpadronadoModalV2({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4">
-                <div>
-                  <Label className="text-sm font-medium">Períodos pendientes</Label>
-                  <p className="text-sm">{deudaItems.length}</p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex-1">
+                  <Label className="text-xs sm:text-sm font-medium">Períodos pendientes</Label>
+                  <p className="text-sm font-semibold">{deudaItems.length}</p>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">Períodos morosos</Label>
-                  <p className="text-sm">{deudaItems.filter(item => item.esMoroso).length}</p>
+                <div className="flex-1">
+                  <Label className="text-xs sm:text-sm font-medium">Períodos morosos</Label>
+                  <p className="text-sm font-semibold text-destructive">{deudaItems.filter(item => item.esMoroso).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -207,10 +208,11 @@ export default function DetalleEmpadronadoModalV2({
                 <Input 
                   value={generarLinkCompartir()} 
                   readOnly 
-                  className="flex-1"
+                  className="flex-1 text-xs sm:text-sm"
                 />
                 <Button onClick={copiarLink} variant="outline" size="sm">
-                  <Copy className="h-4 w-4" />
+                  <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline ml-1">Copiar</span>
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
@@ -221,9 +223,15 @@ export default function DetalleEmpadronadoModalV2({
 
           {/* Tabs para detalles */}
           <Tabs defaultValue="estado-cuenta" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="estado-cuenta">Estado de Cuenta</TabsTrigger>
-              <TabsTrigger value="registrar-pago">Registrar Pago</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 h-auto p-1">
+              <TabsTrigger value="estado-cuenta" className="text-xs sm:text-sm py-2">
+                <span className="hidden sm:inline">Estado de Cuenta</span>
+                <span className="sm:hidden">Estado</span>
+              </TabsTrigger>
+              <TabsTrigger value="registrar-pago" className="text-xs sm:text-sm py-2">
+                <span className="hidden sm:inline">Registrar Pago</span>
+                <span className="sm:hidden">Pago</span>
+              </TabsTrigger>
             </TabsList>
 
             {/* Estado de Cuenta */}
@@ -240,26 +248,26 @@ export default function DetalleEmpadronadoModalV2({
                       </p>
                     ) : (
                       deudaItems.map((item) => (
-                        <div key={item.chargeId} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex-1">
-                            <div className="font-medium">Período: {item.periodo}</div>
-                            <div className="text-sm text-muted-foreground">
+                        <div key={item.chargeId} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm sm:text-base">Período: {item.periodo}</div>
+                            <div className="text-xs sm:text-sm text-muted-foreground">
                               Vence: {formatearFecha(item.fechaVencimiento)}
                               {item.montoMorosidad && (
-                                <span className="ml-2 text-destructive">
+                                <span className="block sm:inline sm:ml-2 text-destructive">
                                   (+ {formatearMoneda(item.montoMorosidad)} mora)
                                 </span>
                               )}
                             </div>
                           </div>
                           
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <div className="font-medium">{formatearMoneda(item.saldo)}</div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                            <div className="text-center sm:text-right">
+                              <div className="font-medium text-sm sm:text-base">{formatearMoneda(item.saldo)}</div>
                               <Badge variant={
                                 item.estado === 'pagado' ? 'default' : 
                                 item.esMoroso ? 'destructive' : 'secondary'
-                              }>
+                              } className="text-xs">
                                 {item.esMoroso ? 'Moroso' : item.estado}
                               </Badge>
                             </div>
@@ -271,9 +279,10 @@ export default function DetalleEmpadronadoModalV2({
                                 chargeId: item.chargeId,
                                 monto: item.saldo.toString()
                               }))}
+                              className="w-full sm:w-auto"
                             >
-                              <CreditCard className="h-4 w-4 mr-1" />
-                              Pagar
+                              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                              <span className="text-xs sm:text-sm">Pagar</span>
                             </Button>
                           </div>
                         </div>
@@ -291,7 +300,7 @@ export default function DetalleEmpadronadoModalV2({
                   <CardTitle>Registrar Nuevo Pago</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="cargo">Período a Pagar</Label>
                       <Select 

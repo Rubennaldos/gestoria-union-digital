@@ -19,7 +19,7 @@ export const BottomNavigation = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 md:hidden">
-      <div className="flex items-center justify-around px-2 py-1">
+      <div className="flex items-center justify-around px-1 py-1">
         {navigationItems.map((item) => {
           // activo si la ruta coincide o si estás en una subruta de ese item
           const isActive =
@@ -31,14 +31,14 @@ export const BottomNavigation = () => {
               key={item.href}
               to={item.href}
               className={cn(
-                "flex flex-col items-center py-2 px-3 rounded-lg transition-all duration-200 min-w-[60px]",
+                "flex flex-col items-center py-2 px-2 rounded-lg transition-all duration-200 min-w-[55px] max-w-[70px]",
                 isActive
                   ? "text-primary bg-primary/10"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               )}
             >
-              <item.icon className="h-5 w-5 mb-1" />
-              <span className="text-xs font-medium">{item.label}</span>
+              <item.icon className="h-4 w-4 sm:h-5 sm:w-5 mb-1" />
+              <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">{item.label}</span>
             </Link>
           );
         })}
@@ -70,15 +70,16 @@ export const TopNavigation = () => {
 
   return (
     <header className="sticky top-0 z-40 w-full bg-card border-b border-border backdrop-blur-sm">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="container mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
+        <div className="flex items-center space-x-2 sm:space-x-4">
           {/* 👇 Logo/Marca siempre vuelve a /inicio (NO a "/") */}
-          <Link to="/inicio" className="text-xl font-bold text-primary hover:underline">
-            Gestoria Digital
+          <Link to="/inicio" className="text-lg sm:text-xl font-bold text-primary hover:underline truncate">
+            <span className="hidden sm:inline">Gestoria Digital</span>
+            <span className="sm:hidden">Gestoria</span>
           </Link>
         </div>
-        <div className="flex items-center space-x-4">
-          <div className="hidden md:flex items-center space-x-2">
+        <div className="flex items-center space-x-2 sm:space-x-4">
+          <div className="hidden lg:flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">Usuario:</span>
             <span className="text-sm font-medium">Administrador</span>
           </div>
@@ -86,10 +87,11 @@ export const TopNavigation = () => {
             variant="ghost"
             size="sm"
             onClick={handleLogout}
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3"
           >
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Cerrar Sesión</span>
+            <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline text-xs sm:text-sm">Cerrar Sesión</span>
+            <span className="sm:hidden text-xs">Salir</span>
           </Button>
         </div>
       </div>

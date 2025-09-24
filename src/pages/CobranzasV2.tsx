@@ -297,14 +297,14 @@ export default function CobranzasV2() {
 
         {/* KPIs */}
         {estadisticas && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Recaudado del Mes</CardTitle>
-                <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Recaudado del Mes</CardTitle>
+                <ArrowUpCircle className="h-4 w-4 text-success" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-lg sm:text-2xl font-bold text-success">
                   {formatearMoneda(estadisticas.recaudadoMes)}
                 </div>
               </CardContent>
@@ -312,11 +312,11 @@ export default function CobranzasV2() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pendiente Total</CardTitle>
-                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Pendiente Total</CardTitle>
+                <AlertCircle className="h-4 w-4 text-warning" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
+                <div className="text-lg sm:text-2xl font-bold text-warning">
                   {formatearMoneda(estadisticas.pendienteTotal)}
                 </div>
               </CardContent>
@@ -324,11 +324,11 @@ export default function CobranzasV2() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Morosos</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Morosos</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-destructive" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">
+                <div className="text-lg sm:text-2xl font-bold text-destructive">
                   {estadisticas.morosos}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -339,11 +339,11 @@ export default function CobranzasV2() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Tasa de Cobranza</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Tasa de Cobranza</CardTitle>
+                <TrendingUp className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
+                <div className="text-lg sm:text-2xl font-bold text-primary">
                   {formatearPorcentaje(estadisticas.tasaCobranza)}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -352,37 +352,37 @@ export default function CobranzasV2() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="sm:col-span-2 lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Ingresos del Mes</CardTitle>
-                <ArrowUpCircle className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Ingresos del Mes</CardTitle>
+                <ArrowUpCircle className="h-4 w-4 text-success" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-lg sm:text-2xl font-bold text-success">
                   {formatearMoneda(estadisticas.ingresosMes)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="sm:col-span-2 lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Egresos del Mes</CardTitle>
-                <ArrowDownCircle className="h-4 w-4 text-red-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Egresos del Mes</CardTitle>
+                <ArrowDownCircle className="h-4 w-4 text-destructive" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">
+                <div className="text-lg sm:text-2xl font-bold text-destructive">
                   {formatearMoneda(estadisticas.egresosMes)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="sm:col-span-2 lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Saldo del Mes</CardTitle>
-                <DollarSign className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-xs sm:text-sm font-medium">Saldo del Mes</CardTitle>
+                <DollarSign className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${estadisticas.saldoMes >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`text-lg sm:text-2xl font-bold ${estadisticas.saldoMes >= 0 ? 'text-success' : 'text-destructive'}`}>
                   {formatearMoneda(estadisticas.saldoMes)}
                 </div>
               </CardContent>
@@ -399,100 +399,127 @@ export default function CobranzasV2() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3">
-              <Button 
-                onClick={() => ejecutarAccion(
-                  () => generarDesdeEnero2025(user?.uid || 'sistema'),
-                  'Backfill completado desde enero 2025'
-                )}
-                disabled={procesando}
-                variant="default"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Generar Desde Enero 2025
-              </Button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <Button 
+              onClick={() => ejecutarAccion(
+                () => generarDesdeEnero2025(user?.uid || 'sistema'),
+                'Backfill completado desde enero 2025'
+              )}
+              disabled={procesando}
+              variant="default"
+              size="sm"
+              className="justify-start"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Generar Desde Enero 2025</span>
+              <span className="sm:hidden">Generar 2025</span>
+            </Button>
 
-              <Button 
-                onClick={() => ejecutarAccion(
-                  () => generarMesActual(user?.uid || 'sistema'),
-                  'Mes actual generado correctamente'
-                )}
-                disabled={procesando}
-                variant="outline"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Generar Mes Actual
-              </Button>
+            <Button 
+              onClick={() => ejecutarAccion(
+                () => generarMesActual(user?.uid || 'sistema'),
+                'Mes actual generado correctamente'
+              )}
+              disabled={procesando}
+              variant="outline"
+              size="sm"
+              className="justify-start"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Generar Mes Actual</span>
+              <span className="sm:hidden">Mes Actual</span>
+            </Button>
 
-              <Button 
-                onClick={() => ejecutarAccion(
-                  ejecutarCierreMensualV2,
-                  'Cierre mensual ejecutado correctamente'
-                )}
-                disabled={procesando}
-                variant="destructive"
-              >
-                <UserCheck className="h-4 w-4 mr-2" />
-                Ejecutar Cierre
-              </Button>
+            <Button 
+              onClick={() => ejecutarAccion(
+                ejecutarCierreMensualV2,
+                'Cierre mensual ejecutado correctamente'
+              )}
+              disabled={procesando}
+              variant="destructive"
+              size="sm"
+              className="justify-start"
+            >
+              <UserCheck className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Ejecutar Cierre</span>
+              <span className="sm:hidden">Cierre</span>
+            </Button>
 
-              <Button 
-                onClick={async () => {
-                  try {
-                    const reporte = await obtenerReporteDeudores();
-                    
-                    if (reporte.length === 0) {
-                      toast({
-                        title: "Sin deudores",
-                        description: "No hay empadronados con deudas pendientes"
-                      });
-                      return;
-                    }
-
-                    // Crear CSV del reporte
-                    const csvHeaders = "Nombre,Apellidos,Padron,Deuda Total,Periodos Vencidos,Estado\n";
-                    const csvData = reporte.map(item => 
-                      `"${item.nombre}","${item.apellidos}","${item.numeroPadron}","${item.deudaTotal.toFixed(2)}","${item.periodosVencidos.join(', ')}","${item.esMoroso ? 'Moroso' : 'Pendiente'}"`
-                    ).join('\n');
-
-                    const blob = new Blob([csvHeaders + csvData], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `reporte_deudores_${new Date().toISOString().split('T')[0]}.csv`;
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-
+            <Button 
+              onClick={async () => {
+                try {
+                  const reporte = await obtenerReporteDeudores();
+                  
+                  if (reporte.length === 0) {
                     toast({
-                      title: "Reporte generado",
-                      description: `Se encontraron ${reporte.length} deudores`
+                      title: "Sin deudores",
+                      description: "No hay empadronados con deudas pendientes"
                     });
-                  } catch (error) {
-                    toast({
-                      title: "Error",
-                      description: "Error generando el reporte",
-                      variant: "destructive"
-                    });
+                    return;
                   }
-                }}
-                disabled={procesando}
-                variant="secondary"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar Deudores
-              </Button>
-            </div>
+
+                  // Crear CSV del reporte
+                  const csvHeaders = "Nombre,Apellidos,Padron,Deuda Total,Periodos Vencidos,Estado\n";
+                  const csvData = reporte.map(item => 
+                    `"${item.nombre}","${item.apellidos}","${item.numeroPadron}","${item.deudaTotal.toFixed(2)}","${item.periodosVencidos.join(', ')}","${item.esMoroso ? 'Moroso' : 'Pendiente'}"`
+                  ).join('\n');
+
+                  const blob = new Blob([csvHeaders + csvData], { type: 'text/csv' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `reporte_deudores_${new Date().toISOString().split('T')[0]}.csv`;
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+
+                  toast({
+                    title: "Reporte generado",
+                    description: `Se encontraron ${reporte.length} deudores`
+                  });
+                } catch (error) {
+                  toast({
+                    title: "Error",
+                    description: "Error generando el reporte",
+                    variant: "destructive"
+                  });
+                }
+              }}
+              disabled={procesando}
+              variant="secondary"
+              size="sm"
+              className="justify-start"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Exportar Deudores</span>
+              <span className="sm:hidden">Exportar</span>
+            </Button>
+          </div>
           </CardContent>
         </Card>
 
         {/* Tabs principales */}
         <Tabs defaultValue="asociados" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="asociados">Asociados</TabsTrigger>
-            <TabsTrigger value="pagos">Pagos Recientes</TabsTrigger>
-            <TabsTrigger value="bandeja">Bandeja Economía</TabsTrigger>
-            <TabsTrigger value="egresos">Egresos</TabsTrigger>
-            <TabsTrigger value="configuracion">Configuración</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+            <TabsTrigger value="asociados" className="text-xs sm:text-sm py-2">
+              <span className="hidden sm:inline">Asociados</span>
+              <span className="sm:hidden">Asoc</span>
+            </TabsTrigger>
+            <TabsTrigger value="pagos" className="text-xs sm:text-sm py-2">
+              <span className="hidden sm:inline">Pagos Recientes</span>
+              <span className="sm:hidden">Pagos</span>
+            </TabsTrigger>
+            <TabsTrigger value="bandeja" className="text-xs sm:text-sm py-2">
+              <span className="hidden sm:inline">Bandeja Economía</span>
+              <span className="sm:hidden">Bandeja</span>
+            </TabsTrigger>
+            <TabsTrigger value="egresos" className="text-xs sm:text-sm py-2">
+              <span className="hidden sm:inline">Egresos</span>
+              <span className="sm:hidden">Egres</span>
+            </TabsTrigger>
+            <TabsTrigger value="configuracion" className="text-xs sm:text-sm py-2">
+              <span className="hidden sm:inline">Configuración</span>
+              <span className="sm:hidden">Config</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Tab Asociados */}
