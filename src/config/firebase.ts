@@ -17,7 +17,7 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 
-// ➕ Restaurar adminApp/adminAuth (si algo los importa)
-const existingAdmin = getApps().find(a => a.name === "AdminApp");
+// (Opcional) App secundaria para aislar auth admin si en alguna parte la usas
+const existingAdmin = getApps().find((a) => a.name === "AdminApp");
 export const adminApp = existingAdmin ?? initializeApp(firebaseConfig, "AdminApp");
 export const adminAuth = getAuth(adminApp);

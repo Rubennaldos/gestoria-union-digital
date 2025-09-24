@@ -75,12 +75,15 @@ export function VisitaTab() {
       const telefonoVigilancia = ""; // “51999…”, si lo tienes
 
       // normalizar visitantes
-      const visitantesLimpios = visitantes
-        .map((v) => ({
-          nombre: v.nombre.trim(),
-          dni: v.dni.trim(),
-        }))
-        .filter((v) => v.nombre && v.dni);
+      // ✅ ahora (cumple el tipo Visitante: { id, nombre, dni })
+const visitantesLimpios: Visitante[] = visitantes
+  .map((v) => ({
+    id: v.id,                              // <- mantener id
+    nombre: v.nombre.trim(),
+    dni: v.dni.trim(),
+  }))
+  .filter((v) => v.nombre && v.dni);
+
 
       // TIPAMOS EXACTAMENTE EL OBJETO COMO EL 1er PARÁMETRO DE registrarVisita
       const registro: Parameters<typeof registrarVisita>[0] = {

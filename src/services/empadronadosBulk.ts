@@ -1,3 +1,4 @@
+// src/services/empadronadosBulk.ts
 import * as XLSX from "xlsx";
 import { getEmpadronados, updateEmpadronado } from "@/services/empadronados";
 
@@ -11,18 +12,17 @@ const tsToISO = (ts?: number) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-/** util: normaliza "DD/MM/YYYY" o fechas Excel a YYYY-MM-DD */
+/** util: normaliza "DD/MM/YYYY", "YYYY-MM-DD" o fechas Excel (serial) a YYYY-MM-DD */
 const normalizeToISO = (v: any): string | null => {
   if (v === undefined || v === null || v === "") return null;
 
-  // 1) Número excel (serial)
+  // 1) Número excel (serial) — usar SSF para evitar TZ drift
   if (typeof v === "number") {
-    // Excel epoch 1899-12-30
-    const jsDate = new Date(Math.round((v - 25569) * 86400 * 1000));
-    if (isNaN(jsDate.getTime())) return null;
-    const yyyy = jsDate.getFullYear();
-    const mm = String(jsDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(jsDate.getDate()).padStart(2, "0");
+    const parsed = XLSX.SSF.parse_date_code(v);
+    if (!parsed) return null;
+    const yyyy = parsed.y;
+    const mm = String(parsed.m).padStart(2, "0");
+    const dd = String(parsed.d).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   }
 
@@ -83,8 +83,8 @@ export async function exportEmpadronadosTemplateXLSX() {
     { wch: 14 },
     { wch: 30 },
   ];
-  // encabezado congelado
-  (wsDatos["!freeze"] as any) = { xSplit: 0, ySplit: 1 };
+  // Nota: el "freeze" visual no es parte del core community de SheetJS.
+  // Algunos visores lo ignoran; lo dejamos fuera por compatibilidad.
 
   // --- Hoja "Instrucciones" ---
   const instrucciones = [
@@ -135,7 +135,7 @@ export async function importEmpadronadosXLSX(file: File, actorUid: string) {
     nombreCompleto?: any;
     dni?: any;
     ["fechaIngreso (YYYY-MM-DD o DD/MM/YYYY)"]?: any;
-    fechaIngreso?: any; // por si alguien renombra
+    fechaIngreso?: any; // por si alguien renombra la cabecera
   };
 
   const json: Row[] = XLSX.utils.sheet_to_json(ws, { defval: "" });

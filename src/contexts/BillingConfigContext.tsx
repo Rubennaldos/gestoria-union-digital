@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { db } from "@/config/firebase";
 import { onValue, ref } from "firebase/database";
 
@@ -12,7 +12,7 @@ export type BillingConfig = {
   recargoSancionPct: number;  // % (de "porcentajeSancion")
   fechaCorteISO: string;      // "YYYY-MM-DD" (si no existe en DB, 2025-01-15)
 
-  // Extras opcionales que también traemos por si los usas:
+  // Extras opcionales
   sede?: string;
   serieComprobantes?: string;
   numeroComprobanteActual?: number;
@@ -31,7 +31,7 @@ const DEFAULT_CFG: BillingConfig = {
 
 const Ctx = createContext<BillingConfig>(DEFAULT_CFG);
 
-export function BillingConfigProvider({ children }: { children: React.ReactNode }) {
+export function BillingConfigProvider({ children }: { children: ReactNode }) {
   const [cfg, setCfg] = useState<BillingConfig>(DEFAULT_CFG);
 
   useEffect(() => {
