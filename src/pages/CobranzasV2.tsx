@@ -17,6 +17,10 @@ import {
   ArrowDownCircle,
   CheckCircle2,
   AlertTriangle,
+  Search,
+  Filter,
+  SortAsc,
+  SortDesc,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -98,6 +102,12 @@ export default function CobranzasV2() {
   const [empadronadoSeleccionado, setEmpadronadoSeleccionado] = useState<Empadronado | null>(null);
   const [chargesEmpadronado, setChargesEmpadronado] = useState<ChargeV2[]>([]);
   const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
+
+  // Estados de filtros y búsqueda
+  const [busquedaTexto, setBusquedaTexto] = useState('');
+  const [ordenarPor, setOrdenarPor] = useState<'nombre' | 'padron' | 'deuda' | 'estado'>('nombre');
+  const [direccionOrden, setDireccionOrden] = useState<'asc' | 'desc'>('asc');
+  const [filtroEstado, setFiltroEstado] = useState<'todos' | 'morosos' | 'al-dia' | 'con-deuda'>('todos');
 
   useEffect(() => {
     cargarDatos();
@@ -263,6 +273,68 @@ export default function CobranzasV2() {
   const formatearMoneda = (monto: number) => `S/ ${monto.toFixed(2)}`;
   const formatearFecha = (timestamp: number) => new Date(timestamp).toLocaleDateString('es-PE');
   const formatearPorcentaje = (valor: number) => `${valor.toFixed(1)}%`;
+
+  // Función para filtrar y ordenar empadronados
+  const empadronadosFiltrados = empadronados.filter((emp) => {
+    const deuda = calcularDeudaEmpadronado(emp.id);
+    const moroso = esMoroso(emp.id);
+    
+    // Filtro por texto de búsqueda
+    const textoCompleto = `${emp.nombre} ${emp.apellidos} ${emp.numeroPadron} ${emp.dni}`.toLowerCase();
+    const cumpleBusqueda = busquedaTexto === '' || textoCompleto.includes(busquedaTexto.toLowerCase());
+    
+    // Filtro por estado
+    let cumpleEstado = true;
+    switch (filtroEstado) {
+      case 'morosos':
+        cumpleEstado = moroso;
+        break;
+      case 'al-dia':
+        cumpleEstado = !moroso && deuda === 0;
+        break;
+      case 'con-deuda':
+        cumpleEstado = deuda > 0;
+        break;
+      default:
+        cumpleEstado = true;
+    }
+    
+    return cumpleBusqueda && cumpleEstado;
+  }).sort((a, b) => {
+    let resultado = 0;
+    
+    switch (ordenarPor) {
+      case 'nombre':
+        resultado = `${a.nombre} ${a.apellidos}`.localeCompare(`${b.nombre} ${b.apellidos}`);
+        break;
+      case 'padron':
+        resultado = a.numeroPadron.localeCompare(b.numeroPadron);
+        break;
+      case 'deuda':
+        const deudaA = calcularDeudaEmpadronado(a.id);
+        const deudaB = calcularDeudaEmpadronado(b.id);
+        resultado = deudaA - deudaB;
+        break;
+      case 'estado':
+        const morosoA = esMoroso(a.id);
+        const morosoB = esMoroso(b.id);
+        if (morosoA && !morosoB) resultado = -1;
+        else if (!morosoA && morosoB) resultado = 1;
+        else resultado = calcularDeudaEmpadronado(b.id) - calcularDeudaEmpadronado(a.id);
+        break;
+    }
+    
+    return direccionOrden === 'asc' ? resultado : -resultado;
+  });
+
+  const cambiarOrden = (nuevoOrden: typeof ordenarPor) => {
+    if (ordenarPor === nuevoOrden) {
+      setDireccionOrden(direccionOrden === 'asc' ? 'desc' : 'asc');
+    } else {
+      setOrdenarPor(nuevoOrden);
+      setDireccionOrden('asc');
+    }
+  };
 
   if (loading) {
     return (
@@ -528,43 +600,150 @@ export default function CobranzasV2() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
-                  Lista de Asociados ({empadronados.length})
+                  Lista de Asociados ({empadronadosFiltrados.length} de {empadronados.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Controles de búsqueda y filtros */}
+                <div className="space-y-4 mb-6">
+                  {/* Búsqueda inteligente */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nombre, apellido, padrón o DNI..."
+                      value={busquedaTexto}
+                      onChange={(e) => setBusquedaTexto(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+
+                  {/* Filtros y ordenación */}
+                  <div className="flex flex-wrap gap-3">
+                    {/* Filtro por estado */}
+                    <div className="flex items-center gap-2">
+                      <Filter className="h-4 w-4 text-muted-foreground" />
+                      <Select value={filtroEstado} onValueChange={(value: any) => setFiltroEstado(value)}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          <SelectItem value="morosos">Morosos</SelectItem>
+                          <SelectItem value="con-deuda">Con Deuda</SelectItem>
+                          <SelectItem value="al-dia">Al Día</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Botones de ordenación */}
+                    <div className="flex gap-1">
+                      <Button
+                        variant={ordenarPor === 'nombre' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => cambiarOrden('nombre')}
+                        className="flex items-center gap-1"
+                      >
+                        Nombre
+                        {ordenarPor === 'nombre' && (
+                          direccionOrden === 'asc' ? <SortAsc className="h-3 w-3" /> : <SortDesc className="h-3 w-3" />
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant={ordenarPor === 'padron' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => cambiarOrden('padron')}
+                        className="flex items-center gap-1"
+                      >
+                        Padrón
+                        {ordenarPor === 'padron' && (
+                          direccionOrden === 'asc' ? <SortAsc className="h-3 w-3" /> : <SortDesc className="h-3 w-3" />
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant={ordenarPor === 'deuda' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => cambiarOrden('deuda')}
+                        className="flex items-center gap-1"
+                      >
+                        Deuda
+                        {ordenarPor === 'deuda' && (
+                          direccionOrden === 'asc' ? <SortAsc className="h-3 w-3" /> : <SortDesc className="h-3 w-3" />
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant={ordenarPor === 'estado' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => cambiarOrden('estado')}
+                        className="flex items-center gap-1"
+                      >
+                        Estado
+                        {ordenarPor === 'estado' && (
+                          direccionOrden === 'asc' ? <SortAsc className="h-3 w-3" /> : <SortDesc className="h-3 w-3" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de asociados filtrada */}
                 <div className="space-y-3">
-                  {empadronados.map((emp) => {
-                    const deuda = calcularDeudaEmpadronado(emp.id);
-                    const moroso = esMoroso(emp.id);
-                    
-                    return (
-                      <div key={emp.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="font-medium">{emp.nombre} {emp.apellidos}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Padrón: {emp.numeroPadron} | DNI: {emp.dni}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="font-medium">{formatearMoneda(deuda)}</div>
-                            <Badge variant={moroso ? "destructive" : "default"}>
-                              {moroso ? "Moroso" : "Al día"}
-                            </Badge>
+                  {empadronadosFiltrados.length === 0 ? (
+                    <div className="text-center p-8 text-muted-foreground">
+                      <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No se encontraron asociados con los filtros aplicados</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-2"
+                        onClick={() => {
+                          setBusquedaTexto('');
+                          setFiltroEstado('todos');
+                          setOrdenarPor('nombre');
+                          setDireccionOrden('asc');
+                        }}
+                      >
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  ) : (
+                    empadronadosFiltrados.map((emp) => {
+                      const deuda = calcularDeudaEmpadronado(emp.id);
+                      const moroso = esMoroso(emp.id);
+                      
+                      return (
+                        <div key={emp.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex-1">
+                            <div className="font-medium">{emp.nombre} {emp.apellidos}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Padrón: {emp.numeroPadron} | DNI: {emp.dni}
+                            </div>
                           </div>
                           
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => verDetallesEmpadronado(emp.id)}
-                          >
-                            Ver Detalles
-                          </Button>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <div className={`font-medium ${deuda > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                {formatearMoneda(deuda)}
+                              </div>
+                              <Badge variant={moroso ? "destructive" : deuda > 0 ? "secondary" : "default"}>
+                                {moroso ? "Moroso" : deuda > 0 ? "Debe" : "Al día"}
+                              </Badge>
+                            </div>
+                            
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => verDetallesEmpadronado(emp.id)}
+                            >
+                              Ver Detalles
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>
