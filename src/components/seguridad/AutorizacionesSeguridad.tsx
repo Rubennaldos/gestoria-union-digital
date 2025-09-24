@@ -26,6 +26,7 @@ function tsFrom(obj: any): number {
 export const AutorizacionesSeguridad = () => {
   const { toast } = useToast();
   const [autorizaciones, setAutorizaciones] = useState<AutorizacionPendiente[]>([]);
+  const [cargando, setCargando] = useState(false);
 
   const { data: visitas } = useFirebaseData<Record<string, RegistroVisita>>("acceso/visitas");
   const { data: trabajadores } = useFirebaseData<Record<string, RegistroTrabajadores>>("acceso/trabajadores");
@@ -33,55 +34,101 @@ export const AutorizacionesSeguridad = () => {
 
   useEffect(() => {
     const cargarAutorizaciones = async () => {
+      setCargando(true);
+      console.log("Cargando autorizaciones...");
       const pendientes: AutorizacionPendiente[] = [];
 
       if (visitas) {
+        console.log("Procesando visitas:", Object.keys(visitas).length);
         for (const [id, v] of Object.entries(visitas)) {
           if ((v as any).estado === "pendiente") {
-            const empadronado = await getEmpadronado(v.empadronadoId);
-            pendientes.push({ 
-              id, 
-              tipo: "visitante", 
-              data: v, 
-              fechaCreacion: tsFrom(v),
-              empadronado: empadronado || undefined
-            });
+            console.log(`Procesando visita ${id}, empadronadoId: ${v.empadronadoId}`);
+            try {
+              const empadronado = await getEmpadronado(v.empadronadoId);
+              console.log(`Empadronado obtenido para ${id}:`, empadronado?.nombre || "No encontrado");
+              pendientes.push({ 
+                id, 
+                tipo: "visitante", 
+                data: v, 
+                fechaCreacion: tsFrom(v),
+                empadronado: empadronado || undefined
+              });
+            } catch (error) {
+              console.error(`Error obteniendo empadronado para visita ${id}:`, error);
+              pendientes.push({ 
+                id, 
+                tipo: "visitante", 
+                data: v, 
+                fechaCreacion: tsFrom(v),
+                empadronado: undefined
+              });
+            }
           }
         }
       }
 
       if (trabajadores) {
+        console.log("Procesando trabajadores:", Object.keys(trabajadores).length);
         for (const [id, t] of Object.entries(trabajadores)) {
           if ((t as any).estado === "pendiente") {
-            const empadronado = await getEmpadronado(t.empadronadoId);
-            pendientes.push({ 
-              id, 
-              tipo: "trabajador", 
-              data: t, 
-              fechaCreacion: tsFrom(t),
-              empadronado: empadronado || undefined
-            });
+            console.log(`Procesando trabajador ${id}, empadronadoId: ${t.empadronadoId}`);
+            try {
+              const empadronado = await getEmpadronado(t.empadronadoId);
+              console.log(`Empadronado obtenido para trabajador ${id}:`, empadronado?.nombre || "No encontrado");
+              pendientes.push({ 
+                id, 
+                tipo: "trabajador", 
+                data: t, 
+                fechaCreacion: tsFrom(t),
+                empadronado: empadronado || undefined
+              });
+            } catch (error) {
+              console.error(`Error obteniendo empadronado para trabajador ${id}:`, error);
+              pendientes.push({ 
+                id, 
+                tipo: "trabajador", 
+                data: t, 
+                fechaCreacion: tsFrom(t),
+                empadronado: undefined
+              });
+            }
           }
         }
       }
 
       if (proveedores) {
+        console.log("Procesando proveedores:", Object.keys(proveedores).length);
         for (const [id, p] of Object.entries(proveedores)) {
           if ((p as any).estado === "pendiente") {
-            const empadronado = await getEmpadronado(p.empadronadoId);
-            pendientes.push({ 
-              id, 
-              tipo: "proveedor", 
-              data: p, 
-              fechaCreacion: tsFrom(p),
-              empadronado: empadronado || undefined
-            });
+            console.log(`Procesando proveedor ${id}, empadronadoId: ${p.empadronadoId}`);
+            try {
+              const empadronado = await getEmpadronado(p.empadronadoId);
+              console.log(`Empadronado obtenido para proveedor ${id}:`, empadronado?.nombre || "No encontrado");
+              pendientes.push({ 
+                id, 
+                tipo: "proveedor", 
+                data: p, 
+                fechaCreacion: tsFrom(p),
+                empadronado: empadronado || undefined
+              });
+            } catch (error) {
+              console.error(`Error obteniendo empadronado para proveedor ${id}:`, error);
+              pendientes.push({ 
+                id, 
+                tipo: "proveedor", 
+                data: p, 
+                fechaCreacion: tsFrom(p),
+                empadronado: undefined
+              });
+            }
           }
         }
       }
 
+      console.log("Total pendientes procesados:", pendientes.length);
       pendientes.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
       setAutorizaciones(pendientes);
+      setCargando(false);
     };
 
     cargarAutorizaciones();
@@ -198,8 +245,13 @@ export const AutorizacionesSeguridad = () => {
                             <p className="text-muted-foreground">{auth.empadronado.numeroPadron}</p>
                           </div>
                         </div>
+                      ) : cargando ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                          <span>Cargando información del vecino...</span>
+                        </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Cargando información del vecino...</p>
+                        <p className="text-sm text-destructive">Error: No se pudo cargar la información del vecino</p>
                       )}
                     </div>
 
