@@ -17,6 +17,10 @@ export interface RegistroVisita {
   fechaCreacion: number;
   estado: 'pendiente' | 'autorizado' | 'denegado';
   esFavorito?: boolean;
+  vecinoSolicitante?: {
+    nombre: string;
+    numeroPadron: string;
+  };
 }
 
 export interface MaestroObra {
@@ -49,6 +53,10 @@ export interface RegistroTrabajadores {
   fechaCreacion: number;
   estado: 'pendiente' | 'autorizado' | 'denegado';
   esFavorito?: boolean;
+  vecinoSolicitante?: {
+    nombre: string;
+    numeroPadron: string;
+  };
 }
 
 export interface RegistroProveedor {
@@ -60,6 +68,10 @@ export interface RegistroProveedor {
   tipoServicio?: 'gas' | 'delivery' | 'otro';
   fechaCreacion: number;
   estado: 'pendiente' | 'autorizado' | 'denegado';
+  vecinoSolicitante?: {
+    nombre: string;
+    numeroPadron: string;
+  };
 }
 
 export interface FavoritoUsuario {

@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Star, Users, Car, MapPin, Save } from "lucide-react";
+import { getEmpadronado } from "@/services/empadronados";
 import { useFirebaseWrite } from "@/hooks/useFirebase";
 import { Visitante, RegistroVisita } from "@/types/acceso";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
@@ -116,6 +117,9 @@ export const RegistroManualVisitas = () => {
 
   const confirmarRegistro = async () => {
     try {
+      // Obtener información del empadronado
+      const empadronado = await getEmpadronado(empadronadoId);
+      
       const registro: Omit<RegistroVisita, 'id'> = {
         empadronadoId,
         tipoAcceso,
@@ -123,7 +127,14 @@ export const RegistroManualVisitas = () => {
         visitantes,
         menores,
         fechaCreacion: Date.now(),
-        estado: 'pendiente' // Será autorizado por seguridad
+        estado: 'pendiente', // Será autorizado por seguridad
+        vecinoSolicitante: empadronado ? {
+          nombre: `${empadronado.nombre} ${empadronado.apellidos}`,
+          numeroPadron: empadronado.numeroPadron
+        } : {
+          nombre: 'Vecino no identificado',
+          numeroPadron: empadronadoId
+        }
       };
 
       await pushData('acceso/visitas', registro);

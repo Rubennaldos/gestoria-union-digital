@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Star, UserCheck, Car, MapPin, Save, CheckCircle, XCircle } from "lucide-react";
+import { getEmpadronado } from "@/services/empadronados";
 import { useFirebaseWrite } from "@/hooks/useFirebase";
 import { Trabajador, RegistroTrabajadores, MaestroObra } from "@/types/acceso";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
@@ -127,6 +128,9 @@ export const RegistroManualTrabajadores = () => {
 
   const confirmarRegistro = async () => {
     try {
+      // Obtener información del empadronado
+      const empadronado = await getEmpadronado(empadronadoId);
+      
       const registro: Omit<RegistroTrabajadores, 'id'> = {
         empadronadoId,
         tipoAcceso,
@@ -134,7 +138,14 @@ export const RegistroManualTrabajadores = () => {
         maestroObraId,
         trabajadores,
         fechaCreacion: Date.now(),
-        estado: 'pendiente'
+        estado: 'pendiente',
+        vecinoSolicitante: empadronado ? {
+          nombre: `${empadronado.nombre} ${empadronado.apellidos}`,
+          numeroPadron: empadronado.numeroPadron
+        } : {
+          nombre: 'Vecino no identificado',
+          numeroPadron: empadronadoId
+        }
       };
 
       await pushData('acceso/trabajadores', registro);
