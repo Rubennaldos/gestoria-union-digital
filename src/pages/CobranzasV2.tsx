@@ -50,6 +50,7 @@ import {
 } from "@/services/cobranzas-v2";
 
 import { getEmpadronados } from "@/services/empadronados";
+import DetalleEmpadronadoModalV2 from "@/components/cobranzas/DetalleEmpadronadoModalV2";
 
 import { 
   ConfiguracionCobranzasV2, 
@@ -94,8 +95,9 @@ export default function CobranzasV2() {
   });
 
   // Estados de detalles
-  const [empadronadoSeleccionado, setEmpadronadoSeleccionado] = useState<string | null>(null);
+  const [empadronadoSeleccionado, setEmpadronadoSeleccionado] = useState<Empadronado | null>(null);
   const [chargesEmpadronado, setChargesEmpadronado] = useState<ChargeV2[]>([]);
+  const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
 
   useEffect(() => {
     cargarDatos();
@@ -184,14 +186,45 @@ export default function CobranzasV2() {
   const verDetallesEmpadronado = async (empId: string) => {
     try {
       const chargesEmp = await obtenerChargesPorEmpadronadoV2(empId);
-      setChargesEmpadronado(chargesEmp);
-      setEmpadronadoSeleccionado(empId);
+      const empadronado = empadronados.find(e => e.id === empId);
+      if (empadronado) {
+        setChargesEmpadronado(chargesEmp);
+        setEmpadronadoSeleccionado(empadronado);
+        setModalDetalleAbierto(true);
+      }
     } catch (error) {
       toast({
         title: "Error",
         description: "No se pudieron cargar los detalles",
         variant: "destructive"
       });
+    }
+  };
+
+  const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => {
+    try {
+      await registrarPagoV2(chargeId, monto, metodoPago, numeroOperacion, observaciones);
+      
+      toast({
+        title: "Pago registrado",
+        description: "El pago se ha registrado correctamente"
+      });
+      
+      // Recargar datos
+      await cargarDatos();
+      
+      // Actualizar charges del empadronado seleccionado
+      if (empadronadoSeleccionado) {
+        const chargesEmp = await obtenerChargesPorEmpadronadoV2(empadronadoSeleccionado.id);
+        setChargesEmpadronado(chargesEmp);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo registrar el pago",
+        variant: "destructive"
+      });
+      throw error;
     }
   };
 
@@ -509,46 +542,6 @@ export default function CobranzasV2() {
               </CardContent>
             </Card>
 
-            {/* Modal de detalles del empadronado */}
-            {empadronadoSeleccionado && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Historial de Cargos</span>
-                    <Button 
-                      size="sm" 
-                      variant="ghost"
-                      onClick={() => setEmpadronadoSeleccionado(null)}
-                    >
-                      Cerrar
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {chargesEmpadronado.map((charge) => (
-                      <div key={charge.id} className="flex items-center justify-between p-2 border rounded">
-                        <div>
-                          <div className="font-medium">Período: {charge.periodo}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Vence: {formatearFecha(charge.fechaVencimiento)}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium">{formatearMoneda(charge.saldo)}</div>
-                          <Badge variant={
-                            charge.estado === 'pagado' ? 'default' : 
-                            charge.esMoroso ? 'destructive' : 'secondary'
-                          }>
-                            {charge.estado}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           {/* Tab Pagos Recientes */}
@@ -1150,6 +1143,15 @@ export default function CobranzasV2() {
       </main>
 
       <BottomNavigation />
+
+      {/* Modal de detalle del empadronado */}
+      <DetalleEmpadronadoModalV2
+        open={modalDetalleAbierto}
+        onOpenChange={setModalDetalleAbierto}
+        empadronado={empadronadoSeleccionado}
+        charges={chargesEmpadronado}
+        onRegistrarPago={registrarPagoModal}
+      />
     </div>
   );
 }
