@@ -17,6 +17,16 @@ export interface RegistroVisita {
   fechaCreacion: number;
   estado: "pendiente" | "autorizado" | "denegado";
   esFavorito?: boolean;
+
+  /** Snapshot para mostrar en Seguridad sin lookups */
+  solicitadoPorNombre?: string;
+  solicitadoPorPadron?: string;
+
+  /** Compatibilidad con tu modelo previo */
+  vecinoSolicitante?: {
+    nombre: string;
+    numeroPadron: string;
+  };
 }
 
 export interface MaestroObra {
@@ -49,6 +59,16 @@ export interface RegistroTrabajadores {
   fechaCreacion: number;
   estado: "pendiente" | "autorizado" | "denegado";
   esFavorito?: boolean;
+
+  /** Snapshot para Seguridad */
+  solicitadoPorNombre?: string;
+  solicitadoPorPadron?: string;
+
+  /** Compatibilidad */
+  vecinoSolicitante?: {
+    nombre: string;
+    numeroPadron: string;
+  };
 }
 
 export interface RegistroProveedor {
@@ -60,6 +80,16 @@ export interface RegistroProveedor {
   tipoServicio?: "gas" | "delivery" | "otro";
   fechaCreacion: number;
   estado: "pendiente" | "autorizado" | "denegado";
+
+  /** Snapshot para Seguridad */
+  solicitadoPorNombre?: string;
+  solicitadoPorPadron?: string;
+
+  /** Compatibilidad */
+  vecinoSolicitante?: {
+    nombre: string;
+    numeroPadron: string;
+  };
 }
 
 export interface FavoritoUsuario {

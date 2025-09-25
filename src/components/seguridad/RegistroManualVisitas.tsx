@@ -12,7 +12,7 @@ import { Visitante } from "@/types/acceso";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 
-// ⬇⬇ usamos el servicio unificado que persiste snapshot de vecino y padrón
+// Servicio unificado: persiste snapshot del vecino y padrón
 import { registrarVisita } from "@/services/acceso";
 
 export const RegistroManualVisitas = () => {
@@ -58,7 +58,7 @@ export const RegistroManualVisitas = () => {
         fechaCreacion: Date.now(),
       };
 
-      // Mantengo tu ruta original de favoritos para no romper nada
+      // Conserva tu ruta actual de favoritos
       await pushData(`usuarios/${empadronadoId}/favoritos`, favorito);
 
       toast({
@@ -101,14 +101,14 @@ export const RegistroManualVisitas = () => {
 
   const confirmarRegistro = async () => {
     try {
-      // Mapear al shape que requiere el servicio (sin esMenor)
+      // Normaliza visitantes al shape del servicio (sin esMenor)
       const visitantesLimpios = visitantes
         .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
         .filter((v) => v.nombre && v.dni);
 
-      // 🚀 Usa el servicio unificado — esto crea:
-      // acceso/visitas/{id} con snapshot solicitadoPor{Nombre,Padron}
-      // seguridad/porticos/principal/pendientes/{id} con el mismo snapshot
+      // Servicio unificado:
+      // - Crea acceso/visitas/{id} incluyendo solicitadoPorNombre/solicitadoPorPadron
+      // - Crea seguridad/porticos/principal/pendientes/{id} con el mismo snapshot
       const id = await registrarVisita({
         empadronadoId,
         tipoAcceso,
@@ -118,7 +118,7 @@ export const RegistroManualVisitas = () => {
         porticoId: "principal",
       });
 
-      // (Opcional) log auxiliar en seguridad/registros_manuales (no interfiere con el pórtico)
+      // (Opcional) log auxiliar para auditoría (no afecta pórtico)
       await pushData("seguridad/registros_manuales", {
         idVisita: id,
         tipo: "visita",
@@ -195,7 +195,7 @@ export const RegistroManualVisitas = () => {
             </RadioGroup>
           </div>
 
-          {/* Placa */}
+          {/* Placa (si vehicular) */}
           {tipoAcceso === "vehicular" && (
             <div className="space-y-2">
               <Label>Placa del Vehículo</Label>

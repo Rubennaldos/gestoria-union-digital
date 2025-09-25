@@ -7,6 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Car, MapPin, Save, Users } from "lucide-react";
+import { getEmpadronado } from "@/services/empadronados";
 import { useFirebaseWrite } from "@/hooks/useFirebase";
 import { RegistroProveedor } from "@/types/acceso";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
@@ -67,6 +68,9 @@ export const RegistroManualProveedores = () => {
 
   const confirmarRegistro = async () => {
     try {
+      // Obtener información del empadronado
+      const empadronado = await getEmpadronado(empadronadoId);
+      
       const registro: Omit<RegistroProveedor, 'id'> = {
         empadronadoId,
         tipoAcceso,
@@ -74,7 +78,14 @@ export const RegistroManualProveedores = () => {
         empresa,
         tipoServicio,
         fechaCreacion: Date.now(),
-        estado: 'pendiente'
+        estado: 'pendiente',
+        vecinoSolicitante: empadronado ? {
+          nombre: `${empadronado.nombre} ${empadronado.apellidos}`,
+          numeroPadron: empadronado.numeroPadron
+        } : {
+          nombre: 'Vecino no identificado',
+          numeroPadron: empadronadoId
+        }
       };
 
       await pushData('acceso/proveedores', registro);

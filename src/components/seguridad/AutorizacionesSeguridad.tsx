@@ -7,6 +7,8 @@ import { Check, X, Clock, Users, UserCheck, Shield } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { cambiarEstadoAcceso } from "@/services/acceso";
+
+// 👇 resolvemos info del vecino (nombre + padrón)
 import { getEmpadronado, getEmpadronados } from "@/services/empadronados";
 import { Empadronado } from "@/types/empadronados";
 
@@ -66,7 +68,7 @@ export const AutorizacionesSeguridad = () => {
   const { data: proveedores } =
     useFirebaseData<Record<string, RegistroProveedor>>("acceso/proveedores");
 
-  // 1) Armar lista de pendientes (sin vecino aún)
+  // 1) Armar lista de pendientes (independiente del snapshot guardado)
   useEffect(() => {
     const pendientes: AutorizacionPendiente[] = [];
 
@@ -116,7 +118,6 @@ export const AutorizacionesSeguridad = () => {
   // 2) Resolver empadronados EN BLOQUE para todos los pendientes visibles
   useEffect(() => {
     const resolverVecinos = async () => {
-      // ids únicos que aún no tenemos en el mapa
       const faltantes = new Set<string>();
       for (const a of autorizaciones) {
         const empId = (a.data as any)?.empadronadoId;
@@ -124,20 +125,16 @@ export const AutorizacionesSeguridad = () => {
       }
       if (faltantes.size === 0) return;
 
-      // Si la cantidad es grande, trae todos y mapea; si es chica, trae individual
       try {
         if (faltantes.size > 8) {
+          // muchos: trae todos una sola vez
           const all = await getEmpadronados();
           const nuevo: Record<string, Empadronado | null> = { ...empMap };
-          for (const emp of all) {
-            nuevo[emp.id] = emp;
-          }
-          // asegura que los faltantes tengan alguna entrada (null si no existe)
-          for (const id of faltantes) {
-            if (!(id in nuevo)) nuevo[id] = null;
-          }
+          for (const emp of all) nuevo[emp.id] = emp;
+          for (const id of faltantes) if (!(id in nuevo)) nuevo[id] = null;
           setEmpMap(nuevo);
         } else {
+          // pocos: trae individual
           const nuevo: Record<string, Empadronado | null> = { ...empMap };
           await Promise.all(
             Array.from(faltantes).map(async (id) => {
@@ -148,7 +145,6 @@ export const AutorizacionesSeguridad = () => {
           setEmpMap(nuevo);
         }
       } catch (e) {
-        // Si algo falla, no bloquees la UI
         console.error("No se pudieron resolver algunos empadronados:", e);
       }
     };
@@ -228,7 +224,8 @@ export const AutorizacionesSeguridad = () => {
         <div className="grid gap-4">
           {items.map((auth) => {
             const Icono = getIcono(auth.tipo);
-            const emp = auth.empadronado;
+            const emp = auth.empadronado; // puede ser undefined (cargando), null (no existe) o Empadronado
+
             return (
               <Card key={auth.id} className="border-l-4 border-l-warning">
                 <CardHeader className="pb-3">
@@ -259,7 +256,9 @@ export const AutorizacionesSeguridad = () => {
                       </div>
 
                       {emp === undefined ? (
-                        <p className="text-sm text-muted-foreground">Cargando información del vecino…</p>
+                        <p className="text-sm text-muted-foreground">
+                          Cargando información del vecino…
+                        </p>
                       ) : emp ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                           <div>
@@ -301,7 +300,10 @@ export const AutorizacionesSeguridad = () => {
                           <span className="font-medium">Visitantes:</span>
                           <div className="mt-2 space-y-1">
                             {(auth.data as RegistroVisita).visitantes?.map((visitante, index) => (
-                              <div key={index} className="text-muted-foreground flex items-center gap-2">
+                              <div
+                                key={index}
+                                className="text-muted-foreground flex items-center gap-2"
+                              >
                                 <span className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-xs">
                                   {index + 1}
                                 </span>
@@ -329,20 +331,25 @@ export const AutorizacionesSeguridad = () => {
                         <div className="md:col-span-2">
                           <span className="font-medium">Trabajadores:</span>
                           <div className="mt-2 space-y-1">
-                            {(auth.data as any).trabajadores?.map((trabajador: any, index: number) => (
-                              <div key={index} className="text-muted-foreground flex items-center gap-2">
-                                <span className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-xs">
-                                  {index + 1}
-                                </span>
-                                <span>{trabajador.nombre}</span>
-                                <span className="text-xs">({trabajador.dni})</span>
-                                {trabajador.esMaestroObra && (
-                                  <Badge variant="outline" className="text-xs">
-                                    Maestro de Obra
-                                  </Badge>
-                                )}
-                              </div>
-                            ))}
+                            {(auth.data as any).trabajadores?.map(
+                              (trabajador: any, index: number) => (
+                                <div
+                                  key={index}
+                                  className="text-muted-foreground flex items-center gap-2"
+                                >
+                                  <span className="w-4 h-4 bg-primary/20 rounded-full flex items-center justify-center text-xs">
+                                    {index + 1}
+                                  </span>
+                                  <span>{trabajador.nombre}</span>
+                                  <span className="text-xs">({trabajador.dni})</span>
+                                  {trabajador.esMaestroObra && (
+                                    <Badge variant="outline" className="text-xs">
+                                      Maestro de Obra
+                                    </Badge>
+                                  )}
+                                </div>
+                              )
+                            )}
                           </div>
                         </div>
                       )}
