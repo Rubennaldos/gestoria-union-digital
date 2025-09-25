@@ -8,17 +8,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Minus, Star, Users, Car, MapPin, Save } from "lucide-react";
 import { useFirebaseWrite } from "@/hooks/useFirebase";
-import { Visitante, RegistroVisita } from "@/types/acceso";
+import { Visitante } from "@/types/acceso";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
+
+// ⬇⬇ usamos el servicio unificado que persiste snapshot de vecino y padrón
+import { registrarVisita } from "@/services/acceso";
 
 export const RegistroManualVisitas = () => {
   const { toast } = useToast();
   const { pushData } = useFirebaseWrite();
-  
-  const [tipoAcceso, setTipoAcceso] = useState<'vehicular' | 'peatonal'>('peatonal');
+
+  const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placa, setPlaca] = useState("");
-  const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: '1', nombre: '', dni: '' }]);
+  const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: "1", nombre: "", dni: "" }]);
   const [menores, setMenores] = useState(0);
   const [direccion, setDireccion] = useState("");
   const [empadronadoId, setEmpadronadoId] = useState("");
@@ -26,44 +29,43 @@ export const RegistroManualVisitas = () => {
 
   const agregarVisitante = () => {
     const nuevoId = (visitantes.length + 1).toString();
-    setVisitantes([...visitantes, { id: nuevoId, nombre: '', dni: '' }]);
+    setVisitantes([...visitantes, { id: nuevoId, nombre: "", dni: "" }]);
   };
 
   const eliminarVisitante = (id: string) => {
     if (visitantes.length > 1) {
-      setVisitantes(visitantes.filter(v => v.id !== id));
+      setVisitantes(visitantes.filter((v) => v.id !== id));
     }
   };
 
   const actualizarVisitante = (id: string, campo: keyof Visitante, valor: string | boolean) => {
-    setVisitantes(visitantes.map(v => 
-      v.id === id ? { ...v, [campo]: valor } : v
-    ));
+    setVisitantes(visitantes.map((v) => (v.id === id ? { ...v, [campo]: valor as any } : v)));
   };
 
   const guardarFavorito = async () => {
     try {
       const favorito = {
         empadronadoId,
-        tipo: 'visitante' as const,
-        nombre: visitantes[0]?.nombre || 'Sin nombre',
+        tipo: "visitante" as const,
+        nombre: visitantes[0]?.nombre || "Sin nombre",
         datos: {
           tipoAcceso,
-          placa: tipoAcceso === 'vehicular' ? placa : undefined,
+          placa: tipoAcceso === "vehicular" ? placa : undefined,
           visitantes,
           menores,
-          direccion
+          direccion,
         },
-        fechaCreacion: Date.now()
+        fechaCreacion: Date.now(),
       };
 
+      // Mantengo tu ruta original de favoritos para no romper nada
       await pushData(`usuarios/${empadronadoId}/favoritos`, favorito);
-      
+
       toast({
         title: "Favorito Guardado",
         description: "La visita ha sido guardada en favoritos",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "No se pudo guardar en favoritos",
@@ -72,69 +74,57 @@ export const RegistroManualVisitas = () => {
     }
   };
 
-  const registrarVisita = async () => {
-    // Validaciones
+  const validar = () => {
     if (!empadronadoId.trim()) {
-      toast({
-        title: "Error",
-        description: "Seleccione un empadronado",
-        variant: "destructive",
-      });
-      return;
+      toast({ title: "Error", description: "Seleccione un empadronado", variant: "destructive" });
+      return false;
     }
-
     if (!direccion.trim()) {
-      toast({
-        title: "Error",
-        description: "Ingrese la dirección de destino",
-        variant: "destructive",
-      });
-      return;
+      toast({ title: "Error", description: "Ingrese la dirección de destino", variant: "destructive" });
+      return false;
     }
-
-    if (visitantes.some(v => !v.nombre.trim() || !v.dni.trim())) {
-      toast({
-        title: "Error",
-        description: "Complete todos los datos de los visitantes",
-        variant: "destructive",
-      });
-      return;
+    if (visitantes.some((v) => !v.nombre.trim() || !v.dni.trim())) {
+      toast({ title: "Error", description: "Complete todos los datos de los visitantes", variant: "destructive" });
+      return false;
     }
-
-    if (tipoAcceso === 'vehicular' && !placa.trim()) {
-      toast({
-        title: "Error",
-        description: "Ingrese la placa del vehículo",
-        variant: "destructive",
-      });
-      return;
+    if (tipoAcceso === "vehicular" && !placa.trim()) {
+      toast({ title: "Error", description: "Ingrese la placa del vehículo", variant: "destructive" });
+      return false;
     }
+    return true;
+  };
 
-    // Mostrar confirmación antes de registrar
+  const registrarVisitaClick = () => {
+    if (!validar()) return;
     setMostrarConfirmacion(true);
   };
 
   const confirmarRegistro = async () => {
     try {
-      const registro: Omit<RegistroVisita, 'id'> = {
+      // Mapear al shape que requiere el servicio (sin esMenor)
+      const visitantesLimpios = visitantes
+        .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
+        .filter((v) => v.nombre && v.dni);
+
+      // 🚀 Usa el servicio unificado — esto crea:
+      // acceso/visitas/{id} con snapshot solicitadoPor{Nombre,Padron}
+      // seguridad/porticos/principal/pendientes/{id} con el mismo snapshot
+      const id = await registrarVisita({
         empadronadoId,
         tipoAcceso,
-        placa: tipoAcceso === 'vehicular' ? placa : undefined,
-        visitantes,
-        menores,
-        fechaCreacion: Date.now(),
-        estado: 'pendiente' // Será autorizado por seguridad
-      };
+        placa: tipoAcceso === "vehicular" ? placa.toUpperCase() : undefined,
+        visitantes: visitantesLimpios,
+        menores: Number(menores || 0),
+        porticoId: "principal",
+      });
 
-      await pushData('acceso/visitas', registro);
-
-      // También registrar en seguridad para seguimiento
-      await pushData('seguridad/registros_manuales', {
-        ...registro,
-        tipo: 'visita',
+      // (Opcional) log auxiliar en seguridad/registros_manuales (no interfiere con el pórtico)
+      await pushData("seguridad/registros_manuales", {
+        idVisita: id,
+        tipo: "visita",
         direccion,
-        registradoPor: 'seguridad',
-        fechaRegistro: Date.now()
+        registradoPor: "seguridad",
+        fechaRegistro: Date.now(),
       });
 
       toast({
@@ -143,14 +133,14 @@ export const RegistroManualVisitas = () => {
       });
 
       // Limpiar formulario
-      setTipoAcceso('peatonal');
+      setTipoAcceso("peatonal");
       setPlaca("");
-      setVisitantes([{ id: '1', nombre: '', dni: '' }]);
+      setVisitantes([{ id: "1", nombre: "", dni: "" }]);
       setMenores(0);
       setDireccion("");
       setEmpadronadoId("");
       setMostrarConfirmacion(false);
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "No se pudo registrar la visita",
@@ -167,32 +157,27 @@ export const RegistroManualVisitas = () => {
             <Users className="h-5 w-5" />
             Registro Manual de Visitas
           </CardTitle>
-          <CardDescription>
-            Registre manualmente las visitas que requieren autorización
-          </CardDescription>
+          <CardDescription>Registre manualmente las visitas que requieren autorización</CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-6">
           {/* Buscador de Favoritos */}
-          <BuscadorFavoritos 
+          <BuscadorFavoritos
             tipo="visitante"
             onSeleccionar={(favorito) => {
-              setTipoAcceso(favorito.datos.tipoAcceso);
-              setPlaca(favorito.datos.placa || "");
-              setVisitantes(favorito.datos.visitantes);
-              setMenores(favorito.datos.menores);
-              setDireccion(favorito.datos.direccion || "");
-              setEmpadronadoId(favorito.empadronadoId);
+              setTipoAcceso((favorito as any).datos.tipoAcceso);
+              setPlaca((favorito as any).datos.placa || "");
+              setVisitantes((favorito as any).datos.visitantes);
+              setMenores((favorito as any).datos.menores);
+              setDireccion((favorito as any).datos.direccion || "");
+              setEmpadronadoId((favorito as any).empadronadoId);
             }}
           />
 
           {/* Tipo de Acceso */}
           <div className="space-y-3">
             <Label className="text-base font-medium">Tipo de Acceso</Label>
-            <RadioGroup 
-              value={tipoAcceso} 
-              onValueChange={(value: 'vehicular' | 'peatonal') => setTipoAcceso(value)}
-              className="flex gap-6"
-            >
+            <RadioGroup value={tipoAcceso} onValueChange={(v: any) => setTipoAcceso(v)} className="flex gap-6">
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="peatonal" id="peatonal" />
                 <Label htmlFor="peatonal" className="flex items-center gap-2">
@@ -210,8 +195,8 @@ export const RegistroManualVisitas = () => {
             </RadioGroup>
           </div>
 
-          {/* Placa (solo si es vehicular) */}
-          {tipoAcceso === 'vehicular' && (
+          {/* Placa */}
+          {tipoAcceso === "vehicular" && (
             <div className="space-y-2">
               <Label>Placa del Vehículo</Label>
               <Input
@@ -227,12 +212,7 @@ export const RegistroManualVisitas = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-base font-medium">Datos de Visitantes</Label>
-              <Button 
-                onClick={agregarVisitante}
-                variant="outline" 
-                size="sm"
-                className="flex items-center gap-2"
-              >
+              <Button onClick={agregarVisitante} variant="outline" size="sm" className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Agregar Visitante
               </Button>
@@ -243,22 +223,18 @@ export const RegistroManualVisitas = () => {
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium">Visitante {index + 1}</h4>
                   {visitantes.length > 1 && (
-                    <Button
-                      onClick={() => eliminarVisitante(visitante.id)}
-                      variant="outline"
-                      size="sm"
-                    >
+                    <Button onClick={() => eliminarVisitante(visitante.id)} variant="outline" size="sm">
                       <Minus className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Nombre Completo</Label>
                     <Input
                       value={visitante.nombre}
-                      onChange={(e) => actualizarVisitante(visitante.id, 'nombre', e.target.value)}
+                      onChange={(e) => actualizarVisitante(visitante.id, "nombre", e.target.value)}
                       placeholder="Nombre del visitante"
                     />
                   </div>
@@ -266,7 +242,7 @@ export const RegistroManualVisitas = () => {
                     <Label>DNI / Documento</Label>
                     <Input
                       value={visitante.dni}
-                      onChange={(e) => actualizarVisitante(visitante.id, 'dni', e.target.value)}
+                      onChange={(e) => actualizarVisitante(visitante.id, "dni", e.target.value)}
                       placeholder="12345678"
                     />
                   </div>
@@ -274,8 +250,8 @@ export const RegistroManualVisitas = () => {
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    checked={visitante.esMenor}
-                    onCheckedChange={(checked) => actualizarVisitante(visitante.id, 'esMenor', checked as boolean)}
+                    checked={!!visitante.esMenor}
+                    onCheckedChange={(checked) => actualizarVisitante(visitante.id, "esMenor", !!checked)}
                   />
                   <Label>Es menor de edad</Label>
                 </div>
@@ -287,19 +263,11 @@ export const RegistroManualVisitas = () => {
           <div className="space-y-2">
             <Label>Cantidad de Menores (sin datos personales)</Label>
             <div className="flex items-center gap-3 max-w-xs">
-              <Button
-                onClick={() => setMenores(Math.max(0, menores - 1))}
-                variant="outline"
-                size="sm"
-              >
+              <Button onClick={() => setMenores(Math.max(0, menores - 1))} variant="outline" size="sm">
                 <Minus className="h-4 w-4" />
               </Button>
               <span className="text-center font-medium min-w-[2rem]">{menores}</span>
-              <Button
-                onClick={() => setMenores(menores + 1)}
-                variant="outline"
-                size="sm"
-              >
+              <Button onClick={() => setMenores(menores + 1)} variant="outline" size="sm">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -329,21 +297,18 @@ export const RegistroManualVisitas = () => {
             />
           </div>
 
-          {/* Botones de Acción */}
+          {/* Botones */}
           <div className="flex gap-3 pt-4 border-t">
-            <Button 
+            <Button
               onClick={guardarFavorito}
               variant="outline"
               className="flex items-center gap-2"
-              disabled={!empadronadoId || visitantes.some(v => !v.nombre.trim())}
+              disabled={!empadronadoId || visitantes.some((v) => !v.nombre.trim())}
             >
               <Star className="h-4 w-4" />
               Guardar Favorito
             </Button>
-            <Button 
-              onClick={registrarVisita}
-              className="flex-1 flex items-center gap-2"
-            >
+            <Button onClick={registrarVisitaClick} className="flex-1 flex items-center gap-2">
               <Save className="h-4 w-4" />
               Registrar Visita
             </Button>
@@ -351,7 +316,6 @@ export const RegistroManualVisitas = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog de Confirmación */}
       <ConfirmacionDialog
         open={mostrarConfirmacion}
         onOpenChange={setMostrarConfirmacion}

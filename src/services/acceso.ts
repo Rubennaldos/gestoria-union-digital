@@ -71,6 +71,23 @@ function stripUndefinedDeep<T>(value: T): T {
   return (value === undefined ? (undefined as any) : value) as T;
 }
 
+/** Lee nombre completo y padrón del empadronado (para snapshot en Seguridad) */
+async function readEmpadronadoSnapshot(empadronadoId: string): Promise<{
+  solicitadoPorNombre: string | null;
+  solicitadoPorPadron: string | null;
+}> {
+  try {
+    const empSnap = await get(ref(db, `empadronados/${empadronadoId}`));
+    if (!empSnap.exists()) return { solicitadoPorNombre: null, solicitadoPorPadron: null };
+    const emp: any = empSnap.val();
+    const solicitadoPorNombre = [emp?.nombre, emp?.apellidos].filter(Boolean).join(" ").trim() || null;
+    const solicitadoPorPadron = emp?.numeroPadron ? String(emp.numeroPadron) : null;
+    return { solicitadoPorNombre, solicitadoPorPadron };
+  } catch {
+    return { solicitadoPorNombre: null, solicitadoPorPadron: null };
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────
    VISITAS
    ────────────────────────────────────────────────────────────── */
@@ -92,6 +109,7 @@ export type NuevaVisitaInput = {
  */
 export async function registrarVisita(data: NuevaVisitaInput) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar la visita");
+  if (!data?.empadronadoId) throw new Error("Falta empadronadoId (vecino dueño de la solicitud)");
 
   const id = push(child(ref(db), "acceso/visitas")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
@@ -101,6 +119,11 @@ export async function registrarVisita(data: NuevaVisitaInput) {
     nombre: (v?.nombre || "").trim(),
     dni: (v?.dni || "").trim(),
   }));
+
+  // snapshot del empadronado (nombre y padrón) para la UI de Seguridad
+  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
+    data.empadronadoId
+  );
 
   const payload = stripUndefinedDeep({
     empadronadoId: data.empadronadoId,
@@ -115,7 +138,10 @@ export async function registrarVisita(data: NuevaVisitaInput) {
   updates[`acceso/visitas/${id}`] = payload;
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
-    empadronadoId: data.empadronadoId,          // útil si luego lo quieres leer directo
+    empadronadoId: data.empadronadoId,
+    solicitadoPorNombre, // 👈 ya no “no disponible”
+    solicitadoPorPadron,
+    // compat: primer visitante visible
     nombre: visitantes[0]?.nombre || "",
     dni: visitantes[0]?.dni || "",
     createdAt: base.createdAt,
@@ -136,9 +162,14 @@ export async function registrarTrabajadores(
   }
 ) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar trabajadores");
+  if (!data?.empadronadoId) throw new Error("Falta empadronadoId");
 
   const id = push(child(ref(db), "acceso/trabajadores")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
+
+  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
+    data.empadronadoId
+  );
 
   const cleanedData = stripUndefinedDeep(data as any);
   const payload: any = { ...cleanedData, ...base };
@@ -148,6 +179,8 @@ export async function registrarTrabajadores(
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
     empadronadoId: data.empadronadoId,
+    solicitadoPorNombre,
+    solicitadoPorPadron,
     createdAt: base.createdAt,
     tipo: "trabajador",
   });
@@ -162,9 +195,14 @@ export async function registrarProveedor(
   }
 ) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar proveedor");
+  if (!data?.empadronadoId) throw new Error("Falta empadronadoId");
 
   const id = push(child(ref(db), "acceso/proveedores")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
+
+  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
+    data.empadronadoId
+  );
 
   const cleanedData = stripUndefinedDeep(data as any);
   const payload: any = { ...cleanedData, ...base };
@@ -174,6 +212,8 @@ export async function registrarProveedor(
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
     empadronadoId: data.empadronadoId,
+    solicitadoPorNombre,
+    solicitadoPorPadron,
     createdAt: base.createdAt,
     tipo: "proveedor",
   });
@@ -342,6 +382,77 @@ export async function obtenerHistorialAccesos(empadronadoId: string) {
 }
 
 /* ──────────────────────────────────────────────────────────────
+   BACKFILL: completar pendientes sin snapshot de vecino
+   ────────────────────────────────────────────────────────────── */
+type BackfillResultado = { revisados: number; actualizados: number; omitidos: number };
+
+export async function backfillPendientesPortico(
+  porticoId: string = "principal"
+): Promise<BackfillResultado> {
+  const basePath = `seguridad/porticos/${porticoId}/pendientes`;
+  const snapPend = await get(ref(db, basePath));
+  if (!snapPend.exists()) return { revisados: 0, actualizados: 0, omitidos: 0 };
+
+  const pendientes: Record<string, any> = snapPend.val();
+  let revisados = 0;
+  let actualizados = 0;
+  let omitidos = 0;
+
+  async function leerRegistro(id: string) {
+    const pVis = await get(ref(db, `acceso/visitas/${id}`));
+    if (pVis.exists()) return { tipo: "visitante" as const, reg: pVis.val() };
+
+    const pTra = await get(ref(db, `acceso/trabajadores/${id}`));
+    if (pTra.exists()) return { tipo: "trabajador" as const, reg: pTra.val() };
+
+    const pProv = await get(ref(db, `acceso/proveedores/${id}`));
+    if (pProv.exists()) return { tipo: "proveedor" as const, reg: pProv.val() };
+
+    return null;
+  }
+
+  const updates: Record<string, any> = {};
+
+  for (const [id, pend] of Object.entries(pendientes)) {
+    revisados++;
+
+    if (pend?.solicitadoPorNombre || pend?.solicitadoPorPadron) {
+      omitidos++;
+      continue;
+    }
+
+    const info = await leerRegistro(id);
+    if (!info) {
+      omitidos++;
+      continue;
+    }
+
+    const empId = info.reg?.empadronadoId;
+    if (!empId) {
+      omitidos++;
+      continue;
+    }
+
+    const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(empId);
+
+    if (!solicitadoPorNombre && !solicitadoPorPadron) {
+      omitidos++;
+      continue;
+    }
+
+    updates[`${basePath}/${id}/solicitadoPorNombre`] = solicitadoPorNombre || null;
+    updates[`${basePath}/${id}/solicitadoPorPadron`] = solicitadoPorPadron || null;
+    actualizados++;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    await update(ref(db), updates);
+  }
+
+  return { revisados, actualizados, omitidos };
+}
+
+/* ──────────────────────────────────────────────────────────────
    MIGRACIÓN: cambiar empadronadoId = "user123" por el real del usuario
    ────────────────────────────────────────────────────────────── */
 /**
@@ -355,15 +466,15 @@ export async function migrarMisPendientesDesdeUser123(
   const updates: Record<string, any> = {};
   let cambiados = 0;
 
-  // Helper para barrer un path
-  const fixPath = async (path: "acceso/visitas" | "acceso/trabajadores" | "acceso/proveedores") => {
+  const fixPath = async (
+    path: "acceso/visitas" | "acceso/trabajadores" | "acceso/proveedores"
+  ) => {
     const snap = await get(ref(db, path));
     if (!snap.exists()) return;
 
     const obj = snap.val() as Record<string, any>;
-    for (const [id, v] of Object.entries(obj)) {
-      const r: any = v;
-      if (r?.estado === "pendiente" && r?.empadronadoId === "user123") {
+    for (const [id, r] of Object.entries(obj)) {
+      if ((r as any)?.estado === "pendiente" && (r as any)?.empadronadoId === "user123") {
         updates[`${path}/${id}/empadronadoId`] = realEmpadronadoId;
         cambiados++;
       }

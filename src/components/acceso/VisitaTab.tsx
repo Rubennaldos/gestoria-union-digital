@@ -13,7 +13,6 @@ import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
 import { Visitante, FavoritoUsuario } from "@/types/acceso";
 
-// 👇 importa el contexto de auth y el helper para mapear user->empadronado
 import { useAuth } from "@/contexts/AuthContext";
 import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
 
@@ -23,16 +22,14 @@ export function VisitaTab() {
   const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: "1", nombre: "", dni: "" }]);
   const [menores, setMenores] = useState(0);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
-  const [empadronadoId, setEmpadronadoId] = useState<string>(""); // 👈 aquí guardamos el dueño real
+  const [empadronadoId, setEmpadronadoId] = useState<string>("");
   const [cargandoEmp, setCargandoEmp] = useState<boolean>(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const { user } = useAuth(); // user?.uid, user?.displayName, user?.email
-
-  // Al montar / cambiar uid, resolvemos el empadronado del usuario logueado
   useEffect(() => {
     let alive = true;
-    async function run() {
+    (async () => {
       setCargandoEmp(true);
       try {
         if (!user?.uid) {
@@ -47,49 +44,36 @@ export function VisitaTab() {
       } finally {
         if (alive) setCargandoEmp(false);
       }
-    }
-    run();
+    })();
     return () => {
       alive = false;
     };
   }, [user?.uid]);
 
-  // ───────── helpers UI ─────────
   const agregarVisitante = () => {
     setVisitantes((prev) => [...prev, { id: Date.now().toString(), nombre: "", dni: "" }]);
   };
-
   const actualizarVisitante = (id: string, campo: "nombre" | "dni", valor: string) => {
     setVisitantes((prev) => prev.map((v) => (v.id === id ? { ...v, [campo]: valor } : v)));
   };
-
   const eliminarVisitante = (id: string) => {
     setVisitantes((prev) => (prev.length > 1 ? prev.filter((v) => v.id !== id) : prev));
   };
 
   const validarFormulario = () => {
     if (tipoAcceso === "vehicular" && !placa.trim()) {
-      toast({
-        title: "Error",
-        description: "La placa es requerida para acceso vehicular",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "La placa es requerida para acceso vehicular", variant: "destructive" });
       return false;
     }
     const validos = visitantes.filter((v) => v.nombre.trim() && v.dni.trim());
     if (validos.length === 0) {
-      toast({
-        title: "Error",
-        description: "Debe agregar al menos un visitante",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Debe agregar al menos un visitante", variant: "destructive" });
       return false;
     }
     if (!empadronadoId) {
       toast({
         title: "No se pudo identificar al vecino",
-        description:
-          "Tu usuario no está vinculado a un empadronado. Contacta al administrador para vincular tu cuenta.",
+        description: "Tu usuario no está vinculado a un empadronado. Contacta al administrador.",
         variant: "destructive",
       });
       return false;
@@ -97,54 +81,35 @@ export function VisitaTab() {
     return true;
   };
 
-  // ───────── guardar & registrar ─────────
   const guardarYRegistrar = async () => {
     if (!validarFormulario()) return;
 
     try {
-      // Normaliza los visitantes
-      const visitantesLimpios: { nombre: string; dni: string }[] = visitantes
+      const visitantesLimpios = visitantes
         .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
         .filter((v) => v.nombre && v.dni);
 
-      // Parámetros para Seguridad/WhatsApp
-      const nombreUsuario = user?.displayName || "";
-      const direccionUsuario = ""; // si lo tienes en el empadronado, puedes recuperarlo y mostrarlo
-      const telefonoVigilancia = ""; // “51999…”, si lo tienes
-
       const registro = {
-        empadronadoId, // 👈 AQUÍ el dueño real de la solicitud
+        empadronadoId, // dueño real
         tipoAcceso,
         placa: tipoAcceso === "vehicular" ? placa.toUpperCase() : undefined,
         visitantes: visitantesLimpios,
         menores: Number(menores || 0),
         porticoId: "principal",
-        // opcional: auditar quién creó
-        // (si quieres guardarlo en acceso/visitas)
-        // creadoPorUid: user?.uid,
       } as Parameters<typeof registrarVisita>[0];
 
       const id = await registrarVisita(registro);
 
-      // —— Mensaje de WhatsApp opcional
+      // (Opcional) WhatsApp
       const listaVisitantes = registro.visitantes.map((v) => `• ${v.nombre} (DNI: ${v.dni})`).join("\n");
       const mensajeMenores = registro.menores > 0 ? `\n- ${registro.menores} menor(es) de edad` : "";
-      const mensaje = `Yo ${nombreUsuario}${
-        direccionUsuario ? ` con dirección ${direccionUsuario}` : ""
-      } autorizo el ingreso a:\n\n${listaVisitantes}${mensajeMenores}\n\nCódigo de solicitud: ${id}`;
+      const mensaje = `Yo ${user?.displayName || ""} autorizo el ingreso a:\n\n${listaVisitantes}${mensajeMenores}\n\nCódigo de solicitud: ${id}`;
 
-      enviarMensajeWhatsApp({
-        telefono: telefonoVigilancia,
-        mensaje,
-      });
+      enviarMensajeWhatsApp({ telefono: "", mensaje });
 
       setMostrarConfirmacion(true);
-      toast({
-        title: "Registro exitoso",
-        description: "Se ha enviado la solicitud de autorización a vigilancia",
-      });
+      toast({ title: "Registro exitoso", description: "Se ha enviado la solicitud de autorización a vigilancia" });
 
-      // Limpieza del form (opcional)
       setPlaca("");
       setVisitantes([{ id: "1", nombre: "", dni: "" }]);
       setMenores(0);
@@ -158,10 +123,7 @@ export function VisitaTab() {
     }
   };
 
-  const deshabilitarSubmit = useMemo(
-    () => cargandoEmp || !empadronadoId,
-    [cargandoEmp, empadronadoId]
-  );
+  const deshabilitarSubmit = useMemo(() => cargandoEmp || !empadronadoId, [cargandoEmp, empadronadoId]);
 
   return (
     <div className="space-y-6">
@@ -174,16 +136,12 @@ export function VisitaTab() {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Estado de vínculo */}
           {cargandoEmp ? (
             <p className="text-sm text-muted-foreground">Verificando tu empadronado…</p>
           ) : !empadronadoId ? (
-            <p className="text-sm text-destructive">
-              Tu usuario no está vinculado a un empadronado. No puedes registrar visitas.
-            </p>
+            <p className="text-sm text-destructive">Tu usuario no está vinculado a un empadronado.</p>
           ) : null}
 
-          {/* Tipo de acceso */}
           <div className="space-y-3">
             <Label className="text-base font-medium">Tipo de Acceso</Label>
             <RadioGroup
@@ -208,7 +166,6 @@ export function VisitaTab() {
             </RadioGroup>
           </div>
 
-          {/* Placa (solo vehicular) */}
           {tipoAcceso === "vehicular" && (
             <div className="space-y-2">
               <Label htmlFor="placa">Placa del Vehículo *</Label>
@@ -224,7 +181,6 @@ export function VisitaTab() {
 
           <Separator />
 
-          {/* Buscador de favoritos */}
           <BuscadorFavoritos
             tipo="visitante"
             onSeleccionar={(favorito: FavoritoUsuario) => {
@@ -236,17 +192,10 @@ export function VisitaTab() {
 
           <Separator />
 
-          {/* Visitantes */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-base font-medium">Visitantes</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={agregarVisitante}
-                className="flex items-center gap-2"
-              >
+              <Button type="button" variant="outline" size="sm" onClick={agregarVisitante} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Agregar
               </Button>
@@ -289,7 +238,6 @@ export function VisitaTab() {
             ))}
           </div>
 
-          {/* Menores */}
           <div className="space-y-2">
             <Label htmlFor="menores">Cantidad de Menores de Edad</Label>
             <Input
@@ -305,16 +253,12 @@ export function VisitaTab() {
 
           <Separator />
 
-          {/* Botones */}
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               type="button"
               variant="outline"
               className="flex items-center gap-2 h-12"
-              onClick={() => {
-                // TODO: implementar favoritos reales
-                toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" });
-              }}
+              onClick={() => toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" })}
             >
               <Star className="h-4 w-4" />
               Guardar Favorito
