@@ -12,11 +12,7 @@ import {
   equalTo,
 } from "firebase/database";
 import { db } from "@/config/firebase";
-import {
-  RegistroTrabajadores,
-  RegistroProveedor,
-  FavoritoUsuario,
-} from "@/types/acceso";
+import { FavoritoUsuario } from "@/types/acceso";
 
 /* ──────────────────────────────────────────────────────────────
    Helpers
@@ -44,7 +40,7 @@ function buildBase(
     porticoId,
     estado,
     estadoPortico: `${estado}#${porticoId}`,
-    createdAt: serverTimestamp(), // conservar tal cual (objeto especial)
+    createdAt: serverTimestamp(),
   };
 }
 
@@ -57,7 +53,6 @@ function stripUndefinedDeep<T>(value: T): T {
   }
   if (value && typeof value === "object") {
     const maybe = value as any;
-    // conservar serverTimestamp (tiene propiedad .sv)
     if (maybe && typeof maybe === "object" && ".sv" in maybe) {
       return value;
     }
@@ -78,11 +73,14 @@ async function readEmpadronadoSnapshot(empadronadoId: string): Promise<{
 }> {
   try {
     const empSnap = await get(ref(db, `empadronados/${empadronadoId}`));
-    if (!empSnap.exists()) return { solicitadoPorNombre: null, solicitadoPorPadron: null };
+    if (!empSnap.exists())
+      return { solicitadoPorNombre: null, solicitadoPorPadron: null };
     const emp: any = empSnap.val();
     const solicitadoPorNombre =
       [emp?.nombre, emp?.apellidos].filter(Boolean).join(" ").trim() || null;
-    const solicitadoPorPadron = emp?.numeroPadron ? String(emp.numeroPadron) : null;
+    const solicitadoPorPadron = emp?.numeroPadron
+      ? String(emp.numeroPadron)
+      : null;
     return { solicitadoPorNombre, solicitadoPorPadron };
   } catch {
     return { solicitadoPorNombre: null, solicitadoPorPadron: null };
@@ -93,33 +91,24 @@ async function readEmpadronadoSnapshot(empadronadoId: string): Promise<{
    VISITAS
    ────────────────────────────────────────────────────────────── */
 
-/** Entrada simple desde el formulario de visitas */
 export type NuevaVisitaInput = {
   empadronadoId: string;
   tipoAcceso: "peatonal" | "vehicular";
   placa?: string;
   visitantes: { id?: string; nombre: string; dni: string }[];
   menores: number;
-  porticoId: string; // para Seguridad
+  porticoId: string;
 };
 
-/**
- * Crea una nueva visita y la refleja en:
- * - acceso/visitas/{id}
- * - seguridad/porticos/{porticoId}/pendientes/{id}
- */
 export async function registrarVisita(data: NuevaVisitaInput) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar la visita");
 
-  // 1) snapshot de vecino (nombre y padrón)
-  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
-    data.empadronadoId
-  );
+  const { solicitadoPorNombre, solicitadoPorPadron } =
+    await readEmpadronadoSnapshot(data.empadronadoId);
 
   const id = push(child(ref(db), "acceso/visitas")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
 
-  // normalizar visitantes (ignoramos campos extra como id)
   const visitantes = (data.visitantes || []).map((v) => ({
     nombre: (v?.nombre || "").trim(),
     dni: (v?.dni || "").trim(),
@@ -128,7 +117,10 @@ export async function registrarVisita(data: NuevaVisitaInput) {
   const payload = stripUndefinedDeep({
     empadronadoId: data.empadronadoId,
     tipoAcceso: data.tipoAcceso,
-    placa: data.tipoAcceso === "vehicular" ? (data.placa || "").toUpperCase() : undefined,
+    placa:
+      data.tipoAcceso === "vehicular"
+        ? (data.placa || "").toUpperCase()
+        : undefined,
     visitantes,
     menores: Number(data.menores || 0),
     solicitadoPorNombre,
@@ -138,18 +130,17 @@ export async function registrarVisita(data: NuevaVisitaInput) {
 
   const updates: Record<string, unknown> = {};
   updates[`acceso/visitas/${id}`] = payload;
-
-  // nodo para pórtico (pendientes)
-  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
-    id,
-    empadronadoId: data.empadronadoId,
-    nombre: visitantes[0]?.nombre || "",
-    dni: visitantes[0]?.dni || "",
-    createdAt: base.createdAt,
-    tipo: "visitante",
-    solicitadoPorNombre,
-    solicitadoPorPadron,
-  });
+  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] =
+    stripUndefinedDeep({
+      id,
+      empadronadoId: data.empadronadoId,
+      nombre: visitantes[0]?.nombre || "",
+      dni: visitantes[0]?.dni || "",
+      createdAt: base.createdAt,
+      tipo: "visitante",
+      solicitadoPorNombre,
+      solicitadoPorPadron,
+    });
 
   await update(ref(db), updates);
   return id;
@@ -159,22 +150,50 @@ export async function registrarVisita(data: NuevaVisitaInput) {
    TRABAJADORES / PROVEEDORES
    ────────────────────────────────────────────────────────────── */
 
-export async function registrarTrabajadores(
-  data: Omit<RegistroTrabajadores, "estado" | "estadoPortico" | "createdAt"> & {
-    porticoId: string;
-  }
-) {
+/** NUEVO: inputs simples para evitar pedir id/fechaCreacion */
+export type RegistrarTrabajadoresInput = {
+  empadronadoId: string;
+  tipoAcceso: "vehicular" | "peatonal";
+  placa?: string;
+  maestroObraId: string;
+  trabajadores: { nombre: string; dni: string; esMaestroObra?: boolean }[];
+  porticoId: string;
+};
+
+export type RegistrarProveedorInput = {
+  empadronadoId: string;
+  tipoAcceso: "vehicular" | "peatonal";
+  placa?: string;
+  empresa: string;
+  tipoServicio?: "gas" | "delivery" | "otro";
+  porticoId: string;
+};
+
+export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar trabajadores");
   if (!data?.empadronadoId) throw new Error("Falta empadronadoId");
 
   const id = push(child(ref(db), "acceso/trabajadores")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
 
-  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
-    data.empadronadoId
-  );
+  const { solicitadoPorNombre, solicitadoPorPadron } =
+    await readEmpadronadoSnapshot(data.empadronadoId);
 
-  const cleanedData = stripUndefinedDeep(data as any);
+  const cleanedData = stripUndefinedDeep({
+    empadronadoId: data.empadronadoId,
+    tipoAcceso: data.tipoAcceso,
+    placa:
+      data.tipoAcceso === "vehicular"
+        ? (data.placa || "").toUpperCase()
+        : undefined,
+    maestroObraId: data.maestroObraId,
+    trabajadores: (data.trabajadores || []).map((t) => ({
+      nombre: (t?.nombre || "").trim(),
+      dni: (t?.dni || "").trim(),
+      esMaestroObra: !!t?.esMaestroObra,
+    })),
+  });
+
   const payload: any = {
     ...cleanedData,
     solicitadoPorNombre,
@@ -184,35 +203,41 @@ export async function registrarTrabajadores(
 
   const updates: Record<string, unknown> = {};
   updates[`acceso/trabajadores/${id}`] = payload;
-  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
-    id,
-    empadronadoId: data.empadronadoId,
-    solicitadoPorNombre,
-    solicitadoPorPadron,
-    createdAt: base.createdAt,
-    tipo: "trabajador",
-  });
+  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] =
+    stripUndefinedDeep({
+      id,
+      empadronadoId: data.empadronadoId,
+      solicitadoPorNombre,
+      solicitadoPorPadron,
+      createdAt: base.createdAt,
+      tipo: "trabajador",
+    });
 
   await update(ref(db), updates);
   return id;
 }
 
-export async function registrarProveedor(
-  data: Omit<RegistroProveedor, "estado" | "estadoPortico" | "createdAt"> & {
-    porticoId: string;
-  }
-) {
+export async function registrarProveedor(data: RegistrarProveedorInput) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar proveedor");
   if (!data?.empadronadoId) throw new Error("Falta empadronadoId");
 
   const id = push(child(ref(db), "acceso/proveedores")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
 
-  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
-    data.empadronadoId
-  );
+  const { solicitadoPorNombre, solicitadoPorPadron } =
+    await readEmpadronadoSnapshot(data.empadronadoId);
 
-  const cleanedData = stripUndefinedDeep(data as any);
+  const cleanedData = stripUndefinedDeep({
+    empadronadoId: data.empadronadoId,
+    tipoAcceso: data.tipoAcceso,
+    placa:
+      data.tipoAcceso === "vehicular"
+        ? (data.placa || "").toUpperCase()
+        : undefined,
+    empresa: (data.empresa || "").trim(),
+    tipoServicio: data.tipoServicio ?? "otro",
+  });
+
   const payload: any = {
     ...cleanedData,
     solicitadoPorNombre,
@@ -222,14 +247,15 @@ export async function registrarProveedor(
 
   const updates: Record<string, unknown> = {};
   updates[`acceso/proveedores/${id}`] = payload;
-  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
-    id,
-    empadronadoId: data.empadronadoId,
-    solicitadoPorNombre,
-    solicitadoPorPadron,
-    createdAt: base.createdAt,
-    tipo: "proveedor",
-  });
+  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] =
+    stripUndefinedDeep({
+      id,
+      empadronadoId: data.empadronadoId,
+      solicitadoPorNombre,
+      solicitadoPorPadron,
+      createdAt: base.createdAt,
+      tipo: "proveedor",
+    });
 
   await update(ref(db), updates);
   return id;
@@ -246,7 +272,11 @@ export async function cambiarEstadoAcceso(
   actor: string
 ) {
   const registroPath = `acceso/${
-    tipo === "visitante" ? "visitas" : tipo === "trabajador" ? "trabajadores" : "proveedores"
+    tipo === "visitante"
+      ? "visitas"
+      : tipo === "trabajador"
+      ? "trabajadores"
+      : "proveedores"
   }/${id}`;
 
   const updates: Record<string, unknown> = {};
@@ -255,7 +285,6 @@ export async function cambiarEstadoAcceso(
   updates[`${registroPath}/fechaAutorizacion`] = Date.now();
   updates[`${registroPath}/autorizadoPor`] = actor;
 
-  // quitar de pendientes del pórtico
   updates[`seguridad/porticos/${porticoId}/pendientes/${id}`] = null;
 
   await update(ref(db), updates);
@@ -268,23 +297,34 @@ export async function obtenerFavoritosPorUsuario(
   empadronadoId: string,
   tipo: TipoAcceso
 ): Promise<FavoritoUsuario[]> {
-  const q = query(ref(db, "acceso/favoritos"), orderByChild("empadronadoId"), equalTo(empadronadoId));
+  const q = query(
+    ref(db, "acceso/favoritos"),
+    orderByChild("empadronadoId"),
+    equalTo(empadronadoId)
+  );
   const snap = await get(q);
   if (!snap.exists()) return [];
   const todos: FavoritoUsuario[] = Object.values(snap.val());
-  return todos.filter((f: any) => f.tipo === tipo).sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
+  return todos
+    .filter((f: any) => f.tipo === tipo)
+    .sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
 }
 
 /* ──────────────────────────────────────────────────────────────
    WhatsApp util
    ────────────────────────────────────────────────────────────── */
-export function enviarMensajeWhatsApp(params: { telefono: string; mensaje: string }) {
+export function enviarMensajeWhatsApp(params: {
+  telefono: string;
+  mensaje: string;
+}) {
   const tel = (params.telefono || "").replace(/[^\d]/g, "");
   if (!tel) {
     console.warn("enviarMensajeWhatsApp: teléfono vacío");
     return;
   }
-  const url = `https://wa.me/${tel}?text=${encodeURIComponent(params.mensaje || "")}`;
+  const url = `https://wa.me/${tel}?text=${encodeURIComponent(
+    params.mensaje || ""
+  )}`;
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
@@ -301,8 +341,11 @@ export type MaestroObraInput = {
   [k: string]: any;
 };
 
-export async function crearMaestroObra(data: MaestroObraInput): Promise<string> {
-  if (!data?.nombre || !data.nombre.trim()) throw new Error("El nombre es obligatorio");
+export async function crearMaestroObra(
+  data: MaestroObraInput
+): Promise<string> {
+  if (!data?.nombre || !data.nombre.trim())
+    throw new Error("El nombre es obligatorio");
 
   const id = push(child(ref(db), "acceso/maestrosObra")).key as string;
 
@@ -330,7 +373,9 @@ export async function actualizarMaestroObra(
   await update(ref(db, `acceso/maestrosObra/${id}`), patch);
 }
 
-export async function obtenerMaestroObraPorId(id: string): Promise<any | null> {
+export async function obtenerMaestroObraPorId(
+  id: string
+): Promise<any | null> {
   const snap = await get(ref(db, `acceso/maestrosObra/${id}`));
   return snap.exists() ? snap.val() : null;
 }
@@ -344,7 +389,8 @@ export async function obtenerMaestrosObra(opts?: {
   if (!snap.exists()) return [];
   let arr: any[] = Object.values(snap.val());
 
-  if (typeof opts?.activo === "boolean") arr = arr.filter((m) => (m.activo ?? true) === opts.activo);
+  if (typeof opts?.activo === "boolean")
+    arr = arr.filter((m) => (m.activo ?? true) === opts.activo);
   if (opts?.search) {
     const s = opts.search.toLowerCase();
     arr = arr.filter((m) => (m.nombre || "").toLowerCase().includes(s));
@@ -355,34 +401,52 @@ export async function obtenerMaestrosObra(opts?: {
 }
 
 export async function setActivoMaestroObra(id: string, activo: boolean) {
-  await update(ref(db, `acceso/maestrosObra/${id}`), { activo, updatedAt: Date.now() });
+  await update(ref(db, `acceso/maestrosObra/${id}`), {
+    activo,
+    updatedAt: Date.now(),
+  });
 }
 
 /* ──────────────────────────────────────────────────────────────
    Historial por empadronado
    ────────────────────────────────────────────────────────────── */
-export async function obtenerVisitasPorEmpadronado(empadronadoId: string): Promise<any[]> {
+export async function obtenerVisitasPorEmpadronado(
+  empadronadoId: string
+): Promise<any[]> {
   const snap = await get(ref(db, "acceso/visitas"));
   if (!snap.exists()) return [];
-  const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
+  const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({
+    id,
+    ...v,
+  }));
   return arr
     .filter((v) => (v as any).empadronadoId === empadronadoId)
     .sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
-export async function obtenerTrabajadoresPorEmpadronado(empadronadoId: string): Promise<any[]> {
+export async function obtenerTrabajadoresPorEmpadronado(
+  empadronadoId: string
+): Promise<any[]> {
   const snap = await get(ref(db, "acceso/trabajadores"));
   if (!snap.exists()) return [];
-  const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
+  const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({
+    id,
+    ...v,
+  }));
   return arr
     .filter((v) => (v as any).empadronadoId === empadronadoId)
     .sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
-export async function obtenerProveedoresPorEmpadronado(empadronadoId: string): Promise<any[]> {
+export async function obtenerProveedoresPorEmpadronado(
+  empadronadoId: string
+): Promise<any[]> {
   const snap = await get(ref(db, "acceso/proveedores"));
   if (!snap.exists()) return [];
-  const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
+  const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({
+    id,
+    ...v,
+  }));
   return arr
     .filter((v) => (v as any).empadronadoId === empadronadoId)
     .sort((a, b) => tsFrom(b) - tsFrom(a));
@@ -394,14 +458,19 @@ export async function obtenerHistorialAccesos(empadronadoId: string) {
     obtenerTrabajadoresPorEmpadronado(empadronadoId),
     obtenerProveedoresPorEmpadronado(empadronadoId),
   ]);
-  const tag = (arr: any[], tipo: TipoAcceso) => arr.map((x) => ({ ...x, tipo }));
-  const all = [...tag(vis, "visitante"), ...tag(tra, "trabajador"), ...tag(prov, "proveedor")];
+  const tag = (arr: any[], tipo: TipoAcceso) =>
+    arr.map((x) => ({ ...x, tipo }));
+  const all = [
+    ...tag(vis, "visitante"),
+    ...tag(tra, "trabajador"),
+    ...tag(prov, "proveedor"),
+  ];
   all.sort((a, b) => tsFrom(b) - tsFrom(a));
   return all;
 }
 
 /* ──────────────────────────────────────────────────────────────
-   BACKFILL: completar pendientes sin snapshot de vecino
+   BACKFILL / MIGRACIÓN (igual)
    ────────────────────────────────────────────────────────────── */
 type BackfillResultado = { revisados: number; actualizados: number; omitidos: number };
 
@@ -452,15 +521,18 @@ export async function backfillPendientesPortico(
       continue;
     }
 
-    const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(empId);
+    const { solicitadoPorNombre, solicitadoPorPadron } =
+      await readEmpadronadoSnapshot(empId);
 
     if (!solicitadoPorNombre && !solicitadoPorPadron) {
       omitidos++;
       continue;
     }
 
-    updates[`${basePath}/${id}/solicitadoPorNombre`] = solicitadoPorNombre || null;
-    updates[`${basePath}/${id}/solicitadoPorPadron`] = solicitadoPorPadron || null;
+    updates[`${basePath}/${id}/solicitadoPorNombre`] =
+      solicitadoPorNombre || null;
+    updates[`${basePath}/${id}/solicitadoPorPadron`] =
+      solicitadoPorPadron || null;
     actualizados++;
   }
 
@@ -471,14 +543,6 @@ export async function backfillPendientesPortico(
   return { revisados, actualizados, omitidos };
 }
 
-/* ──────────────────────────────────────────────────────────────
-   MIGRACIÓN: cambiar empadronadoId = "user123" por el real del usuario
-   ────────────────────────────────────────────────────────────── */
-/**
- * Corrige registros PENDIENTES que quedaron con empadronadoId = "user123"
- * en acceso/visitas, acceso/trabajadores y acceso/proveedores.
- * Úsalo 1 sola vez por usuario luego de crear su empadronado real.
- */
 export async function migrarMisPendientesDesdeUser123(
   realEmpadronadoId: string
 ): Promise<{ cambiados: number }> {
@@ -493,7 +557,10 @@ export async function migrarMisPendientesDesdeUser123(
 
     const obj = snap.val() as Record<string, any>;
     for (const [id, r] of Object.entries(obj)) {
-      if ((r as any)?.estado === "pendiente" && (r as any)?.empadronadoId === "user123") {
+      if (
+        (r as any)?.estado === "pendiente" &&
+        (r as any)?.empadronadoId === "user123"
+      ) {
         updates[`${path}/${id}/empadronadoId`] = realEmpadronadoId;
         cambiados++;
       }
