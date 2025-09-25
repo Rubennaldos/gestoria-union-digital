@@ -1,3 +1,4 @@
+// src/services/empadronados.ts
 import {
   ref,
   push,
@@ -17,7 +18,6 @@ import {
   UpdateEmpadronadoForm,
   EmpadronadosStats,
 } from "@/types/empadronados";
-import { Pago } from "@/types/cobranzas";
 import { writeAuditLog } from "./rtdb";
 
 const EMPADRONADOS_PATH = "empadronados";
@@ -28,7 +28,8 @@ const PERIODS_LOCK_PATH = "cobranzas/periods";
    Helpers de periodos / fechas
    ────────────────────────────────────────────────────────────── */
 const pad2 = (n: number) => String(n).padStart(2, "0");
-const periodKeyFromDate = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // "YYYY-MM"
+const periodKeyFromDate = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // "YYYY-MM"
 const compact = (period: string) => period.replace("-", ""); // "YYYY-MM" -> "YYYYMM"
 const addMonths = (period: string, n: number) => {
   const [y, m] = period.split("-").map(Number);
@@ -60,7 +61,7 @@ export const getCobranzasConfig = async (): Promise<CobranzasConfig> => {
   return {
     montoMensual: Number(cfg?.montoMensual ?? 50),
     diaVencimiento: Number(cfg?.diaVencimiento ?? 15),
-    diaCierreMes: Number(cfg?.diaCierre ?? 14), // ojo: el campo en config es "diaCierre"
+    diaCierreMes: Number(cfg?.diaCierre ?? 14), // en RTDB el campo es "diaCierre"
   };
 };
 
@@ -69,12 +70,14 @@ const firstChargePeriodForEmp = async (emp: Empadronado): Promise<string> => {
   const { diaCierreMes } = await getCobranzasConfig();
   const ingresoDate = new Date(emp.fechaIngreso || 0);
 
+  // Si no tiene fecha o ingresó antes de la política -> enero 2025
   if (!emp.fechaIngreso || ingresoDate < POLICY_START) return "2025-01";
 
   const y = ingresoDate.getFullYear();
   const m = ingresoDate.getMonth() + 1;
   const d = ingresoDate.getDate();
 
+  // Hasta el día de cierre: cobra ese mismo mes; después: mes siguiente
   if (d <= diaCierreMes) {
     return `${y}-${pad2(m)}`;
   } else {
@@ -119,7 +122,10 @@ const ensureChargeForMemberPeriod = async (
     total: montoMensual,
     saldo: montoMensual,
     estado: "pendiente",
-    timestamps: { creado: new Date().toISOString(), actualizado: new Date().toISOString() },
+    timestamps: {
+      creado: new Date().toISOString(),
+      actualizado: new Date().toISOString(),
+    },
   });
 
   return true;
@@ -142,7 +148,11 @@ export const ensureChargesForNewMember = async (
   let created = 0;
   for (let i = 0; i <= diff; i++) {
     const p = addMonths(first, i);
-    const ok = await ensureChargeForMemberPeriod({ id: empId, numeroPadron: emp.numeroPadron }, p, authorUid);
+    const ok = await ensureChargeForMemberPeriod(
+      { id: empId, numeroPadron: emp.numeroPadron },
+      p,
+      authorUid
+    );
     if (ok) created++;
   }
   return created;
@@ -169,11 +179,14 @@ export const backfillChargesForAllEmpadronados = async (
 };
 
 /** Genera SOLO la cuota del mes actual para todos (sin duplicar) */
-export const ensureCurrentMonthChargesForAll = async (authorUid: string = "system"): Promise<number> => {
+export const ensureCurrentMonthChargesForAll = async (
+  authorUid: string = "system"
+): Promise<number> => {
   const period = periodKeyFromDate(new Date());
   const yyyymm = compact(period);
   const periodLock = ref(db, `${PERIODS_LOCK_PATH}/${yyyymm}/generated`);
 
+  // lock por período para evitar generación concurrente
   const tx = await runTransaction(periodLock, (cur) => (cur ? cur : { at: Date.now() }));
   if (!tx.committed) return 0;
 
@@ -186,7 +199,11 @@ export const ensureCurrentMonthChargesForAll = async (authorUid: string = "syste
   for (const empId of Object.keys(data)) {
     const emp = data[empId];
     if (emp?.habilitado === false) continue;
-    const ok = await ensureChargeForMemberPeriod({ id: empId, numeroPadron: emp.numeroPadron }, period, authorUid);
+    const ok = await ensureChargeForMemberPeriod(
+      { id: empId, numeroPadron: emp.numeroPadron },
+      period,
+      authorUid
+    );
     if (ok) created++;
   }
   return created;
@@ -209,18 +226,22 @@ const removeUndefined = (obj: any): any => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   (Mantenemos las herramientas sobre /cobranzas/pagos para limpieza histórica)
+   Herramientas sobre /cobranzas/pagos (legacy) para limpieza
    ────────────────────────────────────────────────────────────── */
 export const dedupePagosForAll = async (): Promise<{ kept: number; removed: number }> => {
   const pagosSnap = await get(ref(db, "cobranzas/pagos"));
   if (!pagosSnap.exists()) return { kept: 0, removed: 0 };
 
-  const all = pagosSnap.val() as Record<string, { empadronadoId: string; año: number; mes: number }>;
+  const all = pagosSnap.val() as Record<
+    string,
+    { empadronadoId: string; año: number; mes: number }
+  >;
 
   const seen = new Map<string, string>();
   let kept = 0;
   let removed = 0;
 
+  // resetear índice
   await remove(ref(db, "cobranzas/pagos_index"));
 
   for (const [pagoId, p] of Object.entries(all)) {
@@ -239,10 +260,14 @@ export const dedupePagosForAll = async (): Promise<{ kept: number; removed: numb
   return { kept, removed };
 };
 
-/* Reconciliación completa (trabaja sobre /cobranzas/pagos legacy) */
 export const reconcilePagosForAll = async (
   authorUid: string = "system"
-): Promise<{ totalEmp: number; removedOutOfRange: number; removedDuplicates: number; createdMissing: number }> => {
+): Promise<{
+  totalEmp: number;
+  removedOutOfRange: number;
+  removedDuplicates: number;
+  createdMissing: number;
+}> => {
   const empSnap = await get(ref(db, EMPADRONADOS_PATH));
   if (!empSnap.exists()) {
     return { totalEmp: 0, removedOutOfRange: 0, removedDuplicates: 0, createdMissing: 0 };
@@ -298,12 +323,18 @@ export const reconcilePagosForAll = async (
         continue;
       }
       seen.add(period);
-      await set(ref(db, `cobranzas/pagos_index/${empId}/${compact(period)}`), { createdAt: Date.now() });
+      await set(ref(db, `cobranzas/pagos_index/${empId}/${compact(period)}`), {
+        createdAt: Date.now(),
+      });
     }
 
     for (const period of validPeriods) {
       if (!seen.has(period)) {
-        const ok = await ensureChargeForMemberPeriod({ id: empId, numeroPadron: emp.numeroPadron }, period, authorUid);
+        const ok = await ensureChargeForMemberPeriod(
+          { id: empId, numeroPadron: emp.numeroPadron },
+          period,
+          authorUid
+        );
         if (ok) createdMissing++;
       }
     }
@@ -315,7 +346,11 @@ export const reconcilePagosForAll = async (
 /* ──────────────────────────────────────────────────────────────
    Vinculación con usuarios
    ────────────────────────────────────────────────────────────── */
-export const linkAuthToEmpadronado = async (empadronadoId: string, uid: string, email: string) => {
+export const linkAuthToEmpadronado = async (
+  empadronadoId: string,
+  uid: string,
+  email: string
+) => {
   await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
     authUid: uid,
     emailAcceso: email,
@@ -334,12 +369,14 @@ export const unlinkAuthFromEmpadronado = async (empadronadoId: string) => {
 /* ──────────────────────────────────────────────────────────────
    Búsqueda directa
    ────────────────────────────────────────────────────────────── */
-export const findEmpadronadoByDniOrPadron = async (term: string): Promise<Empadronado | null> => {
+export const findEmpadronadoByDniOrPadron = async (
+  term: string
+): Promise<Empadronado | null> => {
   const t = (term || "").trim();
   if (!t) return null;
 
   // 1) Por número de padrón
-  let q1 = query(ref(db, EMPADRONADOS_PATH), orderByChild("numeroPadron"), equalTo(t));
+  const q1 = query(ref(db, EMPADRONADOS_PATH), orderByChild("numeroPadron"), equalTo(t));
   let snap = await get(q1);
   if (snap.exists()) {
     const v = snap.val();
@@ -347,7 +384,7 @@ export const findEmpadronadoByDniOrPadron = async (term: string): Promise<Empadr
   }
 
   // 2) Por DNI
-  let q2 = query(ref(db, EMPADRONADOS_PATH), orderByChild("dni"), equalTo(t));
+  const q2 = query(ref(db, EMPADRONADOS_PATH), orderByChild("dni"), equalTo(t));
   snap = await get(q2);
   if (snap.exists()) {
     const v = snap.val();
@@ -453,7 +490,11 @@ export const updateEmpadronado = async (
   }
 };
 
-export const deleteEmpadronado = async (id: string, actorUid: string, motivo: string): Promise<boolean> => {
+export const deleteEmpadronado = async (
+  id: string,
+  actorUid: string,
+  motivo: string
+): Promise<boolean> => {
   try {
     const oldData = await getEmpadronado(id);
     if (!oldData) return false;
@@ -533,7 +574,10 @@ export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
   }
 };
 
-export const isNumeroPadronUnique = async (numeroPadron: string, excludeId?: string): Promise<boolean> => {
+export const isNumeroPadronUnique = async (
+  numeroPadron: string,
+  excludeId?: string
+): Promise<boolean> => {
   try {
     const empadronados = await getEmpadronados();
     return !empadronados.some((e) => e.numeroPadron === numeroPadron && e.id !== excludeId);
@@ -543,10 +587,16 @@ export const isNumeroPadronUnique = async (numeroPadron: string, excludeId?: str
   }
 };
 
-export const obtenerEmpadronadoPorAuthUid = async (authUid: string): Promise<Empadronado | null> => {
+export const obtenerEmpadronadoPorAuthUid = async (
+  authUid: string
+): Promise<Empadronado | null> => {
   try {
     const empadronadosRef = ref(db, EMPADRONADOS_PATH);
-    const empadronadosQuery = query(empadronadosRef, orderByChild("authUid"), equalTo(authUid));
+    const empadronadosQuery = query(
+      empadronadosRef,
+      orderByChild("authUid"),
+      equalTo(authUid)
+    );
     const snapshot = await get(empadronadosQuery);
 
     if (!snapshot.exists()) return null;

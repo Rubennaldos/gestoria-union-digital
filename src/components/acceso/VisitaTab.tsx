@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,28 +13,54 @@ import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
 import { Visitante, FavoritoUsuario } from "@/types/acceso";
 
+// 👇 importa el contexto de auth y el helper para mapear user->empadronado
+import { useAuth } from "@/contexts/AuthContext";
+import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
+
 export function VisitaTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placa, setPlaca] = useState("");
-  const [visitantes, setVisitantes] = useState<Visitante[]>([
-    { id: "1", nombre: "", dni: "" },
-  ]);
+  const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: "1", nombre: "", dni: "" }]);
   const [menores, setMenores] = useState(0);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [empadronadoId, setEmpadronadoId] = useState<string>(""); // 👈 aquí guardamos el dueño real
+  const [cargandoEmp, setCargandoEmp] = useState<boolean>(true);
   const { toast } = useToast();
+
+  const { user } = useAuth(); // user?.uid, user?.displayName, user?.email
+
+  // Al montar / cambiar uid, resolvemos el empadronado del usuario logueado
+  useEffect(() => {
+    let alive = true;
+    async function run() {
+      setCargandoEmp(true);
+      try {
+        if (!user?.uid) {
+          setEmpadronadoId("");
+          return;
+        }
+        const emp = await obtenerEmpadronadoPorAuthUid(user.uid);
+        setEmpadronadoId(emp?.id ?? "");
+      } catch (e) {
+        console.error("obtenerEmpadronadoPorAuthUid error:", e);
+        setEmpadronadoId("");
+      } finally {
+        if (alive) setCargandoEmp(false);
+      }
+    }
+    run();
+    return () => {
+      alive = false;
+    };
+  }, [user?.uid]);
 
   // ───────── helpers UI ─────────
   const agregarVisitante = () => {
-    setVisitantes((prev) => [
-      ...prev,
-      { id: Date.now().toString(), nombre: "", dni: "" },
-    ]);
+    setVisitantes((prev) => [...prev, { id: Date.now().toString(), nombre: "", dni: "" }]);
   };
 
   const actualizarVisitante = (id: string, campo: "nombre" | "dni", valor: string) => {
-    setVisitantes((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, [campo]: valor } : v))
-    );
+    setVisitantes((prev) => prev.map((v) => (v.id === id ? { ...v, [campo]: valor } : v)));
   };
 
   const eliminarVisitante = (id: string) => {
@@ -50,12 +76,20 @@ export function VisitaTab() {
       });
       return false;
     }
-
     const validos = visitantes.filter((v) => v.nombre.trim() && v.dni.trim());
     if (validos.length === 0) {
       toast({
         title: "Error",
         description: "Debe agregar al menos un visitante",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (!empadronadoId) {
+      toast({
+        title: "No se pudo identificar al vecino",
+        description:
+          "Tu usuario no está vinculado a un empadronado. Contacta al administrador para vincular tu cuenta.",
         variant: "destructive",
       });
       return false;
@@ -68,47 +102,39 @@ export function VisitaTab() {
     if (!validarFormulario()) return;
 
     try {
-      // TODO: reemplazar por datos reales del usuario logueado
-      const empadronadoId = "user123";
-      const nombreUsuario = "Juan Pérez";
-      const direccionUsuario = "Mz A Lt 15";
+      // Normaliza los visitantes
+      const visitantesLimpios: { nombre: string; dni: string }[] = visitantes
+        .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
+        .filter((v) => v.nombre && v.dni);
+
+      // Parámetros para Seguridad/WhatsApp
+      const nombreUsuario = user?.displayName || "";
+      const direccionUsuario = ""; // si lo tienes en el empadronado, puedes recuperarlo y mostrarlo
       const telefonoVigilancia = ""; // “51999…”, si lo tienes
 
-      // normalizar visitantes
-      // ✅ ahora (cumple el tipo Visitante: { id, nombre, dni })
-const visitantesLimpios: Visitante[] = visitantes
-  .map((v) => ({
-    id: v.id,                              // <- mantener id
-    nombre: v.nombre.trim(),
-    dni: v.dni.trim(),
-  }))
-  .filter((v) => v.nombre && v.dni);
-
-
-      // TIPAMOS EXACTAMENTE EL OBJETO COMO EL 1er PARÁMETRO DE registrarVisita
-      const registro: Parameters<typeof registrarVisita>[0] = {
-        empadronadoId,
-        tipoAcceso, // 'peatonal' | 'vehicular'
+      const registro = {
+        empadronadoId, // 👈 AQUÍ el dueño real de la solicitud
+        tipoAcceso,
         placa: tipoAcceso === "vehicular" ? placa.toUpperCase() : undefined,
-        visitantes: visitantesLimpios, // array de {nombre, dni}
+        visitantes: visitantesLimpios,
         menores: Number(menores || 0),
-        porticoId: "principal", // necesario para reflejar en Seguridad
-      };
+        porticoId: "principal",
+        // opcional: auditar quién creó
+        // (si quieres guardarlo en acceso/visitas)
+        // creadoPorUid: user?.uid,
+      } as Parameters<typeof registrarVisita>[0];
 
       const id = await registrarVisita(registro);
 
-      // —— Mensaje de WhatsApp
-      const listaVisitantes = registro.visitantes
-        .map((v) => `• ${v.nombre} (DNI: ${v.dni})`)
-        .join("\n");
-      const mensajeMenores =
-        registro.menores > 0 ? `\n- ${registro.menores} menor(es) de edad` : "";
+      // —— Mensaje de WhatsApp opcional
+      const listaVisitantes = registro.visitantes.map((v) => `• ${v.nombre} (DNI: ${v.dni})`).join("\n");
+      const mensajeMenores = registro.menores > 0 ? `\n- ${registro.menores} menor(es) de edad` : "";
+      const mensaje = `Yo ${nombreUsuario}${
+        direccionUsuario ? ` con dirección ${direccionUsuario}` : ""
+      } autorizo el ingreso a:\n\n${listaVisitantes}${mensajeMenores}\n\nCódigo de solicitud: ${id}`;
 
-      const mensaje = `Yo ${nombreUsuario} con dirección ${direccionUsuario} autorizo el ingreso a:\n\n${listaVisitantes}${mensajeMenores}\n\nCódigo de solicitud: ${id}`;
-
-      // la función exige { telefono, mensaje }
       enviarMensajeWhatsApp({
-        telefono: telefonoVigilancia, // puede estar vacío; la función lo maneja
+        telefono: telefonoVigilancia,
         mensaje,
       });
 
@@ -117,6 +143,11 @@ const visitantesLimpios: Visitante[] = visitantes
         title: "Registro exitoso",
         description: "Se ha enviado la solicitud de autorización a vigilancia",
       });
+
+      // Limpieza del form (opcional)
+      setPlaca("");
+      setVisitantes([{ id: "1", nombre: "", dni: "" }]);
+      setMenores(0);
     } catch (error: any) {
       console.error("guardarYRegistrar error:", error);
       toast({
@@ -126,6 +157,11 @@ const visitantesLimpios: Visitante[] = visitantes
       });
     }
   };
+
+  const deshabilitarSubmit = useMemo(
+    () => cargandoEmp || !empadronadoId,
+    [cargandoEmp, empadronadoId]
+  );
 
   return (
     <div className="space-y-6">
@@ -138,6 +174,15 @@ const visitantesLimpios: Visitante[] = visitantes
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Estado de vínculo */}
+          {cargandoEmp ? (
+            <p className="text-sm text-muted-foreground">Verificando tu empadronado…</p>
+          ) : !empadronadoId ? (
+            <p className="text-sm text-destructive">
+              Tu usuario no está vinculado a un empadronado. No puedes registrar visitas.
+            </p>
+          ) : null}
+
           {/* Tipo de acceso */}
           <div className="space-y-3">
             <Label className="text-base font-medium">Tipo de Acceso</Label>
@@ -183,7 +228,6 @@ const visitantesLimpios: Visitante[] = visitantes
           <BuscadorFavoritos
             tipo="visitante"
             onSeleccionar={(favorito: FavoritoUsuario) => {
-              // Ajusta a tu shape: asumo favorito.datos = { nombre, dni }
               const nom = (favorito as any)?.datos?.nombre ?? "";
               const doc = (favorito as any)?.datos?.dni ?? "";
               setVisitantes([{ id: Date.now().toString(), nombre: nom, dni: doc }]);
@@ -215,9 +259,7 @@ const visitantesLimpios: Visitante[] = visitantes
                     <Label>Nombre Completo *</Label>
                     <Input
                       value={visitante.nombre}
-                      onChange={(e) =>
-                        actualizarVisitante(visitante.id, "nombre", e.target.value)
-                      }
+                      onChange={(e) => actualizarVisitante(visitante.id, "nombre", e.target.value)}
                       placeholder="Nombre y apellidos"
                     />
                   </div>
@@ -225,9 +267,7 @@ const visitantesLimpios: Visitante[] = visitantes
                     <Label>DNI o Documento *</Label>
                     <Input
                       value={visitante.dni}
-                      onChange={(e) =>
-                        actualizarVisitante(visitante.id, "dni", e.target.value)
-                      }
+                      onChange={(e) => actualizarVisitante(visitante.id, "dni", e.target.value)}
                       placeholder="12345678"
                     />
                   </div>
@@ -260,11 +300,7 @@ const visitantesLimpios: Visitante[] = visitantes
               onChange={(e) => setMenores(parseInt(e.target.value) || 0)}
               placeholder="0"
             />
-            {menores > 0 && (
-              <Badge variant="secondary" className="mt-2">
-                {menores} menor(es) acompañante(s)
-              </Badge>
-            )}
+            {menores > 0 && <Badge variant="secondary" className="mt-2">{menores} menor(es)</Badge>}
           </div>
 
           <Separator />
@@ -276,18 +312,20 @@ const visitantesLimpios: Visitante[] = visitantes
               variant="outline"
               className="flex items-center gap-2 h-12"
               onClick={() => {
-                // TODO: Implementar guardar favorito real
-                toast({
-                  title: "Favorito guardado",
-                  description: "Los datos se han guardado en favoritos",
-                });
+                // TODO: implementar favoritos reales
+                toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" });
               }}
             >
               <Star className="h-4 w-4" />
               Guardar Favorito
             </Button>
 
-            <Button onClick={guardarYRegistrar} className="flex items-center gap-2 h-12 flex-1">
+            <Button
+              onClick={guardarYRegistrar}
+              className="flex items-center gap-2 h-12 flex-1"
+              disabled={deshabilitarSubmit}
+              title={deshabilitarSubmit ? "Esperando tu empadronado…" : ""}
+            >
               <Send className="h-4 w-4" />
               Guardar y Registrar Visita
             </Button>

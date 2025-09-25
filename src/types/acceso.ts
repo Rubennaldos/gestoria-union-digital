@@ -10,12 +10,12 @@ export interface Visitante {
 export interface RegistroVisita {
   id: string;
   empadronadoId: string;
-  tipoAcceso: 'vehicular' | 'peatonal';
+  tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
   visitantes: Visitante[];
   menores: number;
   fechaCreacion: number;
-  estado: 'pendiente' | 'autorizado' | 'denegado';
+  estado: "pendiente" | "autorizado" | "denegado";
   esFavorito?: boolean;
 }
 
@@ -25,7 +25,7 @@ export interface MaestroObra {
   apellidos: string;
   telefono: string;
   empresa: string;
-  sexo: 'masculino' | 'femenino';
+  sexo: "masculino" | "femenino";
   fotoDni?: string;
   autorizado: boolean;
   fechaAutorizacion?: number;
@@ -42,30 +42,30 @@ export interface Trabajador {
 export interface RegistroTrabajadores {
   id: string;
   empadronadoId: string;
-  tipoAcceso: 'vehicular' | 'peatonal';
+  tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
   maestroObraId: string;
   trabajadores: Trabajador[];
   fechaCreacion: number;
-  estado: 'pendiente' | 'autorizado' | 'denegado';
+  estado: "pendiente" | "autorizado" | "denegado";
   esFavorito?: boolean;
 }
 
 export interface RegistroProveedor {
   id: string;
   empadronadoId: string;
-  tipoAcceso: 'vehicular' | 'peatonal';
+  tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
   empresa: string;
-  tipoServicio?: 'gas' | 'delivery' | 'otro';
+  tipoServicio?: "gas" | "delivery" | "otro";
   fechaCreacion: number;
-  estado: 'pendiente' | 'autorizado' | 'denegado';
+  estado: "pendiente" | "autorizado" | "denegado";
 }
 
 export interface FavoritoUsuario {
   id: string;
   empadronadoId: string;
-  tipo: 'visitante' | 'trabajador' | 'proveedor';
+  tipo: "visitante" | "trabajador" | "proveedor";
   nombre: string;
   datos: any;
   fechaCreacion: number;

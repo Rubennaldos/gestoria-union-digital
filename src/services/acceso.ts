@@ -1,3 +1,4 @@
+// src/services/acceso.ts
 import {
   ref,
   push,
@@ -12,7 +13,6 @@ import {
 } from "firebase/database";
 import { db } from "@/config/firebase";
 import {
-  // NO usamos RegistroVisita para crear (tiene campos del backend)
   RegistroTrabajadores,
   RegistroProveedor,
   FavoritoUsuario,
@@ -28,27 +28,27 @@ function tsFrom(obj: any): number {
 
 type TipoAcceso = "visitante" | "trabajador" | "proveedor";
 
-/** Base que añadimos a cada registro (permite reflejar en Seguridad) */
+/** Base añadida a cada registro (permite reflejar en Seguridad) */
 type BaseRegistro = {
   porticoId: string;
   estado?: "pendiente" | "autorizado" | "denegado";
   estadoPortico?: string;
-  createdAt?: any;
+  createdAt?: any; // serverTimestamp
 };
 
 function buildBase(
   porticoId: string,
   estado: BaseRegistro["estado"] = "pendiente"
-) {
+): BaseRegistro {
   return {
     porticoId,
     estado,
     estadoPortico: `${estado}#${porticoId}`,
-    createdAt: serverTimestamp(), // 👈 conservar tal cual (objeto especial)
+    createdAt: serverTimestamp(), // conservar tal cual (objeto especial)
   };
 }
 
-/** Quita undefined profundo (objetos/arrays) sin tocar serverTimestamp */
+/** Quita undefined profundo sin tocar serverTimestamp */
 function stripUndefinedDeep<T>(value: T): T {
   if (Array.isArray(value)) {
     return (value
@@ -72,17 +72,17 @@ function stripUndefinedDeep<T>(value: T): T {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   VISITAS (creación con un tipo de entrada simple)
+   VISITAS
    ────────────────────────────────────────────────────────────── */
 
-/** Tipo de entrada para crear una visita (solo lo que viene del form) */
+/** Entrada simple desde el formulario de visitas */
 export type NuevaVisitaInput = {
   empadronadoId: string;
   tipoAcceso: "peatonal" | "vehicular";
   placa?: string;
   visitantes: { id?: string; nombre: string; dni: string }[];
   menores: number;
-  porticoId: string; // necesario para reflejar en Seguridad
+  porticoId: string; // para Seguridad
 };
 
 /**
@@ -91,9 +91,7 @@ export type NuevaVisitaInput = {
  * - seguridad/porticos/{porticoId}/pendientes/{id}
  */
 export async function registrarVisita(data: NuevaVisitaInput) {
-  if (!data?.porticoId) {
-    throw new Error("Falta porticoId al registrar la visita");
-  }
+  if (!data?.porticoId) throw new Error("Falta porticoId al registrar la visita");
 
   const id = push(child(ref(db), "acceso/visitas")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
@@ -117,6 +115,7 @@ export async function registrarVisita(data: NuevaVisitaInput) {
   updates[`acceso/visitas/${id}`] = payload;
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
+    empadronadoId: data.empadronadoId,          // útil si luego lo quieres leer directo
     nombre: visitantes[0]?.nombre || "",
     dni: visitantes[0]?.dni || "",
     createdAt: base.createdAt,
@@ -128,7 +127,7 @@ export async function registrarVisita(data: NuevaVisitaInput) {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   TRABAJADORES / PROVEEDORES (estos sí pueden usar tus types)
+   TRABAJADORES / PROVEEDORES
    ────────────────────────────────────────────────────────────── */
 
 export async function registrarTrabajadores(
@@ -136,9 +135,7 @@ export async function registrarTrabajadores(
     porticoId: string;
   }
 ) {
-  if (!data?.porticoId) {
-    throw new Error("Falta porticoId al registrar trabajadores");
-  }
+  if (!data?.porticoId) throw new Error("Falta porticoId al registrar trabajadores");
 
   const id = push(child(ref(db), "acceso/trabajadores")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
@@ -150,6 +147,7 @@ export async function registrarTrabajadores(
   updates[`acceso/trabajadores/${id}`] = payload;
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
+    empadronadoId: data.empadronadoId,
     createdAt: base.createdAt,
     tipo: "trabajador",
   });
@@ -163,9 +161,7 @@ export async function registrarProveedor(
     porticoId: string;
   }
 ) {
-  if (!data?.porticoId) {
-    throw new Error("Falta porticoId al registrar proveedor");
-  }
+  if (!data?.porticoId) throw new Error("Falta porticoId al registrar proveedor");
 
   const id = push(child(ref(db), "acceso/proveedores")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
@@ -177,6 +173,7 @@ export async function registrarProveedor(
   updates[`acceso/proveedores/${id}`] = payload;
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
+    empadronadoId: data.empadronadoId,
     createdAt: base.createdAt,
     tipo: "proveedor",
   });
@@ -218,17 +215,11 @@ export async function obtenerFavoritosPorUsuario(
   empadronadoId: string,
   tipo: TipoAcceso
 ): Promise<FavoritoUsuario[]> {
-  const q = query(
-    ref(db, "acceso/favoritos"),
-    orderByChild("empadronadoId"),
-    equalTo(empadronadoId)
-  );
+  const q = query(ref(db, "acceso/favoritos"), orderByChild("empadronadoId"), equalTo(empadronadoId));
   const snap = await get(q);
   if (!snap.exists()) return [];
   const todos: FavoritoUsuario[] = Object.values(snap.val());
-  return todos
-    .filter((f: any) => f.tipo === tipo)
-    .sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
+  return todos.filter((f: any) => f.tipo === tipo).sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -315,33 +306,27 @@ export async function setActivoMaestroObra(id: string, activo: boolean) {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Historial por empadronado (sin índices extra)
+   Historial por empadronado
    ────────────────────────────────────────────────────────────── */
 export async function obtenerVisitasPorEmpadronado(empadronadoId: string): Promise<any[]> {
   const snap = await get(ref(db, "acceso/visitas"));
   if (!snap.exists()) return [];
   const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
-  return arr
-    .filter((v) => (v as any).empadronadoId === empadronadoId)
-    .sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr.filter((v) => (v as any).empadronadoId === empadronadoId).sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerTrabajadoresPorEmpadronado(empadronadoId: string): Promise<any[]> {
   const snap = await get(ref(db, "acceso/trabajadores"));
   if (!snap.exists()) return [];
   const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
-  return arr
-    .filter((v) => (v as any).empadronadoId === empadronadoId)
-    .sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr.filter((v) => (v as any).empadronadoId === empadronadoId).sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerProveedoresPorEmpadronado(empadronadoId: string): Promise<any[]> {
   const snap = await get(ref(db, "acceso/proveedores"));
   if (!snap.exists()) return [];
   const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
-  return arr
-    .filter((v) => (v as any).empadronadoId === empadronadoId)
-    .sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr.filter((v) => (v as any).empadronadoId === empadronadoId).sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerHistorialAccesos(empadronadoId: string) {
@@ -354,4 +339,43 @@ export async function obtenerHistorialAccesos(empadronadoId: string) {
   const all = [...tag(vis, "visitante"), ...tag(tra, "trabajador"), ...tag(prov, "proveedor")];
   all.sort((a, b) => tsFrom(b) - tsFrom(a));
   return all;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   MIGRACIÓN: cambiar empadronadoId = "user123" por el real del usuario
+   ────────────────────────────────────────────────────────────── */
+/**
+ * Corrige registros PENDIENTES que quedaron con empadronadoId = "user123"
+ * en acceso/visitas, acceso/trabajadores y acceso/proveedores.
+ * Úsalo 1 sola vez por usuario luego de crear su empadronado real.
+ */
+export async function migrarMisPendientesDesdeUser123(
+  realEmpadronadoId: string
+): Promise<{ cambiados: number }> {
+  const updates: Record<string, any> = {};
+  let cambiados = 0;
+
+  // Helper para barrer un path
+  const fixPath = async (path: "acceso/visitas" | "acceso/trabajadores" | "acceso/proveedores") => {
+    const snap = await get(ref(db, path));
+    if (!snap.exists()) return;
+
+    const obj = snap.val() as Record<string, any>;
+    for (const [id, v] of Object.entries(obj)) {
+      const r: any = v;
+      if (r?.estado === "pendiente" && r?.empadronadoId === "user123") {
+        updates[`${path}/${id}/empadronadoId`] = realEmpadronadoId;
+        cambiados++;
+      }
+    }
+  };
+
+  await fixPath("acceso/visitas");
+  await fixPath("acceso/trabajadores");
+  await fixPath("acceso/proveedores");
+
+  if (cambiados > 0) {
+    await update(ref(db), updates);
+  }
+  return { cambiados };
 }
