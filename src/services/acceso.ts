@@ -80,7 +80,8 @@ async function readEmpadronadoSnapshot(empadronadoId: string): Promise<{
     const empSnap = await get(ref(db, `empadronados/${empadronadoId}`));
     if (!empSnap.exists()) return { solicitadoPorNombre: null, solicitadoPorPadron: null };
     const emp: any = empSnap.val();
-    const solicitadoPorNombre = [emp?.nombre, emp?.apellidos].filter(Boolean).join(" ").trim() || null;
+    const solicitadoPorNombre =
+      [emp?.nombre, emp?.apellidos].filter(Boolean).join(" ").trim() || null;
     const solicitadoPorPadron = emp?.numeroPadron ? String(emp.numeroPadron) : null;
     return { solicitadoPorNombre, solicitadoPorPadron };
   } catch {
@@ -109,7 +110,11 @@ export type NuevaVisitaInput = {
  */
 export async function registrarVisita(data: NuevaVisitaInput) {
   if (!data?.porticoId) throw new Error("Falta porticoId al registrar la visita");
-  if (!data?.empadronadoId) throw new Error("Falta empadronadoId (vecino dueño de la solicitud)");
+
+  // 1) snapshot de vecino (nombre y padrón)
+  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
+    data.empadronadoId
+  );
 
   const id = push(child(ref(db), "acceso/visitas")).key as string;
   const base = buildBase(data.porticoId, "pendiente");
@@ -120,32 +125,30 @@ export async function registrarVisita(data: NuevaVisitaInput) {
     dni: (v?.dni || "").trim(),
   }));
 
-  // snapshot del empadronado (nombre y padrón) para la UI de Seguridad
-  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(
-    data.empadronadoId
-  );
-
   const payload = stripUndefinedDeep({
     empadronadoId: data.empadronadoId,
     tipoAcceso: data.tipoAcceso,
     placa: data.tipoAcceso === "vehicular" ? (data.placa || "").toUpperCase() : undefined,
     visitantes,
     menores: Number(data.menores || 0),
+    solicitadoPorNombre,
+    solicitadoPorPadron,
     ...base,
   });
 
   const updates: Record<string, unknown> = {};
   updates[`acceso/visitas/${id}`] = payload;
+
+  // nodo para pórtico (pendientes)
   updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] = stripUndefinedDeep({
     id,
     empadronadoId: data.empadronadoId,
-    solicitadoPorNombre, // 👈 ya no “no disponible”
-    solicitadoPorPadron,
-    // compat: primer visitante visible
     nombre: visitantes[0]?.nombre || "",
     dni: visitantes[0]?.dni || "",
     createdAt: base.createdAt,
     tipo: "visitante",
+    solicitadoPorNombre,
+    solicitadoPorPadron,
   });
 
   await update(ref(db), updates);
@@ -172,7 +175,12 @@ export async function registrarTrabajadores(
   );
 
   const cleanedData = stripUndefinedDeep(data as any);
-  const payload: any = { ...cleanedData, ...base };
+  const payload: any = {
+    ...cleanedData,
+    solicitadoPorNombre,
+    solicitadoPorPadron,
+    ...base,
+  };
 
   const updates: Record<string, unknown> = {};
   updates[`acceso/trabajadores/${id}`] = payload;
@@ -205,7 +213,12 @@ export async function registrarProveedor(
   );
 
   const cleanedData = stripUndefinedDeep(data as any);
-  const payload: any = { ...cleanedData, ...base };
+  const payload: any = {
+    ...cleanedData,
+    solicitadoPorNombre,
+    solicitadoPorPadron,
+    ...base,
+  };
 
   const updates: Record<string, unknown> = {};
   updates[`acceso/proveedores/${id}`] = payload;
@@ -352,21 +365,27 @@ export async function obtenerVisitasPorEmpadronado(empadronadoId: string): Promi
   const snap = await get(ref(db, "acceso/visitas"));
   if (!snap.exists()) return [];
   const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
-  return arr.filter((v) => (v as any).empadronadoId === empadronadoId).sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr
+    .filter((v) => (v as any).empadronadoId === empadronadoId)
+    .sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerTrabajadoresPorEmpadronado(empadronadoId: string): Promise<any[]> {
   const snap = await get(ref(db, "acceso/trabajadores"));
   if (!snap.exists()) return [];
   const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
-  return arr.filter((v) => (v as any).empadronadoId === empadronadoId).sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr
+    .filter((v) => (v as any).empadronadoId === empadronadoId)
+    .sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerProveedoresPorEmpadronado(empadronadoId: string): Promise<any[]> {
   const snap = await get(ref(db, "acceso/proveedores"));
   if (!snap.exists()) return [];
   const arr: any[] = Object.entries(snap.val()).map(([id, v]: any) => ({ id, ...v }));
-  return arr.filter((v) => (v as any).empadronadoId === empadronadoId).sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr
+    .filter((v) => (v as any).empadronadoId === empadronadoId)
+    .sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerHistorialAccesos(empadronadoId: string) {
