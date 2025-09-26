@@ -4,18 +4,37 @@ import { cn } from "@/lib/utils";
 import { signOutUser } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useAuthz } from "@/contexts/AuthzContext";
 
-/** 👇 Rutas seguras para HashRouter (NO usar "/") */
-const navigationItems = [
-  { icon: Home, label: "Inicio", href: "/inicio" },          // <- antes era "/"
-  { icon: Calendar, label: "Sesiones", href: "/sesiones" },
-  { icon: DollarSign, label: "Cobranzas", href: "/cobranzas" },
-  { icon: Users, label: "Portal", href: "/portal-asociado" },
-  { icon: MoreHorizontal, label: "Más", href: "/modulos" },
+/** 👇 Rutas con sus módulos de permisos correspondientes */
+const allNavigationItems = [
+  { icon: Home, label: "Inicio", href: "/inicio", module: null }, // Inicio siempre visible
+  { icon: Calendar, label: "Sesiones", href: "/sesiones", module: "deportes" },
+  { icon: DollarSign, label: "Cobranzas", href: "/cobranzas", module: "cobranzas" },
+  { icon: Users, label: "Portal", href: "/portal-asociado", module: "portal" },
+  { icon: MoreHorizontal, label: "Más", href: "/modulos", module: null }, // Módulos siempre visible
 ];
 
 export const BottomNavigation = () => {
   const location = useLocation();
+  const { can, loading } = useAuthz();
+
+  // Filtrar los elementos de navegación según los permisos del usuario
+  const navigationItems = allNavigationItems.filter(item => {
+    // Inicio y Módulos siempre visibles
+    if (!item.module) return true;
+    
+    // Si está cargando, no mostrar módulos con permisos
+    if (loading) return false;
+    
+    // Verificar si el usuario tiene al menos permisos de lectura
+    return can(item.module, 'read');
+  });
+
+  // Si no hay elementos visibles o está cargando, no mostrar la navegación
+  if (loading || navigationItems.length === 0) {
+    return null;
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 md:hidden">
