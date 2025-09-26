@@ -19,22 +19,31 @@ export const BottomNavigation = () => {
   const location = useLocation();
   const { can, loading } = useAuthz();
 
+  // Si está cargando, mostrar navegación básica
+  if (loading) {
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 md:hidden">
+        <div className="flex items-center justify-around px-1 py-1">
+          <Link
+            to="/inicio"
+            className="flex flex-col items-center py-2 px-2 rounded-lg transition-all duration-200 min-w-[55px] max-w-[70px] text-primary bg-primary/10"
+          >
+            <Home className="h-4 w-4 sm:h-5 sm:w-5 mb-1" />
+            <span className="text-[10px] sm:text-xs font-medium text-center leading-tight">Inicio</span>
+          </Link>
+        </div>
+      </nav>
+    );
+  }
+
   // Filtrar los elementos de navegación según los permisos del usuario
   const navigationItems = allNavigationItems.filter(item => {
     // Inicio y Módulos siempre visibles
     if (!item.module) return true;
     
-    // Si está cargando, no mostrar módulos con permisos
-    if (loading) return false;
-    
     // Verificar si el usuario tiene al menos permisos de lectura
     return can(item.module, 'read');
   });
-
-  // Si no hay elementos visibles o está cargando, no mostrar la navegación
-  if (loading || navigationItems.length === 0) {
-    return null;
-  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50 md:hidden">
