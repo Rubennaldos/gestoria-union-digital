@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,11 +10,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Link, AlertCircle } from 'lucide-react';
+import { Link, AlertCircle, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { findUserByIdentifier, designarUsuarioAEmpadronado } from '@/services/rtdb';
+import { findUserByIdentifier, designarUsuarioAEmpadronado, createUserProfile, listRoles } from '@/services/rtdb';
 import { Empadronado } from '@/types/empadronados';
+import { Role } from '@/types/auth';
+import { auth } from '@/config/firebase';
+import { fetchSignInMethodsForEmail } from 'firebase/auth';
 
 interface VincularCuentaModalProps {
   open: boolean;
@@ -32,7 +36,26 @@ export function VincularCuentaModal({
   const [identifier, setIdentifier] = useState('');
   const [loading, setLoading] = useState(false);
   const [searchResult, setSearchResult] = useState<any>(null);
+  const [authOnlyAccount, setAuthOnlyAccount] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('asociado');
+  const [roles, setRoles] = useState<Role[]>([]);
   const { toast } = useToast();
+
+  // Cargar roles cuando se abre el modal
+  useEffect(() => {
+    if (open) {
+      loadRoles();
+    }
+  }, [open]);
+
+  const loadRoles = async () => {
+    try {
+      const rolesData = await listRoles();
+      setRoles(rolesData);
+    } catch (error) {
+      console.error('Error loading roles:', error);
+    }
+  };
 
   const handleSearch = async () => {
     if (!identifier.trim()) {
@@ -45,7 +68,9 @@ export function VincularCuentaModal({
     }
 
     setLoading(true);
+    setAuthOnlyAccount(false);
     try {
+      // Primero buscar en RTDB
       const user = await findUserByIdentifier(identifier.trim());
       if (user) {
         setSearchResult(user);
@@ -53,14 +78,38 @@ export function VincularCuentaModal({
           title: 'Usuario encontrado',
           description: `Se encontró la cuenta: ${user.email}`
         });
-      } else {
-        setSearchResult(null);
-        toast({
-          title: 'No encontrado',
-          description: 'No se encontró ninguna cuenta con ese email o username',
-          variant: 'destructive'
-        });
+        return;
       }
+
+      // Si no está en RTDB pero el identifier es un email, buscar en Firebase Auth
+      if (identifier.trim().includes('@')) {
+        try {
+          const methods = await fetchSignInMethodsForEmail(auth, identifier.trim());
+          if (methods && methods.length > 0) {
+            // La cuenta existe en Auth pero no en RTDB
+            setSearchResult({ 
+              email: identifier.trim(),
+              isAuthOnly: true 
+            });
+            setAuthOnlyAccount(true);
+            toast({
+              title: 'Cuenta encontrada en Firebase Auth',
+              description: 'Esta cuenta existe pero no tiene perfil. Puedes importarla.',
+            });
+            return;
+          }
+        } catch (authError) {
+          console.error('Error checking Firebase Auth:', authError);
+        }
+      }
+
+      // No se encontró en ningún lado
+      setSearchResult(null);
+      toast({
+        title: 'No encontrado',
+        description: 'No se encontró ninguna cuenta con ese email o username',
+        variant: 'destructive'
+      });
     } catch (error: any) {
       console.error('Error buscando usuario:', error);
       toast({
@@ -78,6 +127,25 @@ export function VincularCuentaModal({
 
     setLoading(true);
     try {
+      // Si es una cuenta solo de Auth, primero crear el perfil en RTDB
+      if (authOnlyAccount) {
+        // Necesitamos obtener el UID de Firebase Auth
+        const methods = await fetchSignInMethodsForEmail(auth, searchResult.email);
+        if (!methods || methods.length === 0) {
+          throw new Error('La cuenta ya no existe en Firebase Auth');
+        }
+
+        // Importar usuario desde Auth - necesitamos crear el perfil con un UID temporal
+        // En realidad no podemos obtener el UID sin que el usuario haga login
+        toast({
+          title: 'Advertencia',
+          description: 'No se puede vincular una cuenta de Auth sin perfil. Pide al usuario que haga login primero.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Vincular usuario existente en RTDB
       await designarUsuarioAEmpadronado(
         empadronado.id,
         identifier.trim(),
@@ -106,6 +174,8 @@ export function VincularCuentaModal({
   const handleClose = () => {
     setIdentifier('');
     setSearchResult(null);
+    setAuthOnlyAccount(false);
+    setSelectedRole('asociado');
     onOpenChange(false);
   };
 
@@ -151,7 +221,7 @@ export function VincularCuentaModal({
             </div>
           </div>
 
-          {searchResult && (
+          {searchResult && !authOnlyAccount && (
             <Alert className="border-green-200 bg-green-50">
               <AlertDescription className="space-y-2">
                 <p className="font-medium text-green-900">Usuario encontrado:</p>
@@ -166,6 +236,24 @@ export function VincularCuentaModal({
               </AlertDescription>
             </Alert>
           )}
+
+          {searchResult && authOnlyAccount && (
+            <Alert className="border-orange-200 bg-orange-50">
+              <AlertTriangle className="h-4 w-4 text-orange-600" />
+              <AlertDescription className="space-y-3">
+                <div>
+                  <p className="font-medium text-orange-900">Cuenta en Firebase Auth sin perfil</p>
+                  <div className="text-sm text-orange-800 mt-2">
+                    <p><strong>Email:</strong> {searchResult.email}</p>
+                    <p className="mt-2 text-xs">
+                      Esta cuenta existe en Firebase Auth pero no tiene un perfil en el sistema. 
+                      Para vincularla, el usuario debe hacer login primero, o debes crear una nueva cuenta.
+                    </p>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         <DialogFooter>
@@ -174,7 +262,7 @@ export function VincularCuentaModal({
           </Button>
           <Button 
             onClick={handleLink}
-            disabled={loading || !searchResult}
+            disabled={loading || !searchResult || authOnlyAccount}
           >
             {loading ? 'Vinculando...' : 'Vincular Cuenta'}
           </Button>
