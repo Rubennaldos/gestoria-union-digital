@@ -1,18 +1,11 @@
 import { useState, useEffect } from "react";
 import {
   Home,
-  Download,
-  Upload,
   Calculator,
-  Clock,
   CheckCircle,
-  XCircle,
-  AlertCircle,
-  Heart,
-  Frown,
-  Smile,
   CreditCard,
-  Calendar
+  Calendar,
+  AlertCircle
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,78 +15,44 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { obtenerPagosPorEmpadronado } from "@/services/cobranzas";
-import { Pago } from "@/types/cobranzas";
-import { getEmpadronados } from "@/services/empadronados";
+import { ChargeV2, PagoV2 } from "@/types/cobranzas-v2";
+import { obtenerChargesPorEmpadronadoV2, registrarPagoV2, obtenerEstadoCuentaEmpadronado } from "@/services/cobranzas-v2";
 import { Empadronado } from "@/types/empadronados";
+import { useDeudaAsociado } from "@/hooks/useDeudaAsociado";
+import { useBillingConfig } from "@/contexts/BillingConfigContext";
 
-interface PagoSolicitud {
-  id: string;
-  empadronadoId: string;
-  cuotasSeleccionadas: string[];
-  totalMonto: number;
-  metodoPago: string;
-  banco: string;
-  numeroOperacion: string;
-  fechaPago: string;
-  comprobante?: string;
-  estado: 'pendiente' | 'confirmado' | 'rechazado';
-  motivo?: string;
-  fechaSolicitud: string;
-  fechaRespuesta?: string;
-  respondidoPor?: string;
+interface EstadoCuenta {
+  charges: ChargeV2[];
+  pagos: PagoV2[];
+  totalDeuda: number;
+  totalPagado: number;
 }
-
-const bancosPeru = [
-  "BCP - Banco de Crédito del Perú",
-  "BBVA - Banco BBVA",
-  "Scotiabank",
-  "Interbank", 
-  "BanBif",
-  "Banco Pichincha",
-  "Banco Falabella",
-  "Banco Ripley",
-  "Banco Azteca",
-  "Banco Cencosud",
-  "Mi Banco",
-  "Banco de la Nación",
-  "Caja Arequipa",
-  "Caja Cusco",
-  "Caja Huancayo",
-  "Caja Piura",
-  "Caja Sullana",
-  "Caja Trujillo",
-  "Yape",
-  "Plin",
-  "Lukita",
-  "Tunki"
-];
 
 const PagosCuotas = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const config = useBillingConfig();
 
   const [empadronado, setEmpadronado] = useState<Empadronado | null>(null);
-  const [cuotas, setCuotas] = useState<Pago[]>([]);
-  const [cuotasSeleccionadas, setCuotasSeleccionadas] = useState<Set<string>>(new Set());
+  const [charges, setCharges] = useState<ChargeV2[]>([]);
+  const [pagos, setPagos] = useState<PagoV2[]>([]);
+  const [chargesSeleccionados, setChargesSeleccionados] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [procesandoPago, setProcesandoPago] = useState(false);
-  const [historialPagos, setHistorialPagos] = useState<PagoSolicitud[]>([]);
   
   // Formulario de pago
   const [metodoPago, setMetodoPago] = useState<string>("");
-  const [banco, setBanco] = useState<string>("");
   const [numeroOperacion, setNumeroOperacion] = useState("");
-  const [fechaPago, setFechaPago] = useState("");
-  const [comprobante, setComprobante] = useState<File | null>(null);
+  const [observaciones, setObservaciones] = useState("");
 
   // Modal de confirmación
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Calcular deuda usando el motor
+  const deudaCalculada = useDeudaAsociado(empadronado || {});
 
   useEffect(() => {
     if (user) {
@@ -141,19 +100,19 @@ const PagosCuotas = () => {
 
       setEmpadronado(miEmpadronado);
 
-      // Obtener mis cuotas pendientes
-      const misCuotas = await obtenerPagosPorEmpadronado(miEmpadronado.id);
-      const cuotasPendientes = misCuotas.filter(c => 
+      // Obtener estado de cuenta desde Cobranzas V2
+      const estadoCuenta = await obtenerEstadoCuentaEmpadronado(miEmpadronado.id);
+      
+      // Filtrar solo charges pendientes o morosos
+      const chargesPendientes = estadoCuenta.charges.filter(c => 
         c.estado === 'pendiente' || c.estado === 'moroso'
       );
       
-      setCuotas(cuotasPendientes);
-
-      // Cargar historial de pagos (simulado por ahora)
-      // En una implementación real, esto vendría de Firebase
-      setHistorialPagos([]);
+      setCharges(chargesPendientes);
+      setPagos(estadoCuenta.pagos);
 
     } catch (error) {
+      console.error('Error cargando datos:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar tus datos",
@@ -165,57 +124,42 @@ const PagosCuotas = () => {
   };
 
   const calcularTotalSeleccionado = () => {
-    return cuotas
-      .filter(c => cuotasSeleccionadas.has(c.id))
-      .reduce((total, c) => total + c.monto, 0);
+    return charges
+      .filter(c => chargesSeleccionados.has(c.id))
+      .reduce((total, c) => total + c.saldo, 0);
   };
 
-  const calcularMora = (cuota: Pago) => {
-    if (!cuota.fechaVencimiento) return 0;
-    
-    const [dd, mm, aa] = cuota.fechaVencimiento.split('/');
-    const vencimiento = new Date(Number(aa), Number(mm) - 1, Number(dd));
-    const hoy = new Date();
-    
-    if (hoy <= vencimiento) return 0;
-    
-    const diasVencidos = Math.floor((hoy.getTime() - vencimiento.getTime()) / (1000 * 60 * 60 * 24));
-    const porcentajeMora = 0.1; // 10% de mora por mes
-    const mesesVencidos = Math.ceil(diasVencidos / 30);
-    
-    return cuota.montoOriginal * (porcentajeMora * mesesVencidos);
-  };
-
-  const calcularDescuentoProntoPago = (cuota: Pago) => {
-    // Descuento del 10% si paga antes del día 5
-    const hoy = new Date();
-    if (hoy.getDate() <= 5) {
-      return cuota.montoOriginal * 0.1;
-    }
-    return 0;
-  };
-
-  const handleSeleccionarCuota = (cuotaId: string, seleccionada: boolean) => {
-    const nuevasSeleccionadas = new Set(cuotasSeleccionadas);
-    if (seleccionada) {
-      nuevasSeleccionadas.add(cuotaId);
+  const handleSeleccionarCharge = (chargeId: string, seleccionado: boolean) => {
+    const nuevosSeleccionados = new Set(chargesSeleccionados);
+    if (seleccionado) {
+      nuevosSeleccionados.add(chargeId);
     } else {
-      nuevasSeleccionadas.delete(cuotaId);
+      nuevosSeleccionados.delete(chargeId);
     }
-    setCuotasSeleccionadas(nuevasSeleccionadas);
+    setChargesSeleccionados(nuevosSeleccionados);
+  };
+
+  const formatPeriodo = (periodo: string) => {
+    // YYYYMM -> "Mes Año"
+    const year = periodo.substring(0, 4);
+    const month = parseInt(periodo.substring(4, 6));
+    return new Date(parseInt(year), month - 1).toLocaleDateString('es-PE', {
+      month: 'long',
+      year: 'numeric'
+    });
   };
 
   const handleRegistrarPago = async () => {
-    if (cuotasSeleccionadas.size === 0) {
+    if (chargesSeleccionados.size === 0) {
       toast({
         title: "Error",
-        description: "Debes seleccionar al menos una cuota",
+        description: "Debes seleccionar al menos un cargo",
         variant: "destructive"
       });
       return;
     }
 
-    if (!metodoPago || !banco || !numeroOperacion || !fechaPago) {
+    if (!metodoPago || !numeroOperacion) {
       toast({
         title: "Error", 
         description: "Completa todos los campos requeridos",
@@ -231,39 +175,39 @@ const PagosCuotas = () => {
     try {
       setProcesandoPago(true);
 
-      // Simular subida de comprobante y registro del pago
-      const solicitudPago: PagoSolicitud = {
-        id: `pago_${Date.now()}`,
-        empadronadoId: empadronado?.id || '',
-        cuotasSeleccionadas: Array.from(cuotasSeleccionadas),
-        totalMonto: calcularTotalSeleccionado(),
-        metodoPago,
-        banco,
-        numeroOperacion,
-        fechaPago,
-        comprobante: comprobante ? "archivo_comprobante.pdf" : undefined,
-        estado: 'pendiente',
-        fechaSolicitud: new Date().toLocaleDateString('es-PE')
-      };
-
-      // En implementación real: guardar en Firebase y notificar a economía
-      setHistorialPagos(prev => [solicitudPago, ...prev]);
+      // Registrar pago para cada charge seleccionado
+      const chargesArray = Array.from(chargesSeleccionados);
+      
+      for (const chargeId of chargesArray) {
+        const charge = charges.find(c => c.id === chargeId);
+        if (charge) {
+          await registrarPagoV2(
+            chargeId,
+            charge.saldo, // pagar el saldo completo
+            metodoPago as any,
+            numeroOperacion,
+            observaciones
+          );
+        }
+      }
 
       toast({
-        title: "✅ Pago registrado",
-        description: "Tu pago está por confirmar. Economía revisará tu comprobante.",
+        title: "✅ Pago registrado exitosamente",
+        description: `Se registraron ${chargesArray.length} pago(s)`,
       });
 
-      // Limpiar formulario
-      setCuotasSeleccionadas(new Set());
+      // Limpiar formulario y recargar datos
+      setChargesSeleccionados(new Set());
       setMetodoPago("");
-      setBanco("");
       setNumeroOperacion("");
-      setFechaPago("");
-      setComprobante(null);
+      setObservaciones("");
       setShowConfirmModal(false);
+      
+      // Recargar datos
+      await cargarDatos();
 
     } catch (error) {
+      console.error('Error registrando pago:', error);
       toast({
         title: "Error",
         description: "No se pudo registrar el pago",
@@ -275,8 +219,8 @@ const PagosCuotas = () => {
   };
 
   const obtenerEstadoGeneral = () => {
-    const deudaTotal = cuotas.reduce((total, c) => total + c.monto, 0);
-    const tieneMorosos = cuotas.some(c => c.estado === 'moroso');
+    const deudaTotal = charges.reduce((total, c) => total + c.saldo, 0);
+    const tieneMorosos = charges.some(c => c.esMoroso);
     
     if (deudaTotal === 0) {
       return {
@@ -352,25 +296,31 @@ const PagosCuotas = () => {
               <p className={`${estadoGeneral.color} text-lg`}>
                 {estadoGeneral.mensaje}
               </p>
-              <div className="mt-4 flex justify-center gap-4 text-sm text-muted-foreground">
-                <span>Padrón: {empadronado?.numeroPadron}</span>
-                <span>•</span>
-                <span>{cuotas.length} cuotas pendientes</span>
+              <div className="mt-4 space-y-2">
+                <div className="flex justify-center gap-4 text-sm text-muted-foreground">
+                  <span>Padrón: {empadronado?.numeroPadron}</span>
+                  <span>•</span>
+                  <span>{charges.length} cargos pendientes</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <div>Deuda calculada: <span className="font-semibold">S/ {deudaCalculada.monto.toFixed(2)}</span></div>
+                  <div className="text-xs">({deudaCalculada.quincenas} quincenas desde {new Date(deudaCalculada.desde).toLocaleDateString('es-PE')})</div>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Cuotas Pendientes */}
+        {/* Cargos Pendientes */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5" />
-              Cuotas Pendientes
+              Cargos Mensuales Pendientes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {cuotas.length === 0 ? (
+            {charges.length === 0 ? (
               <div className="text-center py-8">
                 <CheckCircle className="h-16 w-16 mx-auto text-green-500 mb-4" />
                 <h3 className="text-lg font-semibold text-green-600 mb-2">
@@ -382,24 +332,26 @@ const PagosCuotas = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {cuotas.map((cuota) => {
-                  const mora = calcularMora(cuota);
-                  const descuento = calcularDescuentoProntoPago(cuota);
-                  const montoFinal = cuota.monto + mora - descuento;
-                  const seleccionada = cuotasSeleccionadas.has(cuota.id);
+                {charges.map((charge) => {
+                  const seleccionado = chargesSeleccionados.has(charge.id);
+                  const fechaVenc = new Date(charge.fechaVencimiento);
+                  const hoy = new Date();
+                  const diasVencidos = charge.esMoroso 
+                    ? Math.floor((hoy.getTime() - fechaVenc.getTime()) / (1000 * 60 * 60 * 24))
+                    : 0;
 
                   return (
                     <div
-                      key={cuota.id}
+                      key={charge.id}
                       className={`p-4 border rounded-lg transition-all ${
-                        seleccionada ? 'border-primary bg-primary/5' : 'border-border'
+                        seleccionado ? 'border-primary bg-primary/5' : 'border-border'
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         <Checkbox
-                          checked={seleccionada}
+                          checked={seleccionado}
                           onCheckedChange={(checked) => 
-                            handleSeleccionarCuota(cuota.id, !!checked)
+                            handleSeleccionarCharge(charge.id, !!checked)
                           }
                           className="mt-1"
                         />
@@ -407,43 +359,40 @@ const PagosCuotas = () => {
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold">
-                              {new Date(cuota.año, cuota.mes - 1).toLocaleDateString('es-PE', {
-                                month: 'long',
-                                year: 'numeric'
-                              })}
+                              {formatPeriodo(charge.periodo)}
                             </h4>
-                            <Badge variant={cuota.estado === 'moroso' ? 'destructive' : 'secondary'}>
-                              {cuota.estado === 'moroso' ? 'Moroso' : 'Pendiente'}
+                            <Badge variant={charge.esMoroso ? 'destructive' : charge.estado === 'pagado' ? 'default' : 'secondary'}>
+                              {charge.esMoroso ? `Moroso (${diasVencidos}d)` : charge.estado}
                             </Badge>
                           </div>
                           
                           <div className="text-sm space-y-1">
                             <div className="flex justify-between">
-                              <span>Monto base:</span>
-                              <span>S/ {cuota.montoOriginal.toFixed(2)}</span>
+                              <span>Monto original:</span>
+                              <span>S/ {charge.montoOriginal.toFixed(2)}</span>
                             </div>
                             
-                            {mora > 0 && (
-                              <div className="flex justify-between text-red-600">
-                                <span>Mora:</span>
-                                <span>+ S/ {mora.toFixed(2)}</span>
+                            {charge.montoPagado > 0 && (
+                              <div className="flex justify-between text-green-600">
+                                <span>Pagado:</span>
+                                <span>- S/ {charge.montoPagado.toFixed(2)}</span>
                               </div>
                             )}
-                            
-                            {descuento > 0 && (
-                              <div className="flex justify-between text-green-600">
-                                <span>Descuento pronto pago:</span>
-                                <span>- S/ {descuento.toFixed(2)}</span>
+
+                            {charge.montoMorosidad && charge.montoMorosidad > 0 && (
+                              <div className="flex justify-between text-red-600">
+                                <span>Morosidad ({config.recargoMoraPct}%):</span>
+                                <span>+ S/ {charge.montoMorosidad.toFixed(2)}</span>
                               </div>
                             )}
                             
                             <div className="flex justify-between font-semibold border-t pt-1">
-                              <span>Total:</span>
-                              <span>S/ {montoFinal.toFixed(2)}</span>
+                              <span>Saldo:</span>
+                              <span>S/ {charge.saldo.toFixed(2)}</span>
                             </div>
                             
                             <div className="text-xs text-muted-foreground">
-                              Vence: {cuota.fechaVencimiento}
+                              Vence: {fechaVenc.toLocaleDateString('es-PE')}
                             </div>
                           </div>
                         </div>
@@ -457,13 +406,13 @@ const PagosCuotas = () => {
         </Card>
 
         {/* Barra de Total Seleccionado */}
-        {cuotasSeleccionadas.size > 0 && (
+        {chargesSeleccionados.size > 0 && (
           <Card className="sticky bottom-24 md:bottom-6 border-primary shadow-lg">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    {cuotasSeleccionadas.size} cuota(s) seleccionada(s)
+                    {chargesSeleccionados.size} cargo(s) seleccionado(s)
                   </p>
                   <p className="text-xl font-bold text-primary">
                     Total: S/ {totalSeleccionado.toFixed(2)}
@@ -489,24 +438,10 @@ const PagosCuotas = () => {
                             <SelectValue placeholder="Seleccionar método" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="transferencia">Transferencia Bancaria</SelectItem>
-                            <SelectItem value="deposito">Depósito Bancario</SelectItem>
+                            <SelectItem value="efectivo">Efectivo</SelectItem>
+                            <SelectItem value="transferencia">Transferencia</SelectItem>
                             <SelectItem value="yape">Yape</SelectItem>
                             <SelectItem value="plin">Plin</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label>Banco *</Label>
-                        <Select value={banco} onValueChange={setBanco}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar banco" />
-                          </SelectTrigger>
-                          <SelectContent className="max-h-60">
-                            {bancosPeru.map((b) => (
-                              <SelectItem key={b} value={b}>{b}</SelectItem>
-                            ))}
                           </SelectContent>
                         </Select>
                       </div>
@@ -521,33 +456,20 @@ const PagosCuotas = () => {
                       </div>
 
                       <div>
-                        <Label>Fecha de Pago *</Label>
+                        <Label>Observaciones (opcional)</Label>
                         <Input
-                          type="date"
-                          value={fechaPago}
-                          onChange={(e) => setFechaPago(e.target.value)}
-                          max={new Date().toISOString().split('T')[0]}
+                          value={observaciones}
+                          onChange={(e) => setObservaciones(e.target.value)}
+                          placeholder="Notas adicionales"
                         />
-                      </div>
-
-                      <div>
-                        <Label>Comprobante de Pago</Label>
-                        <Input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={(e) => setComprobante(e.target.files?.[0] || null)}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Máximo 5MB - Formatos: JPG, PNG, PDF
-                        </p>
                       </div>
 
                       <div className="bg-muted p-4 rounded-lg">
                         <h4 className="font-semibold mb-2">Resumen del Pago</h4>
                         <div className="text-sm space-y-1">
                           <div className="flex justify-between">
-                            <span>Cuotas seleccionadas:</span>
-                            <span>{cuotasSeleccionadas.size}</span>
+                            <span>Cargos seleccionados:</span>
+                            <span>{chargesSeleccionados.size}</span>
                           </div>
                           <div className="flex justify-between font-semibold">
                             <span>Total a pagar:</span>
@@ -584,64 +506,58 @@ const PagosCuotas = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+              <Calendar className="h-5 w-5" />
               Historial de Pagos
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {historialPagos.length === 0 ? (
+            {pagos.length === 0 ? (
               <div className="text-center py-8">
                 <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">No tienes pagos registrados aún</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {historialPagos.map((pago) => (
+                {pagos.map((pago) => (
                   <div key={pago.id} className="p-4 border rounded-lg">
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <p className="font-semibold">
-                          Pago de {pago.cuotasSeleccionadas.length} cuota(s)
+                          Pago - {formatPeriodo(pago.periodo)}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {pago.fechaSolicitud} • {pago.banco}
+                          {new Date(pago.fechaPago).toLocaleDateString('es-PE')} • {pago.metodoPago}
                         </p>
                       </div>
-                      <Badge
-                        variant={
-                          pago.estado === 'confirmado' ? 'default' :
-                          pago.estado === 'rechazado' ? 'destructive' : 'secondary'
-                        }
-                      >
-                        {pago.estado === 'confirmado' && <CheckCircle className="h-3 w-3 mr-1" />}
-                        {pago.estado === 'rechazado' && <XCircle className="h-3 w-3 mr-1" />}
-                        {pago.estado === 'pendiente' && <Clock className="h-3 w-3 mr-1" />}
-                        {pago.estado.charAt(0).toUpperCase() + pago.estado.slice(1)}
+                      <Badge variant="default">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Confirmado
                       </Badge>
                     </div>
                     
                     <div className="text-sm space-y-1">
                       <div className="flex justify-between">
                         <span>Monto:</span>
-                        <span className="font-semibold">S/ {pago.totalMonto.toFixed(2)}</span>
+                        <span className="font-semibold">S/ {pago.monto.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>N° Operación:</span>
-                        <span>{pago.numeroOperacion}</span>
-                      </div>
-                      {pago.motivo && (
-                        <div className="mt-2 p-2 bg-red-50 rounded text-red-700 text-xs">
-                          <strong>Motivo del rechazo:</strong> {pago.motivo}
+                      {pago.numeroOperacion && (
+                        <div className="flex justify-between">
+                          <span>N° Operación:</span>
+                          <span>{pago.numeroOperacion}</span>
+                        </div>
+                      )}
+                      {pago.descuentoProntoPago && pago.descuentoProntoPago > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Descuento aplicado:</span>
+                          <span>- S/ {pago.descuentoProntoPago.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {pago.observaciones && (
+                        <div className="mt-2 p-2 bg-muted rounded text-xs">
+                          <strong>Nota:</strong> {pago.observaciones}
                         </div>
                       )}
                     </div>
-                    
-                    {pago.comprobante && (
-                      <Button variant="outline" size="sm" className="mt-2 gap-2">
-                        <Download className="h-3 w-3" />
-                        Descargar Comprobante
-                      </Button>
-                    )}
                   </div>
                 ))}
               </div>
