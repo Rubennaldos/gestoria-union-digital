@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
@@ -969,15 +969,15 @@ const EmpadronadoForm: React.FC = () => {
                   </div>
 
                   {isEditing && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setVincularCuentaOpen(true)}
-                      className="w-full"
-                    >
-                      <Link2 className="h-4 w-4 mr-2" />
-                      Vincular cuenta existente
-                    </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setVincularCuentaOpen(true)}
+                    className="w-full"
+                  >
+                    <Link className="h-4 w-4 mr-2" />
+                    Vincular cuenta existente
+                  </Button>
                   )}
                 </div>
 

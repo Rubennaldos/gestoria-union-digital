@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Link2, AlertCircle } from 'lucide-react';
+import { Link, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { findUserByIdentifier, designarUsuarioAEmpadronado } from '@/services/rtdb';
 import { Empadronado } from '@/types/empadronados';
@@ -114,7 +114,7 @@ export function VincularCuentaModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
+            <Link className="h-5 w-5" />
             Vincular Cuenta Existente
           </DialogTitle>
           <DialogDescription>
