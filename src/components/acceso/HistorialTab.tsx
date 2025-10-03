@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, HardHat, Truck, Calendar, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Users, HardHat, Truck, Calendar, Clock, CheckCircle, XCircle, AlertCircle, UserX } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { 
@@ -11,26 +11,49 @@ import {
   obtenerTrabajadoresPorEmpadronado, 
   obtenerProveedoresPorEmpadronado 
 } from "@/services/acceso";
+import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function HistorialTab() {
+  const { user } = useAuth();
   const [visitas, setVisitas] = useState<RegistroVisita[]>([]);
   const [trabajadores, setTrabajadores] = useState<RegistroTrabajadores[]>([]);
   const [proveedores, setProveedores] = useState<RegistroProveedor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [empadronadoId, setEmpadronadoId] = useState<string | null>(null);
+  const [noVinculado, setNoVinculado] = useState(false);
 
   useEffect(() => {
     cargarHistorial();
-  }, []);
+  }, [user]);
 
   const cargarHistorial = async () => {
     try {
-      const empadronadoId = "user123"; // ID del usuario actual
+      setLoading(true);
+      setNoVinculado(false);
+
+      if (!user?.uid) {
+        setNoVinculado(true);
+        return;
+      }
+
+      // Obtener el empadronado vinculado al usuario autenticado
+      const empadronado = await obtenerEmpadronadoPorAuthUid(user.uid);
       
+      if (!empadronado) {
+        console.log('Usuario no vinculado a ningún empadronado');
+        setNoVinculado(true);
+        return;
+      }
+
+      setEmpadronadoId(empadronado.id);
+      
+      // Cargar historial solo del empadronado actual
       const [visitasData, trabajadoresData, proveedoresData] = await Promise.all([
-        obtenerVisitasPorEmpadronado(empadronadoId),
-        obtenerTrabajadoresPorEmpadronado(empadronadoId),
-        obtenerProveedoresPorEmpadronado(empadronadoId)
+        obtenerVisitasPorEmpadronado(empadronado.id),
+        obtenerTrabajadoresPorEmpadronado(empadronado.id),
+        obtenerProveedoresPorEmpadronado(empadronado.id)
       ]);
 
       setVisitas(visitasData);
@@ -38,6 +61,7 @@ export function HistorialTab() {
       setProveedores(proveedoresData);
     } catch (error) {
       console.error('Error al cargar historial:', error);
+      setNoVinculado(true);
     } finally {
       setLoading(false);
     }
@@ -71,6 +95,20 @@ export function HistorialTab() {
         <div className="text-center">
           <Clock className="h-8 w-8 mx-auto animate-spin text-primary" />
           <p className="mt-2 text-muted-foreground">Cargando historial...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (noVinculado) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <UserX className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+          <p className="text-muted-foreground font-medium">No tienes acceso al historial</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Tu cuenta no está vinculada a ningún registro de empadronado
+          </p>
         </div>
       </div>
     );
