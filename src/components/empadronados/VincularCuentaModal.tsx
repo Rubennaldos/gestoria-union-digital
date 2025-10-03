@@ -39,6 +39,8 @@ export function VincularCuentaModal({
   const [authOnlyAccount, setAuthOnlyAccount] = useState(false);
   const [selectedRole, setSelectedRole] = useState('asociado');
   const [roles, setRoles] = useState<Role[]>([]);
+  const [manualUid, setManualUid] = useState('');
+  const [showManualImport, setShowManualImport] = useState(false);
   const { toast } = useToast();
 
   // Cargar roles cuando se abre el modal
@@ -122,34 +124,65 @@ export function VincularCuentaModal({
     }
   };
 
-  const handleLink = async () => {
-    if (!empadronado || !searchResult) return;
+  const handleImportFromAuth = async () => {
+    if (!empadronado || !searchResult || !manualUid.trim()) return;
 
     setLoading(true);
     try {
-      // Si es una cuenta solo de Auth, primero crear el perfil en RTDB
-      if (authOnlyAccount) {
-        // Necesitamos obtener el UID de Firebase Auth
-        const methods = await fetchSignInMethodsForEmail(auth, searchResult.email);
-        if (!methods || methods.length === 0) {
-          throw new Error('La cuenta ya no existe en Firebase Auth');
-        }
+      // Crear el perfil en RTDB con el UID manual
+      const userData = {
+        uid: manualUid.trim(),
+        email: searchResult.email,
+        displayName: `${empadronado.nombre} ${empadronado.apellidos}`,
+        roleId: selectedRole,
+        activo: true,
+        createdAt: Date.now(),
+      };
 
-        // Importar usuario desde Auth - necesitamos crear el perfil con un UID temporal
-        // En realidad no podemos obtener el UID sin que el usuario haga login
-        toast({
-          title: 'Advertencia',
-          description: 'No se puede vincular una cuenta de Auth sin perfil. Pide al usuario que haga login primero.',
-          variant: 'destructive'
-        });
-        return;
-      }
+      await createUserProfile(manualUid.trim(), userData);
 
+      // Ahora vincular al empadronado
+      await designarUsuarioAEmpadronado(
+        empadronado.id,
+        searchResult.email,
+        'admin-user'
+      );
+
+      toast({
+        title: 'Éxito',
+        description: 'La cuenta ha sido importada y vinculada correctamente'
+      });
+
+      onLinked();
+      handleClose();
+    } catch (error: any) {
+      console.error('Error importando cuenta:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Error al importar la cuenta',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLink = async () => {
+    if (!empadronado || !searchResult) return;
+
+    // Si es cuenta solo de Auth, mostrar formulario de importación manual
+    if (authOnlyAccount) {
+      setShowManualImport(true);
+      return;
+    }
+
+    setLoading(true);
+    try {
       // Vincular usuario existente en RTDB
       await designarUsuarioAEmpadronado(
         empadronado.id,
         identifier.trim(),
-        'admin-user' // Actor UID
+        'admin-user'
       );
 
       toast({
@@ -176,6 +209,8 @@ export function VincularCuentaModal({
     setSearchResult(null);
     setAuthOnlyAccount(false);
     setSelectedRole('asociado');
+    setManualUid('');
+    setShowManualImport(false);
     onOpenChange(false);
   };
 
@@ -237,7 +272,7 @@ export function VincularCuentaModal({
             </Alert>
           )}
 
-          {searchResult && authOnlyAccount && (
+          {searchResult && authOnlyAccount && !showManualImport && (
             <Alert className="border-orange-200 bg-orange-50">
               <AlertTriangle className="h-4 w-4 text-orange-600" />
               <AlertDescription className="space-y-3">
@@ -247,12 +282,54 @@ export function VincularCuentaModal({
                     <p><strong>Email:</strong> {searchResult.email}</p>
                     <p className="mt-2 text-xs">
                       Esta cuenta existe en Firebase Auth pero no tiene un perfil en el sistema. 
-                      Para vincularla, el usuario debe hacer login primero, o debes crear una nueva cuenta.
+                      Puedes importarla manualmente ingresando el UID desde Firebase Console.
                     </p>
                   </div>
                 </div>
               </AlertDescription>
             </Alert>
+          )}
+
+          {showManualImport && (
+            <div className="space-y-4 p-4 border border-orange-200 bg-orange-50 rounded-lg">
+              <div className="space-y-2">
+                <Label>Rol del usuario</Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="manual-uid">UID de Firebase Auth</Label>
+                <Input
+                  id="manual-uid"
+                  value={manualUid}
+                  onChange={(e) => setManualUid(e.target.value)}
+                  placeholder="Ej: ABcd1234EFgh5678IJkl9012"
+                  disabled={loading}
+                />
+                <p className="text-xs text-orange-700">
+                  Encuentra el UID en Firebase Console → Authentication → Users → busca el email y copia el UID
+                </p>
+              </div>
+
+              <Button 
+                onClick={handleImportFromAuth}
+                disabled={loading || !manualUid.trim()}
+                className="w-full"
+              >
+                {loading ? 'Importando...' : 'Importar y Vincular'}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -260,12 +337,14 @@ export function VincularCuentaModal({
           <Button variant="outline" onClick={handleClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button 
-            onClick={handleLink}
-            disabled={loading || !searchResult || authOnlyAccount}
-          >
-            {loading ? 'Vinculando...' : 'Vincular Cuenta'}
-          </Button>
+          {!showManualImport && (
+            <Button 
+              onClick={handleLink}
+              disabled={loading || !searchResult}
+            >
+              {loading ? 'Vinculando...' : authOnlyAccount ? 'Importar Manualmente' : 'Vincular Cuenta'}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
