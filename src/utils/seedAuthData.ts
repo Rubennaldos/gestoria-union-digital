@@ -247,6 +247,13 @@ export const seedModules = async () => {
       icon: 'Calculator',
       orden: 20,
       requiereAprobacion: true
+    },
+    admin_seguridad: {
+      id: 'admin_seguridad',
+      nombre: 'Admin Seguridad',
+      icon: 'Shield',
+      orden: 21,
+      requiereAprobacion: true
     }
   };
 
