@@ -12,10 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
-import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique } from '@/services/empadronados';
+import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
 import { listRoles } from '@/services/rtdb';
 import { Role } from '@/types/auth';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 const EmpadronadoForm: React.FC = () => {
   const { id } = useParams();
@@ -54,6 +55,7 @@ const EmpadronadoForm: React.FC = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [unlinkingAccount, setUnlinkingAccount] = useState(false);
 
   const [roles, setRoles] = useState<Role[]>([]);
   
@@ -401,6 +403,33 @@ const EmpadronadoForm: React.FC = () => {
       ...prev,
       vehiculos: prev.vehiculos?.filter((_, i) => i !== index) || []
     }));
+  };
+
+  const handleUnlinkAccount = async () => {
+    if (!id) return;
+    
+    setUnlinkingAccount(true);
+    try {
+      await unlinkAuthFromEmpadronado(id);
+      
+      // Actualizar el estado local
+      setHasExistingAccount(false);
+      setExistingAccountInfo({});
+      
+      toast({
+        title: "Éxito",
+        description: "La cuenta ha sido desvinculada correctamente"
+      });
+    } catch (error) {
+      console.error('Error al desvincular cuenta:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo desvincular la cuenta",
+        variant: "destructive"
+      });
+    } finally {
+      setUnlinkingAccount(false);
+    }
   };
 
   if (loadingData) {
@@ -836,11 +865,39 @@ const EmpadronadoForm: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {hasExistingAccount ? (
-              // Mostrar información de cuenta existente
+              // Mostrar información de cuenta existente con opción de desvincular
               <div className="space-y-4">
                 <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center justify-between mb-2">
                     <Badge variant="default" className="bg-green-600">Cuenta activa</Badge>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          disabled={unlinkingAccount}
+                        >
+                          {unlinkingAccount ? 'Desvinculando...' : 'Desvincular cuenta'}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Desvincular cuenta de usuario?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta acción desvinculará la cuenta <strong>{existingAccountInfo.emailAcceso}</strong> de este empadronado. 
+                            El usuario ya no podrá acceder al sistema con esta cuenta hasta que se vincule nuevamente.
+                            <br /><br />
+                            Esta operación no elimina la cuenta de usuario, solo la desvincula del empadronado.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleUnlinkAccount}>
+                            Desvincular
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div>
@@ -854,8 +911,8 @@ const EmpadronadoForm: React.FC = () => {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Esta cuenta ya está vinculada y el asociado puede usarla para acceder al sistema. 
-                  Si necesitas desvincular o modificar la cuenta, contacta al administrador del sistema.
+                  Esta cuenta está vinculada y el asociado puede usarla para acceder al sistema. 
+                  Puedes desvincularla si necesitas crear una nueva cuenta o corregir la vinculación.
                 </p>
               </div>
             ) : (
