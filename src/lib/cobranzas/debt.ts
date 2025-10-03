@@ -2,17 +2,18 @@
 import type { BillingConfig } from "@/contexts/BillingConfigContext";
 
 export type DeudaCalculada = {
-  quincenas: number;   // cuántas quincenas cerradas debe
-  monto: number;       // quincenas * cfg.montoBase
+  meses: number;       // cuántos meses cerrados debe
+  monto: number;       // meses * cfg.montoBase
   desde: string;       // ISO
   hasta: string;       // ISO
 };
 
 /**
- * Reglas:
+ * Reglas para cobro MENSUAL:
  * - Si ingreso < cfg.fechaCorteISO => se cobra desde cfg.fechaCorteISO.
  * - Si ingreso >= cfg.fechaCorteISO => se cobra desde ingreso.
- * - Solo se cobran quincenas CERRADAS (1ra cierra el día cierreDia, 2da cierra fin de mes).
+ * - Se cobra 1 vez al mes, el día cfg.cierreDia de cada mes.
+ * - Solo se cobran meses CERRADOS (donde ya pasó el día de cierre).
  */
 export function calcularDeuda(
   args: { fechaIngresoISO: string },
@@ -24,10 +25,10 @@ export function calcularDeuda(
 
   const desde = ingreso.getTime() < corte.getTime() ? corte : ingreso;
 
-  const quincenas = contarQuincenasCerradas(desde, hoy, cfg.cierreDia);
+  const meses = contarMesesCerrados(desde, hoy, cfg.cierreDia);
   return {
-    quincenas,
-    monto: quincenas * Number(cfg.montoBase || 0),
+    meses,
+    monto: meses * Number(cfg.montoBase || 0),
     desde: toISO(desde),
     hasta: toISO(hoy),
   };
@@ -35,50 +36,34 @@ export function calcularDeuda(
 
 /* -------------------- helpers -------------------- */
 
-function contarQuincenasCerradas(desde: Date, hasta: Date, cierreDia: number): number {
-  let cursor = startOfDay(desde);
+/**
+ * Cuenta cuántos meses han cerrado desde la fecha 'desde' hasta 'hasta'.
+ * Un mes cierra el día 'cierreDia' de ese mes.
+ * 
+ * Ejemplo: Si cierreDia = 14
+ * - Enero cierra el 14-ene
+ * - Febrero cierra el 14-feb
+ * - etc.
+ */
+function contarMesesCerrados(desde: Date, hasta: Date, cierreDia: number): number {
   let count = 0;
+  let cursor = new Date(desde.getFullYear(), desde.getMonth(), 1); // Primer día del mes de inicio
 
-  while (true) {
-    const limite = proximoLimite(cursor, cierreDia);
-    if (hasta.getTime() > limite.getTime()) {
+  while (cursor.getTime() <= hasta.getTime()) {
+    // Fecha de cierre de este mes
+    const fechaCierre = new Date(cursor.getFullYear(), cursor.getMonth(), cierreDia, 0, 0, 0, 0);
+    
+    // Si la fecha de inicio es después del cierre de este mes, no se cobra este mes
+    // Si hoy es antes del cierre de este mes, no se cobra este mes
+    if (desde.getTime() <= fechaCierre.getTime() && hasta.getTime() >= fechaCierre.getTime()) {
       count++;
-      cursor = addDays(limite, 1); // siguiente periodo arranca día siguiente del límite
-    } else {
-      break;
     }
+    
+    // Avanzar al siguiente mes
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
   }
+  
   return count;
-}
-
-function proximoLimite(d: Date, cierreDia: number): Date {
-  // Si el día del mes de d es <= cierreDia, el límite es el cierre de primera quincena
-  if (d.getDate() <= cierreDia) {
-    return cierrePrimeraQuincena(d, cierreDia);
-  }
-  // Si ya pasó el cierre de primera quincena, el límite es fin de mes
-  return cierreSegundaQuincena(d);
-}
-
-function cierrePrimeraQuincena(d: Date, cierreDia: number): Date {
-  return new Date(d.getFullYear(), d.getMonth(), cierreDia, 0, 0, 0, 0);
-}
-
-function cierreSegundaQuincena(d: Date): Date {
-  const ld = lastDayOfMonth(d);
-  return new Date(ld.getFullYear(), ld.getMonth(), ld.getDate(), 0, 0, 0, 0);
-}
-
-function lastDayOfMonth(d: Date): Date {
-  // El día 0 del mes siguiente es el último día del mes actual
-  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 0, 0, 0, 0);
-}
-
-function addDays(d: Date, days: number): Date {
-  const nd = new Date(d);
-  nd.setDate(nd.getDate() + days);
-  nd.setHours(0, 0, 0, 0);
-  return nd;
 }
 
 function startOfDay(d: Date): Date {

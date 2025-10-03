@@ -304,7 +304,7 @@ const PagosCuotas = () => {
                 </div>
                 <div className="text-sm text-muted-foreground">
                   <div>Deuda calculada: <span className="font-semibold">S/ {deudaCalculada.monto.toFixed(2)}</span></div>
-                  <div className="text-xs">({deudaCalculada.quincenas} quincenas desde {new Date(deudaCalculada.desde).toLocaleDateString('es-PE')})</div>
+                  <div className="text-xs">({deudaCalculada.meses} meses desde {new Date(deudaCalculada.desde).toLocaleDateString('es-PE')})</div>
                 </div>
               </div>
             </div>

@@ -27,7 +27,7 @@ export function useDeudaAsociado(emp: EmpadronadoLike) {
     const res = calcularDeuda({ fechaIngresoISO }, cfg);
     return {
       ...res,
-      esMoroso: res.quincenas > 0,
+      esMoroso: res.meses > 0,
     };
   }, [emp?.fechaIngreso, cfg]);
 }

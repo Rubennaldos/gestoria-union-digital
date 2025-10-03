@@ -4,8 +4,8 @@ import { onValue, ref } from "firebase/database";
 
 export type BillingConfig = {
   // Normalizado para el motor de deuda:
-  montoBase: number;          // S/ por quincena (de "montoMensual" en DB)
-  cierreDia: number;          // día de cierre 1ª quincena (de "diaCierre")
+  montoBase: number;          // S/ por MES (de "montoMensual" en DB)
+  cierreDia: number;          // día de cierre del mes (de "diaCierre")
   vencimientoDia: number;     // día de vencimiento visual (de "diaVencimiento")
   prontoPagoDias: number;     // días (de "diasProntoPago")
   recargoMoraPct: number;     // % (de "porcentajeMorosidad")
@@ -20,7 +20,7 @@ export type BillingConfig = {
 };
 
 const DEFAULT_CFG: BillingConfig = {
-  montoBase: 25, // S/25 por quincena = S/50 mensual
+  montoBase: 50, // S/50 por mes
   cierreDia: 14,
   vencimientoDia: 15,
   prontoPagoDias: 3,
@@ -42,12 +42,9 @@ export function BillingConfigProvider({ children }: { children: ReactNode }) {
         const raw = (snap.val() ?? {}) as any;
 
         // Mapeo de tus claves en español -> claves normalizadas
-        // IMPORTANTE: montoBase es por QUINCENA, pero el usuario configura monto MENSUAL
-        // Por lo tanto, dividimos el monto mensual entre 2
-        const montoMensual = toNum(raw.montoMensual, DEFAULT_CFG.montoBase * 2);
-        
+        // montoBase es MENSUAL, se toma directamente de la configuración
         const parsed: BillingConfig = {
-          montoBase: montoMensual / 2, // Convertir monto mensual a quincenal
+          montoBase: toNum(raw.montoMensual, DEFAULT_CFG.montoBase),
           cierreDia: toNum(raw.diaCierre, DEFAULT_CFG.cierreDia),
           vencimientoDia: toNum(raw.diaVencimiento, DEFAULT_CFG.vencimientoDia),
           prontoPagoDias: toNum(raw.diasProntoPago, DEFAULT_CFG.prontoPagoDias),
