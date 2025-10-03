@@ -393,15 +393,21 @@ export const designarUsuarioAEmpadronado = async (
   // Vincular nuevo usuario -> empadronado
   updates[`users/${user.uid}/empadronadoId`] = empadronadoId;
   updates[`empadronado_user_index/${empadronadoId}`] = { uid: user.uid, at: Date.now() };
+  
+  // Actualizar el registro del empadronado con authUid y emailAcceso
+  updates[`empadronados/${empadronadoId}/authUid`] = user.uid;
+  updates[`empadronados/${empadronadoId}/emailAcceso`] = user.email;
 
   // Si el empadronado tenía otro usuario, desvincularlo
   if (prevUserUid && prevUserUid !== user.uid) {
     updates[`users/${prevUserUid}/empadronadoId`] = null;
   }
 
-  // Si el usuario estaba vinculado a otro empadronado diferente, limpiar ese índice
+  // Si el usuario estaba vinculado a otro empadronado diferente, limpiar ese índice y su registro
   if (prevEmpId && prevEmpId !== empadronadoId) {
     updates[`empadronado_user_index/${prevEmpId}`] = null;
+    updates[`empadronados/${prevEmpId}/authUid`] = null;
+    updates[`empadronados/${prevEmpId}/emailAcceso`] = null;
   }
 
   await update(ref(db), updates);
