@@ -40,6 +40,11 @@ const EmpadronadoForm: React.FC = () => {
 
   // Estado para la creación de cuenta de usuario
   const [createUserAccount, setCreateUserAccount] = useState(false);
+  const [hasExistingAccount, setHasExistingAccount] = useState(false);
+  const [existingAccountInfo, setExistingAccountInfo] = useState<{
+    authUid?: string;
+    emailAcceso?: string;
+  }>({});
   const [userAccountData, setUserAccountData] = useState({
     email: '',
     password: '',
@@ -124,6 +129,20 @@ const EmpadronadoForm: React.FC = () => {
           cumpleanos: empadronado.cumpleanos,
           observaciones: empadronado.observaciones || ''
         });
+        
+        // Verificar si el empadronado tiene una cuenta vinculada
+        if (empadronado.authUid && empadronado.emailAcceso) {
+          console.log('Empadronado tiene cuenta vinculada:', empadronado.authUid, empadronado.emailAcceso);
+          setHasExistingAccount(true);
+          setExistingAccountInfo({
+            authUid: empadronado.authUid,
+            emailAcceso: empadronado.emailAcceso
+          });
+        } else {
+          setHasExistingAccount(false);
+          setExistingAccountInfo({});
+        }
+        
         console.log('Teléfonos cargados:', empadronado.telefonos); // Debug para teléfonos
       } else {
         toast({
@@ -807,33 +826,61 @@ const EmpadronadoForm: React.FC = () => {
           <CardHeader>
             <CardTitle>Cuenta de Usuario del Sistema</CardTitle>
             <CardDescription>
-              {isEditing 
-                ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
-                : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"
+              {hasExistingAccount
+                ? "Este empadronado ya tiene una cuenta de acceso vinculada"
+                : isEditing 
+                  ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
+                  : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"
               }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="createUserAccount"
-                checked={createUserAccount}
-                onCheckedChange={(checked) => {
-                  setCreateUserAccount(checked);
-                  if (!checked) {
-                    setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
-                    setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '' }));
-                    setShowPassword(false);
-                    setShowConfirm(false);
-                  }
-                }}
-              />
-              <Label htmlFor="createUserAccount">
-                {isEditing ? "Crear cuenta de acceso" : "Crear cuenta de acceso al sistema"}
-              </Label>
-            </div>
+            {hasExistingAccount ? (
+              // Mostrar información de cuenta existente
+              <div className="space-y-4">
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="default" className="bg-green-600">Cuenta activa</Badge>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium text-green-900">Email de acceso:</span>
+                      <p className="text-green-800">{existingAccountInfo.emailAcceso}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-green-900">ID de usuario:</span>
+                      <p className="text-green-800 font-mono text-xs">{existingAccountInfo.authUid}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Esta cuenta ya está vinculada y el asociado puede usarla para acceder al sistema. 
+                  Si necesitas desvincular o modificar la cuenta, contacta al administrador del sistema.
+                </p>
+              </div>
+            ) : (
+              // Formulario para crear nueva cuenta
+              <>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="createUserAccount"
+                    checked={createUserAccount}
+                    onCheckedChange={(checked) => {
+                      setCreateUserAccount(checked);
+                      if (!checked) {
+                        setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
+                        setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '' }));
+                        setShowPassword(false);
+                        setShowConfirm(false);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="createUserAccount">
+                    {isEditing ? "Crear cuenta de acceso" : "Crear cuenta de acceso al sistema"}
+                  </Label>
+                </div>
 
-            {createUserAccount && (
+                {createUserAccount && (
               <div className="space-y-4 pt-4 border-t">
                 {/* Email + Password */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -938,6 +985,8 @@ const EmpadronadoForm: React.FC = () => {
                   </p>
                 </div>
               </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
