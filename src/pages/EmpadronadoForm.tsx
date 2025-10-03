@@ -10,13 +10,14 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link2 } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
 import { listRoles } from '@/services/rtdb';
 import { Role } from '@/types/auth';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { VincularCuentaModal } from '@/components/empadronados/VincularCuentaModal';
 
 const EmpadronadoForm: React.FC = () => {
   const { id } = useParams();
@@ -56,6 +57,7 @@ const EmpadronadoForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [unlinkingAccount, setUnlinkingAccount] = useState(false);
+  const [vincularCuentaOpen, setVincularCuentaOpen] = useState(false);
 
   const [roles, setRoles] = useState<Role[]>([]);
   
@@ -944,25 +946,39 @@ const EmpadronadoForm: React.FC = () => {
                 </p>
               </div>
             ) : (
-              // Formulario para crear nueva cuenta
+              // Formulario para crear nueva cuenta o vincular existente
               <>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="createUserAccount"
-                    checked={createUserAccount}
-                    onCheckedChange={(checked) => {
-                      setCreateUserAccount(checked);
-                      if (!checked) {
-                        setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
-                        setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '' }));
-                        setShowPassword(false);
-                        setShowConfirm(false);
-                      }
-                    }}
-                  />
-                  <Label htmlFor="createUserAccount">
-                    {isEditing ? "Crear cuenta de acceso" : "Crear cuenta de acceso al sistema"}
-                  </Label>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="createUserAccount"
+                      checked={createUserAccount}
+                      onCheckedChange={(checked) => {
+                        setCreateUserAccount(checked);
+                        if (!checked) {
+                          setUserAccountData({ email: '', password: '', confirmPassword: '', username: '', roleId: 'asociado' });
+                          setErrors((e) => ({ ...e, userEmail: '', userPassword: '', userPasswordConfirm: '', userUsername: '' }));
+                          setShowPassword(false);
+                          setShowConfirm(false);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="createUserAccount">
+                      Crear nueva cuenta de acceso
+                    </Label>
+                  </div>
+
+                  {isEditing && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setVincularCuentaOpen(true)}
+                      className="w-full"
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Vincular cuenta existente
+                    </Button>
+                  )}
                 </div>
 
                 {createUserAccount && (
@@ -1101,6 +1117,14 @@ const EmpadronadoForm: React.FC = () => {
           </Button>
         </div>
       </form>
+
+      {/* Modal para vincular cuenta existente */}
+      <VincularCuentaModal
+        open={vincularCuentaOpen}
+        onOpenChange={setVincularCuentaOpen}
+        empadronado={id ? { id, nombre: formData.nombre, apellidos: formData.apellidos, numeroPadron: formData.numeroPadron } as any : null}
+        onLinked={loadEmpadronado}
+      />
     </div>
   );
 };

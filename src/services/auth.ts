@@ -186,19 +186,35 @@ export const createAccountForEmpadronado = async (
   const emp = await getEmpadronadoById(empadronadoId);
   if (!emp) throw new Error("Empadronado no encontrado");
 
-  const uid = await createUserAndProfile({
-    displayName: opts.displayName,
-    email: opts.email,
-    username: opts.username,
-    phone: opts.phone,
-    roleId: opts.roleId || "asociado",
-    activo: true,
-    password: opts.password,
-    empadronadoId,
-    tipoUsuario: "asociado",
-  });
+  // Verificar si el empadronado ya tiene una cuenta vinculada
+  if (emp.authUid && emp.emailAcceso) {
+    throw new Error(`Este empadronado ya tiene una cuenta vinculada: ${emp.emailAcceso}`);
+  }
 
-  return uid;
+  try {
+    const uid = await createUserAndProfile({
+      displayName: opts.displayName,
+      email: opts.email,
+      username: opts.username,
+      phone: opts.phone,
+      roleId: opts.roleId || "asociado",
+      activo: true,
+      password: opts.password,
+      empadronadoId,
+      tipoUsuario: "asociado",
+    });
+
+    return uid;
+  } catch (error: any) {
+    // Si el email ya existe en Auth, dar un mensaje más claro
+    if (error?.code === 'auth/email-already-in-use' || error?.message?.includes('email-already-in-use')) {
+      throw new Error(
+        `El email ${opts.email} ya está registrado en el sistema. ` +
+        `Si es una cuenta existente, contacta al administrador para vincularla a este empadronado.`
+      );
+    }
+    throw error;
+  }
 };
 
 /* ─────────────────────────────────────────────────────────
