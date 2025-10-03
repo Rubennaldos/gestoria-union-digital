@@ -20,7 +20,7 @@ export type BillingConfig = {
 };
 
 const DEFAULT_CFG: BillingConfig = {
-  montoBase: 50,
+  montoBase: 25, // S/25 por quincena = S/50 mensual
   cierreDia: 14,
   vencimientoDia: 15,
   prontoPagoDias: 3,
@@ -42,8 +42,12 @@ export function BillingConfigProvider({ children }: { children: ReactNode }) {
         const raw = (snap.val() ?? {}) as any;
 
         // Mapeo de tus claves en español -> claves normalizadas
+        // IMPORTANTE: montoBase es por QUINCENA, pero el usuario configura monto MENSUAL
+        // Por lo tanto, dividimos el monto mensual entre 2
+        const montoMensual = toNum(raw.montoMensual, DEFAULT_CFG.montoBase * 2);
+        
         const parsed: BillingConfig = {
-          montoBase: toNum(raw.montoMensual, DEFAULT_CFG.montoBase),
+          montoBase: montoMensual / 2, // Convertir monto mensual a quincenal
           cierreDia: toNum(raw.diaCierre, DEFAULT_CFG.cierreDia),
           vencimientoDia: toNum(raw.diaVencimiento, DEFAULT_CFG.vencimientoDia),
           prontoPagoDias: toNum(raw.diasProntoPago, DEFAULT_CFG.prontoPagoDias),
