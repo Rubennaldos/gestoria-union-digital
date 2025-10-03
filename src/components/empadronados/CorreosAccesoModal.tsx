@@ -9,11 +9,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Mail, Search, Users } from 'lucide-react';
+import { Mail, Search, Users, Edit } from 'lucide-react';
 import { Empadronado } from '@/types/empadronados';
 import { getEmpadronados } from '@/services/empadronados';
 import { useToast } from '@/hooks/use-toast';
+import { EditarAccesoModal } from './EditarAccesoModal';
 
 interface CorreosAccesoModalProps {
   open: boolean;
@@ -25,6 +27,8 @@ export function CorreosAccesoModal({ open, onOpenChange }: CorreosAccesoModalPro
   const [filteredEmpadronados, setFilteredEmpadronados] = useState<Empadronado[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editingEmpadronado, setEditingEmpadronado] = useState<Empadronado | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -70,7 +74,23 @@ export function CorreosAccesoModal({ open, onOpenChange }: CorreosAccesoModalPro
     }
   };
 
+  const handleEditAcceso = (emp: Empadronado) => {
+    setEditingEmpadronado(emp);
+    setEditModalOpen(true);
+  };
+
+  const handleAccesoUpdated = () => {
+    loadEmpadronadosConAcceso();
+  };
+
   return (
+    <>
+      <EditarAccesoModal
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        empadronado={editingEmpadronado}
+        onUpdated={handleAccesoUpdated}
+      />
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh]">
         <DialogHeader>
@@ -122,6 +142,7 @@ export function CorreosAccesoModal({ open, onOpenChange }: CorreosAccesoModalPro
                     <TableHead>Nombre Completo</TableHead>
                     <TableHead>Email de Acceso</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -147,6 +168,16 @@ export function CorreosAccesoModal({ open, onOpenChange }: CorreosAccesoModalPro
                           {emp.habilitado ? 'Habilitado' : 'Deshabilitado'}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditAcceso(emp)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -163,5 +194,6 @@ export function CorreosAccesoModal({ open, onOpenChange }: CorreosAccesoModalPro
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
