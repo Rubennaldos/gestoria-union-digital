@@ -212,6 +212,20 @@ const EmpadronadoForm: React.FC = () => {
       if (userAccountData.email && !emailRegex.test(userAccountData.email)) {
         newErrors.userEmail = 'El formato del email no es válido';
       }
+
+      // Validar username si se proporciona - NO debe tener espacios
+      if (userAccountData.username.trim()) {
+        if (/\s/.test(userAccountData.username.trim())) {
+          newErrors.userUsername = 'El nombre de usuario no puede contener espacios';
+        }
+        if (userAccountData.username.trim().length < 3) {
+          newErrors.userUsername = 'El nombre de usuario debe tener al menos 3 caracteres';
+        }
+        // Solo letras, números, puntos, guiones y guiones bajos
+        if (!/^[a-zA-Z0-9._-]+$/.test(userAccountData.username.trim())) {
+          newErrors.userUsername = 'El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos';
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -287,14 +301,20 @@ const EmpadronadoForm: React.FC = () => {
       // Si se creó/actualizó el empadronado exitosamente y está habilitada la creación de cuenta
       if (success && createUserAccount && empadronadoId) {
         try {
-          console.log('Creando cuenta para empadronado:', empadronadoId, userAccountData);
+          console.log('Creando cuenta para empadronado:', empadronadoId, {
+            email: userAccountData.email.trim(),
+            username: userAccountData.username.trim() || undefined,
+            roleId: userAccountData.roleId
+          });
+          
           await createAccountForEmpadronado(empadronadoId, {
             email: userAccountData.email.trim(),
             password: userAccountData.password,
             displayName: `${formData.nombre} ${formData.apellidos}`,
-            username: userAccountData.username.trim() || undefined,
+            username: userAccountData.username.trim() || undefined, // Solo enviar si hay valor
             roleId: userAccountData.roleId
           });
+          
           console.log('Cuenta creada exitosamente');
           
           toast({
@@ -303,14 +323,22 @@ const EmpadronadoForm: React.FC = () => {
               ? "Empadronado actualizado y cuenta de usuario creada correctamente"
               : "Empadronado y cuenta de usuario creados correctamente"
           });
+          
+          // Recargar el empadronado para obtener los datos actualizados con authUid
+          if (isEditing && id) {
+            await loadEmpadronado();
+          }
         } catch (userError: any) {
           console.error('Error creando cuenta de usuario:', userError);
           // El empadronado se creó pero la cuenta falló
           toast({
             title: "Advertencia",
-            description: `${isEditing ? 'Empadronado actualizado' : 'Empadronado creado'}, pero hubo un error al crear la cuenta de usuario: ${userError.message}`,
+            description: `${isEditing ? 'Empadronado actualizado' : 'Empadronado creado'}, pero hubo un error al crear la cuenta de usuario: ${userError.message || 'Error desconocido'}`,
             variant: "destructive"
           });
+          
+          // No navegar, mantener en el formulario para que el usuario pueda reintentar
+          return;
         }
       } else if (success) {
         toast({
@@ -1008,8 +1036,12 @@ const EmpadronadoForm: React.FC = () => {
                       id="username"
                       value={userAccountData.username}
                       onChange={(e) => setUserAccountData(prev => ({ ...prev, username: e.target.value }))}
-                      placeholder="juan.garcia"
+                      placeholder="juan_garcia (sin espacios)"
                     />
+                    {errors.userUsername && <p className="text-sm text-destructive mt-1">{errors.userUsername}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Solo letras, números, puntos, guiones y guiones bajos. Sin espacios.
+                    </p>
                   </div>
 
                   <div>
