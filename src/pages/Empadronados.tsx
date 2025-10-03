@@ -17,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
   Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye,
-  Download, KeyRound, Settings, Upload
+  Download, KeyRound, Settings, Upload, Mail
 } from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
@@ -27,6 +27,7 @@ import { useAuthz } from '@/contexts/AuthzContext';
 import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
+import { CorreosAccesoModal } from '@/components/empadronados/CorreosAccesoModal';
 
 // >>> XLSX: exportar / importar plantilla de DNI + fechaIngreso
 import {
@@ -60,6 +61,7 @@ const Empadronados: React.FC = () => {
   const [userPermissions, setUserPermissions] = useState<Permission>({});
   const [editingPermissions, setEditingPermissions] = useState(false);
   const [actualizacionMasivaOpen, setActualizacionMasivaOpen] = useState(false);
+  const [correosAccesoOpen, setCorreosAccesoOpen] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -322,6 +324,11 @@ const Empadronados: React.FC = () => {
           <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
             <Search className="h-4 w-4 mr-2" />
             Filtros
+          </Button>
+
+          <Button variant="outline" onClick={() => setCorreosAccesoOpen(true)}>
+            <Mail className="h-4 w-4 mr-2" />
+            Correos con Acceso
           </Button>
 
           {/* XLSX: Exportar / Importar */}
@@ -948,6 +955,12 @@ const Empadronados: React.FC = () => {
         open={actualizacionMasivaOpen}
         onOpenChange={setActualizacionMasivaOpen}
         onComplete={loadData}
+      />
+
+      {/* Modal de correos con acceso */}
+      <CorreosAccesoModal
+        open={correosAccesoOpen}
+        onOpenChange={setCorreosAccesoOpen}
       />
     </div>
   );
