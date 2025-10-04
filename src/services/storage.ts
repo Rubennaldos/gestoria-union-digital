@@ -1,8 +1,27 @@
-import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "@/config/firebase";
+import { ref, push, set, get, update, remove, query, orderByChild, equalTo } from "firebase/database";
+import { db } from "@/config/firebase";
 
 /**
- * Sube un archivo de comprobante de pago a Firebase Storage
+ * Convierte un archivo a base64 para almacenarlo en Firebase RTDB
+ */
+async function convertirArchivoABase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Error al convertir archivo'));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Guarda un comprobante de pago en Firebase RTDB (como base64)
+ * Alternativa a Firebase Storage para evitar problemas de CORS
  */
 export async function subirComprobanteCobranza(
   empadronadoId: string,
@@ -16,26 +35,27 @@ export async function subirComprobanteCobranza(
       throw new Error('Solo se permiten archivos JPG, PNG o PDF');
     }
 
-    // Validar tamaño (max 5MB)
-    const maxSize = 5 * 1024 * 1024;
+    // Validar tamaño (max 2MB para RTDB)
+    const maxSize = 2 * 1024 * 1024;
     if (file.size > maxSize) {
-      throw new Error('El archivo no debe superar los 5MB');
+      throw new Error('El archivo no debe superar los 2MB');
     }
 
-    // Crear referencia única
-    const timestamp = Date.now();
-    const extension = file.name.split('.').pop();
-    const fileName = `comprobantes/${empadronadoId}/${periodo}_${timestamp}.${extension}`;
+    // Convertir a base64
+    const base64Data = await convertirArchivoABase64(file);
     
-    const fileRef = storageRef(storage, fileName);
+    // Guardar en RTDB
+    const comprobantesRef = ref(db, `cobranzas_v2/comprobantes/${empadronadoId}/${periodo}_${Date.now()}`);
+    await set(comprobantesRef, {
+      data: base64Data,
+      tipo: file.type,
+      nombre: file.name,
+      tamaño: file.size,
+      fechaSubida: Date.now()
+    });
     
-    // Subir archivo
-    await uploadBytes(fileRef, file);
-    
-    // Obtener URL de descarga
-    const downloadURL = await getDownloadURL(fileRef);
-    
-    return downloadURL;
+    // Retornar la ruta en RTDB como "URL"
+    return comprobantesRef.toString();
   } catch (error) {
     console.error('Error subiendo comprobante:', error);
     throw error;

@@ -189,11 +189,13 @@ const PagosCuotas = () => {
       
       if (!primerCharge) throw new Error("Cargo no encontrado");
 
+      console.log('📤 Subiendo comprobante...');
       const archivoUrl = await subirComprobanteCobranza(
         empadronado.id,
         primerCharge.periodo,
         archivoComprobante
       );
+      console.log('✅ Comprobante subido:', archivoUrl);
 
       // Registrar pago para cada charge seleccionado
       const fechaPagoTimestamp = new Date(fechaPago).getTime();
@@ -233,17 +235,33 @@ const PagosCuotas = () => {
       setTimeout(() => {
         setShowConfirmModal(false);
         setPagoEnviado(false);
+        setProcesandoPago(false);
         cargarDatos();
       }, 2000);
 
     } catch (error) {
-      console.error('Error registrando pago:', error);
+      console.error('❌ Error registrando pago:', error);
+      
+      // Mensajes de error más específicos
+      let errorMessage = "No se pudo registrar el pago";
+      if (error instanceof Error) {
+        if (error.message.includes('CORS')) {
+          errorMessage = "Error de permisos al subir el archivo. Verifica la configuración de Firebase Storage.";
+        } else if (error.message.includes('storage')) {
+          errorMessage = "Error al subir el comprobante. Intenta con un archivo más pequeño.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo registrar el pago",
+        description: errorMessage,
         variant: "destructive"
       });
+      
       setProcesandoPago(false);
+      setPagoEnviado(false);
     }
   };
 
@@ -454,11 +472,16 @@ const PagosCuotas = () => {
                       Pagar Ahora
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md mx-auto">
+                  <DialogContent className="max-w-md mx-auto" aria-describedby="dialog-description">
                     <DialogHeader>
                       <DialogTitle>
                         {pagoEnviado ? "⏳ Esperando Confirmación" : "Registrar Pago"}
                       </DialogTitle>
+                      <p id="dialog-description" className="sr-only">
+                        {pagoEnviado 
+                          ? "Tu pago está siendo procesado y revisado" 
+                          : "Formulario para registrar un nuevo pago de cuotas"}
+                      </p>
                     </DialogHeader>
                     
                     {pagoEnviado ? (
