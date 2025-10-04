@@ -48,6 +48,8 @@ import {
   obtenerChargesPorEmpadronadoV2,
   crearEgresoV2,
   registrarPagoV2,
+  aprobarPagoV2,
+  rechazarPagoV2,
   crearIngresoV2,
   obtenerIngresosV2,
   obtenerReporteDeudores
@@ -55,6 +57,7 @@ import {
 
 import { getEmpadronados } from "@/services/empadronados";
 import DetalleEmpadronadoModalV2 from "@/components/cobranzas/DetalleEmpadronadoModalV2";
+import { RevisarPagoModal } from "@/components/cobranzas/RevisarPagoModal";
 
 import { 
   ConfiguracionCobranzasV2, 
@@ -78,6 +81,10 @@ export default function CobranzasV2() {
   const [charges, setCharges] = useState<ChargeV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [procesando, setProcesando] = useState(false);
+
+  // Modal de revisión de pago
+  const [pagoSeleccionado, setPagoSeleccionado] = useState<PagoV2 | null>(null);
+  const [showRevisarPagoModal, setShowRevisarPagoModal] = useState(false);
 
   // Estados para formularios
   const [nuevoEgreso, setNuevoEgreso] = useState({
@@ -210,6 +217,55 @@ export default function CobranzasV2() {
       });
     }
   };
+
+  const handleAprobarPago = async (comentario: string) => {
+    if (!pagoSeleccionado) return;
+    
+    try {
+      await aprobarPagoV2(pagoSeleccionado.id, comentario);
+      
+      toast({
+        title: "✅ Pago aprobado",
+        description: "El pago ha sido aprobado exitosamente",
+      });
+      
+      setShowRevisarPagoModal(false);
+      setPagoSeleccionado(null);
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error aprobando pago:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo aprobar el pago",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRechazarPago = async (motivo: string) => {
+    if (!pagoSeleccionado) return;
+    
+    try {
+      await rechazarPagoV2(pagoSeleccionado.id, motivo);
+      
+      toast({
+        title: "❌ Pago rechazado",
+        description: "El pago ha sido rechazado",
+      });
+      
+      setShowRevisarPagoModal(false);
+      setPagoSeleccionado(null);
+      await cargarDatos();
+    } catch (error) {
+      console.error('Error rechazando pago:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo rechazar el pago",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => {
     try {
@@ -920,8 +976,26 @@ export default function CobranzasV2() {
                     {pagos.slice(0, 20).map((pago) => {
                       const emp = empadronados.find(e => e.id === pago.empadronadoId);
                       
+                      const getBadgeEstado = () => {
+                        switch (pago.estado) {
+                          case 'aprobado':
+                            return <Badge className="bg-green-600">Aprobado</Badge>;
+                          case 'rechazado':
+                            return <Badge variant="destructive">Rechazado</Badge>;
+                          default:
+                            return <Badge variant="secondary">Pendiente</Badge>;
+                        }
+                      };
+                      
                       return (
-                        <div key={pago.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div 
+                          key={pago.id} 
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setPagoSeleccionado(pago);
+                            setShowRevisarPagoModal(true);
+                          }}
+                        >
                           <div className="flex-1">
                             <div className="font-medium">
                               {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
@@ -936,13 +1010,16 @@ export default function CobranzasV2() {
                             )}
                           </div>
                           
-                          <div className="text-right">
-                            <div className="font-medium text-green-600">
-                              {formatearMoneda(pago.monto)}
+                          <div className="text-right flex items-center gap-3">
+                            <div>
+                              <div className="font-medium text-green-600">
+                                {formatearMoneda(pago.monto)}
+                              </div>
+                              <Badge variant="outline" className="mt-1">
+                                {pago.metodoPago}
+                              </Badge>
                             </div>
-                            <Badge variant="outline">
-                              {pago.metodoPago}
-                            </Badge>
+                            {getBadgeEstado()}
                           </div>
                         </div>
                       );
@@ -1359,6 +1436,16 @@ export default function CobranzasV2() {
         empadronado={empadronadoSeleccionado}
         charges={chargesEmpadronado}
         onRegistrarPago={registrarPagoModal}
+      />
+
+      {/* Modal de revisión de pago */}
+      <RevisarPagoModal
+        open={showRevisarPagoModal}
+        onOpenChange={setShowRevisarPagoModal}
+        pago={pagoSeleccionado}
+        empadronado={pagoSeleccionado ? empadronados.find(e => e.id === pagoSeleccionado.empadronadoId) || null : null}
+        onAprobar={handleAprobarPago}
+        onRechazar={handleRechazarPago}
       />
     </div>
   );

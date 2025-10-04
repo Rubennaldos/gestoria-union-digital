@@ -617,6 +617,109 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
   }
 }
 
+// === APROBAR/RECHAZAR PAGOS ===
+export async function aprobarPagoV2(pagoId: string, comentario?: string): Promise<void> {
+  try {
+    // Obtener el pago
+    const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
+    const pagoSnapshot = await get(pagoRef);
+    
+    if (!pagoSnapshot.exists()) {
+      throw new Error("Pago no encontrado");
+    }
+
+    const pago: PagoV2 = pagoSnapshot.val();
+
+    if (pago.estado !== 'pendiente') {
+      throw new Error("Solo se pueden aprobar pagos pendientes");
+    }
+
+    // Actualizar el pago a aprobado
+    const updates: any = {
+      estado: 'aprobado',
+      fechaAprobacion: Date.now()
+    };
+
+    if (comentario) {
+      updates.comentarioAprobacion = comentario;
+    }
+
+    await update(pagoRef, updates);
+
+    // Ahora sí actualizar el cargo correspondiente
+    const chargeSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+    let chargePath = '';
+    
+    if (chargeSnapshot.exists()) {
+      const allCharges = chargeSnapshot.val();
+      for (const period in allCharges) {
+        for (const empId in allCharges[period]) {
+          for (const cId in allCharges[period][empId]) {
+            if (cId === pago.chargeId) {
+              chargePath = `${BASE_PATH}/charges/${period}/${empId}/${cId}`;
+              const charge = allCharges[period][empId][cId];
+              
+              // Actualizar saldo del cargo
+              const nuevoSaldo = Math.max(0, charge.saldo - pago.monto);
+              const chargeUpdates: any = {
+                montoPagado: charge.montoPagado + pago.monto,
+                saldo: nuevoSaldo,
+                estado: nuevoSaldo === 0 ? 'pagado' : 'pendiente'
+              };
+              
+              await update(ref(db, chargePath), chargeUpdates);
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    console.log('✅ Pago aprobado:', pagoId);
+  } catch (error) {
+    console.error("Error aprobando pago:", error);
+    throw error;
+  }
+}
+
+export async function rechazarPagoV2(pagoId: string, motivoRechazo: string): Promise<void> {
+  try {
+    if (!motivoRechazo || !motivoRechazo.trim()) {
+      throw new Error("Debes proporcionar un motivo de rechazo");
+    }
+
+    // Obtener el pago
+    const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
+    const pagoSnapshot = await get(pagoRef);
+    
+    if (!pagoSnapshot.exists()) {
+      throw new Error("Pago no encontrado");
+    }
+
+    const pago: PagoV2 = pagoSnapshot.val();
+
+    if (pago.estado !== 'pendiente') {
+      throw new Error("Solo se pueden rechazar pagos pendientes");
+    }
+
+    // Actualizar el pago a rechazado
+    await update(pagoRef, {
+      estado: 'rechazado',
+      motivoRechazo: motivoRechazo.trim(),
+      fechaRechazo: Date.now()
+    });
+
+    // Eliminar el índice anti-duplicados para que pueda volver a pagar
+    const indexRef = ref(db, `${BASE_PATH}/pagos_index/${pago.empadronadoId}/${pago.periodo}`);
+    await remove(indexRef);
+
+    console.log('❌ Pago rechazado:', pagoId);
+  } catch (error) {
+    console.error("Error rechazando pago:", error);
+    throw error;
+  }
+}
+
 export async function obtenerChargesV2(): Promise<ChargeV2[]> {
   try {
     const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
