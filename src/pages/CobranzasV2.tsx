@@ -405,248 +405,253 @@ export default function CobranzasV2() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <TopNavigation />
       
-      <main className="container mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Cobranzas V2 (Mensual)</h1>
-            <p className="text-muted-foreground">Sistema de cobranzas mensual con configuración flexible</p>
+      <main className="container mx-auto px-3 md:px-6 py-4 space-y-4 md:space-y-6">
+        {/* Header - Mobile Optimized */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Cobranzas V2
+            </h1>
+            {procesando && (
+              <div className="flex items-center gap-1.5 text-primary">
+                <RefreshCw className="h-3.5 w-3.5 md:h-4 md:w-4 animate-spin" />
+                <span className="text-xs md:text-sm font-medium">Procesando...</span>
+              </div>
+            )}
           </div>
-          
-          {procesando && (
-            <div className="flex items-center gap-2 text-blue-600">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Procesando...</span>
-            </div>
-          )}
+          <p className="text-xs md:text-sm text-muted-foreground">
+            Sistema de cobranzas mensual
+          </p>
         </div>
 
-        {/* KPIs */}
+        {/* KPIs - Compact Mobile Design */}
         {estadisticas && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Recaudado del Mes</CardTitle>
-                <ArrowUpCircle className="h-4 w-4 text-success" />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
+            <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-all duration-300 animate-fade-in">
+              <CardHeader className="p-3 md:p-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Recaudado
+                  </CardTitle>
+                  <div className="p-1.5 md:p-2 rounded-full bg-green-500/10">
+                    <ArrowUpCircle className="h-3 w-3 md:h-4 md:w-4 text-green-600" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold text-success">
+              <CardContent className="p-3 md:p-4 pt-0">
+                <div className="text-base md:text-2xl font-bold text-green-600">
                   {formatearMoneda(estadisticas.recaudadoMes)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Pendiente Total</CardTitle>
-                <AlertCircle className="h-4 w-4 text-warning" />
+            <Card className="border-l-4 border-l-orange-500 hover:shadow-lg transition-all duration-300 animate-fade-in" style={{animationDelay: '0.1s'}}>
+              <CardHeader className="p-3 md:p-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Pendiente
+                  </CardTitle>
+                  <div className="p-1.5 md:p-2 rounded-full bg-orange-500/10">
+                    <AlertCircle className="h-3 w-3 md:h-4 md:w-4 text-orange-600" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold text-warning">
+              <CardContent className="p-3 md:p-4 pt-0">
+                <div className="text-base md:text-2xl font-bold text-orange-600">
                   {formatearMoneda(estadisticas.pendienteTotal)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Morosos</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-destructive" />
+            <Card className="border-l-4 border-l-red-500 hover:shadow-lg transition-all duration-300 animate-fade-in" style={{animationDelay: '0.2s'}}>
+              <CardHeader className="p-3 md:p-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Morosos
+                  </CardTitle>
+                  <div className="p-1.5 md:p-2 rounded-full bg-red-500/10">
+                    <AlertTriangle className="h-3 w-3 md:h-4 md:w-4 text-red-600" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold text-destructive">
+              <CardContent className="p-3 md:p-4 pt-0">
+                <div className="text-base md:text-2xl font-bold text-red-600">
                   {estadisticas.morosos}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">
                   de {estadisticas.totalEmpadronados} asociados
                 </p>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Tasa de Cobranza</CardTitle>
-                <TrendingUp className="h-4 w-4 text-primary" />
+            <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-300 animate-fade-in" style={{animationDelay: '0.3s'}}>
+              <CardHeader className="p-3 md:p-4 pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-[10px] md:text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Tasa
+                  </CardTitle>
+                  <div className="p-1.5 md:p-2 rounded-full bg-blue-500/10">
+                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold text-primary">
+              <CardContent className="p-3 md:p-4 pt-0">
+                <div className="text-base md:text-2xl font-bold text-blue-600">
                   {formatearPorcentaje(estadisticas.tasaCobranza)}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">
                   {estadisticas.cargosMesPagados} de {estadisticas.cargosMesTotal} cargos
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card className="sm:col-span-2 lg:col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Ingresos del Mes</CardTitle>
-                <ArrowUpCircle className="h-4 w-4 text-success" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold text-success">
-                  {formatearMoneda(estadisticas.ingresosMes)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="sm:col-span-2 lg:col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Egresos del Mes</CardTitle>
-                <ArrowDownCircle className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg sm:text-2xl font-bold text-destructive">
-                  {formatearMoneda(estadisticas.egresosMes)}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="sm:col-span-2 lg:col-span-1">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium">Saldo del Mes</CardTitle>
-                <DollarSign className="h-4 w-4 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className={`text-lg sm:text-2xl font-bold ${estadisticas.saldoMes >= 0 ? 'text-success' : 'text-destructive'}`}>
-                  {formatearMoneda(estadisticas.saldoMes)}
-                </div>
               </CardContent>
             </Card>
           </div>
         )}
 
-        {/* Botones de Acción */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Play className="h-5 w-5" />
+        {/* Acciones Rápidas - Mobile Optimized */}
+        <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+          <CardHeader className="p-3 md:p-6 bg-gradient-to-r from-primary/5 to-primary/10">
+            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+              <div className="p-1.5 md:p-2 rounded-lg bg-primary/10">
+                <Play className="h-3.5 w-3.5 md:h-5 md:w-5 text-primary" />
+              </div>
               Acciones del Sistema
             </CardTitle>
           </CardHeader>
-          <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-            <Button 
-              onClick={() => ejecutarAccion(
-                () => generarDesdeEnero2025(user?.uid || 'sistema'),
-                'Backfill completado desde enero 2025'
-              )}
-              disabled={procesando}
-              variant="default"
-              size="sm"
-              className="justify-start"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Generar Desde Enero 2025</span>
-              <span className="sm:hidden">Generar 2025</span>
-            </Button>
+          <CardContent className="p-3 md:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+              <Button 
+                onClick={() => ejecutarAccion(
+                  () => generarDesdeEnero2025(user?.uid || 'sistema'),
+                  'Backfill completado desde enero 2025'
+                )}
+                disabled={procesando}
+                variant="default"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
+              >
+                <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">Generar Desde 2025</span>
+              </Button>
 
-            <Button 
-              onClick={() => ejecutarAccion(
-                () => generarMesActual(user?.uid || 'sistema'),
-                'Mes actual generado correctamente'
-              )}
-              disabled={procesando}
-              variant="outline"
-              size="sm"
-              className="justify-start"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Generar Mes Actual</span>
-              <span className="sm:hidden">Mes Actual</span>
-            </Button>
+              <Button 
+                onClick={() => ejecutarAccion(
+                  () => generarMesActual(user?.uid || 'sistema'),
+                  'Mes actual generado correctamente'
+                )}
+                disabled={procesando}
+                variant="outline"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
+              >
+                <RefreshCw className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">Mes Actual</span>
+              </Button>
 
-            <Button 
-              onClick={() => ejecutarAccion(
-                ejecutarCierreMensualV2,
-                'Cierre mensual ejecutado correctamente'
-              )}
-              disabled={procesando}
-              variant="destructive"
-              size="sm"
-              className="justify-start"
-            >
-              <UserCheck className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Ejecutar Cierre</span>
-              <span className="sm:hidden">Cierre</span>
-            </Button>
+              <Button 
+                onClick={() => ejecutarAccion(
+                  ejecutarCierreMensualV2,
+                  'Cierre mensual ejecutado correctamente'
+                )}
+                disabled={procesando}
+                variant="destructive"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
+              >
+                <UserCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">Ejecutar Cierre</span>
+              </Button>
 
-            <Button 
-              onClick={async () => {
-                try {
-                  const reporte = await obtenerReporteDeudores();
-                  
-                  if (reporte.length === 0) {
+              <Button 
+                onClick={async () => {
+                  try {
+                    const reporte = await obtenerReporteDeudores();
+                    
+                    if (reporte.length === 0) {
+                      toast({
+                        title: "Sin deudores",
+                        description: "No hay empadronados con deudas pendientes"
+                      });
+                      return;
+                    }
+
+                    // Crear CSV del reporte
+                    const csvHeaders = "Nombre,Apellidos,Padron,Deuda Total,Periodos Vencidos,Estado\n";
+                    const csvData = reporte.map(item => 
+                      `"${item.nombre}","${item.apellidos}","${item.numeroPadron}","${item.deudaTotal.toFixed(2)}","${item.periodosVencidos.join(', ')}","${item.esMoroso ? 'Moroso' : 'Pendiente'}"`
+                    ).join('\n');
+
+                    const blob = new Blob([csvHeaders + csvData], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `reporte_deudores_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+
                     toast({
-                      title: "Sin deudores",
-                      description: "No hay empadronados con deudas pendientes"
+                      title: "Reporte generado",
+                      description: `Se encontraron ${reporte.length} deudores`
                     });
-                    return;
+                  } catch (error) {
+                    toast({
+                      title: "Error",
+                      description: "Error generando el reporte",
+                      variant: "destructive"
+                    });
                   }
-
-                  // Crear CSV del reporte
-                  const csvHeaders = "Nombre,Apellidos,Padron,Deuda Total,Periodos Vencidos,Estado\n";
-                  const csvData = reporte.map(item => 
-                    `"${item.nombre}","${item.apellidos}","${item.numeroPadron}","${item.deudaTotal.toFixed(2)}","${item.periodosVencidos.join(', ')}","${item.esMoroso ? 'Moroso' : 'Pendiente'}"`
-                  ).join('\n');
-
-                  const blob = new Blob([csvHeaders + csvData], { type: 'text/csv' });
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `reporte_deudores_${new Date().toISOString().split('T')[0]}.csv`;
-                  a.click();
-                  window.URL.revokeObjectURL(url);
-
-                  toast({
-                    title: "Reporte generado",
-                    description: `Se encontraron ${reporte.length} deudores`
-                  });
-                } catch (error) {
-                  toast({
-                    title: "Error",
-                    description: "Error generando el reporte",
-                    variant: "destructive"
-                  });
-                }
-              }}
-              disabled={procesando}
-              variant="secondary"
-              size="sm"
-              className="justify-start"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Exportar Deudores</span>
-              <span className="sm:hidden">Exportar</span>
-            </Button>
-          </div>
+                }}
+                disabled={procesando}
+                variant="secondary"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
+              >
+                <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">Exportar</span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Tabs principales */}
-        <Tabs defaultValue="asociados" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
-            <TabsTrigger value="asociados" className="text-xs sm:text-sm py-2">
-              <span className="hidden sm:inline">Asociados</span>
-              <span className="sm:hidden">Asoc</span>
+        {/* Tabs principales - Mobile Optimized */}
+        <Tabs defaultValue="asociados" className="space-y-3 md:space-y-4">
+          <TabsList className="grid w-full grid-cols-5 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
+            <TabsTrigger 
+              value="asociados" 
+              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+            >
+              <Users className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
+              <span className="hidden md:inline">Asociados</span>
             </TabsTrigger>
-            <TabsTrigger value="pagos" className="text-xs sm:text-sm py-2">
-              <span className="hidden sm:inline">Pagos Recientes</span>
-              <span className="sm:hidden">Pagos</span>
+            <TabsTrigger 
+              value="pagos" 
+              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+            >
+              <CreditCard className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
+              <span className="hidden md:inline">Pagos</span>
             </TabsTrigger>
-            <TabsTrigger value="bandeja" className="text-xs sm:text-sm py-2">
-              <span className="hidden sm:inline">Bandeja Economía</span>
-              <span className="sm:hidden">Bandeja</span>
+            <TabsTrigger 
+              value="bandeja" 
+              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+            >
+              <FileText className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
+              <span className="hidden md:inline">Bandeja</span>
             </TabsTrigger>
-            <TabsTrigger value="egresos" className="text-xs sm:text-sm py-2">
-              <span className="hidden sm:inline">Egresos</span>
-              <span className="sm:hidden">Egres</span>
+            <TabsTrigger 
+              value="egresos" 
+              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+            >
+              <ArrowDownCircle className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
+              <span className="hidden md:inline">Egresos</span>
             </TabsTrigger>
-            <TabsTrigger value="configuracion" className="text-xs sm:text-sm py-2">
-              <span className="hidden sm:inline">Configuración</span>
-              <span className="sm:hidden">Config</span>
+            <TabsTrigger 
+              value="configuracion" 
+              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+            >
+              <Settings className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
+              <span className="hidden md:inline">Config</span>
             </TabsTrigger>
           </TabsList>
 
