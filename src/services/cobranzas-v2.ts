@@ -322,23 +322,34 @@ export async function registrarPagoV2(
     const montoFinal = Math.max(0, monto - descuentoProntoPago);
 
     // Crear el pago (en estado pendiente de aprobación)
+    // IMPORTANTE: Firebase RTDB no acepta undefined, solo incluir propiedades con valores
     const pagoRef = push(ref(db, `${BASE_PATH}/pagos`));
-    const pago: PagoV2 = {
+    const pago: any = {
       id: pagoRef.key!,
       chargeId: charge.id,
       empadronadoId: charge.empadronadoId,
       periodo: charge.periodo,
       monto: montoFinal,
       montoOriginal: monto,
-      descuentoProntoPago: descuentoProntoPago > 0 ? descuentoProntoPago : undefined,
       metodoPago: metodoPago as any,
-      numeroOperacion,
       fechaPagoRegistrada,
       fechaCreacion: Date.now(),
-      observaciones,
-      estado: 'pendiente',
-      archivoComprobante
+      estado: 'pendiente'
     };
+
+    // Solo agregar propiedades opcionales si tienen valores
+    if (descuentoProntoPago > 0) {
+      pago.descuentoProntoPago = descuentoProntoPago;
+    }
+    if (numeroOperacion) {
+      pago.numeroOperacion = numeroOperacion;
+    }
+    if (observaciones) {
+      pago.observaciones = observaciones;
+    }
+    if (archivoComprobante) {
+      pago.archivoComprobante = archivoComprobante;
+    }
 
     await set(pagoRef, pago);
 
