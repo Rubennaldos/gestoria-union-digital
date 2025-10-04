@@ -305,41 +305,73 @@ const Empadronados: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
-            <Home className="w-4 h-4" />
-            Inicio
+    <div className="p-3 md:p-6 space-y-3 md:space-y-6">
+      {/* Header - Mobile Optimized */}
+      <div className="flex flex-col gap-3 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/')} 
+            className="gap-1.5 h-8 md:h-9 px-2 md:px-3"
+          >
+            <Home className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="text-xs md:text-sm">Inicio</span>
           </Button>
-          <div className="h-6 w-px bg-border" />
+          <div className="h-4 md:h-6 w-px bg-border" />
           <div>
-            <h1 className="text-2xl font-bold">Padrón de Asociados</h1>
-            <p className="text-muted-foreground">Gestión completa del registro de asociados</p>
+            <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              Padrón de Asociados
+            </h1>
+            <p className="text-[10px] md:text-sm text-muted-foreground hidden sm:block">
+              Gestión completa del registro de asociados
+            </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setShowFilters(!showFilters)}>
-            <Search className="h-4 w-4 mr-2" />
-            Filtros
+        {/* Action Buttons - Mobile Grid */}
+        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <Search className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden sm:inline">Filtros</span>
           </Button>
 
-          <Button variant="outline" onClick={() => setCorreosAccesoOpen(true)}>
-            <Mail className="h-4 w-4 mr-2" />
-            Correos con Acceso
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setCorreosAccesoOpen(true)}
+            className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <Mail className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden sm:inline">Accesos</span>
           </Button>
 
-          {/* XLSX: Exportar / Importar */}
-          <Button variant="outline" onClick={onExportXLSX}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar plantilla (Excel)
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={onExportXLSX}
+            className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <Download className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden sm:inline">Exportar</span>
           </Button>
-          <Button variant="outline" onClick={onClickImportXLSX} disabled={importing}>
-            <Upload className="h-4 w-4 mr-2" />
-            {importing ? 'Importando…' : 'Importar cambios (Excel)'}
+          
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={onClickImportXLSX} 
+            disabled={importing}
+            className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <Upload className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden sm:inline">{importing ? 'Importando…' : 'Importar'}</span>
           </Button>
+          
           <input
             ref={fileRef}
             type="file"
@@ -348,84 +380,99 @@ const Empadronados: React.FC = () => {
             onChange={onFileSelected}
           />
 
-          <Button onClick={() => navigate('/padron/nuevo')}>
-            <UserPlus className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={() => navigate('/padron/nuevo')}
+            size="sm"
+            className="col-span-2 h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <UserPlus className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
             Nuevo Empadronado
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Empadronados</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+      {/* Stats Cards - Modern & Compact */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+        <Card className="border-l-4 border-l-primary hover:shadow-md transition-all duration-300 animate-fade-in">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Total</CardTitle>
+            <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">{stats.habilitados} habilitados</p>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold">{stats.total}</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground">{stats.habilitados} habilitados</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Residentes Activos</CardTitle>
-            <Home className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-l-4 border-l-green-500 hover:shadow-md transition-all duration-300 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Activos</CardTitle>
+            <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-green-500/10 flex items-center justify-center">
+              <Home className="h-3.5 w-3.5 md:h-4 md:w-4 text-green-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.viven}</div>
-            <p className="text-xs text-muted-foreground">Viven en la asociación</p>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold">{stats.viven}</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground">Residen aquí</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Viviendas Construidas</CardTitle>
-            <Construction className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-l-4 border-l-blue-500 hover:shadow-md transition-all duration-300 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Viviendas</CardTitle>
+            <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <Construction className="h-3.5 w-3.5 md:h-4 md:w-4 text-blue-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.construida}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.construccion} en construcción, {stats.terreno} solo terreno
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold">{stats.construida}</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground">
+              {stats.construccion} constr., {stats.terreno} terreno
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Distribución</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+        <Card className="border-l-4 border-l-purple-500 hover:shadow-md transition-all duration-300 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 md:p-4">
+            <CardTitle className="text-xs md:text-sm font-medium">Género</CardTitle>
+            <div className="h-7 w-7 md:h-8 md:w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
+              <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-purple-600" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.masculinos}M / {stats.femeninos}F</div>
-            <p className="text-xs text-muted-foreground">Masculinos / Femeninos</p>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
+            <div className="text-xl md:text-2xl font-bold">{stats.masculinos}M / {stats.femeninos}F</div>
+            <p className="text-[10px] md:text-xs text-muted-foreground">Distribución</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters Panel */}
+      {/* Filters Panel - Compact */}
       {showFilters && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Filtros de Búsqueda</CardTitle>
+        <Card className="animate-fade-in">
+          <CardHeader className="p-3 md:p-4 bg-gradient-to-r from-primary/5 to-primary/10">
+            <CardTitle className="text-sm md:text-lg">Filtros de Búsqueda</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <CardContent className="space-y-3 md:space-y-4 p-3 md:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4">
               <div>
-                <Label htmlFor="search">Buscar</Label>
+                <Label htmlFor="search" className="text-xs md:text-sm">Buscar</Label>
                 <Input
                   id="search"
-                  placeholder="Nombre, apellidos, padrón, DNI o familia..."
+                  placeholder="Nombre, DNI, padrón..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-8 md:h-10 text-xs md:text-sm"
                 />
               </div>
 
               <div>
-                <Label>Estado</Label>
+                <Label className="text-xs md:text-sm">Estado</Label>
                 <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="habilitado">Habilitados</SelectItem>
@@ -435,9 +482,11 @@ const Empadronados: React.FC = () => {
               </div>
 
               <div>
-                <Label>Vivienda</Label>
+                <Label className="text-xs md:text-sm">Vivienda</Label>
                 <Select value={filterVivienda} onValueChange={(value: any) => setFilterVivienda(value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="construida">Construida</SelectItem>
@@ -448,9 +497,11 @@ const Empadronados: React.FC = () => {
               </div>
 
               <div>
-                <Label>Residencia</Label>
+                <Label className="text-xs md:text-sm">Residencia</Label>
                 <Select value={filterVive} onValueChange={(value: any) => setFilterVive(value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 md:h-10 text-xs md:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="si">Vive aquí</SelectItem>
@@ -460,25 +511,44 @@ const Empadronados: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 md:gap-4">
               <div>
-                <Label htmlFor="manzana">Manzana</Label>
-                <Input id="manzana" placeholder="Filtrar por manzana..." value={filterManzana} onChange={(e) => setFilterManzana(e.target.value)} />
+                <Label htmlFor="manzana" className="text-xs md:text-sm">Manzana</Label>
+                <Input 
+                  id="manzana" 
+                  placeholder="Manzana..." 
+                  value={filterManzana} 
+                  onChange={(e) => setFilterManzana(e.target.value)} 
+                  className="h-8 md:h-10 text-xs md:text-sm"
+                />
               </div>
 
               <div>
-                <Label htmlFor="lote">Lote</Label>
-                <Input id="lote" placeholder="Filtrar por lote..." value={filterLote} onChange={(e) => setFilterLote(e.target.value)} />
+                <Label htmlFor="lote" className="text-xs md:text-sm">Lote</Label>
+                <Input 
+                  id="lote" 
+                  placeholder="Lote..." 
+                  value={filterLote} 
+                  onChange={(e) => setFilterLote(e.target.value)} 
+                  className="h-8 md:h-10 text-xs md:text-sm"
+                />
               </div>
 
               <div>
-                <Label htmlFor="etapa">Etapa</Label>
-                <Input id="etapa" placeholder="Filtrar por etapa..." value={filterEtapa} onChange={(e) => setFilterEtapa(e.target.value)} />
+                <Label htmlFor="etapa" className="text-xs md:text-sm">Etapa</Label>
+                <Input 
+                  id="etapa" 
+                  placeholder="Etapa..." 
+                  value={filterEtapa} 
+                  onChange={(e) => setFilterEtapa(e.target.value)} 
+                  className="h-8 md:h-10 text-xs md:text-sm"
+                />
               </div>
 
               <div className="flex items-end">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => {
                     setSearchTerm('');
                     setFilterStatus('all');
@@ -488,9 +558,9 @@ const Empadronados: React.FC = () => {
                     setFilterLote('');
                     setFilterEtapa('');
                   }}
-                  className="w-full"
+                  className="w-full h-8 md:h-10 text-xs md:text-sm transition-all hover:scale-105"
                 >
-                  Limpiar Filtros
+                  Limpiar
                 </Button>
               </div>
             </div>
@@ -498,93 +568,109 @@ const Empadronados: React.FC = () => {
         </Card>
       )}
 
-      {/* Results count */}
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-muted-foreground">
-          Mostrando {filteredEmpadronados.length} de {stats.total} empadronados
+      {/* Results count - Compact */}
+      <div className="flex justify-between items-center px-1">
+        <p className="text-xs md:text-sm text-muted-foreground">
+          <span className="font-semibold">{filteredEmpadronados.length}</span> de {stats.total}
         </p>
-        <Button variant="outline" size="sm" onClick={onExportXLSX}>
-          <Download className="h-4 w-4 mr-2" />
-          Exportar
-        </Button>
       </div>
 
-      {/* Table */}
-      <Card>
+      {/* Table - Mobile Optimized */}
+      <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Padrón</TableHead>
-                <TableHead>Nombre Completo</TableHead>
-                <TableHead>DNI</TableHead>
-                <TableHead>Email Acceso</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Vivienda</TableHead>
-                <TableHead>Vive</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEmpadronados.map((empadronado) => (
-                <TableRow key={empadronado.id}>
-                  <TableCell className="font-medium">{empadronado.numeroPadron}</TableCell>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
-                      <p className="text-sm text-muted-foreground">{empadronado.familia}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>{empadronado.dni}</TableCell>
-                  <TableCell>
-                    {empadronado.emailAcceso ? (
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium text-green-600">{empadronado.emailAcceso}</div>
-                        <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gradient-to-r from-primary/5 to-primary/10">
+                  <TableHead className="text-xs md:text-sm">Padrón</TableHead>
+                  <TableHead className="text-xs md:text-sm">Nombre</TableHead>
+                  <TableHead className="hidden md:table-cell text-xs md:text-sm">DNI</TableHead>
+                  <TableHead className="hidden lg:table-cell text-xs md:text-sm">Email Acceso</TableHead>
+                  <TableHead className="text-xs md:text-sm">Estado</TableHead>
+                  <TableHead className="hidden sm:table-cell text-xs md:text-sm">Vivienda</TableHead>
+                  <TableHead className="text-xs md:text-sm">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredEmpadronados.map((empadronado, idx) => (
+                  <TableRow 
+                    key={empadronado.id}
+                    className="hover:bg-muted/50 transition-colors animate-fade-in"
+                    style={{ animationDelay: `${idx * 0.02}s` }}
+                  >
+                    <TableCell className="font-medium text-xs md:text-sm py-2 md:py-4">
+                      {empadronado.numeroPadron}
+                    </TableCell>
+                    <TableCell className="py-2 md:py-4">
+                      <div>
+                        <p className="font-medium text-xs md:text-sm">
+                          {empadronado.nombre} {empadronado.apellidos}
+                        </p>
+                        <p className="text-[10px] md:text-xs text-muted-foreground">
+                          {empadronado.familia}
+                        </p>
                       </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">Sin acceso</div>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={empadronado.habilitado ? 'default' : 'secondary'}>
-                      {empadronado.habilitado ? 'Habilitado' : 'Deshabilitado'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getViviendaIcon(empadronado.estadoVivienda)}
-                      <Badge className={getViviendaColor(empadronado.estadoVivienda)}>
-                        {empadronado.estadoVivienda === 'construida' ? 'Construida'
-                          : empadronado.estadoVivienda === 'construccion' ? 'En Construcción'
-                            : 'Solo Terreno'}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-xs md:text-sm py-2 md:py-4">
+                      {empadronado.dni}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell py-2 md:py-4">
+                      {empadronado.emailAcceso ? (
+                        <div className="space-y-1">
+                          <div className="text-xs md:text-sm font-medium text-green-600">
+                            {empadronado.emailAcceso}
+                          </div>
+                          <Badge variant="secondary" className="text-[10px] md:text-xs">
+                            Activa
+                          </Badge>
+                        </div>
+                      ) : (
+                        <div className="text-xs md:text-sm text-muted-foreground">Sin acceso</div>
+                      )}
+                    </TableCell>
+                    <TableCell className="py-2 md:py-4">
+                      <Badge 
+                        variant={empadronado.habilitado ? 'default' : 'secondary'}
+                        className="text-[10px] md:text-xs"
+                      >
+                        {empadronado.habilitado ? 'Sí' : 'No'}
                       </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={empadronado.vive ? 'default' : 'outline'}>
-                      {empadronado.vive ? 'Sí' : 'No'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Sheet>
-                        <SheetTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={() => setSelectedEmpadronado(empadronado)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </SheetTrigger>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell py-2 md:py-4">
+                      <div className="flex items-center gap-1.5">
+                        {getViviendaIcon(empadronado.estadoVivienda)}
+                        <Badge className={`${getViviendaColor(empadronado.estadoVivienda)} text-[10px] md:text-xs`}>
+                          {empadronado.estadoVivienda === 'construida' ? 'Constr.'
+                            : empadronado.estadoVivienda === 'construccion' ? 'En Constr.'
+                              : 'Terreno'}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2 md:py-4">
+                      <div className="flex gap-1">
+                        <Sheet>
+                          <SheetTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setSelectedEmpadronado(empadronado)}
+                              className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
+                            >
+                              <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                            </Button>
+                          </SheetTrigger>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedEmpadronado(empadronado);
-                            setGestionarPermisosOpen(true);
-                          }}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedEmpadronado(empadronado);
+                              setGestionarPermisosOpen(true);
+                            }}
+                            className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
+                          >
+                            <Settings className="h-3 w-3 md:h-4 md:w-4" />
+                          </Button>
 
                         <SheetContent className="w-[600px] sm:w-[800px]">
                           {selectedEmpadronado && (
@@ -842,8 +928,13 @@ const Empadronados: React.FC = () => {
                         </SheetContent>
                       </Sheet>
 
-                      <Button variant="ghost" size="sm" onClick={() => navigate(`/padron/editar/${empadronado.id}`)}>
-                        <Edit3 className="h-4 w-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => navigate(`/padron/editar/${empadronado.id}`)}
+                        className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
+                      >
+                        <Edit3 className="h-3 w-3 md:h-4 md:w-4" />
                       </Button>
 
                       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -855,8 +946,9 @@ const Empadronados: React.FC = () => {
                               setSelectedEmpadronado(empadronado);
                               setShowDeleteDialog(true);
                             }}
+                            className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -921,6 +1013,7 @@ const Empadronados: React.FC = () => {
               ))}
             </TableBody>
           </Table>
+          </div>
 
           {filteredEmpadronados.length === 0 && (
             <div className="p-8 text-center">
