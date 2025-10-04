@@ -106,11 +106,12 @@ export const BotonEmergencia = () => {
         <DialogTrigger asChild>
           <Button 
             variant="destructive" 
-            size="lg"
-            className="bg-red-600 hover:bg-red-700 text-white animate-pulse"
+            size="sm"
+            className="bg-red-600 hover:bg-red-700 text-white animate-pulse h-8 md:h-10 px-2 md:px-4 text-xs md:text-sm"
           >
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            EMERGENCIA
+            <AlertTriangle className="h-3.5 w-3.5 md:h-5 md:w-5 md:mr-2" />
+            <span className="hidden sm:inline">EMERGENCIA</span>
+            <span className="sm:hidden ml-1">EMERG</span>
           </Button>
         </DialogTrigger>
         

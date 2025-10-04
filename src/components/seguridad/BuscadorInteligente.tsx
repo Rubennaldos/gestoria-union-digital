@@ -155,89 +155,103 @@ export const BuscadorInteligente = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Buscador de Personas */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-6">
+      {/* Buscador de Personas - Mobile Optimized */}
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+        <CardHeader className="p-3 md:p-6 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+            <div className="p-1.5 md:p-2 rounded-lg bg-primary/10">
+              <Search className="h-3.5 w-3.5 md:h-5 md:w-5 text-primary" />
+            </div>
             Buscador Inteligente
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             Busque por nombre, apellido o número de identidad
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-3 md:p-6 space-y-3 md:space-y-4">
           <div className="flex gap-2">
             <Input
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               placeholder="DNI, nombre o apellido"
-              className="flex-1"
+              className="flex-1 text-sm md:text-base h-9 md:h-10"
             />
-            <Button onClick={buscarPersona}>
-              <Search className="h-4 w-4" />
+            <Button onClick={buscarPersona} size="sm" className="h-9 md:h-10 px-3 md:px-4">
+              <Search className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </div>
 
           {resultadoBusqueda && (
-            <div className="space-y-3">
+            <div className="space-y-3 animate-fade-in">
               {resultadoBusqueda.encontrado ? (
-                <div className="border rounded-lg p-4 space-y-3">
+                <div className="border rounded-lg p-3 md:p-4 space-y-3 bg-gradient-to-br from-background to-muted/20">
                   <div className="flex items-center gap-2">
-                    <User className="h-5 w-5 text-green-600" />
-                    <h4 className="font-medium">{resultadoBusqueda.datos.nombre}</h4>
+                    <div className="p-1.5 rounded-full bg-green-500/10">
+                      <User className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
+                    </div>
+                    <h4 className="font-medium text-sm md:text-base">{resultadoBusqueda.datos.nombre}</h4>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-xs md:text-sm">
                     <div>
                       <span className="font-medium">DNI:</span>
-                      <p>{resultadoBusqueda.datos.dni}</p>
+                      <p className="text-muted-foreground">{resultadoBusqueda.datos.dni}</p>
                     </div>
                     <div>
                       <span className="font-medium">Teléfono:</span>
-                      <p>{resultadoBusqueda.datos.telefono}</p>
+                      <p className="text-muted-foreground">{resultadoBusqueda.datos.telefono}</p>
                     </div>
                     <div className="col-span-2">
                       <span className="font-medium">Dirección:</span>
-                      <p>{resultadoBusqueda.datos.direccion}</p>
+                      <p className="text-muted-foreground">{resultadoBusqueda.datos.direccion}</p>
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
-                    <Badge className={resultadoBusqueda.datos.esResidente ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                  <div className="flex flex-wrap gap-1.5 md:gap-2">
+                    <Badge className={`text-[10px] md:text-xs ${resultadoBusqueda.datos.esResidente ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {resultadoBusqueda.datos.esResidente ? 'RESIDENTE' : 'NO RESIDENTE'}
                     </Badge>
-                    <Badge className={resultadoBusqueda.datos.esAportante ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}>
+                    <Badge className={`text-[10px] md:text-xs ${resultadoBusqueda.datos.esAportante ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                       {resultadoBusqueda.datos.esAportante ? 'APORTANTE' : 'NO APORTANTE'}
                     </Badge>
                   </div>
 
                   <Button 
-                    className="w-full"
+                    className="w-full text-xs md:text-sm h-9 md:h-10 hover:scale-105 transition-transform"
                     disabled={!resultadoBusqueda.datos.esResidente}
                   >
-                    {resultadoBusqueda.datos.esResidente ? 'Autorizar Ingreso' : 'Ingreso No Autorizado'}
+                    {resultadoBusqueda.datos.esResidente ? (
+                      <>
+                        <CheckCircle className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                        Autorizar Ingreso
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                        Ingreso No Autorizado
+                      </>
+                    )}
                   </Button>
                 </div>
               ) : (
-                <div className="border rounded-lg p-4 space-y-3">
+                <div className="border rounded-lg p-3 md:p-4 space-y-3 bg-orange-50/50">
                   <div className="flex items-center gap-2 text-orange-600">
-                    <XCircle className="h-5 w-5" />
-                    <h4 className="font-medium">Usuario no encontrado</h4>
+                    <XCircle className="h-4 w-4 md:h-5 md:w-5" />
+                    <h4 className="font-medium text-sm md:text-base">Usuario no encontrado</h4>
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs md:text-sm text-muted-foreground">
                     No se encontró información para: {busqueda}
                   </p>
                   
                   <Dialog open={mostrarRegistroNuevo} onOpenChange={setMostrarRegistroNuevo}>
                     <DialogTrigger asChild>
-                      <Button className="w-full">
-                        <UserPlus className="h-4 w-4 mr-2" />
+                      <Button className="w-full text-xs md:text-sm h-9 md:h-10 hover:scale-105 transition-transform">
+                        <UserPlus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
                         Registrar Nuevo Usuario
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-md mx-auto">
                       <DialogHeader>
                         <DialogTitle>Registrar Nuevo Usuario</DialogTitle>
                         <DialogDescription>
@@ -302,69 +316,89 @@ export const BuscadorInteligente = () => {
         </CardContent>
       </Card>
 
-      {/* Reconocimiento de Placas */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5" />
+      {/* Reconocimiento de Placas - Mobile Optimized */}
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+        <CardHeader className="p-3 md:p-6 bg-gradient-to-r from-blue-500/5 to-blue-500/10">
+          <CardTitle className="flex items-center gap-2 text-sm md:text-base">
+            <div className="p-1.5 md:p-2 rounded-lg bg-blue-500/10">
+              <Camera className="h-3.5 w-3.5 md:h-5 md:w-5 text-blue-600" />
+            </div>
             Reconocimiento de Placas
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             Active la cámara para reconocer placas automáticamente
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-3 md:p-6 space-y-3 md:space-y-4">
           <div className="flex gap-2">
             <Input
               value={placaBuscada}
               onChange={(e) => setPlacaBuscada(e.target.value.toUpperCase())}
               placeholder="ABC-123 (opcional)"
-              className="flex-1"
+              className="flex-1 text-sm md:text-base h-9 md:h-10"
             />
-            <Button onClick={reconocerPlaca}>
-              <Camera className="h-4 w-4" />
+            <Button onClick={reconocerPlaca} size="sm" className="h-9 md:h-10 px-3 md:px-4">
+              <Camera className="h-3.5 w-3.5 md:h-4 md:w-4" />
             </Button>
           </div>
 
-          <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
-            <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground mb-4">
+          <div className="border-2 border-dashed border-muted rounded-lg p-6 md:p-8 text-center bg-gradient-to-br from-background to-muted/20">
+            <Camera className="h-10 w-10 md:h-12 md:w-12 text-muted-foreground mx-auto mb-3 md:mb-4" />
+            <p className="text-xs md:text-sm text-muted-foreground mb-3 md:mb-4">
               Función de reconocimiento automático
             </p>
-            <Button variant="outline" onClick={reconocerPlaca}>
+            <Button 
+              variant="outline" 
+              onClick={reconocerPlaca}
+              size="sm"
+              className="text-xs md:text-sm h-9 md:h-10 hover:scale-105 transition-transform"
+            >
+              <Camera className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
               Activar Cámara
             </Button>
           </div>
 
           {resultadoPlaca && (
-            <div className="border rounded-lg p-4 space-y-3">
+            <div className="border rounded-lg p-3 md:p-4 space-y-3 bg-gradient-to-br from-background to-blue-50/20 animate-fade-in">
               <div className="flex items-center gap-2">
-                <Car className="h-5 w-5 text-blue-600" />
-                <h4 className="font-medium">Placa: {resultadoPlaca.placa}</h4>
+                <div className="p-1.5 rounded-full bg-blue-500/10">
+                  <Car className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+                </div>
+                <h4 className="font-medium text-sm md:text-base">Placa: {resultadoPlaca.placa}</h4>
               </div>
               
-              <div className="text-sm">
+              <div className="text-xs md:text-sm">
                 <span className="font-medium">Propietario:</span>
-                <p>{resultadoPlaca.propietario}</p>
+                <p className="text-muted-foreground">{resultadoPlaca.propietario}</p>
               </div>
 
-              <div className="flex gap-2">
-                <Badge className={resultadoPlaca.esResidente ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+              <div className="flex flex-wrap gap-1.5 md:gap-2">
+                <Badge className={`text-[10px] md:text-xs ${resultadoPlaca.esResidente ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                   {resultadoPlaca.esResidente ? 'RESIDENTE' : 'NO RESIDENTE'}
                 </Badge>
-                <Badge className={resultadoPlaca.esAportante ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}>
+                <Badge className={`text-[10px] md:text-xs ${resultadoPlaca.esAportante ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                   {resultadoPlaca.esAportante ? 'APORTANTE' : 'NO APORTANTE'}
                 </Badge>
-                <Badge className={resultadoPlaca.vigente ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                <Badge className={`text-[10px] md:text-xs ${resultadoPlaca.vigente ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                   {resultadoPlaca.vigente ? 'VIGENTE' : 'VENCIDO'}
                 </Badge>
               </div>
 
               <Button 
-                className="w-full"
+                className="w-full text-xs md:text-sm h-9 md:h-10 hover:scale-105 transition-transform"
                 disabled={!resultadoPlaca.esResidente || !resultadoPlaca.vigente}
               >
-                {resultadoPlaca.esResidente && resultadoPlaca.vigente ? 'Autorizar Ingreso' : 'Ingreso No Autorizado'}
+                {resultadoPlaca.esResidente && resultadoPlaca.vigente ? (
+                  <>
+                    <CheckCircle className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                    Autorizar Ingreso
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5" />
+                    Ingreso No Autorizado
+                  </>
+                )}
               </Button>
             </div>
           )}
