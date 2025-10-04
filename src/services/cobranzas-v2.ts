@@ -265,6 +265,8 @@ export async function registrarPagoV2(
   chargeId: string,
   monto: number,
   metodoPago: string,
+  fechaPagoRegistrada: number,
+  archivoComprobante?: string,
   numeroOperacion?: string,
   observaciones?: string
 ): Promise<PagoV2> {
@@ -319,7 +321,7 @@ export async function registrarPagoV2(
 
     const montoFinal = Math.max(0, monto - descuentoProntoPago);
 
-    // Crear el pago
+    // Crear el pago (en estado pendiente de aprobación)
     const pagoRef = push(ref(db, `${BASE_PATH}/pagos`));
     const pago: PagoV2 = {
       id: pagoRef.key!,
@@ -331,22 +333,17 @@ export async function registrarPagoV2(
       descuentoProntoPago: descuentoProntoPago > 0 ? descuentoProntoPago : undefined,
       metodoPago: metodoPago as any,
       numeroOperacion,
-      fechaPago: Date.now(),
+      fechaPagoRegistrada,
       fechaCreacion: Date.now(),
-      observaciones
+      observaciones,
+      estado: 'pendiente',
+      archivoComprobante
     };
 
     await set(pagoRef, pago);
 
-    // Actualizar el cargo
-    const nuevoSaldo = Math.max(0, charge.saldo - montoFinal);
-    const updates: any = {
-      montoPagado: charge.montoPagado + montoFinal,
-      saldo: nuevoSaldo,
-      estado: nuevoSaldo === 0 ? 'pagado' : 'pendiente'
-    };
-
-    await update(ref(db, chargePath), updates);
+    // NO actualizar el cargo aún, esperamos la aprobación
+    // El cargo se actualizará cuando se apruebe el pago
 
     // Crear índice anti-duplicados
     const indexRef = ref(db, `${BASE_PATH}/pagos_index/${charge.empadronadoId}/${charge.periodo}`);
@@ -469,7 +466,7 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
       const allPagos = pagosSnapshot.val();
       for (const pagoId in allPagos) {
         const pago: PagoV2 = allPagos[pagoId];
-        const pagoDate = new Date(pago.fechaPago);
+        const pagoDate = new Date(pago.fechaPagoRegistrada);
         
         if (pagoDate.getMonth() + 1 === currentMonth && pagoDate.getFullYear() === currentYear) {
           recaudadoMes += pago.monto;
@@ -602,7 +599,7 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
     }
 
     const pagosData = pagosSnapshot.val();
-    return (Object.values(pagosData) as PagoV2[]).sort((a, b) => b.fechaPago - a.fechaPago);
+    return (Object.values(pagosData) as PagoV2[]).sort((a, b) => b.fechaPagoRegistrada - a.fechaPagoRegistrada);
   } catch (error) {
     console.error("Error obteniendo pagos V2:", error);
     return [];

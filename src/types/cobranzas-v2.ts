@@ -36,9 +36,12 @@ export interface PagoV2 {
   descuentoProntoPago?: number;
   metodoPago: 'efectivo' | 'transferencia' | 'yape' | 'plin';
   numeroOperacion?: string;
-  fechaPago: number;
-  fechaCreacion: number;
+  fechaPagoRegistrada: number; // Fecha que el usuario indica que pagó
+  fechaCreacion: number; // Fecha que se registró en el sistema
   observaciones?: string;
+  estado: 'pendiente' | 'aprobado' | 'rechazado';
+  archivoComprobante?: string; // URL del archivo adjunto
+  motivoRechazo?: string;
 }
 
 export interface IngresoV2 {

@@ -213,7 +213,7 @@ export default function CobranzasV2() {
 
   const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => {
     try {
-      await registrarPagoV2(chargeId, monto, metodoPago, numeroOperacion, observaciones);
+      await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
       
       toast({
         title: "Pago registrado",
@@ -871,6 +871,8 @@ export default function CobranzasV2() {
                           cargo.id,
                           nuevoPago.monto,
                           nuevoPago.metodoPago,
+                          Date.now(),
+                          undefined,
                           nuevoPago.numeroOperacion || undefined,
                           nuevoPago.observaciones || undefined
                         );
@@ -925,7 +927,7 @@ export default function CobranzasV2() {
                               {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              Período: {pago.periodo} | {formatearFecha(pago.fechaPago)}
+                              Período: {pago.periodo} | {formatearFecha(pago.fechaPagoRegistrada)}
                             </div>
                             {pago.descuentoProntoPago && (
                               <div className="text-xs text-green-600">
@@ -1015,7 +1017,7 @@ export default function CobranzasV2() {
                                 Pago - {emp ? `${emp.nombre} ${emp.apellidos}` : 'N/A'}
                               </div>
                               <div className="text-sm text-muted-foreground">
-                                {formatearFecha(pago.fechaPago)} | Período: {pago.periodo}
+                                {formatearFecha(pago.fechaPagoRegistrada)} | Período: {pago.periodo}
                               </div>
                             </div>
                           </div>

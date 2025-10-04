@@ -47,9 +47,12 @@ const PagosCuotas = () => {
   const [metodoPago, setMetodoPago] = useState<string>("");
   const [numeroOperacion, setNumeroOperacion] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  const [fechaPago, setFechaPago] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
 
   // Modal de confirmación
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pagoEnviado, setPagoEnviado] = useState(false);
 
   // Calcular deuda usando el motor
   const deudaCalculada = useDeudaAsociado(empadronado || {});
@@ -159,10 +162,10 @@ const PagosCuotas = () => {
       return;
     }
 
-    if (!metodoPago || !numeroOperacion) {
+    if (!metodoPago || !numeroOperacion || !fechaPago || !archivoComprobante) {
       toast({
         title: "Error", 
-        description: "Completa todos los campos requeridos",
+        description: "Completa todos los campos requeridos (incluyendo archivo)",
         variant: "destructive"
       });
       return;
@@ -175,45 +178,71 @@ const PagosCuotas = () => {
     try {
       setProcesandoPago(true);
 
-      // Registrar pago para cada charge seleccionado
+      if (!archivoComprobante || !empadronado) {
+        throw new Error("Falta archivo o empadronado");
+      }
+
+      // Subir archivo primero
+      const { subirComprobanteCobranza } = await import('@/services/storage');
       const chargesArray = Array.from(chargesSeleccionados);
+      const primerCharge = charges.find(c => c.id === chargesArray[0]);
+      
+      if (!primerCharge) throw new Error("Cargo no encontrado");
+
+      const archivoUrl = await subirComprobanteCobranza(
+        empadronado.id,
+        primerCharge.periodo,
+        archivoComprobante
+      );
+
+      // Registrar pago para cada charge seleccionado
+      const fechaPagoTimestamp = new Date(fechaPago).getTime();
       
       for (const chargeId of chargesArray) {
         const charge = charges.find(c => c.id === chargeId);
         if (charge) {
           await registrarPagoV2(
             chargeId,
-            charge.saldo, // pagar el saldo completo
+            charge.saldo,
             metodoPago as any,
+            fechaPagoTimestamp,
+            archivoUrl,
             numeroOperacion,
             observaciones
           );
         }
       }
 
+      // Marcar como enviado
+      setPagoEnviado(true);
+
       toast({
-        title: "✅ Pago registrado exitosamente",
-        description: `Se registraron ${chargesArray.length} pago(s)`,
+        title: "✅ Pago enviado",
+        description: "Tu pago está siendo revisado. Recibirás una confirmación pronto.",
       });
 
-      // Limpiar formulario y recargar datos
+      // Limpiar formulario
       setChargesSeleccionados(new Set());
       setMetodoPago("");
       setNumeroOperacion("");
       setObservaciones("");
-      setShowConfirmModal(false);
+      setFechaPago(new Date().toISOString().split('T')[0]);
+      setArchivoComprobante(null);
       
-      // Recargar datos
-      await cargarDatos();
+      // Esperar 2 segundos para mostrar el mensaje y luego cerrar
+      setTimeout(() => {
+        setShowConfirmModal(false);
+        setPagoEnviado(false);
+        cargarDatos();
+      }, 2000);
 
     } catch (error) {
       console.error('Error registrando pago:', error);
       toast({
         title: "Error",
-        description: "No se pudo registrar el pago",
+        description: error instanceof Error ? error.message : "No se pudo registrar el pago",
         variant: "destructive"
       });
-    } finally {
       setProcesandoPago(false);
     }
   };
@@ -427,74 +456,117 @@ const PagosCuotas = () => {
                   </DialogTrigger>
                   <DialogContent className="max-w-md mx-auto">
                     <DialogHeader>
-                      <DialogTitle>Registrar Pago</DialogTitle>
+                      <DialogTitle>
+                        {pagoEnviado ? "⏳ Esperando Confirmación" : "Registrar Pago"}
+                      </DialogTitle>
                     </DialogHeader>
                     
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Método de Pago *</Label>
-                        <Select value={metodoPago} onValueChange={setMetodoPago}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar método" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="efectivo">Efectivo</SelectItem>
-                            <SelectItem value="transferencia">Transferencia</SelectItem>
-                            <SelectItem value="yape">Yape</SelectItem>
-                            <SelectItem value="plin">Plin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    {pagoEnviado ? (
+                      <div className="py-8 text-center">
+                        <div className="text-6xl mb-4">⏳</div>
+                        <h3 className="text-lg font-semibold mb-2">
+                          Tu pago está siendo revisado
+                        </h3>
+                        <p className="text-muted-foreground">
+                          Recibirás una confirmación en tu historial de pagos
+                        </p>
                       </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div>
+                          <Label>Fecha de Pago *</Label>
+                          <Input
+                            type="date"
+                            value={fechaPago}
+                            onChange={(e) => setFechaPago(e.target.value)}
+                            max={new Date().toISOString().split('T')[0]}
+                          />
+                        </div>
 
-                      <div>
-                        <Label>Número de Operación *</Label>
-                        <Input
-                          value={numeroOperacion}
-                          onChange={(e) => setNumeroOperacion(e.target.value)}
-                          placeholder="Ingresa el número de operación"
-                        />
-                      </div>
+                        <div>
+                          <Label>Método de Pago *</Label>
+                          <Select value={metodoPago} onValueChange={setMetodoPago}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar método" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="efectivo">Efectivo</SelectItem>
+                              <SelectItem value="transferencia">Transferencia</SelectItem>
+                              <SelectItem value="yape">Yape</SelectItem>
+                              <SelectItem value="plin">Plin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      <div>
-                        <Label>Observaciones (opcional)</Label>
-                        <Input
-                          value={observaciones}
-                          onChange={(e) => setObservaciones(e.target.value)}
-                          placeholder="Notas adicionales"
-                        />
-                      </div>
+                        <div>
+                          <Label>Número de Operación *</Label>
+                          <Input
+                            value={numeroOperacion}
+                            onChange={(e) => setNumeroOperacion(e.target.value)}
+                            placeholder="Ingresa el número de operación"
+                          />
+                        </div>
 
-                      <div className="bg-muted p-4 rounded-lg">
-                        <h4 className="font-semibold mb-2">Resumen del Pago</h4>
-                        <div className="text-sm space-y-1">
-                          <div className="flex justify-between">
-                            <span>Cargos seleccionados:</span>
-                            <span>{chargesSeleccionados.size}</span>
-                          </div>
-                          <div className="flex justify-between font-semibold">
-                            <span>Total a pagar:</span>
-                            <span>S/ {totalSeleccionado.toFixed(2)}</span>
+                        <div>
+                          <Label>Comprobante de Pago * (PDF o JPG)</Label>
+                          <Input
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={(e) => setArchivoComprobante(e.target.files?.[0] || null)}
+                            className="cursor-pointer"
+                          />
+                          {archivoComprobante && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              ✓ {archivoComprobante.name} ({(archivoComprobante.size / 1024).toFixed(0)} KB)
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label>Observaciones (opcional)</Label>
+                          <Input
+                            value={observaciones}
+                            onChange={(e) => setObservaciones(e.target.value)}
+                            placeholder="Notas adicionales"
+                          />
+                        </div>
+
+                        <div className="bg-muted p-4 rounded-lg">
+                          <h4 className="font-semibold mb-2">Resumen del Pago</h4>
+                          <div className="text-sm space-y-1">
+                            <div className="flex justify-between">
+                              <span>Cargos seleccionados:</span>
+                              <span>{chargesSeleccionados.size}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold">
+                              <span>Total a pagar:</span>
+                              <span>S/ {totalSeleccionado.toFixed(2)}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowConfirmModal(false)}
-                          className="flex-1"
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          onClick={confirmarPago}
-                          disabled={procesandoPago}
-                          className="flex-1"
-                        >
-                          {procesandoPago ? "Procesando..." : "Confirmar Pago"}
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowConfirmModal(false);
+                              setArchivoComprobante(null);
+                            }}
+                            className="flex-1"
+                            disabled={procesandoPago}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            onClick={confirmarPago}
+                            disabled={procesandoPago}
+                            className="flex-1"
+                          >
+                            {procesandoPago ? "Procesando..." : "Confirmar Pago"}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>
@@ -518,48 +590,75 @@ const PagosCuotas = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {pagos.map((pago) => (
-                  <div key={pago.id} className="p-4 border rounded-lg">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-semibold">
-                          Pago - {formatPeriodo(pago.periodo)}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(pago.fechaPago).toLocaleDateString('es-PE')} • {pago.metodoPago}
-                        </p>
+                {pagos.map((pago) => {
+                  const getBadgeEstado = () => {
+                    switch (pago.estado) {
+                      case 'aprobado':
+                        return <Badge variant="default" className="bg-green-600"><CheckCircle className="h-3 w-3 mr-1" />Aprobado</Badge>;
+                      case 'rechazado':
+                        return <Badge variant="destructive"><AlertCircle className="h-3 w-3 mr-1" />Rechazado</Badge>;
+                      default:
+                        return <Badge variant="secondary"><AlertCircle className="h-3 w-3 mr-1" />Pendiente</Badge>;
+                    }
+                  };
+
+                  return (
+                    <div key={pago.id} className="p-4 border rounded-lg">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-semibold">
+                            Pago - {formatPeriodo(pago.periodo)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(pago.fechaPagoRegistrada).toLocaleDateString('es-PE')} • {pago.metodoPago}
+                          </p>
+                        </div>
+                        {getBadgeEstado()}
                       </div>
-                      <Badge variant="default">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Confirmado
-                      </Badge>
-                    </div>
-                    
-                    <div className="text-sm space-y-1">
-                      <div className="flex justify-between">
-                        <span>Monto:</span>
-                        <span className="font-semibold">S/ {pago.monto.toFixed(2)}</span>
-                      </div>
-                      {pago.numeroOperacion && (
+                      
+                      <div className="text-sm space-y-1">
                         <div className="flex justify-between">
-                          <span>N° Operación:</span>
-                          <span>{pago.numeroOperacion}</span>
+                          <span>Monto:</span>
+                          <span className="font-semibold">S/ {pago.monto.toFixed(2)}</span>
                         </div>
-                      )}
-                      {pago.descuentoProntoPago && pago.descuentoProntoPago > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Descuento aplicado:</span>
-                          <span>- S/ {pago.descuentoProntoPago.toFixed(2)}</span>
-                        </div>
-                      )}
-                      {pago.observaciones && (
-                        <div className="mt-2 p-2 bg-muted rounded text-xs">
-                          <strong>Nota:</strong> {pago.observaciones}
-                        </div>
-                      )}
+                        {pago.numeroOperacion && (
+                          <div className="flex justify-between">
+                            <span>N° Operación:</span>
+                            <span>{pago.numeroOperacion}</span>
+                          </div>
+                        )}
+                        {pago.descuentoProntoPago && pago.descuentoProntoPago > 0 && (
+                          <div className="flex justify-between text-green-600">
+                            <span>Descuento aplicado:</span>
+                            <span>- S/ {pago.descuentoProntoPago.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {pago.archivoComprobante && (
+                          <div className="mt-2">
+                            <a 
+                              href={pago.archivoComprobante} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline"
+                            >
+                              📎 Ver comprobante
+                            </a>
+                          </div>
+                        )}
+                        {pago.estado === 'rechazado' && pago.motivoRechazo && (
+                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+                            <strong>Motivo del rechazo:</strong> {pago.motivoRechazo}
+                          </div>
+                        )}
+                        {pago.observaciones && (
+                          <div className="mt-2 p-2 bg-muted rounded text-xs">
+                            <strong>Nota:</strong> {pago.observaciones}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

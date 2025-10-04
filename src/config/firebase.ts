@@ -3,6 +3,7 @@ import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFirestore } from "firebase/firestore"; // 👈 Firestore
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBXcToF3ieWgLHOoVE44vShZS5whV4U1Xw",
@@ -23,6 +24,9 @@ export const db = getDatabase(app);
 
 // Firestore (nuevo, para las rutas como bootstrap/ y companias/.../configuracion/)
 export const fs = getFirestore(app);
+
+// Storage (para archivos)
+export const storage = getStorage(app);
 
 // (Opcional) App secundaria para aislar auth admin si la usas
 const existingAdmin = getApps().find((a) => a.name === "AdminApp");
