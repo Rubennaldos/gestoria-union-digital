@@ -11,49 +11,43 @@ import {
   obtenerTrabajadoresPorEmpadronado, 
   obtenerProveedoresPorEmpadronado 
 } from "@/services/acceso";
-import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function HistorialTab() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [visitas, setVisitas] = useState<RegistroVisita[]>([]);
   const [trabajadores, setTrabajadores] = useState<RegistroTrabajadores[]>([]);
   const [proveedores, setProveedores] = useState<RegistroProveedor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [empadronadoId, setEmpadronadoId] = useState<string | null>(null);
   const [noVinculado, setNoVinculado] = useState(false);
 
+  const empadronadoId = profile?.empadronadoId || "";
+
   useEffect(() => {
-    cargarHistorial();
-  }, [user]);
+    if (empadronadoId) {
+      cargarHistorial();
+    } else {
+      setLoading(false);
+      setNoVinculado(true);
+    }
+  }, [empadronadoId]);
 
   const cargarHistorial = async () => {
     try {
       setLoading(true);
       setNoVinculado(false);
 
-      if (!user?.uid) {
+      if (!empadronadoId) {
         setNoVinculado(true);
         return;
       }
-
-      // Obtener el empadronado vinculado al usuario autenticado
-      const empadronado = await obtenerEmpadronadoPorAuthUid(user.uid);
-      
-      if (!empadronado) {
-        console.log('Usuario no vinculado a ningún empadronado');
-        setNoVinculado(true);
-        return;
-      }
-
-      setEmpadronadoId(empadronado.id);
       
       // Cargar historial solo del empadronado actual
       const [visitasData, trabajadoresData, proveedoresData] = await Promise.all([
-        obtenerVisitasPorEmpadronado(empadronado.id),
-        obtenerTrabajadoresPorEmpadronado(empadronado.id),
-        obtenerProveedoresPorEmpadronado(empadronado.id)
+        obtenerVisitasPorEmpadronado(empadronadoId),
+        obtenerTrabajadoresPorEmpadronado(empadronadoId),
+        obtenerProveedoresPorEmpadronado(empadronadoId)
       ]);
 
       setVisitas(visitasData);
