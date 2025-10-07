@@ -13,6 +13,8 @@ import { ref, push, set, get } from "firebase/database";
 import { db } from "@/config/firebase";
 import { obtenerMaestrosObra } from "@/services/acceso";
 import { MaestroObra } from "@/types/acceso";
+import { ListaSanciones } from "./ListaSanciones";
+import { DetalleSancionModal } from "./DetalleSancionModal";
 
 export const SancionesSeguridad = () => {
   const { user } = useAuth();
@@ -21,6 +23,9 @@ export const SancionesSeguridad = () => {
   const [tipoSancion, setTipoSancion] = useState("amonestacion");
   const [maestrosObra, setMaestrosObra] = useState<MaestroObra[]>([]);
   const [loadingMaestros, setLoadingMaestros] = useState(false);
+  const [sancionSeleccionada, setSancionSeleccionada] = useState<any>(null);
+  const [detalleOpen, setDetalleOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const [formData, setFormData] = useState({
     entidadId: "",
@@ -99,27 +104,37 @@ export const SancionesSeguridad = () => {
       const newSancionRef = push(sancionesRef);
       const numeroSancion = `SAN-${Date.now().toString().slice(-6)}`;
       
-      const sancionData = {
+      const sancionData: any = {
         id: newSancionRef.key,
         numeroSancion,
         numeroResolucion,
         tipoEntidad,
         entidadId: formData.entidadId || newSancionRef.key,
         entidadNombre: formData.entidadNombre.trim(),
-        entidadDocumento: formData.entidadDocumento.trim() || undefined,
         tipoSancion,
         motivo: formData.motivo.trim(),
         descripcion: formData.descripcion.trim(),
-        montoMulta: formData.montoMulta ? parseFloat(formData.montoMulta) : undefined,
         fechaAplicacion: new Date().toISOString(),
-        fechaVencimiento: formData.fechaVencimiento || undefined,
         estado: "activa",
         aplicadoPor: user?.uid,
         aplicadoPorNombre: user?.email || "Sistema",
-        observaciones: formData.observaciones.trim() || undefined,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+      
+      // Agregar campos opcionales solo si tienen valor
+      if (formData.entidadDocumento.trim()) {
+        sancionData.entidadDocumento = formData.entidadDocumento.trim();
+      }
+      if (formData.montoMulta && parseFloat(formData.montoMulta) > 0) {
+        sancionData.montoMulta = parseFloat(formData.montoMulta);
+      }
+      if (formData.fechaVencimiento) {
+        sancionData.fechaVencimiento = formData.fechaVencimiento;
+      }
+      if (formData.observaciones.trim()) {
+        sancionData.observaciones = formData.observaciones.trim();
+      }
 
       await set(newSancionRef, sancionData);
 
@@ -143,6 +158,7 @@ export const SancionesSeguridad = () => {
       toast.success("Sanción registrada exitosamente");
       setModalOpen(false);
       resetForm();
+      setRefreshKey(prev => prev + 1); // Recargar lista
     } catch (error) {
       toast.error("Error al registrar la sanción");
       console.error(error);
@@ -347,15 +363,21 @@ export const SancionesSeguridad = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            <Ban className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Registre sanciones para empadronados y maestros de obra</p>
-            <p className="text-sm mt-2">
-              Las multas se integrarán automáticamente con el módulo de Cobranzas V2
-            </p>
-          </div>
+          <ListaSanciones 
+            key={refreshKey}
+            onVerDetalle={(sancion) => {
+              setSancionSeleccionada(sancion);
+              setDetalleOpen(true);
+            }} 
+          />
         </CardContent>
       </Card>
+
+      <DetalleSancionModal
+        sancion={sancionSeleccionada}
+        open={detalleOpen}
+        onOpenChange={setDetalleOpen}
+      />
     </div>
   );
 };
