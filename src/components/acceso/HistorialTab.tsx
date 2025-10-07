@@ -193,7 +193,7 @@ export function HistorialTab() {
                           {visita.placa && <p><strong>Placa:</strong> {visita.placa}</p>}
                           <p><strong>Visitantes:</strong></p>
                           <ul className="ml-4 space-y-1">
-                            {visita.visitantes.map((visitante, index) => (
+                            {Array.isArray(visita.visitantes) && visita.visitantes.map((visitante, index) => (
                               <li key={index}>• {visitante.nombre} (DNI: {visitante.dni})</li>
                             ))}
                             {visita.menores > 0 && (
@@ -233,7 +233,7 @@ export function HistorialTab() {
                           <p><strong>Tipo:</strong> {registro.tipoAcceso}</p>
                           {registro.placa && <p><strong>Placa:</strong> {registro.placa}</p>}
                           <p><strong>Maestro de Obra ID:</strong> {registro.maestroObraId}</p>
-                          {registro.trabajadores.length > 0 && (
+                          {Array.isArray(registro.trabajadores) && registro.trabajadores.length > 0 && (
                             <>
                               <p><strong>Trabajadores adicionales:</strong></p>
                               <ul className="ml-4 space-y-1">
