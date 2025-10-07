@@ -7,13 +7,20 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Car, User, Star, Send, Clock } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Plus, Car, User, Star, Send, Clock, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
+import { MaestroObraRapidoModal } from "@/components/acceso/MaestroObraRapidoModal";
 import { registrarTrabajadores, enviarMensajeWhatsApp, obtenerMaestrosObra } from "@/services/acceso";
 import { Trabajador, MaestroObra } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
-import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
 
 export function TrabajadoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
@@ -22,32 +29,28 @@ export function TrabajadoresTab() {
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [maestrosObra, setMaestrosObra] = useState<MaestroObra[]>([]);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
-
-  const [empadronadoId, setEmpadronadoId] = useState<string>("");
-  const [cargandoEmp, setCargandoEmp] = useState(true);
+  const [mostrarModalRapido, setMostrarModalRapido] = useState(false);
 
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+
+  // Usar empadronadoId directamente del perfil
+  const empadronadoId = profile?.empadronadoId || "";
+  const cargandoEmp = !profile;
 
   useEffect(() => { void cargarMaestrosObra(); }, []);
   const cargarMaestrosObra = async () => {
     try { setMaestrosObra(await obtenerMaestrosObra()); } catch (e) { console.error(e); }
   };
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setCargandoEmp(true);
-      try {
-        if (!user?.uid) { setEmpadronadoId(""); return; }
-        const emp = await obtenerEmpadronadoPorAuthUid(user.uid);
-        if (alive) setEmpadronadoId(emp?.id ?? "");
-      } finally {
-        if (alive) setCargandoEmp(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [user?.uid]);
+  const handleMaestroCreado = async (maestroId: string) => {
+    await cargarMaestrosObra();
+    setMaestroObraId(maestroId);
+    toast({
+      title: "Maestro de obra seleccionado",
+      description: "Puede continuar con el registro de trabajadores",
+    });
+  };
 
   const agregarTrabajador = () =>
     setTrabajadores((prev) => [...prev, { id: Date.now().toString(), nombre: "", dni: "", esMaestroObra: false }]);
@@ -69,11 +72,6 @@ export function TrabajadoresTab() {
     }
     if (!maestroObraId) {
       toast({ title: "Error", description: "Debe seleccionar un maestro de obra", variant: "destructive" });
-      return false;
-    }
-    const maestro = maestrosObra.find((m) => m.id === maestroObraId);
-    if (!maestro?.autorizado) {
-      toast({ title: "Error", description: "El maestro de obra seleccionado no está autorizado", variant: "destructive" });
       return false;
     }
     return true;
@@ -132,19 +130,59 @@ export function TrabajadoresTab() {
           <Separator />
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Label className="text-base font-medium">Maestro de Obra *</Label>
-              <Button type="button" variant="outline" size="sm" onClick={() => { /* abre tu modal si quieres */ }}>
-                Nuevo Maestro
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMostrarModalRapido(true)}
+                className="flex items-center gap-2 hover:scale-105 transition-transform"
+              >
+                <Zap className="h-4 w-4" />
+                Acceso Rápido
               </Button>
             </div>
-            <Input value={maestroObraId} onChange={(e) => setMaestroObraId(e.target.value)} placeholder="ID del maestro de obra" />
+            
+            <Select value={maestroObraId} onValueChange={setMaestroObraId}>
+              <SelectTrigger className="w-full h-11 bg-background">
+                <SelectValue placeholder="Buscar el nombre del maestro de obra" />
+              </SelectTrigger>
+              <SelectContent className="bg-background z-50">
+                {maestrosObra.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground text-center">
+                    No hay maestros de obra registrados
+                  </div>
+                ) : (
+                  maestrosObra.map((maestro) => (
+                    <SelectItem key={maestro.id} value={maestro.id}>
+                      <div className="flex items-center justify-between w-full gap-3">
+                        <span className="font-medium">{maestro.nombre}</span>
+                        {maestro.dni && (
+                          <span className="text-xs text-muted-foreground">DNI: {maestro.dni}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
 
-            {maestroObraId && (
-              <div className="p-3 border rounded-lg">
-                {maestrosObra.find((m) => m.id === maestroObraId)?.autorizado
-                  ? <Badge>Autorizado</Badge>
-                  : <Badge variant="destructive">No Autorizado</Badge>}
+            {maestroObraId && maestrosObra.find((m) => m.id === maestroObraId) && (
+              <div className="p-3 border rounded-lg bg-muted/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">
+                    {maestrosObra.find((m) => m.id === maestroObraId)?.nombre}
+                  </span>
+                  <Badge variant={maestrosObra.find((m) => m.id === maestroObraId)?.activo ? "default" : "destructive"}>
+                    {maestrosObra.find((m) => m.id === maestroObraId)?.activo ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
+                {maestrosObra.find((m) => m.id === maestroObraId)?.dni && (
+                  <p className="text-xs text-muted-foreground">
+                    DNI: {maestrosObra.find((m) => m.id === maestroObraId)?.dni}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -194,6 +232,12 @@ export function TrabajadoresTab() {
             <p className="text-sm text-muted-foreground">Su solicitud ha sido enviada.</p>
           </div>
         }
+      />
+
+      <MaestroObraRapidoModal
+        open={mostrarModalRapido}
+        onOpenChange={setMostrarModalRapido}
+        onCreated={handleMaestroCreado}
       />
     </div>
   );

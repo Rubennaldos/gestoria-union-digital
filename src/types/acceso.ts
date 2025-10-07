@@ -32,12 +32,20 @@ export interface RegistroVisita {
 export interface MaestroObra {
   id: string;
   nombre: string;
-  apellidos: string;
-  telefono: string;
-  empresa: string;
-  sexo: "masculino" | "femenino";
+  dni?: string;
+  telefono?: string;
+  empresa?: string;
+  notas?: string;
+  activo?: boolean;
+  creadoPorUid?: string;
+  createdAt?: number;
+  updatedAt?: number;
+  
+  // Campos legacy (mantener por compatibilidad)
+  apellidos?: string;
+  sexo?: "masculino" | "femenino";
   fotoDni?: string;
-  autorizado: boolean;
+  autorizado?: boolean;
   fechaAutorizacion?: number;
   autorizadoPor?: string;
 }

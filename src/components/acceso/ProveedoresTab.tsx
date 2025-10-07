@@ -1,5 +1,5 @@
 // src/components/acceso/ProveedoresTab.tsx
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,33 +11,19 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { registrarProveedor, enviarMensajeWhatsApp } from "@/services/acceso";
 import { useAuth } from "@/contexts/AuthContext";
-import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
 
 export function ProveedoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placa, setPlaca] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
-  const [empadronadoId, setEmpadronadoId] = useState<string>("");
-  const [cargandoEmp, setCargandoEmp] = useState(true);
 
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setCargandoEmp(true);
-      try {
-        if (!user?.uid) { setEmpadronadoId(""); return; }
-        const emp = await obtenerEmpadronadoPorAuthUid(user.uid);
-        if (alive) setEmpadronadoId(emp?.id ?? "");
-      } finally {
-        if (alive) setCargandoEmp(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [user?.uid]);
+  // Usar empadronadoId directamente del perfil
+  const empadronadoId = profile?.empadronadoId || "";
+  const cargandoEmp = !profile;
 
   const serviciosRapidos = [
     { id: "gas", label: "Gas", icon: Zap, color: "bg-orange-500" },
