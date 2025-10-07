@@ -22,6 +22,7 @@ import {
   SortAsc,
   SortDesc,
   MessageCircle,
+  Trash2,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -53,6 +54,7 @@ import {
   registrarPagoV2,
   aprobarPagoV2,
   rechazarPagoV2,
+  eliminarPagoV2,
   crearIngresoV2,
   obtenerIngresosV2,
   obtenerReporteDeudores
@@ -1059,13 +1061,15 @@ export default function CobranzasV2() {
                       return (
                         <div 
                           key={pago.id} 
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                          onClick={() => {
-                            setPagoSeleccionado(pago);
-                            setShowRevisarPagoModal(true);
-                          }}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
-                          <div className="flex-1">
+                          <div 
+                            className="flex-1 cursor-pointer"
+                            onClick={() => {
+                              setPagoSeleccionado(pago);
+                              setShowRevisarPagoModal(true);
+                            }}
+                          >
                             <div className="font-medium">
                               {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
                             </div>
@@ -1089,6 +1093,32 @@ export default function CobranzasV2() {
                               </Badge>
                             </div>
                             {getBadgeEstado()}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm('¿Está seguro de eliminar este pago? Esta acción no se puede deshacer.')) {
+                                  try {
+                                    await eliminarPagoV2(pago.id);
+                                    toast({
+                                      title: "Pago eliminado",
+                                      description: "El pago ha sido eliminado correctamente"
+                                    });
+                                    await cargarDatos();
+                                  } catch (error: any) {
+                                    toast({
+                                      title: "Error",
+                                      description: error.message || "Error al eliminar el pago",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       );

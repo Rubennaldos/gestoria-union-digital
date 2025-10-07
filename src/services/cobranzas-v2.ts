@@ -777,6 +777,58 @@ export async function rechazarPagoV2(pagoId: string, motivoRechazo: string): Pro
   }
 }
 
+export async function eliminarPagoV2(pagoId: string): Promise<void> {
+  try {
+    // Obtener el pago
+    const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
+    const pagoSnapshot = await get(pagoRef);
+    
+    if (!pagoSnapshot.exists()) {
+      throw new Error("Pago no encontrado");
+    }
+
+    const pago: PagoV2 = pagoSnapshot.val();
+
+    // Si el pago fue aprobado, actualizar el charge
+    if (pago.estado === 'aprobado') {
+      const chargeRef = ref(db, `${BASE_PATH}/charges/${pago.periodo}/${pago.empadronadoId}/${pago.chargeId}`);
+      const chargeSnapshot = await get(chargeRef);
+      
+      if (chargeSnapshot.exists()) {
+        const charge: ChargeV2 = chargeSnapshot.val();
+        
+        // Revertir el pago del charge
+        const nuevoMontoPagado = charge.montoPagado - pago.monto;
+        const nuevoSaldo = charge.saldo + pago.monto;
+        const nuevoEstado = nuevoSaldo > 0 
+          ? (Date.now() > charge.fechaVencimiento ? 'moroso' : 'pendiente')
+          : 'pagado';
+        
+        await update(chargeRef, {
+          montoPagado: nuevoMontoPagado,
+          saldo: nuevoSaldo,
+          estado: nuevoEstado,
+          esMoroso: nuevoEstado === 'moroso'
+        });
+        
+        console.log('🔄 Charge actualizado al eliminar pago:', pago.chargeId);
+      }
+    }
+
+    // Eliminar el índice anti-duplicados
+    const indexRef = ref(db, `${BASE_PATH}/pagos_index/${pago.empadronadoId}/${pago.periodo}`);
+    await remove(indexRef);
+
+    // Eliminar el pago
+    await remove(pagoRef);
+
+    console.log('🗑️ Pago eliminado:', pagoId);
+  } catch (error) {
+    console.error("Error eliminando pago:", error);
+    throw error;
+  }
+}
+
 export async function obtenerChargesV2(): Promise<ChargeV2[]> {
   try {
     const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
