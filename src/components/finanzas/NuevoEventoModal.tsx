@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -194,6 +194,9 @@ export function NuevoEventoModal({ open, onOpenChange, onSuccess }: NuevoEventoM
             <Calendar className="h-5 w-5" />
             Registrar Nuevo Evento
           </DialogTitle>
+          <DialogDescription>
+            Ingresa los detalles del evento con sus ingresos y egresos
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
