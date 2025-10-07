@@ -2,21 +2,21 @@ import { ArrowLeft, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 
-type Props = {
+interface BackButtonProps {
   /** A dónde caer si no hay historial válido en la app */
   fallbackTo?: string;
   label?: string;
   className?: string;
   /** Si true, usa el ícono de Home en lugar de ArrowLeft */
   homeIcon?: boolean;
-};
+}
 
-export default function BackButton({
+const BackButton = ({
   fallbackTo = "/",
   label = "Inicio",
   className,
   homeIcon = true,
-}: Props) {
+}: BackButtonProps) => {
   const navigate = useNavigate();
 
   const handleClick = () => {
@@ -46,4 +46,6 @@ export default function BackButton({
       <span className="text-xs md:text-sm relative z-10">{label}</span>
     </Button>
   );
-}
+};
+
+export default BackButton;
