@@ -142,20 +142,22 @@ export function NuevoEventoModal({ open, onOpenChange, onSuccess }: NuevoEventoM
       
       descripcionDetallada += `BALANCE NETO: S/ ${balance.toFixed(2)}`;
 
-      await crearMovimientoFinanciero(
-        {
-          tipo,
-          categoria: "evento",
-          monto,
-          descripcion: descripcionDetallada,
-          fecha,
-          comprobantes: [],
-          registradoPor: "current-user", // Esto debería venir del contexto de auth
-          registradoPorNombre: "Usuario Actual",
-          observaciones: observaciones || undefined,
-        },
-        archivos
-      );
+      const movimientoData: any = {
+        tipo,
+        categoria: "evento",
+        monto,
+        descripcion: descripcionDetallada,
+        fecha,
+        comprobantes: [],
+        registradoPor: "current-user",
+        registradoPorNombre: "Usuario Actual",
+      };
+
+      if (observaciones && observaciones.trim()) {
+        movimientoData.observaciones = observaciones.trim();
+      }
+
+      await crearMovimientoFinanciero(movimientoData, archivos);
 
       toast({
         title: "Evento registrado",
