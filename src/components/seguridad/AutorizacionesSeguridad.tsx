@@ -3,10 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Clock, Users, UserCheck, Shield } from "lucide-react";
+import { Check, X, Clock, Users, UserCheck, Shield, Eye } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { cambiarEstadoAcceso } from "@/services/acceso";
+import { DetalleAutorizacionModal } from "./DetalleAutorizacionModal";
 
 // 👇 resolvemos info del vecino (nombre + padrón)
 import { getEmpadronado, getEmpadronados } from "@/services/empadronados";
@@ -61,6 +62,8 @@ export const AutorizacionesSeguridad = () => {
   const { toast } = useToast();
   const [autorizaciones, setAutorizaciones] = useState<AutorizacionPendiente[]>([]);
   const [empMap, setEmpMap] = useState<Record<string, Empadronado | null>>({});
+  const [selectedAuth, setSelectedAuth] = useState<AutorizacionPendiente | null>(null);
+  const [detalleOpen, setDetalleOpen] = useState(false);
 
   const { data: visitas } = useFirebaseData<Record<string, RegistroVisita>>("acceso/visitas");
   const { data: trabajadores } =
@@ -366,6 +369,16 @@ export const AutorizacionesSeguridad = () => {
 
                     <div className="flex gap-2 pt-3 border-t">
                       <Button
+                        onClick={() => {
+                          setSelectedAuth(auth);
+                          setDetalleOpen(true);
+                        }}
+                        variant="outline"
+                        size="icon"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
                         onClick={() => manejarAutorizacion(auth.id, auth.tipo, true)}
                         className="flex-1 bg-green-600 hover:bg-green-700"
                       >
@@ -387,6 +400,17 @@ export const AutorizacionesSeguridad = () => {
             );
           })}
         </div>
+      )}
+
+      {selectedAuth && (
+        <DetalleAutorizacionModal
+          open={detalleOpen}
+          onOpenChange={setDetalleOpen}
+          tipo={selectedAuth.tipo}
+          data={selectedAuth.data}
+          empadronado={selectedAuth.empadronado}
+          fechaCreacion={selectedAuth.fechaCreacion}
+        />
       )}
     </div>
   );
