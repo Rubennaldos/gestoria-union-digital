@@ -31,7 +31,6 @@ jobs:
       - name: Build (con base para /pecaditos-web/)
         run: VITE_BASE=/pecaditos-web/ npm run build
 
-      # 👇 crea el 404.html para SPA/recargas
       - name: Add 404 for SPA
         run: cp dist/index.html dist/404.html
 

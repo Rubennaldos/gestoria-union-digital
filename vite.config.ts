@@ -8,8 +8,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  // Si se define VITE_BASE (Pages), úsalo. Si no, conserva tu lógica actual para Lovable.
-  base: process.env.VITE_BASE ?? (mode === "production" ? "./" : "/"),
+  // ✅ Para GitHub Pages:
+  // 1) Si VITE_BASE viene del workflow, úsalo.
+  // 2) Si no, en producción assume /pecaditos-web/ (nombre del repo).
+  // 3) En dev => "/"
+  base: process.env.VITE_BASE ?? (mode === "production" ? "/pecaditos-web/" : "/"),
+
   server: { host: "::", port: 8080 },
   build: { outDir: "dist", emptyOutDir: true, sourcemap: true },
   plugins: [react(), mode === "development" ? componentTagger() : null].filter(Boolean),
