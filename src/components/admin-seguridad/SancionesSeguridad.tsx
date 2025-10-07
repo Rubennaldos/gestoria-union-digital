@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Ban, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { ref, push, set } from "firebase/database";
+import { ref, push, set, get } from "firebase/database";
 import { db } from "@/config/firebase";
 import { obtenerMaestrosObra } from "@/services/acceso";
 import { MaestroObra } from "@/types/acceso";
@@ -30,7 +30,6 @@ export const SancionesSeguridad = () => {
     descripcion: "",
     montoMulta: "",
     fechaVencimiento: "",
-    resolucion: "",
     observaciones: "",
   });
 
@@ -76,13 +75,34 @@ export const SancionesSeguridad = () => {
 
     try {
       const sancionesRef = ref(db, "sanciones");
-      const newSancionRef = push(sancionesRef);
       
+      // Generar número de resolución correlativo automático
+      const sancionesSnap = await get(sancionesRef);
+      let ultimoNumero = 0;
+      if (sancionesSnap.exists()) {
+        const sanciones = Object.values(sancionesSnap.val());
+        sanciones.forEach((s: any) => {
+          if (s.numeroResolucion) {
+            const match = s.numeroResolucion.match(/RES-\d{4}-(\d+)/);
+            if (match) {
+              const num = parseInt(match[1]);
+              if (num > ultimoNumero) ultimoNumero = num;
+            }
+          }
+        });
+      }
+      
+      const year = new Date().getFullYear();
+      const siguienteNumero = ultimoNumero + 1;
+      const numeroResolucion = `RES-${year}-${siguienteNumero.toString().padStart(4, '0')}`;
+      
+      const newSancionRef = push(sancionesRef);
       const numeroSancion = `SAN-${Date.now().toString().slice(-6)}`;
       
       const sancionData = {
         id: newSancionRef.key,
         numeroSancion,
+        numeroResolucion,
         tipoEntidad,
         entidadId: formData.entidadId || newSancionRef.key,
         entidadNombre: formData.entidadNombre.trim(),
@@ -96,7 +116,6 @@ export const SancionesSeguridad = () => {
         estado: "activa",
         aplicadoPor: user?.uid,
         aplicadoPorNombre: user?.email || "Sistema",
-        resolucion: formData.resolucion.trim() || undefined,
         observaciones: formData.observaciones.trim() || undefined,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -139,7 +158,6 @@ export const SancionesSeguridad = () => {
       descripcion: "",
       montoMulta: "",
       fechaVencimiento: "",
-      resolucion: "",
       observaciones: "",
     });
     setTipoEntidad("empadronado");
@@ -294,13 +312,10 @@ export const SancionesSeguridad = () => {
                     </div>
                   )}
 
-                  <div>
-                    <Label htmlFor="resolucion">Número de Resolución</Label>
-                    <Input
-                      id="resolucion"
-                      value={formData.resolucion}
-                      onChange={(e) => setFormData({ ...formData, resolucion: e.target.value })}
-                    />
+                  <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                    <p className="text-muted-foreground">
+                      ℹ️ El <strong>Número de Resolución</strong> se generará automáticamente con formato: RES-{new Date().getFullYear()}-XXXX
+                    </p>
                   </div>
 
                   <div>
