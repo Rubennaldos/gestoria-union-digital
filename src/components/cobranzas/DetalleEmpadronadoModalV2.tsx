@@ -38,6 +38,7 @@ export default function DetalleEmpadronadoModalV2({
   charges,
   onRegistrarPago 
 }: DetalleEmpadronadoModalV2Props) {
+  const [activeTab, setActiveTab] = useState("estado-cuenta");
   const [nuevoPago, setNuevoPago] = useState({
     chargeId: '',
     monto: '',
@@ -198,31 +199,9 @@ export default function DetalleEmpadronadoModalV2({
             </CardContent>
           </Card>
 
-          {/* Link para compartir */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Link de Consulta</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input 
-                  value={generarLinkCompartir()} 
-                  readOnly 
-                  className="flex-1 text-xs sm:text-sm"
-                />
-                <Button onClick={copiarLink} variant="outline" size="sm">
-                  <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline ml-1">Copiar</span>
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Comparte este enlace con el asociado para que consulte su estado de cuenta
-              </p>
-            </CardContent>
-          </Card>
 
           {/* Tabs para detalles */}
-          <Tabs defaultValue="estado-cuenta" className="space-y-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-2 h-auto p-1">
               <TabsTrigger value="estado-cuenta" className="text-xs sm:text-sm py-2">
                 <span className="hidden sm:inline">Estado de Cuenta</span>
@@ -274,11 +253,16 @@ export default function DetalleEmpadronadoModalV2({
                             
                             <Button 
                               size="sm" 
-                              onClick={() => setNuevoPago(prev => ({ 
-                                ...prev, 
-                                chargeId: item.chargeId,
-                                monto: item.saldo.toString()
-                              }))}
+                              onClick={() => {
+                                setNuevoPago({
+                                  chargeId: item.chargeId,
+                                  monto: item.saldo.toString(),
+                                  metodoPago: '',
+                                  numeroOperacion: '',
+                                  observaciones: ''
+                                });
+                                setActiveTab("registrar-pago");
+                              }}
                               className="w-full sm:w-auto"
                             >
                               <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
