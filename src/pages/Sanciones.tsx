@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, Plus, Search, Filter, FileText, Eye, Edit, Trash2, Home } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
+import BackButton from "@/components/layout/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,33 +105,26 @@ const Sanciones = () => {
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <TopNavigation />
       
-      <main className="container mx-auto px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => window.location.href = '/'}
-              className="gap-2"
-            >
-              <Home className="w-4 h-4" />
-              Inicio
-            </Button>
-            <div className="h-6 w-px bg-border" />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <BackButton fallbackTo="/" />
+            <div className="h-4 md:h-6 w-px bg-border" />
             <div>
-              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
+              <h1 className="text-lg md:text-2xl font-bold text-foreground flex items-center gap-2 bg-gradient-to-r from-destructive to-destructive/60 bg-clip-text text-transparent">
+                <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-destructive" />
                 Sanciones
               </h1>
-              <p className="text-muted-foreground">Gestión de sanciones disciplinarias</p>
+              <p className="text-[10px] md:text-sm text-muted-foreground">Gestión de sanciones disciplinarias</p>
             </div>
           </div>
           <Button 
-            className="bg-destructive hover:bg-destructive/90"
+            size="sm"
+            className="bg-destructive hover:bg-destructive/90 h-8 md:h-9 text-xs md:text-sm"
             onClick={() => setShowNuevaSancionModal(true)}
           >
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-3 w-3 md:h-4 md:w-4 mr-1.5 md:mr-2" />
             Nueva Sanción
           </Button>
         </div>

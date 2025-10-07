@@ -15,6 +15,7 @@ import { obtenerCanchas, obtenerReservas, obtenerEstadisticas } from "@/services
 import { Cancha, Reserva, EstadisticasDeportes } from "@/types/deportes";
 import { toast } from "@/hooks/use-toast";
 import { TopNavigation } from "@/components/layout/Navigation";
+import BackButton from "@/components/layout/BackButton";
 
 export default function Deportes() {
   const [canchas, setCanchas] = useState<Cancha[]>([]);
@@ -130,14 +131,20 @@ export default function Deportes() {
     <div className="min-h-screen bg-background">
       <TopNavigation />
       
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-3 md:p-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Gestión Deportiva</h1>
-            <p className="text-muted-foreground">
-              Administra reservas, canchas y actividades deportivas
-            </p>
+          <div className="flex items-center gap-2 md:gap-4">
+            <BackButton fallbackTo="/" />
+            <div className="h-4 md:h-6 w-px bg-border" />
+            <div>
+              <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                Gestión Deportiva
+              </h1>
+              <p className="text-[10px] md:text-sm text-muted-foreground">
+                Administra reservas, canchas y actividades deportivas
+              </p>
+            </div>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-2">

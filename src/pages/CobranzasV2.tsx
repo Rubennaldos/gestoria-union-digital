@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
+import BackButton from "@/components/layout/BackButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -411,20 +412,26 @@ export default function CobranzasV2() {
       <main className="container mx-auto px-3 md:px-6 py-4 space-y-4 md:space-y-6">
         {/* Header - Mobile Optimized */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Cobranzas V2
-            </h1>
-            {procesando && (
-              <div className="flex items-center gap-1.5 text-primary">
-                <RefreshCw className="h-3.5 w-3.5 md:h-4 md:w-4 animate-spin" />
-                <span className="text-xs md:text-sm font-medium">Procesando...</span>
+          <div className="flex items-center gap-2 md:gap-4">
+            <BackButton fallbackTo="/" />
+            <div className="h-4 md:h-6 w-px bg-border" />
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  Cobranzas V2
+                </h1>
+                {procesando && (
+                  <div className="flex items-center gap-1.5 text-primary">
+                    <RefreshCw className="h-3.5 w-3.5 md:h-4 md:w-4 animate-spin" />
+                    <span className="text-xs md:text-sm font-medium">Procesando...</span>
+                  </div>
+                )}
               </div>
-            )}
+              <p className="text-[10px] md:text-sm text-muted-foreground">
+                Sistema de cobranzas mensual
+              </p>
+            </div>
           </div>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            Sistema de cobranzas mensual
-          </p>
         </div>
 
         {/* KPIs - Compact Mobile Design */}

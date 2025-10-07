@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import BackButton from '@/components/layout/BackButton';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -309,15 +310,7 @@ const Empadronados: React.FC = () => {
       {/* Header - Mobile Optimized */}
       <div className="flex flex-col gap-3 md:gap-4">
         <div className="flex items-center gap-2 md:gap-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/')} 
-            className="gap-1.5 h-8 md:h-9 px-2 md:px-3"
-          >
-            <Home className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="text-xs md:text-sm">Inicio</span>
-          </Button>
+          <BackButton fallbackTo="/" />
           <div className="h-4 md:h-6 w-px bg-border" />
           <div>
             <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
