@@ -83,6 +83,39 @@ export function HistorialTab() {
     }
   };
 
+  const formatFecha = (fecha: any) => {
+    try {
+      // Intentar convertir diferentes formatos de fecha
+      let date: Date;
+      
+      if (!fecha) {
+        return "Fecha no disponible";
+      }
+      
+      if (typeof fecha === 'number') {
+        // Es un timestamp
+        date = new Date(fecha);
+      } else if (typeof fecha === 'string') {
+        // Es una fecha en formato ISO
+        date = new Date(fecha);
+      } else if (fecha instanceof Date) {
+        date = fecha;
+      } else {
+        return "Fecha inválida";
+      }
+      
+      // Validar que la fecha es válida
+      if (isNaN(date.getTime())) {
+        return "Fecha inválida";
+      }
+      
+      return format(date, "dd/MM/yyyy 'a las' HH:mm", { locale: es });
+    } catch (error) {
+      console.error("Error al formatear fecha:", error, fecha);
+      return "Fecha inválida";
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -149,7 +182,7 @@ export function HistorialTab() {
                           <div className="flex items-center gap-2">
                             {getEstadoIcon(visita.estado)}
                             <span className="font-medium">
-                              {format(new Date(visita.fechaCreacion), "dd/MM/yyyy 'a las' HH:mm", { locale: es })}
+                              {formatFecha(visita.fechaCreacion || (visita as any).createdAt)}
                             </span>
                           </div>
                           {getEstadoBadge(visita.estado)}
@@ -190,7 +223,7 @@ export function HistorialTab() {
                           <div className="flex items-center gap-2">
                             {getEstadoIcon(registro.estado)}
                             <span className="font-medium">
-                              {format(new Date(registro.fechaCreacion), "dd/MM/yyyy 'a las' HH:mm", { locale: es })}
+                              {formatFecha(registro.fechaCreacion || (registro as any).createdAt)}
                             </span>
                           </div>
                           {getEstadoBadge(registro.estado)}
@@ -233,7 +266,7 @@ export function HistorialTab() {
                           <div className="flex items-center gap-2">
                             {getEstadoIcon(proveedor.estado)}
                             <span className="font-medium">
-                              {format(new Date(proveedor.fechaCreacion), "dd/MM/yyyy 'a las' HH:mm", { locale: es })}
+                              {formatFecha(proveedor.fechaCreacion || (proveedor as any).createdAt)}
                             </span>
                           </div>
                           {getEstadoBadge(proveedor.estado)}
