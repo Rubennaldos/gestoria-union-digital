@@ -21,6 +21,7 @@ import {
   Filter,
   SortAsc,
   SortDesc,
+  MessageCircle,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -33,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -59,6 +61,7 @@ import {
 import { getEmpadronados } from "@/services/empadronados";
 import DetalleEmpadronadoModalV2 from "@/components/cobranzas/DetalleEmpadronadoModalV2";
 import { RevisarPagoModal } from "@/components/cobranzas/RevisarPagoModal";
+import { EnvioWhatsAppMasivoModal } from "@/components/cobranzas/EnvioWhatsAppMasivoModal";
 
 import { 
   ConfiguracionCobranzasV2, 
@@ -96,6 +99,10 @@ export default function CobranzasV2() {
     numeroOperacion: '',
     observaciones: ''
   });
+
+  // Estados para selección y WhatsApp masivo
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   const [nuevoPago, setNuevoPago] = useState({
     empadronadoId: '',
@@ -780,9 +787,24 @@ export default function CobranzasV2() {
                     empadronadosFiltrados.map((emp) => {
                       const deuda = calcularDeudaEmpadronado(emp.id);
                       const moroso = esMoroso(emp.id);
+                      const isSelected = seleccionados.has(emp.id);
                       
                       return (
-                        <div key={emp.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div key={emp.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <Checkbox
+                            id={`select-${emp.id}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => {
+                              const newSeleccionados = new Set(seleccionados);
+                              if (checked) {
+                                newSeleccionados.add(emp.id);
+                              } else {
+                                newSeleccionados.delete(emp.id);
+                              }
+                              setSeleccionados(newSeleccionados);
+                            }}
+                          />
+                          
                           <div className="flex-1">
                             <div className="font-medium">{emp.nombre} {emp.apellidos}</div>
                             <div className="text-sm text-muted-foreground">
@@ -1458,6 +1480,18 @@ export default function CobranzasV2() {
         empadronado={pagoSeleccionado ? empadronados.find(e => e.id === pagoSeleccionado.empadronadoId) || null : null}
         onAprobar={handleAprobarPago}
         onRechazar={handleRechazarPago}
+      />
+
+      {/* Modal de envío masivo de WhatsApp */}
+      <EnvioWhatsAppMasivoModal
+        open={showWhatsAppModal}
+        onOpenChange={setShowWhatsAppModal}
+        empadronados={empadronados.filter(e => seleccionados.has(e.id))}
+        deudas={new Map(
+          empadronados
+            .filter(e => seleccionados.has(e.id))
+            .map(e => [e.id, calcularDeudaEmpadronado(e.id)])
+        )}
       />
     </div>
   );
