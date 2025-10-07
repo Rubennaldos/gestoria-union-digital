@@ -151,10 +151,10 @@ async function calcularResumenCaja(): Promise<ResumenCaja> {
     const cobranzasRef = ref(db, "cobranzas-v2/pagos");
     const snapshot = await get(cobranzasRef);
     if (snapshot.exists()) {
-      const pagos = Object.values(snapshot.val());
+      const pagos: any[] = Object.values(snapshot.val());
       saldoEsperado = pagos
         .filter((p: any) => p.estado === "pagado")
-        .reduce((sum, p: any) => sum + (p.monto || 0), 0);
+        .reduce((sum: number, p: any) => sum + (Number(p.monto) || 0), 0);
     }
   } catch (error) {
     console.error("Error al obtener saldo esperado:", error);

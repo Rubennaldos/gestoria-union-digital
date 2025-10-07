@@ -39,7 +39,8 @@ const moduleIcons: Record<string, any> = {
   "portal-asociado": UserCircle,
   acceso: UserCheck,
   pagosCuotas: CreditCard,
-  admin_seguridad: Shield
+  admin_seguridad: Shield,
+  finanzas: BarChart3
 };
 
 // Mapa de colores para los módulos
@@ -63,7 +64,8 @@ const moduleColors: Record<string, "primary" | "warning" | "success" | "secondar
   "portal-asociado": "primary",
   acceso: "secondary",
   pagosCuotas: "success",
-  admin_seguridad: "warning"
+  admin_seguridad: "warning",
+  finanzas: "success"
 };
 
 // Mapa de rutas para los módulos
@@ -87,7 +89,8 @@ const moduleRoutes: Record<string, string> = {
   "portal-asociado": "/portal-asociado",
   acceso: "/acceso",
   pagosCuotas: "/pagos-cuotas",
-  admin_seguridad: "/admin-seguridad"
+  admin_seguridad: "/admin-seguridad",
+  finanzas: "/finanzas"
 };
 
 const Index = () => {

@@ -30,6 +30,7 @@ import PortalAsociado from "./pages/PortalAsociado";
 import Acceso from "./pages/Acceso";
 import Seguridad from "./pages/Seguridad";
 import AdminSeguridad from "./pages/AdminSeguridad";
+import Finanzas from "./pages/Finanzas";
 
 const queryClient = new QueryClient();
 
@@ -219,6 +220,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <AdminSeguridad />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Finanzas */}
+              <Route
+                path="/finanzas"
+                element={
+                  <ProtectedRoute>
+                    <Finanzas />
                   </ProtectedRoute>
                 }
               />

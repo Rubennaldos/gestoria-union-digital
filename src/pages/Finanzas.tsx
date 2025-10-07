@@ -8,7 +8,7 @@ import { NuevoMovimientoModal } from "@/components/finanzas/NuevoMovimientoModal
 import { ListaMovimientos } from "@/components/finanzas/ListaMovimientos";
 import { DetalleMovimientoModal } from "@/components/finanzas/DetalleMovimientoModal";
 import { MovimientoFinanciero } from "@/types/finanzas";
-import { MiBreadcrumb } from "@/components/layout/MiBreadcrumb";
+import MiBreadcrumb from "@/components/layout/MiBreadcrumb";
 
 export default function Finanzas() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -40,12 +40,7 @@ export default function Finanzas() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <MiBreadcrumb
-            items={[
-              { label: "Inicio", href: "/inicio" },
-              { label: "Finanzas" },
-            ]}
-          />
+          <MiBreadcrumb paginaActual="Finanzas" />
           <h1 className="text-3xl font-bold mt-2">Gestión Financiera</h1>
           <p className="text-muted-foreground">
             Control de ingresos, egresos y caja de la asociación
