@@ -12,6 +12,7 @@ import { es } from "date-fns/locale";
 interface ListaMovimientosProps {
   onVerDetalle: (movimiento: MovimientoFinanciero) => void;
   refreshKey?: number;
+  filtroTipo?: "ingreso" | "egreso";
 }
 
 const categoriasLabels: Record<string, string> = {
@@ -33,18 +34,18 @@ const categoriasLabels: Record<string, string> = {
   otro: "Otro",
 };
 
-export const ListaMovimientos = ({ onVerDetalle, refreshKey }: ListaMovimientosProps) => {
+export const ListaMovimientos = ({ onVerDetalle, refreshKey, filtroTipo }: ListaMovimientosProps) => {
   const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     cargarMovimientos();
-  }, [refreshKey]);
+  }, [refreshKey, filtroTipo]);
 
   const cargarMovimientos = async () => {
     try {
       setCargando(true);
-      const data = await obtenerMovimientos();
+      const data = await obtenerMovimientos({ tipo: filtroTipo });
       setMovimientos(data);
     } catch (error) {
       console.error("Error al cargar movimientos:", error);

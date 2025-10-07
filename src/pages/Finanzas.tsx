@@ -94,6 +94,7 @@ export default function Finanzas() {
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
                 refreshKey={refreshKey}
+                filtroTipo="ingreso"
               />
             </TabsContent>
 
@@ -101,6 +102,7 @@ export default function Finanzas() {
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
                 refreshKey={refreshKey}
+                filtroTipo="egreso"
               />
             </TabsContent>
           </Tabs>
