@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,12 +11,16 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { ref, push, set } from "firebase/database";
 import { db } from "@/config/firebase";
+import { obtenerMaestrosObra } from "@/services/acceso";
+import { MaestroObra } from "@/types/acceso";
 
 export const SancionesSeguridad = () => {
   const { user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [tipoEntidad, setTipoEntidad] = useState<"empadronado" | "maestro_obra">("empadronado");
   const [tipoSancion, setTipoSancion] = useState("amonestacion");
+  const [maestrosObra, setMaestrosObra] = useState<MaestroObra[]>([]);
+  const [loadingMaestros, setLoadingMaestros] = useState(false);
   
   const [formData, setFormData] = useState({
     entidadId: "",
@@ -29,6 +33,38 @@ export const SancionesSeguridad = () => {
     resolucion: "",
     observaciones: "",
   });
+
+  // Cargar maestros de obra cuando el modal se abre y el tipo es maestro_obra
+  useEffect(() => {
+    if (modalOpen && tipoEntidad === "maestro_obra") {
+      cargarMaestrosObra();
+    }
+  }, [modalOpen, tipoEntidad]);
+
+  const cargarMaestrosObra = async () => {
+    try {
+      setLoadingMaestros(true);
+      const maestros = await obtenerMaestrosObra({ activo: true });
+      setMaestrosObra(maestros);
+    } catch (error) {
+      console.error("Error al cargar maestros de obra:", error);
+      toast.error("Error al cargar maestros de obra");
+    } finally {
+      setLoadingMaestros(false);
+    }
+  };
+
+  const handleMaestroSelect = (maestroId: string) => {
+    const maestro = maestrosObra.find(m => m.id === maestroId);
+    if (maestro) {
+      setFormData({
+        ...formData,
+        entidadId: maestro.id,
+        entidadNombre: maestro.nombre,
+        entidadDocumento: maestro.dni || "",
+      });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,24 +201,53 @@ export const SancionesSeguridad = () => {
                     </div>
                   </div>
 
-                  <div>
-                    <Label htmlFor="entidadNombre">Nombre Completo *</Label>
-                    <Input
-                      id="entidadNombre"
-                      value={formData.entidadNombre}
-                      onChange={(e) => setFormData({ ...formData, entidadNombre: e.target.value })}
-                      required
-                    />
-                  </div>
+                  {tipoEntidad === "maestro_obra" ? (
+                    <div>
+                      <Label htmlFor="maestroSelect">Seleccionar Maestro de Obra *</Label>
+                      <Select 
+                        value={formData.entidadId} 
+                        onValueChange={handleMaestroSelect}
+                        disabled={loadingMaestros}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={loadingMaestros ? "Cargando..." : "Seleccionar maestro de obra"} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background">
+                          {maestrosObra.map((maestro) => (
+                            <SelectItem key={maestro.id} value={maestro.id}>
+                              {maestro.nombre} {maestro.dni ? `- DNI: ${maestro.dni}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {formData.entidadNombre && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Seleccionado: {formData.entidadNombre}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <Label htmlFor="entidadNombre">Nombre Completo *</Label>
+                      <Input
+                        id="entidadNombre"
+                        value={formData.entidadNombre}
+                        onChange={(e) => setFormData({ ...formData, entidadNombre: e.target.value })}
+                        required
+                      />
+                    </div>
+                  )}
 
-                  <div>
-                    <Label htmlFor="entidadDocumento">DNI / Documento</Label>
-                    <Input
-                      id="entidadDocumento"
-                      value={formData.entidadDocumento}
-                      onChange={(e) => setFormData({ ...formData, entidadDocumento: e.target.value })}
-                    />
-                  </div>
+                  {tipoEntidad !== "maestro_obra" && (
+                    <div>
+                      <Label htmlFor="entidadDocumento">DNI / Documento</Label>
+                      <Input
+                        id="entidadDocumento"
+                        value={formData.entidadDocumento}
+                        onChange={(e) => setFormData({ ...formData, entidadDocumento: e.target.value })}
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <Label htmlFor="motivo">Motivo *</Label>
