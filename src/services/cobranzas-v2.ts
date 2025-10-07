@@ -11,6 +11,7 @@ import {
   PagoIndex
 } from "@/types/cobranzas-v2";
 import { getEmpadronados } from "@/services/empadronados";
+import { crearMovimientoFinanciero } from "@/services/finanzas";
 
 const BASE_PATH = "cobranzas_v2";
 
@@ -649,6 +650,7 @@ export async function aprobarPagoV2(pagoId: string, comentario?: string): Promis
     // Ahora sí actualizar el cargo correspondiente
     const chargeSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
     let chargePath = '';
+    let empadronadoNombre = '';
     
     if (chargeSnapshot.exists()) {
       const allCharges = chargeSnapshot.val();
@@ -668,11 +670,44 @@ export async function aprobarPagoV2(pagoId: string, comentario?: string): Promis
               };
               
               await update(ref(db, chargePath), chargeUpdates);
+              
+              // Obtener nombre del empadronado para el ingreso
+              try {
+                const empadronados = await getEmpadronados();
+                const empadronado = empadronados.find(e => e.id === pago.empadronadoId);
+                empadronadoNombre = empadronado ? `${empadronado.nombre} ${empadronado.apellidos}` : pago.empadronadoId;
+              } catch (err) {
+                empadronadoNombre = pago.empadronadoId;
+              }
+              
               break;
             }
           }
         }
       }
+    }
+
+    // Registrar el ingreso en el módulo de Finanzas
+    try {
+      const periodoFormateado = `${pago.periodo.substring(4)}/${pago.periodo.substring(0, 4)}`;
+      const descripcion = `Pago de cuota mensual - Período ${periodoFormateado} - ${empadronadoNombre}`;
+      
+      await crearMovimientoFinanciero({
+        tipo: 'ingreso',
+        categoria: 'cuotas',
+        monto: pago.monto,
+        descripcion,
+        fecha: new Date(pago.fechaPagoRegistrada).toISOString(),
+        comprobantes: [],
+        registradoPor: 'sistema',
+        registradoPorNombre: 'Sistema Cobranzas',
+        observaciones: `Aprobación de pago ID: ${pagoId}${comentario ? ` - ${comentario}` : ''}`
+      });
+      
+      console.log('💰 Ingreso registrado en Finanzas para pago:', pagoId);
+    } catch (finanzasError) {
+      console.error("Error registrando ingreso en Finanzas:", finanzasError);
+      // No lanzar el error para no bloquear la aprobación del pago
     }
 
     console.log('✅ Pago aprobado:', pagoId);

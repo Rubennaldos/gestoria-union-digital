@@ -19,6 +19,7 @@ interface NuevoMovimientoModalProps {
 }
 
 const categoriasIngreso: { value: CategoriaIngreso; label: string }[] = [
+  { value: "cuotas", label: "Cuotas Mensuales" },
   { value: "donacion", label: "Donación" },
   { value: "multa_externa", label: "Multa Externa" },
   { value: "evento", label: "Evento" },

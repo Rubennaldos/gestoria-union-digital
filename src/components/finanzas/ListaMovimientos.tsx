@@ -16,6 +16,7 @@ interface ListaMovimientosProps {
 
 const categoriasLabels: Record<string, string> = {
   // Ingresos
+  cuotas: "Cuotas Mensuales",
   donacion: "Donación",
   multa_externa: "Multa Externa",
   evento: "Evento",

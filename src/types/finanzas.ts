@@ -3,6 +3,7 @@
 export type TipoMovimiento = "ingreso" | "egreso";
 
 export type CategoriaIngreso = 
+  | "cuotas"
   | "donacion"
   | "multa_externa"
   | "evento"
