@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, BarChart3, Calendar } from "lucide-react";
 import { ResumenCaja } from "@/components/finanzas/ResumenCaja";
 import { NuevoMovimientoModal } from "@/components/finanzas/NuevoMovimientoModal";
+import { NuevoEventoModal } from "@/components/finanzas/NuevoEventoModal";
 import { ListaMovimientos } from "@/components/finanzas/ListaMovimientos";
 import { DetalleMovimientoModal } from "@/components/finanzas/DetalleMovimientoModal";
 import { MovimientoFinanciero } from "@/types/finanzas";
@@ -13,6 +14,7 @@ import MiBreadcrumb from "@/components/layout/MiBreadcrumb";
 export default function Finanzas() {
   const [modalOpen, setModalOpen] = useState(false);
   const [tipoModal, setTipoModal] = useState<"ingreso" | "egreso">("egreso");
+  const [eventoModalOpen, setEventoModalOpen] = useState(false);
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<MovimientoFinanciero | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -47,6 +49,10 @@ export default function Finanzas() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={() => setEventoModalOpen(true)} variant="secondary">
+            <Calendar className="h-4 w-4 mr-2" />
+            Ingresar Eventos
+          </Button>
           <Button onClick={abrirModalIngreso} variant="outline">
             <TrendingUp className="h-4 w-4 mr-2" />
             Nuevo Ingreso
@@ -107,6 +113,12 @@ export default function Finanzas() {
         onOpenChange={setModalOpen}
         onSuccess={handleSuccess}
         tipoInicial={tipoModal}
+      />
+
+      <NuevoEventoModal
+        open={eventoModalOpen}
+        onOpenChange={setEventoModalOpen}
+        onSuccess={handleSuccess}
       />
 
       <DetalleMovimientoModal
