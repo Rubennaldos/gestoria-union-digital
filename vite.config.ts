@@ -8,8 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  // relativo en producción para funcionar dentro del iframe/subrutas de Lovable
-  base: mode === "production" ? "./" : "/",
+  // Si se define VITE_BASE (Pages), úsalo. Si no, conserva tu lógica actual para Lovable.
+  base: process.env.VITE_BASE ?? (mode === "production" ? "./" : "/"),
   server: { host: "::", port: 8080 },
   build: { outDir: "dist", emptyOutDir: true, sourcemap: true },
   plugins: [react(), mode === "development" ? componentTagger() : null].filter(Boolean),
