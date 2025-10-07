@@ -44,7 +44,7 @@ export const SancionesSeguridad = () => {
   const cargarMaestrosObra = async () => {
     try {
       setLoadingMaestros(true);
-      const maestros = await obtenerMaestrosObra({ activo: true });
+      const maestros = await obtenerMaestrosObra();
       setMaestrosObra(maestros);
     } catch (error) {
       console.error("Error al cargar maestros de obra:", error);
