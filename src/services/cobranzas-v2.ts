@@ -688,9 +688,26 @@ export async function aprobarPagoV2(pagoId: string, comentario?: string): Promis
     }
 
     // Registrar el ingreso en el módulo de Finanzas
+    console.log('📊 Intentando registrar ingreso en Finanzas para pago:', pagoId);
+    console.log('📊 Datos del pago:', {
+      empadronadoId: pago.empadronadoId,
+      periodo: pago.periodo,
+      monto: pago.monto,
+      fechaPagoRegistrada: pago.fechaPagoRegistrada
+    });
+    console.log('📊 Nombre del empadronado:', empadronadoNombre);
+    
     try {
       const periodoFormateado = `${pago.periodo.substring(4)}/${pago.periodo.substring(0, 4)}`;
       const descripcion = `Pago de cuota mensual - Período ${periodoFormateado} - ${empadronadoNombre}`;
+      
+      console.log('📊 Datos para crear movimiento:', {
+        tipo: 'ingreso',
+        categoria: 'cuotas',
+        monto: pago.monto,
+        descripcion,
+        fecha: new Date(pago.fechaPagoRegistrada).toISOString()
+      });
       
       await crearMovimientoFinanciero({
         tipo: 'ingreso',
@@ -704,9 +721,14 @@ export async function aprobarPagoV2(pagoId: string, comentario?: string): Promis
         observaciones: `Aprobación de pago ID: ${pagoId}${comentario ? ` - ${comentario}` : ''}`
       });
       
-      console.log('💰 Ingreso registrado en Finanzas para pago:', pagoId);
-    } catch (finanzasError) {
-      console.error("Error registrando ingreso en Finanzas:", finanzasError);
+      console.log('💰 ✅ Ingreso registrado exitosamente en Finanzas para pago:', pagoId);
+    } catch (finanzasError: any) {
+      console.error("❌ Error registrando ingreso en Finanzas:", finanzasError);
+      console.error("❌ Detalles del error:", {
+        message: finanzasError?.message,
+        stack: finanzasError?.stack,
+        error: finanzasError
+      });
       // No lanzar el error para no bloquear la aprobación del pago
     }
 
