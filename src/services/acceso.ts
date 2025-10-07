@@ -297,17 +297,19 @@ export async function obtenerFavoritosPorUsuario(
   empadronadoId: string,
   tipo: TipoAcceso
 ): Promise<FavoritoUsuario[]> {
-  const q = query(
-    ref(db, "acceso/favoritos"),
-    orderByChild("empadronadoId"),
-    equalTo(empadronadoId)
-  );
-  const snap = await get(q);
-  if (!snap.exists()) return [];
-  const todos: FavoritoUsuario[] = Object.values(snap.val());
-  return todos
-    .filter((f: any) => f.tipo === tipo)
-    .sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
+  try {
+    // Obtener todos los favoritos y filtrar en cliente (evita requerir índice)
+    const snap = await get(ref(db, "acceso/favoritos"));
+    if (!snap.exists()) return [];
+    
+    const todos: FavoritoUsuario[] = Object.values(snap.val());
+    return todos
+      .filter((f: any) => f.empadronadoId === empadronadoId && f.tipo === tipo)
+      .sort((a: any, b: any) => tsFrom(b) - tsFrom(a));
+  } catch (error) {
+    console.error("Error al cargar favoritos:", error);
+    return [];
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────

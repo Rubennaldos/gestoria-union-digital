@@ -14,7 +14,6 @@ import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
 import { Visitante, FavoritoUsuario } from "@/types/acceso";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
 
 export function VisitaTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
@@ -22,33 +21,12 @@ export function VisitaTab() {
   const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: "1", nombre: "", dni: "" }]);
   const [menores, setMenores] = useState(0);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
-  const [empadronadoId, setEmpadronadoId] = useState<string>("");
-  const [cargandoEmp, setCargandoEmp] = useState<boolean>(true);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setCargandoEmp(true);
-      try {
-        if (!user?.uid) {
-          setEmpadronadoId("");
-          return;
-        }
-        const emp = await obtenerEmpadronadoPorAuthUid(user.uid);
-        setEmpadronadoId(emp?.id ?? "");
-      } catch (e) {
-        console.error("obtenerEmpadronadoPorAuthUid error:", e);
-        setEmpadronadoId("");
-      } finally {
-        if (alive) setCargandoEmp(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [user?.uid]);
+  // Usar empadronadoId directamente del perfil
+  const empadronadoId = profile?.empadronadoId || "";
+  const cargandoEmp = !profile;
 
   const agregarVisitante = () => {
     setVisitantes((prev) => [...prev, { id: Date.now().toString(), nombre: "", dni: "" }]);
@@ -183,6 +161,7 @@ export function VisitaTab() {
 
           <BuscadorFavoritos
             tipo="visitante"
+            empadronadoId={empadronadoId}
             onSeleccionar={(favorito: FavoritoUsuario) => {
               const nom = (favorito as any)?.datos?.nombre ?? "";
               const doc = (favorito as any)?.datos?.dni ?? "";
