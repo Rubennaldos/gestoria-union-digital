@@ -28,9 +28,13 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Build (con base para /pecaditos-web/)
-        run: VITE_BASE=/pecaditos-web/ npm run build
+      # ⚠️ IMPORTANTe: NO forzamos VITE_BASE aquí.
+      # Vite tomará la base desde tu vite.config.ts (./), así los assets serán relativos
+      # y funcionará perfecto en /gestoria-union-digital/.
+      - name: Build
+        run: npm run build
 
+      # 404 para SPA (evita pantallas blancas al recargar rutas)
       - name: Add 404 for SPA
         run: cp dist/index.html dist/404.html
 
