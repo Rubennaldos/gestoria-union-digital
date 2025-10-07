@@ -673,10 +673,22 @@ export default function CobranzasV2() {
           <TabsContent value="asociados">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Lista de Asociados ({empadronadosFiltrados.length} de {empadronados.length})
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Lista de Asociados ({empadronadosFiltrados.length} de {empadronados.length})
+                  </CardTitle>
+                  
+                  {seleccionados.size > 0 && (
+                    <Button
+                      onClick={() => setShowWhatsAppModal(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Enviar WhatsApp Masivo ({seleccionados.size})
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 {/* Controles de búsqueda y filtros */}
@@ -690,6 +702,29 @@ export default function CobranzasV2() {
                       onChange={(e) => setBusquedaTexto(e.target.value)}
                       className="pl-10"
                     />
+                  </div>
+
+                  {/* Selección masiva */}
+                  <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                    <Checkbox
+                      id="select-all"
+                      checked={empadronadosFiltrados.length > 0 && seleccionados.size === empadronadosFiltrados.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSeleccionados(new Set(empadronadosFiltrados.map(e => e.id)));
+                        } else {
+                          setSeleccionados(new Set());
+                        }
+                      }}
+                    />
+                    <Label htmlFor="select-all" className="font-medium cursor-pointer">
+                      Seleccionar todos ({empadronadosFiltrados.length})
+                    </Label>
+                    {seleccionados.size > 0 && (
+                      <Badge variant="secondary">
+                        {seleccionados.size} seleccionado(s)
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Filtros y ordenación */}
