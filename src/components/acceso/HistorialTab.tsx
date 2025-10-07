@@ -9,7 +9,8 @@ import { es } from "date-fns/locale";
 import { 
   obtenerVisitasPorEmpadronado, 
   obtenerTrabajadoresPorEmpadronado, 
-  obtenerProveedoresPorEmpadronado 
+  obtenerProveedoresPorEmpadronado,
+  obtenerMaestroObraPorId
 } from "@/services/acceso";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +22,7 @@ export function HistorialTab() {
   const [proveedores, setProveedores] = useState<RegistroProveedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [noVinculado, setNoVinculado] = useState(false);
+  const [maestrosObraData, setMaestrosObraData] = useState<Record<string, any>>({});
 
   const empadronadoId = profile?.empadronadoId || "";
 
@@ -53,6 +55,24 @@ export function HistorialTab() {
       setVisitas(visitasData);
       setTrabajadores(trabajadoresData);
       setProveedores(proveedoresData);
+
+      // Cargar datos de maestros de obra
+      const maestrosIds = trabajadoresData
+        .map(t => t.maestroObraId)
+        .filter((id, index, self) => id && self.indexOf(id) === index);
+
+      const maestrosMap: Record<string, any> = {};
+      await Promise.all(
+        maestrosIds.map(async (id) => {
+          if (id) {
+            const maestro = await obtenerMaestroObraPorId(id);
+            if (maestro) {
+              maestrosMap[id] = maestro;
+            }
+          }
+        })
+      );
+      setMaestrosObraData(maestrosMap);
     } catch (error) {
       console.error('Error al cargar historial:', error);
       setNoVinculado(true);
@@ -232,7 +252,31 @@ export function HistorialTab() {
                         <div className="space-y-2 text-sm">
                           <p><strong>Tipo:</strong> {registro.tipoAcceso}</p>
                           {registro.placa && <p><strong>Placa:</strong> {registro.placa}</p>}
-                          <p><strong>Maestro de Obra ID:</strong> {registro.maestroObraId}</p>
+                          {registro.maestroObraId && maestrosObraData[registro.maestroObraId] ? (
+                            <div>
+                              <p><strong>Maestro de Obra:</strong></p>
+                              <div className="ml-4 mt-1 p-2 bg-muted/50 rounded">
+                                <p className="font-medium">{maestrosObraData[registro.maestroObraId].nombre}</p>
+                                {maestrosObraData[registro.maestroObraId].dni && (
+                                  <p className="text-xs text-muted-foreground">
+                                    DNI: {maestrosObraData[registro.maestroObraId].dni}
+                                  </p>
+                                )}
+                                {maestrosObraData[registro.maestroObraId].telefono && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Tel: {maestrosObraData[registro.maestroObraId].telefono}
+                                  </p>
+                                )}
+                                {maestrosObraData[registro.maestroObraId].empresa && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Empresa: {maestrosObraData[registro.maestroObraId].empresa}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <p><strong>Maestro de Obra:</strong> {registro.maestroObraId || "No especificado"}</p>
+                          )}
                           {Array.isArray(registro.trabajadores) && registro.trabajadores.length > 0 && (
                             <>
                               <p><strong>Trabajadores adicionales:</strong></p>
