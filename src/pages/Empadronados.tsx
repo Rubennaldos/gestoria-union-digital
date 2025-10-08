@@ -665,7 +665,7 @@ const Empadronados: React.FC = () => {
                             <Settings className="h-3 w-3 md:h-4 md:w-4" />
                           </Button>
 
-                        <SheetContent className="w-[600px] sm:w-[800px]">
+                          <SheetContent className="w-[600px] sm:w-[800px] overflow-y-auto">
                           {selectedEmpadronado && (
                             <>
                               <SheetHeader>
@@ -676,13 +676,28 @@ const Empadronados: React.FC = () => {
                               </SheetHeader>
 
                               <div className="mt-6 space-y-6">
+                                {/* Botón de acción para completar datos */}
+                                <Button 
+                                  className="w-full"
+                                  onClick={() => navigate(`/padron/editar/${selectedEmpadronado.id}`)}
+                                >
+                                  <Edit3 className="h-4 w-4 mr-2" />
+                                  Completar Datos Faltantes
+                                </Button>
+
+                                <Separator />
+
                                 {/* Información personal */}
                                 <div>
                                   <h4 className="font-semibold mb-3">Información Personal</h4>
                                   <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
+                                      <Label className="text-muted-foreground">Nombre Completo</Label>
+                                      <p className="font-medium">{selectedEmpadronado.nombre} {selectedEmpadronado.apellidos}</p>
+                                    </div>
+                                    <div>
                                       <Label className="text-muted-foreground">DNI</Label>
-                                      <p>{selectedEmpadronado.dni}</p>
+                                      <p>{selectedEmpadronado.dni || <span className="text-muted-foreground italic">No especificado</span>}</p>
                                     </div>
                                     <div>
                                       <Label className="text-muted-foreground">Género</Label>
@@ -690,11 +705,17 @@ const Empadronados: React.FC = () => {
                                     </div>
                                     <div>
                                       <Label className="text-muted-foreground">Cumpleaños</Label>
-                                      <p>{selectedEmpadronado.cumpleanos}</p>
+                                      <p>{selectedEmpadronado.cumpleanos || <span className="text-muted-foreground italic">No especificado</span>}</p>
                                     </div>
                                     <div>
                                       <Label className="text-muted-foreground">Fecha Ingreso</Label>
                                       <p>{formatDate(selectedEmpadronado.fechaIngreso)}</p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-muted-foreground">Estado</Label>
+                                      <Badge variant={selectedEmpadronado.habilitado ? 'default' : 'secondary'}>
+                                        {selectedEmpadronado.habilitado ? 'Habilitado' : 'Deshabilitado'}
+                                      </Badge>
                                     </div>
                                   </div>
                                 </div>
@@ -702,139 +723,56 @@ const Empadronados: React.FC = () => {
                                 <Separator />
 
                                 {/* Acceso al Sistema */}
-                                {selectedEmpadronado && (
-                                  <div>
-                                    <h4 className="font-semibold mb-3">Acceso al Sistema</h4>
-                                    <div className="space-y-4">
-                                      {selectedEmpadronado.emailAcceso ? (
-                                        <div className="space-y-3">
-                                          <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div>
-                                              <Label className="text-muted-foreground">Email de Acceso</Label>
-                                              <p className="font-medium text-green-600">{selectedEmpadronado.emailAcceso}</p>
-                                            </div>
-                                            <div>
-                                              <Label className="text-muted-foreground">Estado</Label>
-                                              <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
-                                            </div>
-                                          </div>
-
-                                          {/* Permisos de Módulos */}
-                                          <div className="border rounded-lg p-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                              <Label className="font-medium">Permisos de Módulos</Label>
-                                              <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => {
-                                                  setEditingPermissions(!editingPermissions);
-                                                  if (!editingPermissions) {
-                                                    loadUserPermissions(selectedEmpadronado.authUid);
-                                                    loadModules();
-                                                  }
-                                                }}
-                                              >
-                                                <Settings className="h-3 w-3 mr-1" />
-                                                {editingPermissions ? 'Cancelar' : 'Editar'}
-                                              </Button>
-                                            </div>
-
-                                            {editingPermissions ? (
-                                              <div className="space-y-3">
-                                                {modules.map((module) => {
-                                                  const nivelActual = userPermissions[module.id] || 'none';
-                                                  return (
-                                                    <div key={module.id} className="border rounded-lg p-3 bg-muted/20">
-                                                      <div className="flex items-center justify-between mb-2">
-                                                        <span className="font-medium text-sm">{module.nombre}</span>
-                                                        <Badge variant={
-                                                          nivelActual === 'none' ? 'outline'
-                                                            : nivelActual === 'read' ? 'secondary'
-                                                              : nivelActual === 'write' ? 'default' : 'destructive'
-                                                        }>
-                                                          {nivelActual === 'none' ? 'Sin acceso'
-                                                            : nivelActual === 'read' ? 'Lectura'
-                                                              : nivelActual === 'write' ? 'Escritura' : 'Admin'}
-                                                        </Badge>
-                                                      </div>
-                                                      <div className="grid grid-cols-4 gap-1">
-                                                        {[
-                                                          { valor: 'none', label: 'No', color: 'bg-muted text-muted-foreground' },
-                                                          { valor: 'read', label: 'Leer', color: 'bg-blue-500 text-white' },
-                                                          { valor: 'write', label: 'Escribir', color: 'bg-green-500 text-white' },
-                                                          { valor: 'admin', label: 'Admin', color: 'bg-purple-500 text-white' }
-                                                        ].map((opcion) => (
-                                                          <button
-                                                            key={opcion.valor}
-                                                            onClick={() => setUserPermissions(prev => ({
-                                                              ...prev,
-                                                              [module.id]: opcion.valor as PermissionLevel
-                                                            }))}
-                                                            className={`text-xs px-2 py-1 rounded transition-all ${
-                                                              nivelActual === opcion.valor
-                                                                ? opcion.color
-                                                                : 'bg-background border border-border hover:bg-muted text-muted-foreground'
-                                                            }`}
-                                                          >
-                                                            {opcion.label}
-                                                          </button>
-                                                        ))}
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })}
-                                                <div className="flex justify-end gap-2 mt-4">
-                                                  <Button size="sm" variant="outline" onClick={() => setEditingPermissions(false)}>Cancelar</Button>
-                                                  <Button size="sm" onClick={() => saveUserPermissions(selectedEmpadronado.authUid)}>Guardar Permisos</Button>
-                                                </div>
-                                              </div>
-                                            ) : (
-                                              <div className="space-y-2">
-                                                {modules.map((module) => {
-                                                  const nivel = userPermissions[module.id] || 'none';
-                                                  return (
-                                                    <div key={module.id} className="flex items-center justify-between p-2 rounded bg-muted/30">
-                                                      <span className="text-sm">{module.nombre}</span>
-                                                      <Badge variant={
-                                                        nivel === 'none' ? 'outline'
-                                                          : nivel === 'read' ? 'secondary'
-                                                            : nivel === 'write' ? 'default' : 'destructive'
-                                                      }>
-                                                        {nivel === 'none' ? 'Sin acceso'
-                                                          : nivel === 'read' ? 'Lectura'
-                                                            : nivel === 'write' ? 'Escritura' : 'Admin'}
-                                                      </Badge>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
-                                          </div>
+                                <div>
+                                  <h4 className="font-semibold mb-3">Acceso al Sistema</h4>
+                                  <div className="space-y-3">
+                                    {selectedEmpadronado.emailAcceso ? (
+                                      <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                          <Label className="text-muted-foreground">Email de Acceso</Label>
+                                          <p className="font-medium text-green-600">{selectedEmpadronado.emailAcceso}</p>
                                         </div>
-                                      ) : (
-                                        <div className="text-center py-4 border-2 border-dashed rounded-lg">
-                                          <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                          <p className="text-sm text-muted-foreground">No tiene acceso al sistema</p>
+                                        <div>
+                                          <Label className="text-muted-foreground">Estado</Label>
+                                          <Badge variant="secondary" className="text-xs">Cuenta activa</Badge>
                                         </div>
-                                      )}
-                                    </div>
+                                      </div>
+                                    ) : (
+                                      <div className="text-center py-4 border-2 border-dashed rounded-lg">
+                                        <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                        <p className="text-sm text-muted-foreground">No tiene acceso al sistema</p>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
+                                </div>
 
                                 <Separator />
 
-                                {/* Contacto */}
+                                {/* Ubicación y Contacto */}
                                 <div>
-                                  <h4 className="font-semibold mb-3">Contacto</h4>
-                                  <div className="space-y-2 text-sm">
+                                  <h4 className="font-semibold mb-3">Ubicación y Contacto</h4>
+                                  <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div>
-                                      <Label className="text-muted-foreground">Dirección</Label>
-                                      <p>Mz. {selectedEmpadronado.manzana} Lt. {selectedEmpadronado.lote} {selectedEmpadronado.etapa ? `Etapa ${selectedEmpadronado.etapa}` : ''}</p>
+                                      <Label className="text-muted-foreground">Manzana</Label>
+                                      <p>{selectedEmpadronado.manzana || <span className="text-muted-foreground italic">No especificado</span>}</p>
                                     </div>
-                                    {selectedEmpadronado.telefonos && selectedEmpadronado.telefonos.length > 0 && (
-                                      <div>
+                                    <div>
+                                      <Label className="text-muted-foreground">Lote</Label>
+                                      <p>{selectedEmpadronado.lote || <span className="text-muted-foreground italic">No especificado</span>}</p>
+                                    </div>
+                                    <div className="col-span-2">
+                                      <Label className="text-muted-foreground">Etapa</Label>
+                                      <p>{selectedEmpadronado.etapa || <span className="text-muted-foreground italic">No especificado</span>}</p>
+                                    </div>
+                                    {selectedEmpadronado.telefonos && selectedEmpadronado.telefonos.length > 0 ? (
+                                      <div className="col-span-2">
                                         <Label className="text-muted-foreground">Teléfonos</Label>
                                         <p>{selectedEmpadronado.telefonos.map(t => t.numero).filter(Boolean).join(', ')}</p>
+                                      </div>
+                                    ) : (
+                                      <div className="col-span-2">
+                                        <Label className="text-muted-foreground">Teléfonos</Label>
+                                        <p className="text-muted-foreground italic">No especificado</p>
                                       </div>
                                     )}
                                   </div>
