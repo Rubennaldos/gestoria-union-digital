@@ -59,8 +59,8 @@ const ConfiguracionCuenta: React.FC = () => {
   const [loadingEmpadronado, setLoadingEmpadronado] = useState(true);
 
   // Estados para información del perfil
-  const [telefono, setTelefono] = useState("");
   const [username, setUsername] = useState("");
+  const [correoPersonal, setCorreoPersonal] = useState("");
 
   // Estados para datos editables del empadronado
   const [genero, setGenero] = useState<"masculino" | "femenino">("masculino");
@@ -114,7 +114,6 @@ const ConfiguracionCuenta: React.FC = () => {
         // Cargar datos del perfil
         const userProfile = await getUserProfile(user.uid);
         if (userProfile) {
-          setTelefono(userProfile.phone || "");
           setUsername(userProfile.username || "");
         }
 
@@ -159,7 +158,6 @@ const ConfiguracionCuenta: React.FC = () => {
       await updateUserProfile(
         user.uid,
         {
-          phone: telefono || undefined,
           username: username || undefined,
         },
         user.uid
@@ -523,6 +521,22 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Fecha de Ingreso a la Asociación
+                    </Label>
+                    <Input
+                      value={
+                        empadronado?.fechaIngreso
+                          ? new Date(empadronado.fechaIngreso).toLocaleDateString("es-PE")
+                          : "No registrada"
+                      }
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
                     <Label>Fecha de Cumpleaños</Label>
                     <Input
                       value={cumpleanos}
@@ -551,24 +565,6 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Familia</Label>
-                    <Input
-                      value={familia}
-                      onChange={(e) => setFamilia(e.target.value)}
-                      placeholder="Ingresa tu familia"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Etapa</Label>
-                    <Input
-                      value={etapa}
-                      onChange={(e) => setEtapa(e.target.value)}
-                      placeholder="Ingresa tu etapa"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
                     <Label>Estado del Terreno</Label>
                     <Select
                       value={estadoVivienda}
@@ -585,6 +581,15 @@ const ConfiguracionCuenta: React.FC = () => {
                         <SelectItem value="terreno">Solo Terreno</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Familia</Label>
+                    <Input
+                      value={familia}
+                      onChange={(e) => setFamilia(e.target.value)}
+                      placeholder="Ingresa tu familia"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -606,7 +611,7 @@ const ConfiguracionCuenta: React.FC = () => {
 
                 <Separator />
 
-                {/* Ubicación y Contacto - Solo lectura */}
+                {/* Ubicación - Solo lectura */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
@@ -633,25 +638,18 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Fecha de Ingreso
-                    </Label>
+                    <Label>Etapa</Label>
                     <Input
-                      value={
-                        empadronado?.fechaIngreso
-                          ? new Date(empadronado.fechaIngreso).toLocaleDateString("es-PE")
-                          : "No registrada"
-                      }
-                      disabled
-                      className="bg-muted"
+                      value={etapa}
+                      onChange={(e) => setEtapa(e.target.value)}
+                      placeholder="Ingresa tu etapa"
                     />
                   </div>
                 </div>
 
                 <Separator />
 
-                {/* Campos editables */}
+                {/* Datos de Acceso */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Email</Label>
@@ -667,12 +665,12 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Teléfono</Label>
+                    <Label>Correo Personal</Label>
                     <Input
-                      type="tel"
-                      value={telefono}
-                      onChange={(e) => setTelefono(e.target.value)}
-                      placeholder="Ingresa tu teléfono"
+                      type="email"
+                      value={correoPersonal}
+                      onChange={(e) => setCorreoPersonal(e.target.value)}
+                      placeholder="correo@personal.com"
                     />
                   </div>
 
@@ -693,7 +691,7 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4">
+                <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleUpdateProfile}
                     disabled={loading}
@@ -703,16 +701,6 @@ const ConfiguracionCuenta: React.FC = () => {
                     <Save className="h-4 w-4 mr-2" />
                     Guardar Perfil
                   </Button>
-                  {empadronado && (
-                    <Button
-                      onClick={handleUpdateEmpadronado}
-                      disabled={loading}
-                      className="w-full sm:w-auto"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {loading ? "Guardando..." : "Guardar Datos Personales"}
-                    </Button>
-                  )}
                 </div>
               </CardContent>
             </Card>
@@ -994,6 +982,20 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Botón para guardar todos los datos personales */}
+            {empadronado && (
+              <div className="flex justify-end pt-2">
+                <Button
+                  onClick={handleUpdateEmpadronado}
+                  disabled={loading}
+                  className="w-full sm:w-auto"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {loading ? "Guardando..." : "Guardar Datos Personales"}
+                </Button>
+              </div>
             )}
           </TabsContent>
 
