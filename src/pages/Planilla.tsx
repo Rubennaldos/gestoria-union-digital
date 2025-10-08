@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Users, Clock, ShieldCheck, UserCheck, UserX, Edit, Trash2, UserMinus, MoreVertical } from "lucide-react";
+import { Plus, Search, Users, Clock, ShieldCheck, UserCheck, UserX, Edit, Trash2, UserMinus, MoreVertical, Briefcase, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,8 @@ import { createPersonalPlanilla } from "@/services/planilla";
 import { Switch } from "@/components/ui/switch";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 
 const DIAS_SEMANA = [
   { value: 'lunes', label: 'Lunes' },
@@ -277,44 +279,60 @@ export default function Planilla() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Personal</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] border-2 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Personal</CardTitle>
+              <div className="p-3 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors duration-300">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalPersonal}</div>
+            <CardContent className="relative">
+              <div className="text-4xl font-bold mb-2">{stats.totalPersonal}</div>
+              <p className="text-xs text-muted-foreground">Personal registrado</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Activos</CardTitle>
-              <UserCheck className="h-4 w-4 text-green-600" />
+          <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] border-2 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Activos</CardTitle>
+              <div className="p-3 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors duration-300">
+                <UserCheck className="h-5 w-5 text-success" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.activos}</div>
+            <CardContent className="relative">
+              <div className="text-4xl font-bold mb-2 text-success">{stats.activos}</div>
+              <p className="text-xs text-muted-foreground">En servicio activo</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Inactivos</CardTitle>
-              <UserX className="h-4 w-4 text-muted-foreground" />
+          <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] border-2 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-muted/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Inactivos</CardTitle>
+              <div className="p-3 bg-muted/10 rounded-lg group-hover:bg-muted/20 transition-colors duration-300">
+                <UserX className="h-5 w-5 text-muted-foreground" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-muted-foreground">{stats.inactivos}</div>
+            <CardContent className="relative">
+              <div className="text-4xl font-bold mb-2 text-muted-foreground">{stats.inactivos}</div>
+              <p className="text-xs text-muted-foreground">Fuera de servicio</p>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Con Acceso Sistema</CardTitle>
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
+          <Card className="group hover:shadow-xl transition-all duration-300 hover:scale-[1.02] border-2 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Con Acceso Sistema</CardTitle>
+              <div className="p-3 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors duration-300">
+                <ShieldCheck className="h-5 w-5 text-accent-foreground" />
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.conAccesoSistema}</div>
+            <CardContent className="relative">
+              <div className="text-4xl font-bold mb-2 text-accent-foreground">{stats.conAccesoSistema}</div>
+              <p className="text-xs text-muted-foreground">Acceso autorizado</p>
             </CardContent>
           </Card>
         </div>
@@ -358,232 +376,307 @@ export default function Planilla() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="mr-2 h-4 w-4" />
+                  <Button size="lg" className="shadow-lg hover:shadow-xl transition-all">
+                    <Plus className="mr-2 h-5 w-5" />
                     Agregar Personal
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
-                    <DialogDescription>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-2xl">{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
+                    <DialogDescription className="text-base">
                       {editingPersonal ? 'Actualiza la información del personal' : 'Completa el formulario para agregar personal a la planilla'}
                     </DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    {!editingPersonal && (
-                      <div className="space-y-2">
-                        <Label htmlFor="empadronado">Seleccionar Persona</Label>
-                        <Select
-                          value={formData.empadronadoId}
-                          onValueChange={(value) => setFormData({ ...formData, empadronadoId: value })}
-                          required
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione una persona" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {empadronadosDisponibles.map((emp) => (
-                              <SelectItem key={emp.id} value={emp.id}>
-                                {emp.nombre} {emp.apellidos} - {emp.dni}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                  <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-1">
+                    <Tabs defaultValue="basicos" className="w-full">
+                      <TabsList className="grid w-full grid-cols-3 mb-6">
+                        <TabsTrigger value="basicos" className="gap-2">
+                          <Users className="h-4 w-4" />
+                          Datos Básicos
+                        </TabsTrigger>
+                        <TabsTrigger value="laborales" className="gap-2">
+                          <Briefcase className="h-4 w-4" />
+                          Datos Laborales
+                        </TabsTrigger>
+                        <TabsTrigger value="acceso" className="gap-2">
+                          <ShieldCheck className="h-4 w-4" />
+                          Acceso al Sistema
+                        </TabsTrigger>
+                      </TabsList>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="funcion">Función / Cargo</Label>
-                      <Input
-                        id="funcion"
-                        value={formData.funcion}
-                        onChange={(e) => setFormData({ ...formData, funcion: e.target.value })}
-                        placeholder="Ej: Guardia de seguridad, Personal de limpieza"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="area">Área Asignada (Opcional)</Label>
-                      <Input
-                        id="area"
-                        value={formData.areaAsignada}
-                        onChange={(e) => setFormData({ ...formData, areaAsignada: e.target.value })}
-                        placeholder="Ej: Pórtico principal, Áreas verdes"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="fecha">Fecha de Contratación</Label>
-                      <Input
-                        id="fecha"
-                        type="date"
-                        value={formData.fechaContratacion}
-                        onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="sueldo">Sueldo Mensual (Opcional)</Label>
-                        <Input
-                          id="sueldo"
-                          type="number"
-                          step="0.01"
-                          value={formData.sueldo}
-                          onChange={(e) => setFormData({ ...formData, sueldo: e.target.value })}
-                          placeholder="0.00"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
-                        <Select
-                          value={formData.tipoContrato}
-                          onValueChange={(value: any) => setFormData({ ...formData, tipoContrato: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="planilla">Planilla</SelectItem>
-                            <SelectItem value="recibo_honorarios">Recibo por Honorarios</SelectItem>
-                            <SelectItem value="temporal">Temporal</SelectItem>
-                            <SelectItem value="indefinido">Indefinido</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="frecuencia">Frecuencia de Pago</Label>
-                        <Select
-                          value={formData.frecuenciaPago}
-                          onValueChange={(value: any) => setFormData({ ...formData, frecuenciaPago: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="semanal">Semanal</SelectItem>
-                            <SelectItem value="quincenal">Quincenal</SelectItem>
-                            <SelectItem value="mensual">Mensual</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="observaciones">Observaciones (Opcional)</Label>
-                      <Input
-                        id="observaciones"
-                        value={formData.observaciones}
-                        onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                        placeholder="Información adicional relevante"
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="activo"
-                        checked={formData.activo}
-                        onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
-                      />
-                      <Label htmlFor="activo">Personal Activo</Label>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="acceso"
-                        checked={formData.tieneAccesoSistema}
-                        onCheckedChange={(checked) => setFormData({ ...formData, tieneAccesoSistema: checked })}
-                      />
-                      <Label htmlFor="acceso">Permitir Acceso al Sistema</Label>
-                    </div>
-
-                    {formData.tieneAccesoSistema && (
-                      <div className="space-y-3 border rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <Label>Horarios de Acceso al Sistema</Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const newHorarios = formData.horariosAcceso.map(h => ({
-                                ...h,
-                                horaInicio: "00:00",
-                                horaFin: "23:59",
-                              }));
-                              setFormData({ ...formData, horariosAcceso: newHorarios });
-                            }}
-                          >
-                            24 Horas Todos
-                          </Button>
-                        </div>
-                        {formData.horariosAcceso.map((horario, index) => (
-                          <div key={horario.dia} className="flex items-center gap-3">
-                            <Checkbox
-                              checked={horario.activo}
-                              onCheckedChange={(checked) => {
-                                const newHorarios = [...formData.horariosAcceso];
-                                newHorarios[index].activo = checked as boolean;
-                                setFormData({ ...formData, horariosAcceso: newHorarios });
-                              }}
-                            />
-                            <span className="w-24 text-sm">{DIAS_SEMANA[index].label}</span>
-                            <Input
-                              type="time"
-                              value={horario.horaInicio}
-                              onChange={(e) => {
-                                const newHorarios = [...formData.horariosAcceso];
-                                newHorarios[index].horaInicio = e.target.value;
-                                setFormData({ ...formData, horariosAcceso: newHorarios });
-                              }}
-                              disabled={!horario.activo}
-                              className="w-32"
-                            />
-                            <span className="text-sm">a</span>
-                            <Input
-                              type="time"
-                              value={horario.horaFin}
-                              onChange={(e) => {
-                                const newHorarios = [...formData.horariosAcceso];
-                                newHorarios[index].horaFin = e.target.value;
-                                setFormData({ ...formData, horariosAcceso: newHorarios });
-                              }}
-                              disabled={!horario.activo}
-                              className="w-32"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const newHorarios = [...formData.horariosAcceso];
-                                newHorarios[index].horaInicio = "00:00";
-                                newHorarios[index].horaFin = "23:59";
-                                setFormData({ ...formData, horariosAcceso: newHorarios });
-                              }}
-                              disabled={!horario.activo}
-                              className="text-xs"
+                      {/* Tab: Datos Básicos */}
+                      <TabsContent value="basicos" className="space-y-6 mt-0">
+                        {!editingPersonal && (
+                          <div className="space-y-3">
+                            <Label htmlFor="empadronado" className="text-base font-semibold">Seleccionar Persona *</Label>
+                            <Select
+                              value={formData.empadronadoId}
+                              onValueChange={(value) => setFormData({ ...formData, empadronadoId: value })}
+                              required
                             >
-                              24h
-                            </Button>
+                              <SelectTrigger className="h-12">
+                                <SelectValue placeholder="Seleccione una persona del padrón" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {empadronadosDisponibles.map((emp) => (
+                                  <SelectItem key={emp.id} value={emp.id}>
+                                    {emp.nombre} {emp.apellidos} - {emp.dni}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">Selecciona la persona del padrón que será agregada a planilla</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
+                        )}
 
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button type="button" variant="outline" onClick={() => {
+                        <div className="space-y-3">
+                          <Label htmlFor="funcion" className="text-base font-semibold">Función / Cargo *</Label>
+                          <Input
+                            id="funcion"
+                            value={formData.funcion}
+                            onChange={(e) => setFormData({ ...formData, funcion: e.target.value })}
+                            placeholder="Ej: Guardia de seguridad, Personal de limpieza"
+                            required
+                            className="h-12"
+                          />
+                          <p className="text-xs text-muted-foreground">Especifica el rol o función que desempeñará</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label htmlFor="area" className="text-base font-semibold">Área Asignada</Label>
+                          <Input
+                            id="area"
+                            value={formData.areaAsignada}
+                            onChange={(e) => setFormData({ ...formData, areaAsignada: e.target.value })}
+                            placeholder="Ej: Pórtico principal, Áreas verdes"
+                            className="h-12"
+                          />
+                          <p className="text-xs text-muted-foreground">Zona o área donde trabajará (opcional)</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          <Label htmlFor="fecha" className="text-base font-semibold">Fecha de Contratación *</Label>
+                          <Input
+                            id="fecha"
+                            type="date"
+                            value={formData.fechaContratacion}
+                            onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
+                            required
+                            className="h-12"
+                          />
+                          <p className="text-xs text-muted-foreground">Fecha de inicio de labores</p>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
+                          <div className="space-y-1">
+                            <Label htmlFor="activo" className="text-base font-medium cursor-pointer">Personal Activo</Label>
+                            <p className="text-xs text-muted-foreground">El personal está actualmente en servicio</p>
+                          </div>
+                          <Switch
+                            id="activo"
+                            checked={formData.activo}
+                            onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
+                          />
+                        </div>
+                      </TabsContent>
+
+                      {/* Tab: Datos Laborales */}
+                      <TabsContent value="laborales" className="space-y-6 mt-0">
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-3">
+                            <Label htmlFor="sueldo" className="text-base font-semibold">Sueldo Mensual</Label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">S/</span>
+                              <Input
+                                id="sueldo"
+                                type="number"
+                                step="0.01"
+                                value={formData.sueldo}
+                                onChange={(e) => setFormData({ ...formData, sueldo: e.target.value })}
+                                placeholder="0.00"
+                                className="h-12 pl-10"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Remuneración mensual (opcional)</p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <Label htmlFor="tipoContrato" className="text-base font-semibold">Tipo de Contrato</Label>
+                            <Select
+                              value={formData.tipoContrato}
+                              onValueChange={(value: any) => setFormData({ ...formData, tipoContrato: value })}
+                            >
+                              <SelectTrigger className="h-12">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="planilla">Planilla</SelectItem>
+                                <SelectItem value="recibo_honorarios">Recibo por Honorarios</SelectItem>
+                                <SelectItem value="temporal">Temporal</SelectItem>
+                                <SelectItem value="indefinido">Indefinido</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">Modalidad de contratación</p>
+                          </div>
+
+                          <div className="space-y-3">
+                            <Label htmlFor="frecuencia" className="text-base font-semibold">Frecuencia de Pago</Label>
+                            <Select
+                              value={formData.frecuenciaPago}
+                              onValueChange={(value: any) => setFormData({ ...formData, frecuenciaPago: value })}
+                            >
+                              <SelectTrigger className="h-12">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="semanal">Semanal</SelectItem>
+                                <SelectItem value="quincenal">Quincenal</SelectItem>
+                                <SelectItem value="mensual">Mensual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">Periodicidad del pago</p>
+                          </div>
+                        </div>
+
+                        <Separator className="my-6" />
+
+                        <div className="space-y-3">
+                          <Label htmlFor="observaciones" className="text-base font-semibold">Observaciones</Label>
+                          <Input
+                            id="observaciones"
+                            value={formData.observaciones}
+                            onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                            placeholder="Información adicional relevante sobre el personal"
+                            className="h-12"
+                          />
+                          <p className="text-xs text-muted-foreground">Notas adicionales (opcional)</p>
+                        </div>
+                      </TabsContent>
+
+                      {/* Tab: Acceso al Sistema */}
+                      <TabsContent value="acceso" className="space-y-6 mt-0">
+                        <div className="flex items-center justify-between p-5 bg-muted/30 rounded-lg border-2 border-dashed">
+                          <div className="space-y-1">
+                            <Label htmlFor="acceso2" className="text-base font-semibold cursor-pointer">Permitir Acceso al Sistema</Label>
+                            <p className="text-sm text-muted-foreground">Habilitar inicio de sesión en el sistema</p>
+                          </div>
+                          <Switch
+                            id="acceso2"
+                            checked={formData.tieneAccesoSistema}
+                            onCheckedChange={(checked) => setFormData({ ...formData, tieneAccesoSistema: checked })}
+                          />
+                        </div>
+
+                        {formData.tieneAccesoSistema && (
+                          <div className="space-y-5 border-2 rounded-xl p-6 bg-card">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <Label className="text-lg font-semibold">Horarios de Acceso al Sistema</Label>
+                                <p className="text-sm text-muted-foreground mt-1">Define los días y horarios permitidos</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const newHorarios = formData.horariosAcceso.map(h => ({
+                                    ...h,
+                                    activo: true,
+                                    horaInicio: "00:00",
+                                    horaFin: "23:59",
+                                  }));
+                                  setFormData({ ...formData, horariosAcceso: newHorarios });
+                                }}
+                                className="gap-2"
+                              >
+                                <Clock className="h-4 w-4" />
+                                24h Todos
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              {formData.horariosAcceso.map((horario, index) => (
+                                <div key={horario.dia} className="flex items-center gap-4 p-4 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
+                                  <Checkbox
+                                    checked={horario.activo}
+                                    onCheckedChange={(checked) => {
+                                      const newHorarios = [...formData.horariosAcceso];
+                                      newHorarios[index].activo = checked as boolean;
+                                      setFormData({ ...formData, horariosAcceso: newHorarios });
+                                    }}
+                                    className="h-5 w-5"
+                                  />
+                                  <span className="w-28 text-sm font-medium">{DIAS_SEMANA[index].label}</span>
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <Input
+                                      type="time"
+                                      value={horario.horaInicio}
+                                      onChange={(e) => {
+                                        const newHorarios = [...formData.horariosAcceso];
+                                        newHorarios[index].horaInicio = e.target.value;
+                                        setFormData({ ...formData, horariosAcceso: newHorarios });
+                                      }}
+                                      disabled={!horario.activo}
+                                      className="flex-1 h-10"
+                                    />
+                                    <span className="text-sm text-muted-foreground font-medium">hasta</span>
+                                    <Input
+                                      type="time"
+                                      value={horario.horaFin}
+                                      onChange={(e) => {
+                                        const newHorarios = [...formData.horariosAcceso];
+                                        newHorarios[index].horaFin = e.target.value;
+                                        setFormData({ ...formData, horariosAcceso: newHorarios });
+                                      }}
+                                      disabled={!horario.activo}
+                                      className="flex-1 h-10"
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newHorarios = [...formData.horariosAcceso];
+                                      newHorarios[index].horaInicio = "00:00";
+                                      newHorarios[index].horaFin = "23:59";
+                                      setFormData({ ...formData, horariosAcceso: newHorarios });
+                                    }}
+                                    disabled={!horario.activo}
+                                    className="text-xs gap-1 h-9 px-3"
+                                  >
+                                    <Clock className="h-3 w-3" />
+                                    24h
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {!formData.tieneAccesoSistema && (
+                          <div className="text-center py-12 px-4 border-2 border-dashed rounded-xl bg-muted/10">
+                            <ShieldCheck className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
+                            <p className="text-muted-foreground">Activa "Permitir Acceso al Sistema" para configurar horarios</p>
+                          </div>
+                        )}
+                      </TabsContent>
+                    </Tabs>
+
+                    <Separator className="my-6" />
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <Button type="button" variant="outline" size="lg" onClick={() => {
                         setDialogOpen(false);
                         setEditingPersonal(null);
                       }}>
                         Cancelar
                       </Button>
-                      <Button type="submit">{editingPersonal ? 'Actualizar Personal' : 'Agregar Personal'}</Button>
+                      <Button type="submit" size="lg" className="min-w-[150px]">
+                        {editingPersonal ? 'Actualizar Personal' : 'Agregar Personal'}
+                      </Button>
                     </div>
                   </form>
                 </DialogContent>
