@@ -1,7 +1,5 @@
 import { ref, push, set, get, update, remove, query, orderByChild, equalTo } from "firebase/database";
 import { db } from "@/config/firebase";
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/config/firebase';
 
 /**
  * Convierte un archivo a base64 para almacenarlo en Firebase RTDB
@@ -65,25 +63,7 @@ export async function subirComprobanteCobranza(
 }
 
 /**
- * Sube un archivo al Firebase Storage
- * @param file - El archivo a subir
- * @param path - Ruta donde se guardará el archivo
- * @returns URL del archivo subido
- */
-export async function uploadFileToStorage(file: File, path: string): Promise<string> {
-  try {
-    const fileRef = storageRef(storage, path);
-    await uploadBytes(fileRef, file);
-    const downloadURL = await getDownloadURL(fileRef);
-    return downloadURL;
-  } catch (error: any) {
-    console.error('Error uploading file to storage:', error);
-    throw new Error(`Error al subir archivo: ${error.message}`);
-  }
-}
-
-/**
- * Sube documentos de personal de seguridad
+ * Sube documentos de personal de seguridad a RTDB como base64
  */
 export async function uploadPersonalSeguridadDocuments(
   empadronadoId: string,
@@ -104,22 +84,68 @@ export async function uploadPersonalSeguridadDocuments(
   } = {};
 
   try {
+    // Validar tamaño de archivos
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+
     if (files.dniFrontal) {
-      const extension = files.dniFrontal.name.split('.').pop();
-      const path = `personal-seguridad/${empadronadoId}/dni-frontal.${extension}`;
-      urls.dniFrontalURL = await uploadFileToStorage(files.dniFrontal, path);
+      if (!validTypes.includes(files.dniFrontal.type)) {
+        throw new Error('DNI frontal: Solo se permiten archivos JPG, PNG o PDF');
+      }
+      if (files.dniFrontal.size > maxSize) {
+        throw new Error('DNI frontal: El archivo no debe superar los 2MB');
+      }
+
+      const base64Data = await convertirArchivoABase64(files.dniFrontal);
+      const docRef = ref(db, `personal-seguridad/${empadronadoId}/dni-frontal`);
+      await set(docRef, {
+        data: base64Data,
+        tipo: files.dniFrontal.type,
+        nombre: files.dniFrontal.name,
+        tamaño: files.dniFrontal.size,
+        fechaSubida: Date.now()
+      });
+      urls.dniFrontalURL = `rtdb://personal-seguridad/${empadronadoId}/dni-frontal`;
     }
 
     if (files.dniReverso) {
-      const extension = files.dniReverso.name.split('.').pop();
-      const path = `personal-seguridad/${empadronadoId}/dni-reverso.${extension}`;
-      urls.dniReversoURL = await uploadFileToStorage(files.dniReverso, path);
+      if (!validTypes.includes(files.dniReverso.type)) {
+        throw new Error('DNI reverso: Solo se permiten archivos JPG, PNG o PDF');
+      }
+      if (files.dniReverso.size > maxSize) {
+        throw new Error('DNI reverso: El archivo no debe superar los 2MB');
+      }
+
+      const base64Data = await convertirArchivoABase64(files.dniReverso);
+      const docRef = ref(db, `personal-seguridad/${empadronadoId}/dni-reverso`);
+      await set(docRef, {
+        data: base64Data,
+        tipo: files.dniReverso.type,
+        nombre: files.dniReverso.name,
+        tamaño: files.dniReverso.size,
+        fechaSubida: Date.now()
+      });
+      urls.dniReversoURL = `rtdb://personal-seguridad/${empadronadoId}/dni-reverso`;
     }
 
     if (files.reciboLuz) {
-      const extension = files.reciboLuz.name.split('.').pop();
-      const path = `personal-seguridad/${empadronadoId}/recibo-luz.${extension}`;
-      urls.reciboLuzURL = await uploadFileToStorage(files.reciboLuz, path);
+      if (!validTypes.includes(files.reciboLuz.type)) {
+        throw new Error('Recibo de luz: Solo se permiten archivos JPG, PNG o PDF');
+      }
+      if (files.reciboLuz.size > maxSize) {
+        throw new Error('Recibo de luz: El archivo no debe superar los 2MB');
+      }
+
+      const base64Data = await convertirArchivoABase64(files.reciboLuz);
+      const docRef = ref(db, `personal-seguridad/${empadronadoId}/recibo-luz`);
+      await set(docRef, {
+        data: base64Data,
+        tipo: files.reciboLuz.type,
+        nombre: files.reciboLuz.name,
+        tamaño: files.reciboLuz.size,
+        fechaSubida: Date.now()
+      });
+      urls.reciboLuzURL = `rtdb://personal-seguridad/${empadronadoId}/recibo-luz`;
     }
 
     return urls;
