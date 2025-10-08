@@ -254,6 +254,13 @@ export const seedModules = async () => {
       icon: 'Shield',
       orden: 21,
       requiereAprobacion: true
+    },
+    planilla: {
+      id: 'planilla',
+      nombre: 'Planilla',
+      icon: 'Briefcase',
+      orden: 22,
+      requiereAprobacion: false
     }
   };
 
