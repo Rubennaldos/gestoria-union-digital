@@ -14,8 +14,11 @@ import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link, Shield } from 'lucid
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
+import { uploadPersonalSeguridadDocuments } from '@/services/storage';
 import { listRoles } from '@/services/rtdb';
 import { Role } from '@/types/auth';
+import { ref, update } from 'firebase/database';
+import { db } from '@/config/firebase';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { VincularCuentaModal } from '@/components/empadronados/VincularCuentaModal';
 
@@ -61,6 +64,13 @@ const EmpadronadoForm: React.FC = () => {
 
   const [roles, setRoles] = useState<Role[]>([]);
   
+  // Estados para archivos de personal de seguridad
+  const [dniFrontalFile, setDniFrontalFile] = useState<File | null>(null);
+  const [dniReversoFile, setDniReversoFile] = useState<File | null>(null);
+  const [reciboLuzFile, setReciboLuzFile] = useState<File | null>(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [newTelefonoEmergencia, setNewTelefonoEmergencia] = useState('');
+  
   // Form state
   const [formData, setFormData] = useState<CreateEmpadronadoForm>({
     numeroPadron: '',
@@ -81,7 +91,11 @@ const EmpadronadoForm: React.FC = () => {
     estadoVivienda: 'terreno',
     cumpleanos: '',
     observaciones: '',
-    tipoRegistro: 'residente' // Por defecto es residente
+    tipoRegistro: 'residente', // Por defecto es residente
+    telefonosEmergencia: [],
+    tipoSangre: '',
+    direccionDomicilio: '',
+    exentoCobroMensual: false
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -171,20 +185,39 @@ const EmpadronadoForm: React.FC = () => {
 
   const validateForm = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {};
+    
+    const esPersonalSeguridad = formData.tipoRegistro === 'personal_seguridad';
 
-    // Validaciones requeridas
-    if (!formData.numeroPadron.trim()) newErrors.numeroPadron = 'El número de padrón es requerido';
-    if (!formData.nombre.trim()) newErrors.nombre = 'El nombre es requerido';
-    if (!formData.apellidos.trim()) newErrors.apellidos = 'Los apellidos son requeridos';
-    if (!formData.dni.trim()) newErrors.dni = 'El DNI es requerido';
-    if (!formData.familia.trim()) newErrors.familia = 'La familia es requerida';
-    if (!formData.manzana?.trim()) newErrors.manzana = 'La manzana es requerida';
-    if (!formData.lote?.trim()) newErrors.lote = 'El lote es requerido';
-    if (!formData.cumpleanos.trim()) newErrors.cumpleanos = 'El cumpleaños es requerido';
+    // Validaciones básicas
+    if (!formData.numeroPadron.trim()) newErrors.numeroPadron = 'Número de padrón requerido';
+    if (!formData.nombre.trim()) newErrors.nombre = 'Nombre requerido';
+    if (!formData.apellidos.trim()) newErrors.apellidos = 'Apellidos requeridos';
+    if (!formData.dni.trim()) newErrors.dni = 'DNI requerido';
+    if (formData.dni.trim() && formData.dni.length !== 8) newErrors.dni = 'El DNI debe tener 8 dígitos';
+    
+    // Solo validar familia si es residente
+    if (!esPersonalSeguridad && !formData.familia.trim()) {
+      newErrors.familia = 'Familia requerida';
+    }
+    
+    if (!formData.cumpleanos.trim()) newErrors.cumpleanos = 'Cumpleaños requerido';
 
-    // Validar formato de DNI (8 dígitos)
-    if (formData.dni && !/^\d{8}$/.test(formData.dni)) {
-      newErrors.dni = 'El DNI debe tener 8 dígitos';
+    // Validaciones específicas para personal de seguridad
+    if (esPersonalSeguridad) {
+      if (!formData.direccionDomicilio?.trim()) {
+        newErrors.direccionDomicilio = 'Dirección de domicilio requerida';
+      }
+      
+      // Validar archivos solo si no está editando (en edición son opcionales)
+      if (!isEditing) {
+        if (!dniFrontalFile) newErrors.dniFrontal = 'DNI frontal requerido';
+        if (!dniReversoFile) newErrors.dniReverso = 'DNI reverso requerido';
+        if (!reciboLuzFile) newErrors.reciboLuz = 'Recibo de luz requerido';
+      }
+    } else {
+      // Validaciones para residentes
+      if (!formData.manzana?.trim()) newErrors.manzana = 'Manzana requerida';
+      if (!formData.lote?.trim()) newErrors.lote = 'Lote requerido';
     }
 
     // Validar formato de cumpleaños (DD/MM/YYYY)
@@ -284,6 +317,18 @@ const EmpadronadoForm: React.FC = () => {
         }),
         ...(formData.etapa?.trim() && {
           etapa: formData.etapa.trim()
+        }),
+        // Campos específicos para personal de seguridad
+        ...(formData.tipoRegistro === 'personal_seguridad' && {
+          tipoRegistro: 'personal_seguridad' as const,
+          tipoSangre: formData.tipoSangre?.trim() || undefined,
+          direccionDomicilio: formData.direccionDomicilio?.trim() || undefined,
+          exentoCobroMensual: formData.exentoCobroMensual || false,
+          ...(formData.telefonosEmergencia?.filter(t => t.numero?.trim()).length > 0 && {
+            telefonosEmergencia: formData.telefonosEmergencia.filter(t => t.numero?.trim()).map(t => ({
+              numero: t.numero.trim()
+            }))
+          })
         })
       };
 
@@ -299,6 +344,39 @@ const EmpadronadoForm: React.FC = () => {
         empadronadoId = await createEmpadronado(submitData, 'admin-user');
         success = Boolean(empadronadoId);
         console.log('Empadronado creado con ID:', empadronadoId, 'Success:', success);
+      }
+
+      // Si es personal de seguridad y hay archivos, subirlos
+      if (success && formData.tipoRegistro === 'personal_seguridad' && 
+          (dniFrontalFile || dniReversoFile || reciboLuzFile)) {
+        try {
+          setUploadingFiles(true);
+          const documentURLs = await uploadPersonalSeguridadDocuments(empadronadoId, {
+            dniFrontal: dniFrontalFile || undefined,
+            dniReverso: dniReversoFile || undefined,
+            reciboLuz: reciboLuzFile || undefined
+          });
+
+          // Actualizar empadronado con URLs de documentos usando firebase directly
+          const empadronadoRef = ref(db, `empadronados/${empadronadoId}`);
+          await update(empadronadoRef, {
+            documentoDniFrontal: documentURLs.dniFrontalURL || null,
+            documentoDniReverso: documentURLs.dniReversoURL || null,
+            documentoReciboLuz: documentURLs.reciboLuzURL || null,
+            updatedAt: Date.now()
+          });
+
+          console.log('Documentos subidos exitosamente');
+        } catch (uploadError: any) {
+          console.error('Error subiendo documentos:', uploadError);
+          toast({
+            title: "Advertencia",
+            description: `Empadronado ${isEditing ? 'actualizado' : 'creado'}, pero hubo un error al subir los documentos: ${uploadError.message}`,
+            variant: "destructive"
+          });
+        } finally {
+          setUploadingFiles(false);
+        }
       }
 
       // Si se creó/actualizó el empadronado exitosamente y está habilitada la creación de cuenta
@@ -960,6 +1038,168 @@ const EmpadronadoForm: React.FC = () => {
             />
           </CardContent>
         </Card>
+
+        {/* Información Adicional - Solo Personal de Seguridad */}
+        {formData.tipoRegistro === 'personal_seguridad' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Información Adicional de Personal de Seguridad</CardTitle>
+              <CardDescription>Datos específicos para el personal de seguridad</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="tipoSangre">Tipo de Sangre</Label>
+                  <Input
+                    id="tipoSangre"
+                    value={formData.tipoSangre}
+                    onChange={(e) => setFormData(prev => ({ ...prev, tipoSangre: e.target.value }))}
+                    placeholder="O+, A-, etc."
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="direccionDomicilio">Dirección de Domicilio *</Label>
+                  <Input
+                    id="direccionDomicilio"
+                    value={formData.direccionDomicilio}
+                    onChange={(e) => setFormData(prev => ({ ...prev, direccionDomicilio: e.target.value }))}
+                    placeholder="Av. Principal 123, Distrito"
+                  />
+                  {errors.direccionDomicilio && <p className="text-sm text-destructive mt-1">{errors.direccionDomicilio}</p>}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <Label>Teléfonos de Emergencia</Label>
+                <div className="space-y-2">
+                  {formData.telefonosEmergencia?.map((telefono, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={telefono.numero}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          telefonosEmergencia: prev.telefonosEmergencia?.map((t, i) => 
+                            i === index ? { numero: e.target.value } : t
+                          )
+                        }))}
+                        placeholder="Teléfono de emergencia"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          telefonosEmergencia: prev.telefonosEmergencia?.filter((_, i) => i !== index)
+                        }))}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newTelefonoEmergencia}
+                      onChange={(e) => setNewTelefonoEmergencia(e.target.value)}
+                      placeholder="Agregar teléfono de emergencia"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => {
+                        if (newTelefonoEmergencia.trim()) {
+                          setFormData(prev => ({
+                            ...prev,
+                            telefonosEmergencia: [...(prev.telefonosEmergencia || []), { numero: newTelefonoEmergencia }]
+                          }));
+                          setNewTelefonoEmergencia('');
+                        }
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="font-medium text-sm">Documentos (PDF, JPG o PNG)</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="dniFrontal">DNI Frontal *</Label>
+                    <Input
+                      id="dniFrontal"
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setDniFrontalFile(file);
+                      }}
+                    />
+                    {dniFrontalFile && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ✓ {dniFrontalFile.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="dniReverso">DNI Reverso *</Label>
+                    <Input
+                      id="dniReverso"
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setDniReversoFile(file);
+                      }}
+                    />
+                    {dniReversoFile && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ✓ {dniReversoFile.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="reciboLuz">Recibo de Luz *</Label>
+                    <Input
+                      id="reciboLuz"
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) setReciboLuzFile(file);
+                      }}
+                    />
+                    {reciboLuzFile && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ✓ {reciboLuzFile.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="exentoCobroMensual"
+                  checked={formData.exentoCobroMensual}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, exentoCobroMensual: checked }))}
+                />
+                <Label htmlFor="exentoCobroMensual">Exento de cobro mensual</Label>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Cuenta de Usuario del Sistema */}
         <Card>

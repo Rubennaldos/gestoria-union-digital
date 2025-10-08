@@ -1,5 +1,7 @@
 import { ref, push, set, get, update, remove, query, orderByChild, equalTo } from "firebase/database";
 import { db } from "@/config/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '@/config/firebase';
 
 /**
  * Convierte un archivo a base64 para almacenarlo en Firebase RTDB
@@ -59,5 +61,70 @@ export async function subirComprobanteCobranza(
   } catch (error) {
     console.error('Error subiendo comprobante:', error);
     throw error;
+  }
+}
+
+/**
+ * Sube un archivo al Firebase Storage
+ * @param file - El archivo a subir
+ * @param path - Ruta donde se guardará el archivo
+ * @returns URL del archivo subido
+ */
+export async function uploadFileToStorage(file: File, path: string): Promise<string> {
+  try {
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file);
+    const downloadURL = await getDownloadURL(fileRef);
+    return downloadURL;
+  } catch (error: any) {
+    console.error('Error uploading file to storage:', error);
+    throw new Error(`Error al subir archivo: ${error.message}`);
+  }
+}
+
+/**
+ * Sube documentos de personal de seguridad
+ */
+export async function uploadPersonalSeguridadDocuments(
+  empadronadoId: string,
+  files: {
+    dniFrontal?: File;
+    dniReverso?: File;
+    reciboLuz?: File;
+  }
+): Promise<{
+  dniFrontalURL?: string;
+  dniReversoURL?: string;
+  reciboLuzURL?: string;
+}> {
+  const urls: {
+    dniFrontalURL?: string;
+    dniReversoURL?: string;
+    reciboLuzURL?: string;
+  } = {};
+
+  try {
+    if (files.dniFrontal) {
+      const extension = files.dniFrontal.name.split('.').pop();
+      const path = `personal-seguridad/${empadronadoId}/dni-frontal.${extension}`;
+      urls.dniFrontalURL = await uploadFileToStorage(files.dniFrontal, path);
+    }
+
+    if (files.dniReverso) {
+      const extension = files.dniReverso.name.split('.').pop();
+      const path = `personal-seguridad/${empadronadoId}/dni-reverso.${extension}`;
+      urls.dniReversoURL = await uploadFileToStorage(files.dniReverso, path);
+    }
+
+    if (files.reciboLuz) {
+      const extension = files.reciboLuz.name.split('.').pop();
+      const path = `personal-seguridad/${empadronadoId}/recibo-luz.${extension}`;
+      urls.reciboLuzURL = await uploadFileToStorage(files.reciboLuz, path);
+    }
+
+    return urls;
+  } catch (error: any) {
+    console.error('Error uploading personal seguridad documents:', error);
+    throw new Error(`Error al subir documentos: ${error.message}`);
   }
 }
