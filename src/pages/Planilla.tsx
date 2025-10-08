@@ -282,59 +282,59 @@ export default function Planilla() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
-              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Total Personal</CardTitle>
-              <div className="p-2 md:p-5 bg-primary/10 rounded-xl md:rounded-2xl group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
-                <Users className="h-4 w-4 md:h-7 md:w-7 text-primary" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3 px-3 md:pt-4 md:px-4">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Total Personal</CardTitle>
+              <div className="p-1.5 md:p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors duration-300">
+                <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-primary" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
-              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3">{stats.totalPersonal}</div>
-              <p className="text-xs md:text-base text-muted-foreground">Personal registrado</p>
+            <CardContent className="relative px-3 md:px-4 pb-3 md:pb-4">
+              <div className="text-2xl md:text-3xl font-bold mb-0.5">{stats.totalPersonal}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">Personal registrado</p>
             </CardContent>
           </Card>
           
-          <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
-              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Activos</CardTitle>
-              <div className="p-2 md:p-5 bg-success/10 rounded-xl md:rounded-2xl group-hover:bg-success/20 group-hover:scale-110 transition-all duration-300">
-                <UserCheck className="h-4 w-4 md:h-7 md:w-7 text-success" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3 px-3 md:pt-4 md:px-4">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Activos</CardTitle>
+              <div className="p-1.5 md:p-2 bg-success/10 rounded-lg group-hover:bg-success/20 transition-colors duration-300">
+                <UserCheck className="h-3.5 w-3.5 md:h-4 md:w-4 text-success" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
-              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-success">{stats.activos}</div>
-              <p className="text-xs md:text-base text-muted-foreground">En servicio activo</p>
+            <CardContent className="relative px-3 md:px-4 pb-3 md:pb-4">
+              <div className="text-2xl md:text-3xl font-bold mb-0.5 text-success">{stats.activos}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">En servicio activo</p>
             </CardContent>
           </Card>
           
-          <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-muted/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
-              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Inactivos</CardTitle>
-              <div className="p-2 md:p-5 bg-muted/10 rounded-xl md:rounded-2xl group-hover:bg-muted/20 group-hover:scale-110 transition-all duration-300">
-                <UserX className="h-4 w-4 md:h-7 md:w-7 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3 px-3 md:pt-4 md:px-4">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Inactivos</CardTitle>
+              <div className="p-1.5 md:p-2 bg-muted/10 rounded-lg group-hover:bg-muted/20 transition-colors duration-300">
+                <UserX className="h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
-              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-muted-foreground">{stats.inactivos}</div>
-              <p className="text-xs md:text-base text-muted-foreground">Fuera de servicio</p>
+            <CardContent className="relative px-3 md:px-4 pb-3 md:pb-4">
+              <div className="text-2xl md:text-3xl font-bold mb-0.5 text-muted-foreground">{stats.inactivos}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">Fuera de servicio</p>
             </CardContent>
           </Card>
           
-          <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
+          <Card className="group hover:shadow-lg transition-all duration-300 hover:scale-[1.02] border overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
-              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Con Acceso Sistema</CardTitle>
-              <div className="p-2 md:p-5 bg-accent/10 rounded-xl md:rounded-2xl group-hover:bg-accent/20 group-hover:scale-110 transition-all duration-300">
-                <ShieldCheck className="h-4 w-4 md:h-7 md:w-7 text-accent-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-3 px-3 md:pt-4 md:px-4">
+              <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">Con Acceso</CardTitle>
+              <div className="p-1.5 md:p-2 bg-accent/10 rounded-lg group-hover:bg-accent/20 transition-colors duration-300">
+                <ShieldCheck className="h-3.5 w-3.5 md:h-4 md:w-4 text-accent-foreground" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
-              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-accent-foreground">{stats.conAccesoSistema}</div>
-              <p className="text-xs md:text-base text-muted-foreground">Acceso autorizado</p>
+            <CardContent className="relative px-3 md:px-4 pb-3 md:pb-4">
+              <div className="text-2xl md:text-3xl font-bold mb-0.5 text-accent-foreground">{stats.conAccesoSistema}</div>
+              <p className="text-[10px] md:text-xs text-muted-foreground">Acceso autorizado</p>
             </CardContent>
           </Card>
         </div>
