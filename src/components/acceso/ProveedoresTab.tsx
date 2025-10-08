@@ -35,12 +35,13 @@ export function ProveedoresTab() {
       toast({ title: "No hay vecino vinculado", description: "Tu usuario no está vinculado a un empadronado.", variant: "destructive" });
       return false;
     }
+    // Solo pedir placa si es vehicular
     if (tipoAcceso === "vehicular" && !placa.trim()) {
-      toast({ title: "Error", description: "La placa es requerida para acceso vehicular", variant: "destructive" });
+      toast({ title: "Placa requerida", description: "Debe ingresar la placa del vehículo", variant: "destructive" });
       return false;
     }
     if (!esRapido && !empresa.trim()) {
-      toast({ title: "Error", description: "Debe especificar la empresa", variant: "destructive" });
+      toast({ title: "Empresa requerida", description: "Debe especificar la empresa o servicio", variant: "destructive" });
       return false;
     }
     return true;

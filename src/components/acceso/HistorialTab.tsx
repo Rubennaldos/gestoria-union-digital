@@ -197,11 +197,11 @@ export function HistorialTab() {
                     </div>
                   ) : (
                     visitas.map((visita) => (
-                      <Card key={visita.id} className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-2">
+                      <Card key={visita.id} className="p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 min-w-0">
                             {getEstadoIcon(visita.estado)}
-                            <span className="font-medium">
+                            <span className="font-medium text-xs sm:text-sm truncate">
                               {formatFecha(visita.fechaCreacion || (visita as any).createdAt)}
                             </span>
                           </div>
@@ -209,12 +209,12 @@ export function HistorialTab() {
                         </div>
                         
                         <div className="space-y-2 text-sm">
-                          <p><strong>Tipo:</strong> {visita.tipoAcceso}</p>
-                          {visita.placa && <p><strong>Placa:</strong> {visita.placa}</p>}
+                          <p className="break-words"><strong>Tipo:</strong> {visita.tipoAcceso}</p>
+                          {visita.placa && <p className="break-words"><strong>Placa:</strong> {visita.placa}</p>}
                           <p><strong>Visitantes:</strong></p>
                           <ul className="ml-4 space-y-1">
                             {Array.isArray(visita.visitantes) && visita.visitantes.map((visitante, index) => (
-                              <li key={index}>• {visitante.nombre} (DNI: {visitante.dni})</li>
+                              <li key={index} className="break-words">• {visitante.nombre} (DNI: {visitante.dni})</li>
                             ))}
                             {visita.menores > 0 && (
                               <li>• {visita.menores} menor(es) de edad</li>
@@ -238,11 +238,11 @@ export function HistorialTab() {
                     </div>
                   ) : (
                     trabajadores.map((registro) => (
-                      <Card key={registro.id} className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-2">
+                      <Card key={registro.id} className="p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 min-w-0">
                             {getEstadoIcon(registro.estado)}
-                            <span className="font-medium">
+                            <span className="font-medium text-xs sm:text-sm truncate">
                               {formatFecha(registro.fechaCreacion || (registro as any).createdAt)}
                             </span>
                           </div>
@@ -250,39 +250,39 @@ export function HistorialTab() {
                         </div>
                         
                         <div className="space-y-2 text-sm">
-                          <p><strong>Tipo:</strong> {registro.tipoAcceso}</p>
-                          {registro.placa && <p><strong>Placa:</strong> {registro.placa}</p>}
+                          <p className="break-words"><strong>Tipo:</strong> {registro.tipoAcceso}</p>
+                          {registro.placa && <p className="break-words"><strong>Placa:</strong> {registro.placa}</p>}
                           {registro.maestroObraId && maestrosObraData[registro.maestroObraId] ? (
                             <div>
                               <p><strong>Maestro de Obra:</strong></p>
-                              <div className="ml-4 mt-1 p-2 bg-muted/50 rounded">
-                                <p className="font-medium">{maestrosObraData[registro.maestroObraId].nombre}</p>
+                              <div className="ml-4 mt-1 p-2 bg-muted/50 rounded break-words">
+                                <p className="font-medium break-words">{maestrosObraData[registro.maestroObraId].nombre}</p>
                                 {maestrosObraData[registro.maestroObraId].dni && (
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-muted-foreground break-words">
                                     DNI: {maestrosObraData[registro.maestroObraId].dni}
                                   </p>
                                 )}
                                 {maestrosObraData[registro.maestroObraId].telefono && (
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-muted-foreground break-words">
                                     Tel: {maestrosObraData[registro.maestroObraId].telefono}
                                   </p>
                                 )}
                                 {maestrosObraData[registro.maestroObraId].empresa && (
-                                  <p className="text-xs text-muted-foreground">
+                                  <p className="text-xs text-muted-foreground break-words">
                                     Empresa: {maestrosObraData[registro.maestroObraId].empresa}
                                   </p>
                                 )}
                               </div>
                             </div>
                           ) : (
-                            <p><strong>Maestro de Obra:</strong> {registro.maestroObraId || "No especificado"}</p>
+                            <p className="break-words"><strong>Maestro de Obra:</strong> {registro.maestroObraId || "No especificado"}</p>
                           )}
                           {Array.isArray(registro.trabajadores) && registro.trabajadores.length > 0 && (
                             <>
                               <p><strong>Trabajadores adicionales:</strong></p>
                               <ul className="ml-4 space-y-1">
                                 {registro.trabajadores.map((trabajador, index) => (
-                                  <li key={index}>• {trabajador.nombre} (DNI: {trabajador.dni})</li>
+                                  <li key={index} className="break-words">• {trabajador.nombre} (DNI: {trabajador.dni})</li>
                                 ))}
                               </ul>
                             </>
@@ -305,11 +305,11 @@ export function HistorialTab() {
                     </div>
                   ) : (
                     proveedores.map((proveedor) => (
-                      <Card key={proveedor.id} className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-2">
+                      <Card key={proveedor.id} className="p-3 sm:p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 min-w-0">
                             {getEstadoIcon(proveedor.estado)}
-                            <span className="font-medium">
+                            <span className="font-medium text-xs sm:text-sm truncate">
                               {formatFecha(proveedor.fechaCreacion || (proveedor as any).createdAt)}
                             </span>
                           </div>
@@ -317,9 +317,9 @@ export function HistorialTab() {
                         </div>
                         
                         <div className="space-y-2 text-sm">
-                          <p><strong>Tipo:</strong> {proveedor.tipoAcceso}</p>
-                          {proveedor.placa && <p><strong>Placa:</strong> {proveedor.placa}</p>}
-                          <p><strong>Empresa:</strong> {proveedor.empresa}</p>
+                          <p className="break-words"><strong>Tipo:</strong> {proveedor.tipoAcceso}</p>
+                          {proveedor.placa && <p className="break-words"><strong>Placa:</strong> {proveedor.placa}</p>}
+                          <p className="break-words"><strong>Empresa:</strong> {proveedor.empresa}</p>
                           {proveedor.tipoServicio && proveedor.tipoServicio !== 'otro' && (
                             <Badge variant="outline" className="text-xs">
                               {proveedor.tipoServicio.toUpperCase()}
