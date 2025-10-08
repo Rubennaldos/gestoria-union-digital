@@ -246,7 +246,23 @@ export const listRoles = async (): Promise<Role[]> => {
 export const listModules = async (): Promise<Module[]> => {
   const modulesRef = ref(db, 'modules');
   const snapshot = await get(modulesRef);
-  const modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
+  let modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
+  
+  // Auto-agregar módulo PLANILLA si no existe
+  const hasPlanilla = modules.some(m => m.id === 'planilla');
+  if (!hasPlanilla && snapshot.exists()) {
+    const allModules = snapshot.val();
+    allModules.planilla = {
+      id: 'planilla',
+      nombre: 'Planilla',
+      icon: 'Briefcase',
+      orden: 22,
+      requiereAprobacion: false
+    };
+    await set(modulesRef, allModules);
+    modules = Object.values(allModules);
+  }
+  
   return modules.sort((a, b) => a.orden - b.orden);
 };
 
