@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link, Shield } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
 import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
@@ -80,7 +80,8 @@ const EmpadronadoForm: React.FC = () => {
     vive: true,
     estadoVivienda: 'terreno',
     cumpleanos: '',
-    observaciones: ''
+    observaciones: '',
+    tipoRegistro: 'residente' // Por defecto es residente
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -507,6 +508,77 @@ const EmpadronadoForm: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Tipo de Registro */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Tipo de Registro
+              {formData.tipoRegistro === 'personal_seguridad' && (
+                <Badge variant="secondary" className="text-xs">Personal de Seguridad</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>
+              Selecciona si es un residente o personal de seguridad
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData(prev => ({ ...prev, tipoRegistro: 'residente' }));
+                  setCreateUserAccount(false);
+                }}
+                className={`p-4 border-2 rounded-lg transition-all ${
+                  formData.tipoRegistro === 'residente'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Home className="h-6 w-6" />
+                  <div className="text-left">
+                    <p className="font-medium">Residente</p>
+                    <p className="text-sm text-muted-foreground">
+                      Persona que vive en la urbanización
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    tipoRegistro: 'personal_seguridad',
+                    familia: 'Personal de Seguridad',
+                    vive: false,
+                    estadoVivienda: 'terreno'
+                  }));
+                  setCreateUserAccount(true);
+                  setUserAccountData(prev => ({ ...prev, roleId: 'seguridad' }));
+                }}
+                className={`p-4 border-2 rounded-lg transition-all ${
+                  formData.tipoRegistro === 'personal_seguridad'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Shield className="h-6 w-6" />
+                  <div className="text-left">
+                    <p className="font-medium">Personal de Seguridad</p>
+                    <p className="text-sm text-muted-foreground">
+                      Guardias y personal de vigilancia
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Información básica */}
         <Card>
           <CardHeader>
@@ -573,16 +645,18 @@ const EmpadronadoForm: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="familia">Familia *</Label>
-                <Input
-                  id="familia"
-                  value={formData.familia}
-                  onChange={(e) => setFormData(prev => ({ ...prev, familia: e.target.value }))}
-                  placeholder="Familia García"
-                />
-                {errors.familia && <p className="text-sm text-destructive mt-1">{errors.familia}</p>}
-              </div>
+              {formData.tipoRegistro === 'residente' && (
+                <div>
+                  <Label htmlFor="familia">Familia *</Label>
+                  <Input
+                    id="familia"
+                    value={formData.familia}
+                    onChange={(e) => setFormData(prev => ({ ...prev, familia: e.target.value }))}
+                    placeholder="Familia García"
+                  />
+                  {errors.familia && <p className="text-sm text-destructive mt-1">{errors.familia}</p>}
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="genero">Género</Label>
@@ -632,12 +706,13 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Miembros de Familia */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Miembros de la Familia</CardTitle>
-            <CardDescription>Agregar otros miembros que viven en la familia</CardDescription>
-          </CardHeader>
+        {/* Miembros de Familia - Solo para residentes */}
+        {formData.tipoRegistro === 'residente' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Miembros de la Familia</CardTitle>
+              <CardDescription>Agregar otros miembros que viven en la familia</CardDescription>
+            </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
               <div className="flex items-center space-x-2">
@@ -697,6 +772,7 @@ const EmpadronadoForm: React.FC = () => {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Contacto */}
         <Card>
@@ -705,41 +781,44 @@ const EmpadronadoForm: React.FC = () => {
             <CardDescription>Información de contacto y ubicación</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="manzana">Manzana *</Label>
-                <Input
-                  id="manzana"
-                  value={formData.manzana}
-                  onChange={(e) => setFormData(prev => ({ ...prev, manzana: e.target.value }))}
-                  placeholder="A"
-                />
-                {errors.manzana && <p className="text-sm text-destructive mt-1">{errors.manzana}</p>}
-              </div>
+            {/* Ubicación - Solo para residentes */}
+            {formData.tipoRegistro === 'residente' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="manzana">Manzana *</Label>
+                  <Input
+                    id="manzana"
+                    value={formData.manzana}
+                    onChange={(e) => setFormData(prev => ({ ...prev, manzana: e.target.value }))}
+                    placeholder="A"
+                  />
+                  {errors.manzana && <p className="text-sm text-destructive mt-1">{errors.manzana}</p>}
+                </div>
 
-              <div>
-                <Label htmlFor="lote">Lote *</Label>
-                <Input
-                  id="lote"
-                  value={formData.lote}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lote: e.target.value }))}
-                  placeholder="15"
-                />
-                {errors.lote && <p className="text-sm text-destructive mt-1">{errors.lote}</p>}
-              </div>
+                <div>
+                  <Label htmlFor="lote">Lote *</Label>
+                  <Input
+                    id="lote"
+                    value={formData.lote}
+                    onChange={(e) => setFormData(prev => ({ ...prev, lote: e.target.value }))}
+                    placeholder="15"
+                  />
+                  {errors.lote && <p className="text-sm text-destructive mt-1">{errors.lote}</p>}
+                </div>
 
-              <div>
-                <Label htmlFor="etapa">Etapa</Label>
-                <Input
-                  id="etapa"
-                  value={formData.etapa}
-                  onChange={(e) => setFormData(prev => ({ ...prev, etapa: e.target.value }))}
-                  placeholder="1"
-                />
+                <div>
+                  <Label htmlFor="etapa">Etapa</Label>
+                  <Input
+                    id="etapa"
+                    value={formData.etapa}
+                    onChange={(e) => setFormData(prev => ({ ...prev, etapa: e.target.value }))}
+                    placeholder="1"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <Separator />
+            {formData.tipoRegistro === 'residente' && <Separator />}
 
             <div>
               <Label>Teléfonos</Label>
@@ -826,42 +905,44 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Vivienda y Residencia */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Vivienda y Residencia</CardTitle>
-            <CardDescription>Estado de la vivienda y residencia</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="estadoVivienda">Estado de Vivienda</Label>
-                <Select 
-                  value={formData.estadoVivienda} 
-                  onValueChange={(value: 'construida' | 'construccion' | 'terreno') => setFormData(prev => ({ ...prev, estadoVivienda: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="construida">Casa Construida</SelectItem>
-                    <SelectItem value="construccion">En Construcción</SelectItem>
-                    <SelectItem value="terreno">Solo Terreno</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Vivienda y Residencia - Solo para residentes */}
+        {formData.tipoRegistro === 'residente' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Vivienda y Residencia</CardTitle>
+              <CardDescription>Estado de la vivienda y residencia</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="estadoVivienda">Estado de Vivienda</Label>
+                  <Select 
+                    value={formData.estadoVivienda} 
+                    onValueChange={(value: 'construida' | 'construccion' | 'terreno') => setFormData(prev => ({ ...prev, estadoVivienda: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="construida">Casa Construida</SelectItem>
+                      <SelectItem value="construccion">En Construcción</SelectItem>
+                      <SelectItem value="terreno">Solo Terreno</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="vive"
-                  checked={formData.vive}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, vive: checked }))}
-                />
-                <Label htmlFor="vive">Vive en la asociación</Label>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="vive"
+                    checked={formData.vive}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, vive: checked }))}
+                  />
+                  <Label htmlFor="vive">Vive en la asociación</Label>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
 
         {/* Observaciones */}
@@ -885,11 +966,13 @@ const EmpadronadoForm: React.FC = () => {
           <CardHeader>
             <CardTitle>Cuenta de Usuario del Sistema</CardTitle>
             <CardDescription>
-              {hasExistingAccount
-                ? "Este empadronado ya tiene una cuenta de acceso vinculada"
-                : isEditing 
-                  ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
-                  : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"
+              {formData.tipoRegistro === 'personal_seguridad' 
+                ? "El personal de seguridad debe tener una cuenta para acceder al sistema"
+                : hasExistingAccount
+                  ? "Este empadronado ya tiene una cuenta de acceso vinculada"
+                  : isEditing 
+                    ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
+                    : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"
               }
             </CardDescription>
           </CardHeader>

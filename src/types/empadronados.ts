@@ -39,6 +39,9 @@ export interface Empadronado {
   creadoPor: string; // uid del usuario que lo creó
   modificadoPor?: string; // uid del último usuario que lo modificó
 
+  /** NUEVO: tipo de registro para diferenciar residentes de personal */
+  tipoRegistro?: 'residente' | 'personal_seguridad';
+  
   /** NUEVO: vínculo con cuenta del sistema */
   authUid?: string;        // UID de Firebase Auth si tiene cuenta
   emailAcceso?: string;    // email con el que accede
@@ -63,6 +66,7 @@ export interface CreateEmpadronadoForm {
   estadoVivienda: 'construida' | 'construccion' | 'terreno';
   cumpleanos: string;
   observaciones?: string;
+  tipoRegistro?: 'residente' | 'personal_seguridad';
 }
 
 export interface UpdateEmpadronadoForm extends Partial<CreateEmpadronadoForm> {}
