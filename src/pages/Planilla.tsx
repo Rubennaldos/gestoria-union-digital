@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { PersonalPlanilla } from "@/types/planilla";
 import { getPersonalPlanilla, getPlanillaStats, puedeAccederAhora, updatePersonalPlanilla, deletePersonalPlanilla } from "@/services/planilla";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -366,6 +366,9 @@ export default function Planilla() {
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
+                    <DialogDescription>
+                      {editingPersonal ? 'Actualiza la información del personal' : 'Completa el formulario para agregar personal a la planilla'}
+                    </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
                     {!editingPersonal && (
@@ -501,7 +504,24 @@ export default function Planilla() {
 
                     {formData.tieneAccesoSistema && (
                       <div className="space-y-3 border rounded-lg p-4">
-                        <Label>Horarios de Acceso al Sistema</Label>
+                        <div className="flex items-center justify-between">
+                          <Label>Horarios de Acceso al Sistema</Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newHorarios = formData.horariosAcceso.map(h => ({
+                                ...h,
+                                horaInicio: "00:00",
+                                horaFin: "23:59",
+                              }));
+                              setFormData({ ...formData, horariosAcceso: newHorarios });
+                            }}
+                          >
+                            24 Horas Todos
+                          </Button>
+                        </div>
                         {formData.horariosAcceso.map((horario, index) => (
                           <div key={horario.dia} className="flex items-center gap-3">
                             <Checkbox
@@ -536,6 +556,21 @@ export default function Planilla() {
                               disabled={!horario.activo}
                               className="w-32"
                             />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newHorarios = [...formData.horariosAcceso];
+                                newHorarios[index].horaInicio = "00:00";
+                                newHorarios[index].horaFin = "23:59";
+                                setFormData({ ...formData, horariosAcceso: newHorarios });
+                              }}
+                              disabled={!horario.activo}
+                              className="text-xs"
+                            >
+                              24h
+                            </Button>
                           </div>
                         ))}
                       </div>

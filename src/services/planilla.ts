@@ -120,8 +120,16 @@ export async function updatePersonalPlanilla(
       throw new Error("Personal no encontrado");
     }
     
+    // Filtrar valores undefined
+    const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as any);
+    
     const updates = {
-      ...data,
+      ...cleanData,
       updatedAt: Date.now(),
       modificadoPor: userId,
     };
