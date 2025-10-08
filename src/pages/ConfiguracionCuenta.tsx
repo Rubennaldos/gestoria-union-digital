@@ -7,14 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Save, Eye, EyeOff, Shield, User, Lock, HelpCircle } from "lucide-react";
+import { ArrowLeft, Save, Eye, EyeOff, Shield, User, Lock, HelpCircle, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { updateUserProfile, getUserProfile } from "@/services/rtdb";
-import { obtenerEmpadronadoPorAuthUid } from "@/services/empadronados";
-import { Empadronado } from "@/types/empadronados";
+import { obtenerEmpadronadoPorAuthUid, updateEmpadronado } from "@/services/empadronados";
+import { Empadronado, FamilyMember, Vehicle, PhoneNumber } from "@/types/empadronados";
 import {
   Select,
   SelectContent,
@@ -62,6 +62,25 @@ const ConfiguracionCuenta: React.FC = () => {
   const [telefono, setTelefono] = useState("");
   const [username, setUsername] = useState("");
 
+  // Estados para datos editables del empadronado
+  const [genero, setGenero] = useState<"masculino" | "femenino">("masculino");
+  const [estadoVivienda, setEstadoVivienda] = useState<"construida" | "construccion" | "terreno">("terreno");
+  const [familia, setFamilia] = useState("");
+  const [cumpleanos, setCumpleanos] = useState("");
+  const [telefonos, setTelefonos] = useState<PhoneNumber[]>([]);
+  const [vehiculos, setVehiculos] = useState<Vehicle[]>([]);
+  const [miembrosFamilia, setMiembrosFamilia] = useState<FamilyMember[]>([]);
+
+  // Estados para agregar nuevos elementos
+  const [newPhone, setNewPhone] = useState("");
+  const [newVehicle, setNewVehicle] = useState<Vehicle>({ placa: "", tipo: "vehiculo" });
+  const [newFamilyMember, setNewFamilyMember] = useState<FamilyMember>({
+    nombre: "",
+    apellidos: "",
+    parentezco: "",
+    cumpleanos: "",
+  });
+
   // Estados para cambio de contraseña
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
@@ -102,6 +121,14 @@ const ConfiguracionCuenta: React.FC = () => {
           const empData = await obtenerEmpadronadoPorAuthUid(user.uid);
           if (empData) {
             setEmpadronado(empData);
+            // Inicializar estados editables
+            setGenero(empData.genero || "masculino");
+            setEstadoVivienda(empData.estadoVivienda || "terreno");
+            setFamilia(empData.familia || "");
+            setCumpleanos(empData.cumpleanos || "");
+            setTelefonos(empData.telefonos || []);
+            setVehiculos(empData.vehiculos || []);
+            setMiembrosFamilia(empData.miembrosFamilia || []);
           }
         }
 
@@ -148,6 +175,102 @@ const ConfiguracionCuenta: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdateEmpadronado = async () => {
+    if (!empadronado?.id || !user?.uid) return;
+
+    // Validar formato de cumpleaños
+    if (cumpleanos && !/^\d{2}\/\d{2}\/\d{4}$/.test(cumpleanos)) {
+      toast({
+        title: "Error",
+        description: "El formato de cumpleaños debe ser DD/MM/YYYY",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await updateEmpadronado(
+        empadronado.id,
+        {
+          genero,
+          estadoVivienda,
+          familia,
+          cumpleanos,
+          telefonos,
+          vehiculos,
+          miembrosFamilia,
+        },
+        user.uid
+      );
+
+      toast({
+        title: "Datos actualizados",
+        description: "Tu información personal se ha actualizado correctamente",
+      });
+
+      // Recargar datos
+      const empData = await obtenerEmpadronadoPorAuthUid(user.uid);
+      if (empData) {
+        setEmpadronado(empData);
+      }
+    } catch (error: any) {
+      console.error("Error actualizando empadronado:", error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar la información",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Funciones para teléfonos
+  const addPhone = () => {
+    if (newPhone.trim()) {
+      setTelefonos([...telefonos, { numero: newPhone.trim() }]);
+      setNewPhone("");
+    }
+  };
+
+  const removePhone = (index: number) => {
+    setTelefonos(telefonos.filter((_, i) => i !== index));
+  };
+
+  // Funciones para vehículos
+  const addVehicle = () => {
+    if (newVehicle.placa.trim()) {
+      setVehiculos([...vehiculos, { ...newVehicle, placa: newVehicle.placa.toUpperCase() }]);
+      setNewVehicle({ placa: "", tipo: "vehiculo" });
+    }
+  };
+
+  const removeVehicle = (index: number) => {
+    setVehiculos(vehiculos.filter((_, i) => i !== index));
+  };
+
+  // Funciones para miembros de familia
+  const addFamilyMember = () => {
+    if (
+      newFamilyMember.nombre.trim() &&
+      newFamilyMember.apellidos.trim() &&
+      newFamilyMember.parentezco.trim()
+    ) {
+      setMiembrosFamilia([...miembrosFamilia, newFamilyMember]);
+      setNewFamilyMember({
+        nombre: "",
+        apellidos: "",
+        parentezco: "",
+        cumpleanos: "",
+      });
+    }
+  };
+
+  const removeFamilyMember = (index: number) => {
+    setMiembrosFamilia(miembrosFamilia.filter((_, i) => i !== index));
   };
 
   const handleChangePassword = async () => {
@@ -394,59 +517,59 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Fecha de Cumpleaños
-                    </Label>
+                    <Label>Fecha de Cumpleaños</Label>
                     <Input
-                      value={empadronado?.cumpleanos || "No registrado"}
-                      disabled
-                      className="bg-muted"
+                      value={cumpleanos}
+                      onChange={(e) => setCumpleanos(e.target.value)}
+                      placeholder="DD/MM/YYYY"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Formato: DD/MM/YYYY (ejemplo: 15/03/1990)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Género</Label>
+                    <Select
+                      value={genero}
+                      onValueChange={(value: "masculino" | "femenino") => setGenero(value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Familia/Etapa</Label>
+                    <Input
+                      value={familia}
+                      onChange={(e) => setFamilia(e.target.value)}
+                      placeholder="Ingresa tu familia o etapa"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Género
-                    </Label>
-                    <Input
-                      value={empadronado?.genero || "No especificado"}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Familia/Etapa
-                    </Label>
-                    <Input
-                      value={empadronado?.familia || "No asignado"}
-                      disabled
-                      className="bg-muted"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Estado del Terreno
-                    </Label>
-                    <Input
-                      value={
-                        empadronado?.estadoVivienda === "construida"
-                          ? "Construida"
-                          : empadronado?.estadoVivienda === "construccion"
-                          ? "En Construcción"
-                          : empadronado?.estadoVivienda === "terreno"
-                          ? "Terreno"
-                          : "No especificado"
+                    <Label>Estado del Terreno</Label>
+                    <Select
+                      value={estadoVivienda}
+                      onValueChange={(value: "construida" | "construccion" | "terreno") =>
+                        setEstadoVivienda(value)
                       }
-                      disabled
-                      className="bg-muted"
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="construida">Casa Construida</SelectItem>
+                        <SelectItem value="construccion">En Construcción</SelectItem>
+                        <SelectItem value="terreno">Solo Terreno</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -515,114 +638,304 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-4">
+                <div className="flex justify-end gap-2 pt-4">
                   <Button
                     onClick={handleUpdateProfile}
                     disabled={loading}
                     className="w-full sm:w-auto"
+                    variant="outline"
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    {loading ? "Guardando..." : "Guardar Cambios"}
+                    Guardar Perfil
                   </Button>
+                  {empadronado && (
+                    <Button
+                      onClick={handleUpdateEmpadronado}
+                      disabled={loading}
+                      className="w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {loading ? "Guardando..." : "Guardar Datos Personales"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Teléfonos de Contacto */}
-            {empadronado?.telefonos && empadronado.telefonos.length > 0 && (
+            {/* Teléfonos de Contacto - Editable */}
+            {empadronado && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     📱 Teléfonos de Contacto
                   </CardTitle>
+                  <CardDescription>
+                    Administra tus números de teléfono
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {empadronado.telefonos.map((tel, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 p-3 bg-accent/30 rounded-lg"
-                      >
-                        <span className="font-medium text-sm">
-                          Teléfono {index + 1}:
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {typeof tel === "string" ? tel : tel.numero}
-                        </span>
-                      </div>
-                    ))}
+                <CardContent className="space-y-3">
+                  {/* Lista de teléfonos */}
+                  {telefonos.map((tel, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 p-3 bg-accent/30 rounded-lg"
+                    >
+                      <Input
+                        value={typeof tel === "string" ? tel : tel.numero}
+                        onChange={(e) => {
+                          const newTelefonos = [...telefonos];
+                          newTelefonos[index] = { numero: e.target.value };
+                          setTelefonos(newTelefonos);
+                        }}
+                        placeholder="999888777"
+                      />
+                      {telefonos.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removePhone(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {/* Agregar nuevo teléfono */}
+                  <div className="flex gap-2 pt-2">
+                    <Input
+                      value={newPhone}
+                      onChange={(e) => setNewPhone(e.target.value)}
+                      placeholder="Agregar otro teléfono"
+                    />
+                    <Button type="button" variant="outline" onClick={addPhone}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Vehículos */}
-            {empadronado?.vehiculos && empadronado.vehiculos.length > 0 && (
+            {/* Vehículos - Editable */}
+            {empadronado && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     🚗 Vehículos Registrados
                   </CardTitle>
+                  <CardDescription>
+                    Administra tus vehículos
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {empadronado.vehiculos.map((vehiculo, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-accent/30 rounded-lg border"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-primary/10 rounded-full">
-                            <span className="text-2xl">
-                              {vehiculo.tipo === "vehiculo" ? "🚗" : "🏍️"}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-semibold">{vehiculo.placa}</p>
-                            <p className="text-sm text-muted-foreground capitalize">
-                              {vehiculo.tipo}
-                            </p>
-                          </div>
-                        </div>
+                <CardContent className="space-y-3">
+                  {/* Lista de vehículos */}
+                  {vehiculos.map((vehiculo, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 p-4 bg-accent/30 rounded-lg border"
+                    >
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <span className="text-2xl">
+                          {vehiculo.tipo === "vehiculo" ? "🚗" : "🏍️"}
+                        </span>
                       </div>
-                    ))}
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Input
+                          value={vehiculo.placa}
+                          onChange={(e) => {
+                            const newVehiculos = [...vehiculos];
+                            newVehiculos[index].placa = e.target.value.toUpperCase();
+                            setVehiculos(newVehiculos);
+                          }}
+                          placeholder="ABC-123"
+                        />
+                        <Select
+                          value={vehiculo.tipo}
+                          onValueChange={(value: "vehiculo" | "moto") => {
+                            const newVehiculos = [...vehiculos];
+                            newVehiculos[index].tipo = value;
+                            setVehiculos(newVehiculos);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="vehiculo">Vehículo</SelectItem>
+                            <SelectItem value="moto">Moto</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeVehicle(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  {/* Agregar nuevo vehículo */}
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                    <Input
+                      value={newVehicle.placa}
+                      onChange={(e) =>
+                        setNewVehicle({ ...newVehicle, placa: e.target.value.toUpperCase() })
+                      }
+                      placeholder="ABC-123"
+                      className="flex-1"
+                    />
+                    <Select
+                      value={newVehicle.tipo}
+                      onValueChange={(value: "vehiculo" | "moto") =>
+                        setNewVehicle({ ...newVehicle, tipo: value })
+                      }
+                    >
+                      <SelectTrigger className="w-full sm:w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vehiculo">Vehículo</SelectItem>
+                        <SelectItem value="moto">Moto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" onClick={addVehicle}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Miembros de Familia */}
-            {empadronado?.miembrosFamilia && empadronado.miembrosFamilia.length > 0 && (
+            {/* Miembros de Familia - Editable */}
+            {empadronado && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     👨‍👩‍👧‍👦 Miembros de la Familia
                   </CardTitle>
+                  <CardDescription>
+                    Administra los miembros de tu familia
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {empadronado.miembrosFamilia.map((miembro, index) => (
-                      <div
-                        key={index}
-                        className="p-4 bg-accent/30 rounded-lg border"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-1">
-                            <p className="font-semibold">
-                              {miembro.nombre} {miembro.apellidos}
+                <CardContent className="space-y-3">
+                  {/* Lista de miembros */}
+                  {miembrosFamilia.map((miembro, index) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-accent/30 rounded-lg border"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="space-y-1 flex-1">
+                          <p className="font-semibold">
+                            {miembro.nombre} {miembro.apellidos}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {miembro.parentezco}
+                          </p>
+                          {miembro.cumpleanos && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              🎂 {miembro.cumpleanos}
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                              {miembro.parentezco}
-                            </p>
-                            {miembro.cumpleanos && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                🎂 {miembro.cumpleanos}
-                              </p>
-                            )}
-                          </div>
+                          )}
                         </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeFamilyMember(index)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                    ))}
+                      
+                      {/* Editar miembro */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <Input
+                          value={miembro.nombre}
+                          onChange={(e) => {
+                            const newMiembros = [...miembrosFamilia];
+                            newMiembros[index].nombre = e.target.value;
+                            setMiembrosFamilia(newMiembros);
+                          }}
+                          placeholder="Nombre"
+                        />
+                        <Input
+                          value={miembro.apellidos}
+                          onChange={(e) => {
+                            const newMiembros = [...miembrosFamilia];
+                            newMiembros[index].apellidos = e.target.value;
+                            setMiembrosFamilia(newMiembros);
+                          }}
+                          placeholder="Apellidos"
+                        />
+                        <Input
+                          value={miembro.parentezco}
+                          onChange={(e) => {
+                            const newMiembros = [...miembrosFamilia];
+                            newMiembros[index].parentezco = e.target.value;
+                            setMiembrosFamilia(newMiembros);
+                          }}
+                          placeholder="Parentezco"
+                        />
+                        <Input
+                          value={miembro.cumpleanos}
+                          onChange={(e) => {
+                            const newMiembros = [...miembrosFamilia];
+                            newMiembros[index].cumpleanos = e.target.value;
+                            setMiembrosFamilia(newMiembros);
+                          }}
+                          placeholder="DD/MM/YYYY"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Agregar nuevo miembro */}
+                  <div className="border-t pt-4 mt-4">
+                    <Label className="mb-2 block">Agregar Nuevo Miembro</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input
+                        value={newFamilyMember.nombre}
+                        onChange={(e) =>
+                          setNewFamilyMember({ ...newFamilyMember, nombre: e.target.value })
+                        }
+                        placeholder="Nombre"
+                      />
+                      <Input
+                        value={newFamilyMember.apellidos}
+                        onChange={(e) =>
+                          setNewFamilyMember({ ...newFamilyMember, apellidos: e.target.value })
+                        }
+                        placeholder="Apellidos"
+                      />
+                      <Input
+                        value={newFamilyMember.parentezco}
+                        onChange={(e) =>
+                          setNewFamilyMember({ ...newFamilyMember, parentezco: e.target.value })
+                        }
+                        placeholder="Parentezco (ej: Hijo/a, Esposo/a)"
+                      />
+                      <Input
+                        value={newFamilyMember.cumpleanos}
+                        onChange={(e) =>
+                          setNewFamilyMember({ ...newFamilyMember, cumpleanos: e.target.value })
+                        }
+                        placeholder="DD/MM/YYYY"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addFamilyMember}
+                      className="mt-2 w-full sm:w-auto"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Familiar
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
