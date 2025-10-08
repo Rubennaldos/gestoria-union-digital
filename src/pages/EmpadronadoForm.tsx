@@ -586,76 +586,97 @@ const EmpadronadoForm: React.FC = () => {
 
   if (loadingData) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="h-96 bg-muted rounded"></div>
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="animate-pulse space-y-4 w-full max-w-2xl">
+          <div className="h-8 bg-muted rounded w-1/3"></div>
+          <div className="h-32 bg-muted rounded"></div>
+          <div className="h-48 bg-muted rounded"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/")} className="gap-2">
-          <Home className="w-4 h-4" />
-          Inicio
-        </Button>
-        <div className="h-6 w-px bg-border" />
-        <Button variant="ghost" size="sm" onClick={() => navigate("/padron")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver al Padrón
-        </Button>
-        <div className="h-6 w-px bg-border" />
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
+      <div className="container max-w-5xl mx-auto p-3 md:p-6 pb-24 sm:pb-6">
+        {/* Extra padding bottom for mobile sticky buttons */}
+      <div className="space-y-3 md:space-y-4 mb-4 md:mb-6">
+        {/* Navigation buttons */}
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate("/")} 
+            className="gap-1.5 h-8 px-2 md:h-9 md:px-3"
+          >
+            <Home className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="text-xs md:text-sm">Inicio</span>
+          </Button>
+          <div className="h-4 md:h-6 w-px bg-border" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate("/padron")}
+            className="gap-1.5 h-8 px-2 md:h-9 md:px-3"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 md:h-4 md:w-4" />
+            <span className="text-xs md:text-sm">Volver al Padrón</span>
+          </Button>
+        </div>
+        
+        {/* Title */}
         <div>
-          <h1 className="text-2xl font-bold">{isEditing ? "Editar Empadronado" : "Nuevo Empadronado"}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+            {isEditing ? "Editar Empadronado" : "Nuevo Empadronado"}
+          </h1>
+          <p className="text-xs md:text-sm text-muted-foreground mt-1">
             {isEditing ? "Modifica los datos del empadronado" : "Completa la información del nuevo empadronado"}
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Tipo de Registro */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              Tipo de Registro
+      <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
+        {/* Tipo de Registro - Mobile Optimized */}
+        <Card className="overflow-hidden">
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2 text-base md:text-lg">
+              <span>Tipo de Registro</span>
               {formData.tipoRegistro === "personal_seguridad" && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs w-fit">
                   Personal de Seguridad
                 </Badge>
               )}
             </CardTitle>
-            <CardDescription>Selecciona si es un residente o personal de seguridad</CardDescription>
+            <CardDescription className="text-xs md:text-sm">
+              Selecciona si es un residente o personal de seguridad
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
               <button
                 type="button"
                 onClick={() => {
                   setFormData((prev) => ({ 
                     ...prev, 
                     tipoRegistro: "residente",
-                    // Limpiar número de padrón solo si es nuevo y venía de personal_seguridad
                     numeroPadron: !isEditing && prev.tipoRegistro === "personal_seguridad" ? "" : prev.numeroPadron,
                     exentoCobroMensual: false,
                   }));
                   setCreateUserAccount(false);
                 }}
-                className={`p-4 border-2 rounded-lg transition-all ${
+                className={`p-3 md:p-4 border-2 rounded-lg transition-all active:scale-95 ${
                   formData.tipoRegistro === "residente"
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border hover:border-primary/50 hover:bg-accent/50"
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Home className="h-6 w-6" />
+                <div className="flex items-start gap-3">
+                  <Home className="h-5 w-5 md:h-6 md:w-6 shrink-0 mt-0.5" />
                   <div className="text-left">
-                    <p className="font-medium">Residente</p>
-                    <p className="text-sm text-muted-foreground">Persona que vive en la urbanización</p>
+                    <p className="font-medium text-sm md:text-base">Residente</p>
+                    <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                      Persona que vive en la urbanización
+                    </p>
                   </div>
                 </div>
               </button>
@@ -676,17 +697,19 @@ const EmpadronadoForm: React.FC = () => {
                   setCreateUserAccount(true);
                   setUserAccountData((prev) => ({ ...prev, roleId: "seguridad" }));
                 }}
-                className={`p-4 border-2 rounded-lg transition-all ${
+                className={`p-3 md:p-4 border-2 rounded-lg transition-all active:scale-95 ${
                   formData.tipoRegistro === "personal_seguridad"
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50"
+                    ? "border-primary bg-primary/5 shadow-sm"
+                    : "border-border hover:border-primary/50 hover:bg-accent/50"
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <Shield className="h-6 w-6" />
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 md:h-6 md:w-6 shrink-0 mt-0.5" />
                   <div className="text-left">
-                    <p className="font-medium">Personal de Seguridad</p>
-                    <p className="text-sm text-muted-foreground">Guardias y personal de vigilancia</p>
+                    <p className="font-medium text-sm md:text-base">Personal de Seguridad</p>
+                    <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+                      Guardias y personal de vigilancia
+                    </p>
                   </div>
                 </div>
               </button>
@@ -694,19 +717,24 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Información básica */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Información Básica</CardTitle>
-            <CardDescription>Datos principales del empadronado</CardDescription>
+        {/* Información básica - Mobile Optimized */}
+        <Card className="overflow-hidden">
+          <CardHeader className="p-4 md:p-6">
+            <CardTitle className="text-base md:text-lg">Información Básica</CardTitle>
+            <CardDescription className="text-xs md:text-sm">
+              Datos principales del empadronado
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="numeroPadron">
+          <CardContent className="p-4 md:p-6 pt-0 md:pt-0 space-y-4 md:space-y-5">
+            {/* Número de Padrón y DNI */}
+            <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="numeroPadron" className="text-xs md:text-sm font-medium">
                   Número de Padrón o Registro *
                   {formData.tipoRegistro === "personal_seguridad" && (
-                    <span className="text-xs text-muted-foreground ml-2">(Generado automáticamente)</span>
+                    <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                      (Generado automáticamente)
+                    </span>
                   )}
                 </Label>
                 <Input
@@ -715,80 +743,93 @@ const EmpadronadoForm: React.FC = () => {
                   onChange={(e) => setFormData((prev) => ({ ...prev, numeroPadron: e.target.value }))}
                   placeholder={formData.tipoRegistro === "personal_seguridad" ? "PS 001" : "001"}
                   readOnly={formData.tipoRegistro === "personal_seguridad"}
-                  className={formData.tipoRegistro === "personal_seguridad" ? "bg-muted" : ""}
+                  className={`h-10 md:h-11 text-sm md:text-base ${
+                    formData.tipoRegistro === "personal_seguridad" ? "bg-muted" : ""
+                  }`}
                 />
-                {errors.numeroPadron && <p className="text-sm text-destructive mt-1">{errors.numeroPadron}</p>}
+                {errors.numeroPadron && (
+                  <p className="text-xs text-destructive mt-1">{errors.numeroPadron}</p>
+                )}
               </div>
 
-              <div>
-                <Label htmlFor="dni">DNI *</Label>
+              <div className="space-y-2">
+                <Label htmlFor="dni" className="text-xs md:text-sm font-medium">DNI *</Label>
                 <Input
                   id="dni"
                   value={formData.dni}
                   onChange={(e) => setFormData((prev) => ({ ...prev, dni: e.target.value }))}
                   placeholder="12345678"
                   maxLength={8}
+                  className="h-10 md:h-11 text-sm md:text-base"
                 />
-                {errors.dni && <p className="text-sm text-destructive mt-1">{errors.dni}</p>}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="habilitado"
-                  checked={formData.habilitado}
-                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, habilitado: checked }))}
-                />
-                <Label htmlFor="habilitado">Habilitado</Label>
+                {errors.dni && <p className="text-xs text-destructive mt-1">{errors.dni}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="nombre">Nombre *</Label>
+            {/* Habilitado Switch */}
+            <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-lg">
+              <Switch
+                id="habilitado"
+                checked={formData.habilitado}
+                onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, habilitado: checked }))}
+              />
+              <Label htmlFor="habilitado" className="text-xs md:text-sm cursor-pointer">
+                Habilitado
+              </Label>
+            </div>
+
+            {/* Nombre y Apellidos */}
+            <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombre" className="text-xs md:text-sm font-medium">Nombre *</Label>
                 <Input
                   id="nombre"
                   value={formData.nombre}
                   onChange={(e) => setFormData((prev) => ({ ...prev, nombre: e.target.value }))}
                   placeholder="Juan Carlos"
+                  className="h-10 md:h-11 text-sm md:text-base"
                 />
-                {errors.nombre && <p className="text-sm text-destructive mt-1">{errors.nombre}</p>}
+                {errors.nombre && <p className="text-xs text-destructive mt-1">{errors.nombre}</p>}
               </div>
 
-              <div>
-                <Label htmlFor="apellidos">Apellidos *</Label>
+              <div className="space-y-2">
+                <Label htmlFor="apellidos" className="text-xs md:text-sm font-medium">Apellidos *</Label>
                 <Input
                   id="apellidos"
                   value={formData.apellidos}
                   onChange={(e) => setFormData((prev) => ({ ...prev, apellidos: e.target.value }))}
                   placeholder="García López"
+                  className="h-10 md:h-11 text-sm md:text-base"
                 />
-                {errors.apellidos && <p className="text-sm text-destructive mt-1">{errors.apellidos}</p>}
+                {errors.apellidos && <p className="text-xs text-destructive mt-1">{errors.apellidos}</p>}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Familia, Género, Cumpleaños */}
+            <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-3 md:gap-4">
               {formData.tipoRegistro === "residente" && (
-                <div>
-                  <Label htmlFor="familia">Familia *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="familia" className="text-xs md:text-sm font-medium">Familia *</Label>
                   <Input
                     id="familia"
                     value={formData.familia}
                     onChange={(e) => setFormData((prev) => ({ ...prev, familia: e.target.value }))}
                     placeholder="Familia García"
+                    className="h-10 md:h-11 text-sm md:text-base"
                   />
-                  {errors.familia && <p className="text-sm text-destructive mt-1">{errors.familia}</p>}
+                  {errors.familia && <p className="text-xs text-destructive mt-1">{errors.familia}</p>}
                 </div>
               )}
 
-              <div>
-                <Label htmlFor="genero">Género</Label>
+              <div className="space-y-2">
+                <Label htmlFor="genero" className="text-xs md:text-sm font-medium">Género</Label>
                 <Select
                   value={formData.genero}
                   onValueChange={(value: "masculino" | "femenino") =>
                     setFormData((prev) => ({ ...prev, genero: value }))
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 md:h-11 text-sm md:text-base">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -798,20 +839,22 @@ const EmpadronadoForm: React.FC = () => {
                 </Select>
               </div>
 
-              <div>
-                <Label htmlFor="cumpleanos">Cumpleaños *</Label>
+              <div className="space-y-2">
+                <Label htmlFor="cumpleanos" className="text-xs md:text-sm font-medium">Cumpleaños *</Label>
                 <Input
                   id="cumpleanos"
                   value={formData.cumpleanos}
                   onChange={(e) => setFormData((prev) => ({ ...prev, cumpleanos: e.target.value }))}
                   placeholder="15/08/1980"
+                  className="h-10 md:h-11 text-sm md:text-base"
                 />
-                {errors.cumpleanos && <p className="text-sm text-destructive mt-1">{errors.cumpleanos}</p>}
+                {errors.cumpleanos && <p className="text-xs text-destructive mt-1">{errors.cumpleanos}</p>}
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="fechaIngreso">Fecha de Ingreso</Label>
+            {/* Fecha de Ingreso */}
+            <div className="space-y-2">
+              <Label htmlFor="fechaIngreso" className="text-xs md:text-sm font-medium">Fecha de Ingreso</Label>
               <Input
                 id="fechaIngreso"
                 type="date"
@@ -826,6 +869,7 @@ const EmpadronadoForm: React.FC = () => {
                     setFormData((prev) => ({ ...prev, fechaIngreso: new Date(dateValue).getTime() }));
                   }
                 }}
+                className="h-10 md:h-11 text-sm md:text-base"
               />
             </div>
           </CardContent>
@@ -1459,12 +1503,21 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Botones de acción */}
-        <div className="flex gap-4 justify-end">
-          <Button type="button" variant="outline" onClick={() => navigate("/padron")}>
+        {/* Botones de acción - Mobile Optimized */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:justify-end sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-4 sm:p-0 -mx-4 sm:mx-0 border-t sm:border-0 sm:relative">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => navigate("/padron")}
+            className="w-full sm:w-auto h-11 md:h-10 text-sm md:text-base"
+          >
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading}>
+          <Button 
+            type="submit" 
+            disabled={loading}
+            className="w-full sm:w-auto h-11 md:h-10 text-sm md:text-base font-semibold shadow-md hover:shadow-lg transition-all"
+          >
             {loading ? (
               <>Guardando...</>
             ) : (
@@ -1493,6 +1546,7 @@ const EmpadronadoForm: React.FC = () => {
         }
         onLinked={loadEmpadronado}
       />
+      </div>
     </div>
   );
 };
