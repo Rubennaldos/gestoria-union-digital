@@ -9,7 +9,6 @@ import { ModuleCircle } from "@/components/ui/module-circle";
 import { QuickAccessSection } from "@/components/dashboard/QuickAccessSection";
 import { useAuthz } from "@/contexts/AuthzContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { SeedDataButton } from "@/components/ui/seedDataButton";
 import { useEffect, useState } from "react";
 import { listModules } from "@/services/rtdb";
 import { Module } from "@/types/auth";
@@ -171,27 +170,13 @@ const Index = () => {
       
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
-          <div className="text-center md:text-left">
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              Panel Principal
-            </h1>
-            <p className="text-muted-foreground">
-              Sistema de Gestión - Junta Directiva
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <SeedDataButton />
-            <button 
-              onClick={async () => {
-                await import("@/utils/seedAuthData").then(m => m.seedAuthData());
-                window.location.reload();
-              }}
-              className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
-            >
-              Recargar Módulos
-            </button>
-          </div>
+        <div className="text-center md:text-left">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+            Panel Principal
+          </h1>
+          <p className="text-muted-foreground">
+            Sistema de Gestión - Junta Directiva
+          </p>
         </div>
 
         {/* Welcome Message */}
