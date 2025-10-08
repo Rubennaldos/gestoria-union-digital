@@ -57,10 +57,16 @@ export default function Login() {
   useEffect(() => {
     console.log('🔍 Login: useEffect - user:', user?.email, 'profile:', profile?.roleId);
     if (!user) return;
-    const from = (location.state as any)?.from?.pathname || '/inicio';
-    console.log('➡️ Login: Redirecting to:', from);
-    navigate(from, { replace: true });
-  }, [user, location.state, navigate]);
+    
+    // Esperar un momento para asegurar que no hay errores pendientes
+    const timer = setTimeout(() => {
+      const from = (location.state as any)?.from?.pathname || '/inicio';
+      console.log('➡️ Login: Redirecting to:', from);
+      navigate(from, { replace: true });
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [user, location.state, navigate, profile]);
 
   // Verificar bootstrap + fallback a admin ya existente
   useEffect(() => {
@@ -97,11 +103,13 @@ export default function Login() {
       toast({ title: 'Inicio de sesión exitoso', description: 'Bienvenido al sistema.' });
       // La redirección ocurre en el useEffect de arriba
     } catch (err: any) {
+      console.log('❌ Login error:', err);
       const msg = String(err?.message || '').toLowerCase();
       let errorMessage = 'Error al iniciar sesión';
       let isScheduleError = false;
       
       if (msg.includes('horario_no_permitido')) {
+        console.log('🚫 Error de horario detectado');
         errorMessage = 'Estás fuera de tu horario laboral, contáctate con el encargado de seguridad.';
         isScheduleError = true;
       } else if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
@@ -113,11 +121,15 @@ export default function Login() {
       } else if (msg.includes('invalid-email')) {
         errorMessage = 'Email inválido';
       }
+      
+      console.log('📝 Setting error message:', errorMessage);
       setError(errorMessage);
       
       if (isScheduleError) {
         // Scroll to top to show the image
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }, 100);
       }
     } finally {
       setLoading(false);
