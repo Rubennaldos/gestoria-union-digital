@@ -31,6 +31,7 @@ import Acceso from "./pages/Acceso";
 import Seguridad from "./pages/Seguridad";
 import AdminSeguridad from "./pages/AdminSeguridad";
 import Finanzas from "./pages/Finanzas";
+import ConfiguracionCuenta from "./pages/ConfiguracionCuenta";
 
 const queryClient = new QueryClient();
 
@@ -233,6 +234,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Finanzas />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Configuración de Cuenta */}
+              <Route
+                path="/configuracion-cuenta"
+                element={
+                  <ProtectedRoute>
+                    <ConfiguracionCuenta />
                   </ProtectedRoute>
                 }
               />

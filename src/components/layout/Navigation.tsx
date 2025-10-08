@@ -1,4 +1,4 @@
-import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users, LogOut } from "lucide-react";
+import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users, LogOut, Settings } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { signOutUser } from "@/services/auth";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthz } from "@/contexts/AuthzContext";
 import { VersionBadge } from "@/components/layout/VersionBadge";
+import { useAuth } from "@/contexts/AuthContext";
 
 /** 👇 Rutas con sus módulos de permisos correspondientes */
 const allNavigationItems = [
@@ -79,6 +80,7 @@ export const BottomNavigation = () => {
 export const TopNavigation = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -111,8 +113,17 @@ export const TopNavigation = () => {
         <div className="flex items-center space-x-2 sm:space-x-4">
           <div className="hidden lg:flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">Usuario:</span>
-            <span className="text-sm font-medium">Administrador</span>
+            <span className="text-sm font-medium">{profile?.displayName || "Usuario"}</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/configuracion-cuenta")}
+            className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3"
+          >
+            <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline text-xs sm:text-sm">Configuración</span>
+          </Button>
           <Button
             variant="ghost"
             size="sm"
