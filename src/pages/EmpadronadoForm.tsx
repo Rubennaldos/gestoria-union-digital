@@ -636,7 +636,13 @@ const EmpadronadoForm: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setFormData((prev) => ({ ...prev, tipoRegistro: "residente" }));
+                  setFormData((prev) => ({ 
+                    ...prev, 
+                    tipoRegistro: "residente",
+                    // Limpiar número de padrón solo si es nuevo y venía de personal_seguridad
+                    numeroPadron: !isEditing && prev.tipoRegistro === "personal_seguridad" ? "" : prev.numeroPadron,
+                    exentoCobroMensual: false,
+                  }));
                   setCreateUserAccount(false);
                 }}
                 className={`p-4 border-2 rounded-lg transition-all ${
