@@ -29,6 +29,7 @@ import { listModules, getUserPermissions, setUserPermissions as savePermissionsT
 import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
 import { CorreosAccesoModal } from '@/components/empadronados/CorreosAccesoModal';
+import { EstadoDeudaBadge } from '@/components/empadronados/EstadoDeudaBadge';
 
 // >>> XLSX: exportar / importar plantilla de DNI + fechaIngreso
 import {
@@ -579,6 +580,7 @@ const Empadronados: React.FC = () => {
                   <TableHead className="text-xs md:text-sm">Nombre</TableHead>
                   <TableHead className="hidden md:table-cell text-xs md:text-sm">DNI</TableHead>
                   <TableHead className="hidden lg:table-cell text-xs md:text-sm">Email Acceso</TableHead>
+                  <TableHead className="text-xs md:text-sm">Estado Pago</TableHead>
                   <TableHead className="text-xs md:text-sm">Estado</TableHead>
                   <TableHead className="hidden sm:table-cell text-xs md:text-sm">Vivienda</TableHead>
                   <TableHead className="text-xs md:text-sm">Acciones</TableHead>
@@ -620,6 +622,9 @@ const Empadronados: React.FC = () => {
                       ) : (
                         <div className="text-xs md:text-sm text-muted-foreground">Sin acceso</div>
                       )}
+                    </TableCell>
+                    <TableCell className="py-2 md:py-4">
+                      <EstadoDeudaBadge empadronado={empadronado} />
                     </TableCell>
                     <TableCell className="py-2 md:py-4">
                       <Badge 
