@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Users, Clock, ShieldCheck, UserCheck, UserX } from "lucide-react";
+import { Plus, Search, Users, Clock, ShieldCheck, UserCheck, UserX, Edit, Trash2, UserMinus, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import BackButton from "@/components/layout/BackButton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { PersonalPlanilla } from "@/types/planilla";
-import { getPersonalPlanilla, getPlanillaStats, puedeAccederAhora } from "@/services/planilla";
+import { getPersonalPlanilla, getPlanillaStats, puedeAccederAhora, updatePersonalPlanilla, deletePersonalPlanilla } from "@/services/planilla";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +19,8 @@ import { getEmpadronados } from "@/services/empadronados";
 import { Empadronado } from "@/types/empadronados";
 import { createPersonalPlanilla } from "@/services/planilla";
 import { Switch } from "@/components/ui/switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const DIAS_SEMANA = [
   { value: 'lunes', label: 'Lunes' },
@@ -40,6 +42,10 @@ export default function Planilla() {
   const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPersonal, setEditingPersonal] = useState<PersonalPlanilla | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [despedirConfirmOpen, setDespedirConfirmOpen] = useState(false);
+  const [selectedPersonal, setSelectedPersonal] = useState<PersonalPlanilla | null>(null);
   
   // Stats
   const [stats, setStats] = useState({
@@ -57,8 +63,8 @@ export default function Planilla() {
     fechaContratacion: new Date().toISOString().split('T')[0],
     activo: true,
     sueldo: "",
-    tipoContrato: "indefinido" as const,
-    frecuenciaPago: "mensual" as const,
+    tipoContrato: "indefinido" as "indefinido" | "planilla" | "recibo_honorarios" | "temporal",
+    frecuenciaPago: "mensual" as "mensual" | "quincenal" | "semanal",
     tieneAccesoSistema: false,
     observaciones: "",
     horariosAcceso: DIAS_SEMANA.map(dia => ({
@@ -103,26 +109,49 @@ export default function Planilla() {
     if (!user) return;
     
     try {
-      await createPersonalPlanilla({
-        empadronadoId: formData.empadronadoId,
-        funcion: formData.funcion,
-        areaAsignada: formData.areaAsignada || undefined,
-        fechaContratacion: new Date(formData.fechaContratacion).getTime(),
-        activo: formData.activo,
-        sueldo: formData.sueldo ? parseFloat(formData.sueldo) : undefined,
-        tipoContrato: formData.tipoContrato,
-        frecuenciaPago: formData.frecuenciaPago,
-        tieneAccesoSistema: formData.tieneAccesoSistema,
-        horariosAcceso: formData.horariosAcceso,
-        observaciones: formData.observaciones || undefined,
-      }, user.uid);
-      
-      toast({
-        title: "Personal agregado",
-        description: "El personal ha sido agregado a la planilla exitosamente",
-      });
+      if (editingPersonal) {
+        // Actualizar personal existente
+        await updatePersonalPlanilla(editingPersonal.id, {
+          funcion: formData.funcion,
+          areaAsignada: formData.areaAsignada || undefined,
+          fechaContratacion: new Date(formData.fechaContratacion).getTime(),
+          activo: formData.activo,
+          sueldo: formData.sueldo ? parseFloat(formData.sueldo) : undefined,
+          tipoContrato: formData.tipoContrato,
+          frecuenciaPago: formData.frecuenciaPago,
+          tieneAccesoSistema: formData.tieneAccesoSistema,
+          horariosAcceso: formData.horariosAcceso,
+          observaciones: formData.observaciones || undefined,
+        }, user.uid);
+        
+        toast({
+          title: "Personal actualizado",
+          description: "Los datos del personal han sido actualizados exitosamente",
+        });
+      } else {
+        // Crear nuevo personal
+        await createPersonalPlanilla({
+          empadronadoId: formData.empadronadoId,
+          funcion: formData.funcion,
+          areaAsignada: formData.areaAsignada || undefined,
+          fechaContratacion: new Date(formData.fechaContratacion).getTime(),
+          activo: formData.activo,
+          sueldo: formData.sueldo ? parseFloat(formData.sueldo) : undefined,
+          tipoContrato: formData.tipoContrato,
+          frecuenciaPago: formData.frecuenciaPago,
+          tieneAccesoSistema: formData.tieneAccesoSistema,
+          horariosAcceso: formData.horariosAcceso,
+          observaciones: formData.observaciones || undefined,
+        }, user.uid);
+        
+        toast({
+          title: "Personal agregado",
+          description: "El personal ha sido agregado a la planilla exitosamente",
+        });
+      }
       
       setDialogOpen(false);
+      setEditingPersonal(null);
       loadData();
       
       // Reset form
@@ -145,10 +174,79 @@ export default function Planilla() {
         })),
       });
     } catch (error) {
-      console.error("Error creating personal:", error);
+      console.error("Error saving personal:", error);
       toast({
         title: "Error",
-        description: "No se pudo agregar el personal",
+        description: editingPersonal ? "No se pudo actualizar el personal" : "No se pudo agregar el personal",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEdit = (personal: PersonalPlanilla) => {
+    setEditingPersonal(personal);
+    setFormData({
+      empadronadoId: personal.empadronadoId,
+      funcion: personal.funcion,
+      areaAsignada: personal.areaAsignada || "",
+      fechaContratacion: new Date(personal.fechaContratacion).toISOString().split('T')[0],
+      activo: personal.activo,
+      sueldo: personal.sueldo?.toString() || "",
+      tipoContrato: personal.tipoContrato || "indefinido",
+      frecuenciaPago: personal.frecuenciaPago || "mensual",
+      tieneAccesoSistema: personal.tieneAccesoSistema,
+      observaciones: personal.observaciones || "",
+      horariosAcceso: personal.horariosAcceso,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDespedir = async () => {
+    if (!selectedPersonal || !user) return;
+    
+    try {
+      await updatePersonalPlanilla(selectedPersonal.id, {
+        activo: false,
+        observaciones: `${selectedPersonal.observaciones || ''}\nDespedido el ${new Date().toLocaleDateString()}`.trim(),
+      }, user.uid);
+      
+      toast({
+        title: "Personal despedido",
+        description: "El personal ha sido marcado como inactivo",
+      });
+      
+      setDespedirConfirmOpen(false);
+      setSelectedPersonal(null);
+      loadData();
+    } catch (error) {
+      console.error("Error despidiendo personal:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo despedir al personal",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedPersonal) return;
+    
+    try {
+      await deletePersonalPlanilla(selectedPersonal.id);
+      
+      toast({
+        title: "Personal eliminado",
+        description: "El personal ha sido eliminado de la planilla",
+      });
+      
+      setDeleteConfirmOpen(false);
+      setSelectedPersonal(null);
+      loadData();
+    } catch (error) {
+      console.error("Error deleting personal:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar al personal",
         variant: "destructive",
       });
     }
@@ -235,7 +333,30 @@ export default function Planilla() {
                 />
               </div>
               
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <Dialog open={dialogOpen} onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) {
+                  setEditingPersonal(null);
+                  setFormData({
+                    empadronadoId: "",
+                    funcion: "",
+                    areaAsignada: "",
+                    fechaContratacion: new Date().toISOString().split('T')[0],
+                    activo: true,
+                    sueldo: "",
+                    tipoContrato: "indefinido" as const,
+                    frecuenciaPago: "mensual" as const,
+                    tieneAccesoSistema: false,
+                    observaciones: "",
+                    horariosAcceso: DIAS_SEMANA.map(dia => ({
+                      dia: dia.value as any,
+                      horaInicio: "08:00",
+                      horaFin: "18:00",
+                      activo: false,
+                    })),
+                  });
+                }
+              }}>
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
@@ -244,28 +365,30 @@ export default function Planilla() {
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Agregar Personal a Planilla</DialogTitle>
+                    <DialogTitle>{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="empadronado">Seleccionar Persona</Label>
-                      <Select
-                        value={formData.empadronadoId}
-                        onValueChange={(value) => setFormData({ ...formData, empadronadoId: value })}
-                        required
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione una persona" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {empadronadosDisponibles.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id}>
-                              {emp.nombre} {emp.apellidos} - {emp.dni}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {!editingPersonal && (
+                      <div className="space-y-2">
+                        <Label htmlFor="empadronado">Seleccionar Persona</Label>
+                        <Select
+                          value={formData.empadronadoId}
+                          onValueChange={(value) => setFormData({ ...formData, empadronadoId: value })}
+                          required
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccione una persona" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {empadronadosDisponibles.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.id}>
+                                {emp.nombre} {emp.apellidos} - {emp.dni}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="funcion">Función / Cargo</Label>
@@ -419,10 +542,13 @@ export default function Planilla() {
                     )}
 
                     <div className="flex justify-end gap-2 pt-4">
-                      <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                      <Button type="button" variant="outline" onClick={() => {
+                        setDialogOpen(false);
+                        setEditingPersonal(null);
+                      }}>
                         Cancelar
                       </Button>
-                      <Button type="submit">Agregar Personal</Button>
+                      <Button type="submit">{editingPersonal ? 'Actualizar Personal' : 'Agregar Personal'}</Button>
                     </div>
                   </form>
                 </DialogContent>
@@ -449,6 +575,7 @@ export default function Planilla() {
                     <TableHead>Estado</TableHead>
                     <TableHead>Horario Sistema</TableHead>
                     <TableHead>Puede Acceder</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -533,6 +660,43 @@ export default function Planilla() {
                           <Badge variant="secondary">N/A</Badge>
                         )}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(p)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            {p.activo && (
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  setSelectedPersonal(p);
+                                  setDespedirConfirmOpen(true);
+                                }}
+                                className="text-orange-600"
+                              >
+                                <UserMinus className="mr-2 h-4 w-4" />
+                                Despedir/Renuncia
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setSelectedPersonal(p);
+                                setDeleteConfirmOpen(true);
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -540,6 +704,42 @@ export default function Planilla() {
             )}
           </CardContent>
         </Card>
+
+        {/* Confirm Despedir Dialog */}
+        <AlertDialog open={despedirConfirmOpen} onOpenChange={setDespedirConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Despedir o registrar renuncia?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esto marcará a {selectedPersonal?.nombreCompleto} como inactivo. El registro se mantendrá en el sistema pero ya no podrá acceder.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSelectedPersonal(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDespedir} className="bg-orange-600 hover:bg-orange-700">
+                Confirmar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Confirm Delete Dialog */}
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar permanentemente?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esto eliminará a {selectedPersonal?.nombreCompleto} de la planilla de forma permanente. Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSelectedPersonal(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
