@@ -936,15 +936,15 @@ const EmpadronadoForm: React.FC = () => {
           </Card>
         )}
 
-        {/* Contacto */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Contacto</CardTitle>
-            <CardDescription>Información de contacto y ubicación</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Ubicación - Solo para residentes */}
-            {formData.tipoRegistro === "residente" && (
+        {/* Contacto - Solo para residentes */}
+        {formData.tipoRegistro === "residente" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Contacto</CardTitle>
+              <CardDescription>Información de contacto y ubicación</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Ubicación */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="manzana">Manzana *</Label>
@@ -978,12 +978,10 @@ const EmpadronadoForm: React.FC = () => {
                   />
                 </div>
               </div>
-            )}
 
-            {formData.tipoRegistro === "residente" && <Separator />}
+              <Separator />
 
-            {/* Teléfonos - Solo para residentes */}
-            {formData.tipoRegistro === "residente" && (
+              {/* Teléfonos */}
               <div>
                 <Label>Teléfonos</Label>
                 {formData.telefonos?.map((telefono, index) => (
@@ -1016,12 +1014,10 @@ const EmpadronadoForm: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            )}
 
-            {formData.tipoRegistro === "residente" && <Separator />}
+              <Separator />
 
-            {/* Vehículos - Solo para residentes */}
-            {formData.tipoRegistro === "residente" && (
+              {/* Vehículos */}
               <div>
                 <Label>Vehículos</Label>
                 {formData.vehiculos?.map((vehiculo, index) => (
@@ -1064,9 +1060,9 @@ const EmpadronadoForm: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Vivienda y Residencia - Solo para residentes */}
         {formData.tipoRegistro === "residente" && (
@@ -1109,17 +1105,27 @@ const EmpadronadoForm: React.FC = () => {
           </Card>
         )}
 
-        {/* Observaciones */}
+        {/* Observaciones / Afectaciones de Salud */}
         <Card>
           <CardHeader>
-            <CardTitle>Observaciones</CardTitle>
-            <CardDescription>Información adicional relevante</CardDescription>
+            <CardTitle>
+              {formData.tipoRegistro === "personal_seguridad" ? "Afectaciones de Salud" : "Observaciones"}
+            </CardTitle>
+            <CardDescription>
+              {formData.tipoRegistro === "personal_seguridad"
+                ? "Registro de condiciones médicas, alergias o limitaciones físicas relevantes para emergencias"
+                : "Información adicional relevante"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={formData.observaciones}
               onChange={(e) => setFormData((prev) => ({ ...prev, observaciones: e.target.value }))}
-              placeholder="Cualquier información adicional importante..."
+              placeholder={
+                formData.tipoRegistro === "personal_seguridad"
+                  ? "Ej: Alergia a penicilina, hipertensión arterial, asma, diabetes tipo 2..."
+                  : "Cualquier información adicional importante..."
+              }
               rows={4}
             />
           </CardContent>
