@@ -209,15 +209,32 @@ export function puedeAccederAhora(personal: PersonalPlanilla): boolean {
     return false;
   }
   
-  const ahora = new Date();
-  const diaActual = ahora.toLocaleDateString('es-ES', { weekday: 'long' }).toLowerCase();
-  const horaActual = `${ahora.getHours().toString().padStart(2, '0')}:${ahora.getMinutes().toString().padStart(2, '0')}`;
+  if (!personal.horariosAcceso || personal.horariosAcceso.length === 0) {
+    return false;
+  }
   
+  const ahora = new Date();
+  
+  // Mapear el día actual al formato correcto
+  const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const diaActual = diasSemana[ahora.getDay()];
+  
+  // Buscar el horario del día actual que esté activo
   const horarioHoy = personal.horariosAcceso.find(h => h.dia === diaActual && h.activo);
   
   if (!horarioHoy) {
     return false;
   }
   
-  return horaActual >= horarioHoy.horaInicio && horaActual <= horarioHoy.horaFin;
+  // Convertir la hora actual a minutos desde medianoche
+  const horaActualMinutos = ahora.getHours() * 60 + ahora.getMinutes();
+  
+  // Convertir horarios de inicio y fin a minutos
+  const [inicioHora, inicioMin] = horarioHoy.horaInicio.split(':').map(Number);
+  const [finHora, finMin] = horarioHoy.horaFin.split(':').map(Number);
+  
+  const inicioMinutos = inicioHora * 60 + inicioMin;
+  const finMinutos = finHora * 60 + finMin;
+  
+  return horaActualMinutos >= inicioMinutos && horaActualMinutos <= finMinutos;
 }
