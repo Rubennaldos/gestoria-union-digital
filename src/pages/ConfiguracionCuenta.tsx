@@ -66,10 +66,12 @@ const ConfiguracionCuenta: React.FC = () => {
   const [genero, setGenero] = useState<"masculino" | "femenino">("masculino");
   const [estadoVivienda, setEstadoVivienda] = useState<"construida" | "construccion" | "terreno">("terreno");
   const [familia, setFamilia] = useState("");
+  const [etapa, setEtapa] = useState("");
   const [cumpleanos, setCumpleanos] = useState("");
   const [telefonos, setTelefonos] = useState<PhoneNumber[]>([]);
   const [vehiculos, setVehiculos] = useState<Vehicle[]>([]);
   const [miembrosFamilia, setMiembrosFamilia] = useState<FamilyMember[]>([]);
+  const [vive, setVive] = useState(true);
 
   // Estados para agregar nuevos elementos
   const [newPhone, setNewPhone] = useState("");
@@ -125,10 +127,12 @@ const ConfiguracionCuenta: React.FC = () => {
             setGenero(empData.genero || "masculino");
             setEstadoVivienda(empData.estadoVivienda || "terreno");
             setFamilia(empData.familia || "");
+            setEtapa(empData.etapa || "");
             setCumpleanos(empData.cumpleanos || "");
             setTelefonos(empData.telefonos || []);
             setVehiculos(empData.vehiculos || []);
             setMiembrosFamilia(empData.miembrosFamilia || []);
+            setVive(empData.vive !== undefined ? empData.vive : true);
           }
         }
 
@@ -198,10 +202,12 @@ const ConfiguracionCuenta: React.FC = () => {
           genero,
           estadoVivienda,
           familia,
+          etapa,
           cumpleanos,
           telefonos,
           vehiculos,
           miembrosFamilia,
+          vive,
         },
         user.uid
       );
@@ -545,11 +551,20 @@ const ConfiguracionCuenta: React.FC = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Familia/Etapa</Label>
+                    <Label>Familia</Label>
                     <Input
                       value={familia}
                       onChange={(e) => setFamilia(e.target.value)}
-                      placeholder="Ingresa tu familia o etapa"
+                      placeholder="Ingresa tu familia"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Etapa</Label>
+                    <Input
+                      value={etapa}
+                      onChange={(e) => setEtapa(e.target.value)}
+                      placeholder="Ingresa tu etapa"
                     />
                   </div>
 
@@ -565,9 +580,25 @@ const ConfiguracionCuenta: React.FC = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="construida">Casa Construida</SelectItem>
+                        <SelectItem value="construida">Construida</SelectItem>
                         <SelectItem value="construccion">En Construcción</SelectItem>
                         <SelectItem value="terreno">Solo Terreno</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>¿Vive Aquí?</Label>
+                    <Select
+                      value={vive ? "si" : "no"}
+                      onValueChange={(value) => setVive(value === "si")}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="si">Sí</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -575,23 +606,47 @@ const ConfiguracionCuenta: React.FC = () => {
 
                 <Separator />
 
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Lock className="h-3 w-3" />
-                    Dirección
-                  </Label>
-                  <Input
-                    value={
-                      empadronado?.direccionDomicilio ||
-                      (empadronado?.manzana && empadronado?.lote
-                        ? `Mz ${empadronado.manzana} Lt ${empadronado.lote}${
-                            empadronado.etapa ? ` - ${empadronado.etapa}` : ""
-                          }`
-                        : "No registrada")
-                    }
-                    disabled
-                    className="bg-muted"
-                  />
+                {/* Ubicación y Contacto - Solo lectura */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Manzana
+                    </Label>
+                    <Input
+                      value={empadronado?.manzana || "No registrada"}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Lote
+                    </Label>
+                    <Input
+                      value={empadronado?.lote || "No registrado"}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Fecha de Ingreso
+                    </Label>
+                    <Input
+                      value={
+                        empadronado?.fechaIngreso
+                          ? new Date(empadronado.fechaIngreso).toLocaleDateString("es-PE")
+                          : "No registrada"
+                      }
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
                 </div>
 
                 <Separator />
