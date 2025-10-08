@@ -99,7 +99,7 @@ export default function Login() {
       const msg = String(err?.message || '').toLowerCase();
       let errorMessage = 'Error al iniciar sesión';
       if (msg.includes('horario_no_permitido')) {
-        errorMessage = 'Tu acceso está restringido a ciertos horarios. Intenta nuevamente durante tu horario laboral.';
+        errorMessage = 'Estás fuera de tu horario laboral, contáctate con el encargado de seguridad.';
       } else if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
         errorMessage = 'Tu acceso está deshabilitado, contacta a Presidencia.';
       } else if (msg.includes('user-not-found') || msg.includes('usuario no encontrado')) {
