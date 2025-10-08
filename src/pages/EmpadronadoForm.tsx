@@ -359,8 +359,12 @@ const EmpadronadoForm: React.FC = () => {
         // Campos específicos para personal de seguridad
         ...(formData.tipoRegistro === "personal_seguridad" && {
           tipoRegistro: "personal_seguridad" as const,
-          tipoSangre: formData.tipoSangre?.trim() || undefined,
-          direccionDomicilio: formData.direccionDomicilio?.trim() || undefined,
+          ...(formData.tipoSangre?.trim() && {
+            tipoSangre: formData.tipoSangre.trim(),
+          }),
+          ...(formData.direccionDomicilio?.trim() && {
+            direccionDomicilio: formData.direccionDomicilio.trim(),
+          }),
           exentoCobroMensual: formData.exentoCobroMensual || false,
           ...(formData.telefonosEmergencia?.filter((t) => t.numero?.trim()).length > 0 && {
             telefonosEmergencia: formData.telefonosEmergencia
