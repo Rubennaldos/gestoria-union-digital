@@ -11,6 +11,7 @@ import { db } from "@/config/firebase";
 import { CreateUserForm } from "@/types/auth";
 import { createUserProfile, getUserProfile, updateUserProfile } from "./rtdb";
 import { getEmpadronadoById, linkAuthToEmpadronado } from "@/services/empadronados";
+import { getPersonalByEmpadronadoId, puedeAccederAhora } from "@/services/planilla";
 
 /* ─────────────────────────────────────────────────────────
    Utils
@@ -88,6 +89,27 @@ export const signInWithEmailOrUsername = async (identifier: string, password: st
 
     await signOut(auth);
     throw new Error("USUARIO_SUSPENDIDO: Tu acceso está deshabilitado, contacta a Presidencia.");
+  }
+
+  // Validar horarios de acceso para personal de planilla
+  if (profile?.empadronadoId) {
+    try {
+      const personal = await getPersonalByEmpadronadoId(profile.empadronadoId);
+      if (personal && personal.tieneAccesoSistema) {
+        if (!puedeAccederAhora(personal)) {
+          await signOut(auth);
+          throw new Error("HORARIO_NO_PERMITIDO: Tu acceso está restringido a ciertos horarios. Intenta nuevamente durante tu horario laboral.");
+        }
+        console.log("✅ Validación de horario exitosa");
+      }
+    } catch (error: any) {
+      // Si el error ya es de horario, lo relanzamos
+      if (error?.message?.includes("HORARIO_NO_PERMITIDO")) {
+        throw error;
+      }
+      // Si no hay registro en planilla, permitir acceso (puede ser un usuario normal)
+      console.log("ℹ️ Usuario sin registro en planilla, permitiendo acceso");
+    }
   }
 
   console.log("✅ Login exitoso");

@@ -105,6 +105,31 @@ export async function getPersonalById(id: string): Promise<PersonalPlanilla | nu
 }
 
 /**
+ * Obtener personal de planilla por empadronadoId
+ */
+export async function getPersonalByEmpadronadoId(empadronadoId: string): Promise<PersonalPlanilla | null> {
+  try {
+    const planillaRef = ref(db, PLANILLA_PATH);
+    const snapshot = await get(planillaRef);
+    
+    if (!snapshot.exists()) {
+      return null;
+    }
+    
+    const data = snapshot.val();
+    const personalArray = Object.entries(data).map(([id, personal]) => ({
+      ...(personal as PersonalPlanilla),
+      id,
+    }));
+    
+    return personalArray.find(p => p.empadronadoId === empadronadoId) || null;
+  } catch (error) {
+    console.error("Error getting personal by empadronadoId:", error);
+    throw error;
+  }
+}
+
+/**
  * Actualizar personal en planilla
  */
 export async function updatePersonalPlanilla(

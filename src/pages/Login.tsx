@@ -98,7 +98,9 @@ export default function Login() {
     } catch (err: any) {
       const msg = String(err?.message || '').toLowerCase();
       let errorMessage = 'Error al iniciar sesión';
-      if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
+      if (msg.includes('horario_no_permitido')) {
+        errorMessage = 'Tu acceso está restringido a ciertos horarios. Intenta nuevamente durante tu horario laboral.';
+      } else if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
         errorMessage = 'Tu acceso está deshabilitado, contacta a Presidencia.';
       } else if (msg.includes('user-not-found') || msg.includes('usuario no encontrado')) {
         errorMessage = 'Usuario no encontrado';
