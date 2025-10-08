@@ -5,6 +5,7 @@ import { signOutUser } from "@/services/auth";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthz } from "@/contexts/AuthzContext";
+import { VersionBadge } from "@/components/layout/VersionBadge";
 
 /** 👇 Rutas con sus módulos de permisos correspondientes */
 const allNavigationItems = [
@@ -99,12 +100,13 @@ export const TopNavigation = () => {
   return (
     <header className="sticky top-0 z-40 w-full bg-card border-b border-border backdrop-blur-sm">
       <div className="container mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-2 sm:space-x-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* 👇 Logo/Marca siempre vuelve a /inicio (NO a "/") */}
           <Link to="/inicio" className="text-lg sm:text-xl font-bold text-primary hover:underline truncate">
             <span className="hidden sm:inline">Gestoria Digital</span>
             <span className="sm:hidden">Gestoria</span>
           </Link>
+          <VersionBadge />
         </div>
         <div className="flex items-center space-x-2 sm:space-x-4">
           <div className="hidden lg:flex items-center space-x-2">
