@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link, Shield } from 'lucide-react';
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from '@/types/empadronados';
-import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado } from '@/services/empadronados';
+import { createEmpadronado, updateEmpadronado, getEmpadronado, isNumeroPadronUnique, unlinkAuthFromEmpadronado, generateNextPersonalSeguridadPadron } from '@/services/empadronados';
 import { createAccountForEmpadronado } from '@/services/auth';
 import { uploadPersonalSeguridadDocuments } from '@/services/storage';
 import { listRoles } from '@/services/rtdb';
@@ -106,8 +106,13 @@ const EmpadronadoForm: React.FC = () => {
     
     if (isEditing && id) {
       loadEmpadronado();
+    } else {
+      // Si es nuevo y personal de seguridad, generar número automáticamente
+      if (formData.tipoRegistro === 'personal_seguridad') {
+        generatePersonalSeguridadPadron();
+      }
     }
-  }, [id, isEditing]);
+  }, [id, isEditing, formData.tipoRegistro]);
 
   const loadRoles = async () => {
     try {
@@ -115,6 +120,15 @@ const EmpadronadoForm: React.FC = () => {
       setRoles(rolesData);
     } catch (error) {
       console.error('Error loading roles:', error);
+    }
+  };
+
+  const generatePersonalSeguridadPadron = async () => {
+    try {
+      const nextPadron = await generateNextPersonalSeguridadPadron();
+      setFormData(prev => ({ ...prev, numeroPadron: nextPadron }));
+    } catch (error) {
+      console.error('Error generating padron:', error);
     }
   };
 
@@ -626,13 +640,16 @@ const EmpadronadoForm: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  const nextPadron = await generateNextPersonalSeguridadPadron();
                   setFormData(prev => ({ 
                     ...prev, 
                     tipoRegistro: 'personal_seguridad',
+                    numeroPadron: nextPadron,
                     familia: 'Personal de Seguridad',
                     vive: false,
-                    estadoVivienda: 'terreno'
+                    estadoVivienda: 'terreno',
+                    exentoCobroMensual: true
                   }));
                   setCreateUserAccount(true);
                   setUserAccountData(prev => ({ ...prev, roleId: 'seguridad' }));
@@ -666,12 +683,19 @@ const EmpadronadoForm: React.FC = () => {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="numeroPadron">Número de Padrón *</Label>
+                <Label htmlFor="numeroPadron">
+                  Número de Padrón *
+                  {formData.tipoRegistro === 'personal_seguridad' && (
+                    <span className="text-xs text-muted-foreground ml-2">(Generado automáticamente)</span>
+                  )}
+                </Label>
                 <Input
                   id="numeroPadron"
                   value={formData.numeroPadron}
                   onChange={(e) => setFormData(prev => ({ ...prev, numeroPadron: e.target.value }))}
-                  placeholder="001"
+                  placeholder={formData.tipoRegistro === 'personal_seguridad' ? 'PS 001' : '001'}
+                  readOnly={formData.tipoRegistro === 'personal_seguridad'}
+                  className={formData.tipoRegistro === 'personal_seguridad' ? 'bg-muted' : ''}
                 />
                 {errors.numeroPadron && <p className="text-sm text-destructive mt-1">{errors.numeroPadron}</p>}
               </div>
@@ -898,51 +922,79 @@ const EmpadronadoForm: React.FC = () => {
 
             {formData.tipoRegistro === 'residente' && <Separator />}
 
-            <div>
-              <Label>Teléfonos</Label>
-              {formData.telefonos?.map((telefono, index) => (
-                <div key={index} className="flex gap-2 mb-2">
+            {/* Teléfonos - Solo para residentes */}
+            {formData.tipoRegistro === 'residente' && (
+              <div>
+                <Label>Teléfonos</Label>
+                {formData.telefonos?.map((telefono, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      value={telefono.numero}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        telefonos: prev.telefonos?.map((t, i) => i === index ? { numero: e.target.value } : t)
+                      }))}
+                      placeholder="999888777"
+                    />
+                    {index > 0 && (
+                      <Button type="button" variant="outline" size="sm" onClick={() => removePhone(index)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex gap-2">
                   <Input
-                    value={telefono.numero}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      telefonos: prev.telefonos?.map((t, i) => i === index ? { numero: e.target.value } : t)
-                    }))}
-                    placeholder="999888777"
+                    value={newPhone}
+                    onChange={(e) => setNewPhone(e.target.value)}
+                    placeholder="Agregar otro teléfono"
                   />
-                  {index > 0 && (
-                    <Button type="button" variant="outline" size="sm" onClick={() => removePhone(index)}>
+                  <Button type="button" variant="outline" onClick={addPhone}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {formData.tipoRegistro === 'residente' && <Separator />}
+
+            {/* Vehículos - Solo para residentes */}
+            {formData.tipoRegistro === 'residente' && (
+              <div>
+                <Label>Vehículos</Label>
+                {formData.vehiculos?.map((vehiculo, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <Input
+                      value={vehiculo.placa}
+                      readOnly
+                      placeholder="Placa"
+                    />
+                    <Select
+                      value={vehiculo.tipo}
+                      disabled
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="vehiculo">Vehículo</SelectItem>
+                        <SelectItem value="moto">Moto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" size="sm" onClick={() => removeVehicle(index)}>
                       <X className="h-4 w-4" />
                     </Button>
-                  )}
-                </div>
-              ))}
-              <div className="flex gap-2">
-                <Input
-                  value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
-                  placeholder="Agregar otro teléfono"
-                />
-                <Button type="button" variant="outline" onClick={addPhone}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            <div>
-              <Label>Vehículos</Label>
-              {formData.vehiculos?.map((vehiculo, index) => (
-                <div key={index} className="flex gap-2 mb-2">
+                  </div>
+                ))}
+                <div className="flex gap-2">
                   <Input
-                    value={vehiculo.placa}
-                    readOnly
-                    placeholder="Placa"
+                    value={newVehicle.placa}
+                    onChange={(e) => setNewVehicle(prev => ({ ...prev, placa: e.target.value }))}
+                    placeholder="ABC-123"
                   />
                   <Select
-                    value={vehiculo.tipo}
-                    disabled
+                    value={newVehicle.tipo}
+                    onValueChange={(value: 'vehiculo' | 'moto') => setNewVehicle(prev => ({ ...prev, tipo: value }))}
                   >
                     <SelectTrigger className="w-32">
                       <SelectValue />
@@ -952,34 +1004,12 @@ const EmpadronadoForm: React.FC = () => {
                       <SelectItem value="moto">Moto</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="sm" onClick={() => removeVehicle(index)}>
-                    <X className="h-4 w-4" />
+                  <Button type="button" variant="outline" onClick={addVehicle}>
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-              ))}
-              <div className="flex gap-2">
-                <Input
-                  value={newVehicle.placa}
-                  onChange={(e) => setNewVehicle(prev => ({ ...prev, placa: e.target.value }))}
-                  placeholder="ABC-123"
-                />
-                <Select
-                  value={newVehicle.tipo}
-                  onValueChange={(value: 'vehiculo' | 'moto') => setNewVehicle(prev => ({ ...prev, tipo: value }))}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vehiculo">Vehículo</SelectItem>
-                    <SelectItem value="moto">Moto</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button type="button" variant="outline" onClick={addVehicle}>
-                  <Plus className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1185,17 +1215,6 @@ const EmpadronadoForm: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="exentoCobroMensual"
-                  checked={formData.exentoCobroMensual}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, exentoCobroMensual: checked }))}
-                />
-                <Label htmlFor="exentoCobroMensual">Exento de cobro mensual</Label>
               </div>
             </CardContent>
           </Card>
