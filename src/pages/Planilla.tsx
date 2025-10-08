@@ -269,72 +269,72 @@ export default function Planilla() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 md:px-8 py-8 md:py-12 space-y-8 md:space-y-10">
-        <div className="flex items-center gap-4 md:gap-6">
+      <div className="container mx-auto px-3 md:px-8 py-4 md:py-12 space-y-4 md:space-y-10">
+        <div className="flex items-center gap-3 md:gap-6">
           <BackButton />
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+          <div className="space-y-1">
+            <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               Planilla de Personal
             </h1>
-            <p className="text-muted-foreground text-base md:text-lg">Gestión de personal contratado y control de accesos</p>
+            <p className="text-muted-foreground text-sm md:text-lg">Gestión de personal contratado y control de accesos</p>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-6 md:gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 pt-6 md:pt-8 px-6 md:px-8">
-              <CardTitle className="text-sm md:text-base font-medium text-muted-foreground">Total Personal</CardTitle>
-              <div className="p-4 md:p-5 bg-primary/10 rounded-2xl group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
-                <Users className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
+              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Total Personal</CardTitle>
+              <div className="p-2 md:p-5 bg-primary/10 rounded-xl md:rounded-2xl group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
+                <Users className="h-4 w-4 md:h-7 md:w-7 text-primary" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-6 md:px-8 pb-6 md:pb-8">
-              <div className="text-5xl md:text-6xl font-bold mb-3">{stats.totalPersonal}</div>
-              <p className="text-sm md:text-base text-muted-foreground">Personal registrado</p>
+            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
+              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3">{stats.totalPersonal}</div>
+              <p className="text-xs md:text-base text-muted-foreground">Personal registrado</p>
             </CardContent>
           </Card>
           
           <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 pt-6 md:pt-8 px-6 md:px-8">
-              <CardTitle className="text-sm md:text-base font-medium text-muted-foreground">Activos</CardTitle>
-              <div className="p-4 md:p-5 bg-success/10 rounded-2xl group-hover:bg-success/20 group-hover:scale-110 transition-all duration-300">
-                <UserCheck className="h-6 w-6 md:h-7 md:w-7 text-success" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
+              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Activos</CardTitle>
+              <div className="p-2 md:p-5 bg-success/10 rounded-xl md:rounded-2xl group-hover:bg-success/20 group-hover:scale-110 transition-all duration-300">
+                <UserCheck className="h-4 w-4 md:h-7 md:w-7 text-success" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-6 md:px-8 pb-6 md:pb-8">
-              <div className="text-5xl md:text-6xl font-bold mb-3 text-success">{stats.activos}</div>
-              <p className="text-sm md:text-base text-muted-foreground">En servicio activo</p>
+            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
+              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-success">{stats.activos}</div>
+              <p className="text-xs md:text-base text-muted-foreground">En servicio activo</p>
             </CardContent>
           </Card>
           
           <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-muted/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 pt-6 md:pt-8 px-6 md:px-8">
-              <CardTitle className="text-sm md:text-base font-medium text-muted-foreground">Inactivos</CardTitle>
-              <div className="p-4 md:p-5 bg-muted/10 rounded-2xl group-hover:bg-muted/20 group-hover:scale-110 transition-all duration-300">
-                <UserX className="h-6 w-6 md:h-7 md:w-7 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
+              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Inactivos</CardTitle>
+              <div className="p-2 md:p-5 bg-muted/10 rounded-xl md:rounded-2xl group-hover:bg-muted/20 group-hover:scale-110 transition-all duration-300">
+                <UserX className="h-4 w-4 md:h-7 md:w-7 text-muted-foreground" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-6 md:px-8 pb-6 md:pb-8">
-              <div className="text-5xl md:text-6xl font-bold mb-3 text-muted-foreground">{stats.inactivos}</div>
-              <p className="text-sm md:text-base text-muted-foreground">Fuera de servicio</p>
+            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
+              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-muted-foreground">{stats.inactivos}</div>
+              <p className="text-xs md:text-base text-muted-foreground">Fuera de servicio</p>
             </CardContent>
           </Card>
           
           <Card className="group hover:shadow-2xl transition-all duration-300 hover:scale-[1.03] border-2 overflow-hidden relative">
             <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 pt-6 md:pt-8 px-6 md:px-8">
-              <CardTitle className="text-sm md:text-base font-medium text-muted-foreground">Con Acceso Sistema</CardTitle>
-              <div className="p-4 md:p-5 bg-accent/10 rounded-2xl group-hover:bg-accent/20 group-hover:scale-110 transition-all duration-300">
-                <ShieldCheck className="h-6 w-6 md:h-7 md:w-7 text-accent-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 pt-4 md:pt-8 px-4 md:px-8">
+              <CardTitle className="text-xs md:text-base font-medium text-muted-foreground">Con Acceso Sistema</CardTitle>
+              <div className="p-2 md:p-5 bg-accent/10 rounded-xl md:rounded-2xl group-hover:bg-accent/20 group-hover:scale-110 transition-all duration-300">
+                <ShieldCheck className="h-4 w-4 md:h-7 md:w-7 text-accent-foreground" />
               </div>
             </CardHeader>
-            <CardContent className="relative px-6 md:px-8 pb-6 md:pb-8">
-              <div className="text-5xl md:text-6xl font-bold mb-3 text-accent-foreground">{stats.conAccesoSistema}</div>
-              <p className="text-sm md:text-base text-muted-foreground">Acceso autorizado</p>
+            <CardContent className="relative px-4 md:px-8 pb-4 md:pb-8">
+              <div className="text-3xl md:text-6xl font-bold mb-1 md:mb-3 text-accent-foreground">{stats.conAccesoSistema}</div>
+              <p className="text-xs md:text-base text-muted-foreground">Acceso autorizado</p>
             </CardContent>
           </Card>
         </div>
@@ -378,124 +378,123 @@ export default function Planilla() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button size="lg" className="shadow-lg hover:shadow-2xl transition-all duration-300 h-12 md:h-14 px-6 md:px-8 text-base md:text-lg">
-                    <Plus className="mr-2 h-5 w-5 md:h-6 md:w-6" />
+                  <Button size="default" className="shadow-lg hover:shadow-2xl transition-all duration-300 h-9 md:h-14 px-4 md:px-8 text-sm md:text-lg">
+                    <Plus className="mr-2 h-4 w-4 md:h-6 md:w-6" />
                     Agregar Personal
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-0" aria-describedby="dialog-description">
-                  <DialogHeader className="pb-6 pt-8 px-6 md:px-10 border-b">
-                    <DialogTitle className="text-2xl md:text-3xl font-bold">{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
-                    <DialogDescription id="dialog-description" className="text-base md:text-lg mt-2">
+                  <DialogHeader className="pb-3 pt-4 px-4 md:pb-6 md:pt-8 md:px-10 border-b">
+                    <DialogTitle className="text-lg md:text-3xl font-bold">{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
+                    <DialogDescription id="dialog-description" className="text-sm md:text-lg mt-1 md:mt-2">
                       {editingPersonal ? 'Actualiza la información del personal' : 'Completa el formulario para agregar personal a la planilla'}
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                     <Tabs defaultValue="basicos" className="w-full">
-                      <div className="px-6 md:px-10 pt-6">
-                        <TabsList className="grid w-full grid-cols-3 h-auto p-1.5 bg-muted/50">
-                          <TabsTrigger value="basicos" className="gap-2 py-3.5 md:py-4 text-sm md:text-base font-medium data-[state=active]:bg-background data-[state=active]:shadow-md">
-                            <Users className="h-4 w-4 md:h-5 md:w-5" />
+                      <div className="px-3 md:px-10 pt-3 md:pt-6">
+                        <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-muted/50">
+                          <TabsTrigger value="basicos" className="gap-1 py-2 md:py-4 text-xs md:text-base font-medium data-[state=active]:bg-background data-[state=active]:shadow-md">
+                            <Users className="h-3 w-3 md:h-5 md:w-5" />
                             <span className="hidden sm:inline">Datos Básicos</span>
                             <span className="sm:hidden">Básicos</span>
                           </TabsTrigger>
-                          <TabsTrigger value="laborales" className="gap-2 py-3.5 md:py-4 text-sm md:text-base font-medium data-[state=active]:bg-background data-[state=active]:shadow-md">
-                            <Briefcase className="h-4 w-4 md:h-5 md:w-5" />
+                          <TabsTrigger value="laborales" className="gap-1 py-2 md:py-4 text-xs md:text-base font-medium data-[state=active]:bg-background data-[state=active]:shadow-md">
+                            <Briefcase className="h-3 w-3 md:h-5 md:w-5" />
                             <span className="hidden sm:inline">Datos Laborales</span>
                             <span className="sm:hidden">Laborales</span>
                           </TabsTrigger>
-                          <TabsTrigger value="acceso" className="gap-2 py-3.5 md:py-4 text-sm md:text-base font-medium data-[state=active]:bg-background data-[state=active]:shadow-md">
-                            <ShieldCheck className="h-4 w-4 md:h-5 md:w-5" />
+                          <TabsTrigger value="acceso" className="gap-1 py-2 md:py-4 text-xs md:text-base font-medium data-[state=active]:bg-background data-[state=active]:shadow-md">
+                            <ShieldCheck className="h-3 w-3 md:h-5 md:w-5" />
                             <span className="hidden sm:inline">Acceso al Sistema</span>
                             <span className="sm:hidden">Acceso</span>
                           </TabsTrigger>
                         </TabsList>
                       </div>
-
+                      
                       {/* Tab: Datos Básicos */}
-                      <TabsContent value="basicos" className="space-y-6 md:space-y-8 mt-8 px-6 md:px-10 pb-6">
+                      <TabsContent value="basicos" className="space-y-3 md:space-y-8 mt-4 md:mt-8 px-3 md:px-10 pb-4 md:pb-6">
                         {!editingPersonal && (
-                          <div className="space-y-3">
-                            <Label htmlFor="empadronado" className="text-base md:text-lg font-semibold">Seleccionar Persona *</Label>
+                          <div className="space-y-2">
+                            <Label htmlFor="empadronado" className="text-sm md:text-lg font-semibold">Seleccionar Persona *</Label>
                             <Select
                               value={formData.empadronadoId}
                               onValueChange={(value) => setFormData({ ...formData, empadronadoId: value })}
                               required
                             >
-                              <SelectTrigger className="h-12 md:h-14 text-base">
+                              <SelectTrigger className="h-9 md:h-14 text-sm md:text-base">
                                 <SelectValue placeholder="Seleccione una persona" />
                               </SelectTrigger>
                               <SelectContent>
                                 {empadronadosDisponibles.map((emp) => (
-                                  <SelectItem key={emp.id} value={emp.id} className="text-base">
+                                  <SelectItem key={emp.id} value={emp.id} className="text-sm md:text-base">
                                     {emp.nombre} {emp.apellidos} - {emp.dni}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
-                            <p className="text-sm text-muted-foreground">Persona del padrón que será agregada</p>
+                            <p className="text-xs md:text-sm text-muted-foreground">Persona del padrón que será agregada</p>
                           </div>
                         )}
 
-                        <div className="space-y-3">
-                          <Label htmlFor="funcion" className="text-base md:text-lg font-semibold">Función / Cargo *</Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="funcion" className="text-sm md:text-lg font-semibold">Función / Cargo *</Label>
                           <Input
                             id="funcion"
                             value={formData.funcion}
                             onChange={(e) => setFormData({ ...formData, funcion: e.target.value })}
                             placeholder="Ej: Guardia de seguridad"
                             required
-                            className="h-12 md:h-14 text-base"
+                            className="h-9 md:h-14 text-sm md:text-base"
                           />
-                          <p className="text-sm text-muted-foreground">Rol o función que desempeñará</p>
+                          <p className="text-xs md:text-sm text-muted-foreground">Rol o función que desempeñará</p>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label htmlFor="area" className="text-base md:text-lg font-semibold">Área Asignada</Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="area" className="text-sm md:text-lg font-semibold">Área Asignada</Label>
                           <Input
                             id="area"
                             value={formData.areaAsignada}
                             onChange={(e) => setFormData({ ...formData, areaAsignada: e.target.value })}
                             placeholder="Ej: Pórtico principal"
-                            className="h-12 md:h-14 text-base"
+                            className="h-9 md:h-14 text-sm md:text-base"
                           />
-                          <p className="text-sm text-muted-foreground">Zona donde trabajará (opcional)</p>
+                          <p className="text-xs md:text-sm text-muted-foreground">Zona donde trabajará (opcional)</p>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label htmlFor="fecha" className="text-base md:text-lg font-semibold">Fecha de Contratación *</Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="fecha" className="text-sm md:text-lg font-semibold">Fecha de Contratación *</Label>
                           <Input
                             id="fecha"
                             type="date"
                             value={formData.fechaContratacion}
                             onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
                             required
-                            className="h-12 md:h-14 text-base"
+                            className="h-9 md:h-14 text-sm md:text-base"
                           />
-                          <p className="text-sm text-muted-foreground">Fecha de inicio de labores</p>
+                          <p className="text-xs md:text-sm text-muted-foreground">Fecha de inicio de labores</p>
                         </div>
 
-                        <div className="flex items-center justify-between p-5 md:p-7 bg-muted/30 rounded-xl border-2">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="activo" className="text-base md:text-lg font-semibold cursor-pointer">Personal Activo</Label>
-                            <p className="text-sm text-muted-foreground">Está actualmente en servicio</p>
+                        <div className="flex items-center justify-between p-3 md:p-7 bg-muted/30 rounded-lg md:rounded-xl border">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="activo" className="text-sm md:text-lg font-semibold cursor-pointer">Personal Activo</Label>
+                            <p className="text-xs md:text-sm text-muted-foreground">Está actualmente en servicio</p>
                           </div>
                           <Switch
                             id="activo"
                             checked={formData.activo}
                             onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
-                            className="scale-110"
                           />
                         </div>
                       </TabsContent>
 
                        {/* Tab: Datos Laborales */}
-                      <TabsContent value="laborales" className="space-y-6 md:space-y-8 mt-8 px-6 md:px-10 pb-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                          <div className="space-y-3">
-                            <Label htmlFor="sueldo" className="text-base md:text-lg font-semibold">Sueldo Mensual</Label>
+                      <TabsContent value="laborales" className="space-y-3 md:space-y-8 mt-4 md:mt-8 px-3 md:px-10 pb-4 md:pb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-8">
+                          <div className="space-y-2">
+                            <Label htmlFor="sueldo" className="text-sm md:text-lg font-semibold">Sueldo Mensual</Label>
                             <div className="relative">
-                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-base">S/</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm md:text-base">S/</span>
                               <Input
                                 id="sueldo"
                                 type="number"
@@ -503,91 +502,90 @@ export default function Planilla() {
                                 value={formData.sueldo}
                                 onChange={(e) => setFormData({ ...formData, sueldo: e.target.value })}
                                 placeholder="0.00"
-                                className="h-12 md:h-14 pl-10 md:pl-12 text-base"
+                                className="h-9 md:h-14 pl-8 md:pl-12 text-sm md:text-base"
                               />
                             </div>
-                            <p className="text-sm text-muted-foreground">Remuneración (opcional)</p>
+                            <p className="text-xs md:text-sm text-muted-foreground">Remuneración (opcional)</p>
                           </div>
 
-                          <div className="space-y-3">
-                            <Label htmlFor="tipoContrato" className="text-base md:text-lg font-semibold">Tipo de Contrato</Label>
+                          <div className="space-y-2">
+                            <Label htmlFor="tipoContrato" className="text-sm md:text-lg font-semibold">Tipo de Contrato</Label>
                             <Select
                               value={formData.tipoContrato}
                               onValueChange={(value: any) => setFormData({ ...formData, tipoContrato: value })}
                             >
-                              <SelectTrigger className="h-12 md:h-14 text-base">
+                              <SelectTrigger className="h-9 md:h-14 text-sm md:text-base">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="planilla" className="text-base">Planilla</SelectItem>
-                                <SelectItem value="recibo_honorarios" className="text-base">Recibo Honorarios</SelectItem>
-                                <SelectItem value="temporal" className="text-base">Temporal</SelectItem>
-                                <SelectItem value="indefinido" className="text-base">Indefinido</SelectItem>
+                                <SelectItem value="planilla" className="text-sm md:text-base">Planilla</SelectItem>
+                                <SelectItem value="recibo_honorarios" className="text-sm md:text-base">Recibo Honorarios</SelectItem>
+                                <SelectItem value="temporal" className="text-sm md:text-base">Temporal</SelectItem>
+                                <SelectItem value="indefinido" className="text-sm md:text-base">Indefinido</SelectItem>
                               </SelectContent>
                             </Select>
-                            <p className="text-sm text-muted-foreground">Modalidad</p>
+                            <p className="text-xs md:text-sm text-muted-foreground">Modalidad</p>
                           </div>
 
-                          <div className="space-y-3">
-                            <Label htmlFor="frecuencia" className="text-base md:text-lg font-semibold">Frecuencia de Pago</Label>
+                          <div className="space-y-2">
+                            <Label htmlFor="frecuencia" className="text-sm md:text-lg font-semibold">Frecuencia de Pago</Label>
                             <Select
                               value={formData.frecuenciaPago}
                               onValueChange={(value: any) => setFormData({ ...formData, frecuenciaPago: value })}
                             >
-                              <SelectTrigger className="h-12 md:h-14 text-base">
+                              <SelectTrigger className="h-9 md:h-14 text-sm md:text-base">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="semanal" className="text-base">Semanal</SelectItem>
-                                <SelectItem value="quincenal" className="text-base">Quincenal</SelectItem>
-                                <SelectItem value="mensual" className="text-base">Mensual</SelectItem>
+                                <SelectItem value="semanal" className="text-sm md:text-base">Semanal</SelectItem>
+                                <SelectItem value="quincenal" className="text-sm md:text-base">Quincenal</SelectItem>
+                                <SelectItem value="mensual" className="text-sm md:text-base">Mensual</SelectItem>
                               </SelectContent>
                             </Select>
-                            <p className="text-sm text-muted-foreground">Periodicidad</p>
+                            <p className="text-xs md:text-sm text-muted-foreground">Periodicidad</p>
                           </div>
                         </div>
 
-                        <Separator className="my-6 md:my-8" />
+                        <Separator className="my-4 md:my-8" />
 
-                        <div className="space-y-3">
-                          <Label htmlFor="observaciones" className="text-base md:text-lg font-semibold">Observaciones</Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="observaciones" className="text-sm md:text-lg font-semibold">Observaciones</Label>
                           <Input
                             id="observaciones"
                             value={formData.observaciones}
                             onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
                             placeholder="Información adicional"
-                            className="h-12 md:h-14 text-base"
+                            className="h-9 md:h-14 text-sm md:text-base"
                           />
-                          <p className="text-sm text-muted-foreground">Notas adicionales (opcional)</p>
+                          <p className="text-xs md:text-sm text-muted-foreground">Notas adicionales (opcional)</p>
                         </div>
                       </TabsContent>
 
                       {/* Tab: Acceso al Sistema */}
-                      <TabsContent value="acceso" className="space-y-6 md:space-y-8 mt-8 px-6 md:px-10 pb-6">
-                        <div className="flex items-center justify-between p-5 md:p-7 bg-gradient-to-r from-primary/5 to-accent/5 rounded-xl border-2 border-dashed border-primary/30">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="acceso2" className="text-base md:text-lg font-semibold cursor-pointer">Permitir Acceso</Label>
-                            <p className="text-sm text-muted-foreground">Inicio de sesión al sistema</p>
+                      <TabsContent value="acceso" className="space-y-3 md:space-y-8 mt-4 md:mt-8 px-3 md:px-10 pb-4 md:pb-6">
+                        <div className="flex items-center justify-between p-3 md:p-7 bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg md:rounded-xl border-2 border-dashed border-primary/30">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="acceso2" className="text-sm md:text-lg font-semibold cursor-pointer">Permitir Acceso</Label>
+                            <p className="text-xs md:text-sm text-muted-foreground">Inicio de sesión al sistema</p>
                           </div>
                           <Switch
                             id="acceso2"
                             checked={formData.tieneAccesoSistema}
                             onCheckedChange={(checked) => setFormData({ ...formData, tieneAccesoSistema: checked })}
-                            className="scale-110"
                           />
                         </div>
 
                         {formData.tieneAccesoSistema && (
-                          <div className="space-y-5 md:space-y-7 border-2 rounded-2xl p-5 md:p-8 bg-card shadow-sm">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b">
+                          <div className="space-y-3 md:space-y-7 border rounded-lg md:border-2 md:rounded-2xl p-3 md:p-8 bg-card shadow-sm">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 pb-3 md:pb-4 border-b">
                               <div>
-                                <Label className="text-lg md:text-xl font-bold">Horarios de Acceso</Label>
-                                <p className="text-sm md:text-base text-muted-foreground mt-1.5">Define días y horarios permitidos</p>
+                                <Label className="text-sm md:text-xl font-bold">Horarios de Acceso</Label>
+                                <p className="text-xs md:text-base text-muted-foreground mt-0.5 md:mt-1.5">Define días y horarios permitidos</p>
                               </div>
                               <Button
                                 type="button"
                                 variant="outline"
-                                size="lg"
+                                size="sm"
                                 onClick={() => {
                                   const newHorarios = formData.horariosAcceso.map(h => ({
                                     ...h,
@@ -597,17 +595,17 @@ export default function Planilla() {
                                   }));
                                   setFormData({ ...formData, horariosAcceso: newHorarios });
                                 }}
-                                className="gap-2 w-full md:w-auto h-11"
+                                className="gap-1 md:gap-2 w-full md:w-auto h-8 md:h-11 text-xs md:text-sm"
                               >
-                                <Clock className="h-4 w-4" />
-                                Habilitar 24h Todos
+                                <Clock className="h-3 w-3 md:h-4 md:w-4" />
+                                24h Todos
                               </Button>
                             </div>
                             
-                            <div className="space-y-3 md:space-y-4">
+                            <div className="space-y-2 md:space-y-4">
                               {formData.horariosAcceso.map((horario, index) => (
-                                <div key={horario.dia} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-5 p-4 md:p-5 rounded-xl border-2 bg-gradient-to-r from-muted/30 to-muted/10 hover:from-muted/50 hover:to-muted/20 transition-all duration-200">
-                                  <div className="flex items-center gap-4 min-w-[140px]">
+                                <div key={horario.dia} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-5 p-2 md:p-5 rounded-lg md:rounded-xl border bg-gradient-to-r from-muted/30 to-muted/10 hover:from-muted/50 hover:to-muted/20 transition-all duration-200">
+                                  <div className="flex items-center gap-2 md:gap-4 min-w-[100px] md:min-w-[140px]">
                                     <Checkbox
                                       checked={horario.activo}
                                       onCheckedChange={(checked) => {
@@ -615,11 +613,11 @@ export default function Planilla() {
                                         newHorarios[index].activo = checked as boolean;
                                         setFormData({ ...formData, horariosAcceso: newHorarios });
                                       }}
-                                      className="h-5 w-5"
+                                      className="h-4 w-4 md:h-5 md:w-5"
                                     />
-                                    <span className="text-sm md:text-base font-semibold min-w-[90px]">{DIAS_SEMANA[index].label}</span>
+                                    <span className="text-xs md:text-base font-semibold min-w-[70px] md:min-w-[90px]">{DIAS_SEMANA[index].label}</span>
                                   </div>
-                                  <div className="flex items-center gap-3 flex-1 w-full">
+                                  <div className="flex items-center gap-2 md:gap-3 flex-1 w-full">
                                     <Input
                                       type="time"
                                       value={horario.horaInicio}
@@ -629,9 +627,9 @@ export default function Planilla() {
                                         setFormData({ ...formData, horariosAcceso: newHorarios });
                                       }}
                                       disabled={!horario.activo}
-                                      className="flex-1 h-11 md:h-12 text-sm md:text-base font-medium"
+                                      className="flex-1 h-8 md:h-12 text-xs md:text-base font-medium"
                                     />
-                                    <span className="text-sm md:text-base text-muted-foreground font-semibold">a</span>
+                                    <span className="text-xs md:text-base text-muted-foreground font-semibold">a</span>
                                     <Input
                                       type="time"
                                       value={horario.horaFin}
@@ -641,7 +639,7 @@ export default function Planilla() {
                                         setFormData({ ...formData, horariosAcceso: newHorarios });
                                       }}
                                       disabled={!horario.activo}
-                                      className="flex-1 h-11 md:h-12 text-sm md:text-base font-medium"
+                                      className="flex-1 h-8 md:h-12 text-xs md:text-base font-medium"
                                     />
                                     <Button
                                       type="button"
@@ -654,10 +652,10 @@ export default function Planilla() {
                                         setFormData({ ...formData, horariosAcceso: newHorarios });
                                       }}
                                       disabled={!horario.activo}
-                                      className="text-xs md:text-sm gap-1.5 h-9 md:h-10 px-3"
+                                      className="text-xs gap-1 h-7 md:h-10 px-2 md:px-3"
                                     >
-                                      <Clock className="h-3.5 w-3.5" />
-                                      <span>24h</span>
+                                      <Clock className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                                      <span className="hidden sm:inline">24h</span>
                                     </Button>
                                   </div>
                                 </div>
@@ -667,25 +665,25 @@ export default function Planilla() {
                         )}
 
                         {!formData.tieneAccesoSistema && (
-                          <div className="text-center py-12 md:py-16 px-6 border-2 border-dashed rounded-2xl bg-gradient-to-b from-muted/20 to-muted/5">
-                            <ShieldCheck className="h-16 w-16 md:h-20 md:w-20 mx-auto text-muted-foreground/30 mb-5" />
-                            <p className="text-sm md:text-base text-muted-foreground font-medium">Activa "Permitir Acceso" arriba para configurar horarios del sistema</p>
+                          <div className="text-center py-8 md:py-16 px-4 md:px-6 border-2 border-dashed rounded-lg md:rounded-2xl bg-gradient-to-b from-muted/20 to-muted/5">
+                            <ShieldCheck className="h-12 w-12 md:h-20 md:w-20 mx-auto text-muted-foreground/30 mb-3 md:mb-5" />
+                            <p className="text-xs md:text-base text-muted-foreground font-medium">Activa "Permitir Acceso" arriba para configurar horarios del sistema</p>
                           </div>
                         )}
                       </TabsContent>
                     </Tabs>
 
-                    <Separator className="my-6 md:my-8" />
+                    <Separator className="my-4 md:my-8" />
 
-                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 md:gap-4 px-6 md:px-10 pb-6">
-                      <Button type="button" variant="outline" size="lg" className="w-full sm:w-auto h-12 md:h-14 px-8 text-base" onClick={() => {
+                    <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 md:gap-4 px-3 md:px-10 pb-4 md:pb-6">
+                      <Button type="button" variant="outline" size="default" className="w-full sm:w-auto h-9 md:h-14 px-4 md:px-8 text-sm md:text-base" onClick={() => {
                         setDialogOpen(false);
                         setEditingPersonal(null);
                       }}>
                         Cancelar
                       </Button>
-                      <Button type="submit" size="lg" className="w-full sm:w-auto md:min-w-[180px] h-12 md:h-14 px-8 text-base font-semibold shadow-lg hover:shadow-xl transition-all">
-                        {editingPersonal ? 'Actualizar Personal' : 'Agregar Personal'}
+                      <Button type="submit" size="default" className="w-full sm:w-auto md:min-w-[180px] h-9 md:h-14 px-4 md:px-8 text-sm md:text-base font-semibold shadow-lg hover:shadow-xl transition-all">
+                        {editingPersonal ? 'Actualizar' : 'Agregar'}
                       </Button>
                     </div>
                   </form>
