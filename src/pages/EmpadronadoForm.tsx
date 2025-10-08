@@ -1244,6 +1244,7 @@ const EmpadronadoForm: React.FC = () => {
                       }}
                     />
                     {dniFrontalFile && <p className="text-xs text-muted-foreground mt-1">✓ {dniFrontalFile.name}</p>}
+                    {errors.dniFrontal && <p className="text-sm text-destructive mt-1">{errors.dniFrontal}</p>}
                   </div>
 
                   <div>
@@ -1258,6 +1259,7 @@ const EmpadronadoForm: React.FC = () => {
                       }}
                     />
                     {dniReversoFile && <p className="text-xs text-muted-foreground mt-1">✓ {dniReversoFile.name}</p>}
+                    {errors.dniReverso && <p className="text-sm text-destructive mt-1">{errors.dniReverso}</p>}
                   </div>
 
                   <div>
@@ -1272,6 +1274,7 @@ const EmpadronadoForm: React.FC = () => {
                       }}
                     />
                     {reciboLuzFile && <p className="text-xs text-muted-foreground mt-1">✓ {reciboLuzFile.name}</p>}
+                    {errors.reciboLuz && <p className="text-sm text-destructive mt-1">{errors.reciboLuz}</p>}
                   </div>
                 </div>
               </div>
@@ -1529,7 +1532,10 @@ const EmpadronadoForm: React.FC = () => {
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                {isEditing ? "Actualizar" : "Crear"} Empadronado
+                {isEditing 
+                  ? (formData.tipoRegistro === "personal_seguridad" ? "Actualizar Perfil" : "Actualizar Empadronado")
+                  : (formData.tipoRegistro === "personal_seguridad" ? "Crear Perfil de Seguridad" : "Crear Empadronado")
+                }
               </>
             )}
           </Button>
