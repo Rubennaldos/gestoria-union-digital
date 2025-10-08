@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthzProvider } from "@/contexts/AuthzContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminCreator } from "@/components/auth/AdminCreator";
+import { useVersionCheck } from "@/hooks/useVersionCheck";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -34,6 +35,9 @@ import Finanzas from "./pages/Finanzas";
 const queryClient = new QueryClient();
 
 const App: React.FC = () => {
+  // Check for updates every minute
+  useVersionCheck(60000);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
