@@ -698,7 +698,7 @@ const EmpadronadoForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="numeroPadron">
-                  Número de Registro *
+                  Número de Padrón o Registro *
                   {formData.tipoRegistro === "personal_seguridad" && (
                     <span className="text-xs text-muted-foreground ml-2">(Generado automáticamente)</span>
                   )}
