@@ -381,42 +381,45 @@ export default function Planilla() {
                     Agregar Personal
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" aria-describedby="dialog-description">
                   <DialogHeader className="pb-4">
-                    <DialogTitle className="text-2xl">{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
-                    <DialogDescription className="text-base">
+                    <DialogTitle className="text-xl md:text-2xl">{editingPersonal ? 'Editar Personal' : 'Agregar Personal a Planilla'}</DialogTitle>
+                    <DialogDescription id="dialog-description" className="text-sm md:text-base">
                       {editingPersonal ? 'Actualiza la información del personal' : 'Completa el formulario para agregar personal a la planilla'}
                     </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-1">
                     <Tabs defaultValue="basicos" className="w-full">
-                      <TabsList className="grid w-full grid-cols-3 mb-6">
-                        <TabsTrigger value="basicos" className="gap-2">
-                          <Users className="h-4 w-4" />
-                          Datos Básicos
+                      <TabsList className="grid w-full grid-cols-3 mb-4 md:mb-6 h-auto">
+                        <TabsTrigger value="basicos" className="gap-1 md:gap-2 flex-col md:flex-row py-2 text-xs md:text-sm">
+                          <Users className="h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden md:inline">Datos Básicos</span>
+                          <span className="md:hidden">Básicos</span>
                         </TabsTrigger>
-                        <TabsTrigger value="laborales" className="gap-2">
-                          <Briefcase className="h-4 w-4" />
-                          Datos Laborales
+                        <TabsTrigger value="laborales" className="gap-1 md:gap-2 flex-col md:flex-row py-2 text-xs md:text-sm">
+                          <Briefcase className="h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden md:inline">Datos Laborales</span>
+                          <span className="md:hidden">Laborales</span>
                         </TabsTrigger>
-                        <TabsTrigger value="acceso" className="gap-2">
-                          <ShieldCheck className="h-4 w-4" />
-                          Acceso al Sistema
+                        <TabsTrigger value="acceso" className="gap-1 md:gap-2 flex-col md:flex-row py-2 text-xs md:text-sm">
+                          <ShieldCheck className="h-3 w-3 md:h-4 md:w-4" />
+                          <span className="hidden md:inline">Acceso al Sistema</span>
+                          <span className="md:hidden">Acceso</span>
                         </TabsTrigger>
                       </TabsList>
 
                       {/* Tab: Datos Básicos */}
-                      <TabsContent value="basicos" className="space-y-6 mt-0">
+                      <TabsContent value="basicos" className="space-y-4 md:space-y-6 mt-0">
                         {!editingPersonal && (
-                          <div className="space-y-3">
-                            <Label htmlFor="empadronado" className="text-base font-semibold">Seleccionar Persona *</Label>
+                          <div className="space-y-2 md:space-y-3">
+                            <Label htmlFor="empadronado" className="text-sm md:text-base font-semibold">Seleccionar Persona *</Label>
                             <Select
                               value={formData.empadronadoId}
                               onValueChange={(value) => setFormData({ ...formData, empadronadoId: value })}
                               required
                             >
-                              <SelectTrigger className="h-12">
-                                <SelectValue placeholder="Seleccione una persona del padrón" />
+                              <SelectTrigger className="h-10 md:h-12">
+                                <SelectValue placeholder="Seleccione una persona" />
                               </SelectTrigger>
                               <SelectContent>
                                 {empadronadosDisponibles.map((emp) => (
@@ -426,52 +429,52 @@ export default function Planilla() {
                                 ))}
                               </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">Selecciona la persona del padrón que será agregada a planilla</p>
+                            <p className="text-xs text-muted-foreground">Persona del padrón que será agregada</p>
                           </div>
                         )}
 
-                        <div className="space-y-3">
-                          <Label htmlFor="funcion" className="text-base font-semibold">Función / Cargo *</Label>
+                        <div className="space-y-2 md:space-y-3">
+                          <Label htmlFor="funcion" className="text-sm md:text-base font-semibold">Función / Cargo *</Label>
                           <Input
                             id="funcion"
                             value={formData.funcion}
                             onChange={(e) => setFormData({ ...formData, funcion: e.target.value })}
-                            placeholder="Ej: Guardia de seguridad, Personal de limpieza"
+                            placeholder="Ej: Guardia de seguridad"
                             required
-                            className="h-12"
+                            className="h-10 md:h-12"
                           />
-                          <p className="text-xs text-muted-foreground">Especifica el rol o función que desempeñará</p>
+                          <p className="text-xs text-muted-foreground">Rol o función que desempeñará</p>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label htmlFor="area" className="text-base font-semibold">Área Asignada</Label>
+                        <div className="space-y-2 md:space-y-3">
+                          <Label htmlFor="area" className="text-sm md:text-base font-semibold">Área Asignada</Label>
                           <Input
                             id="area"
                             value={formData.areaAsignada}
                             onChange={(e) => setFormData({ ...formData, areaAsignada: e.target.value })}
-                            placeholder="Ej: Pórtico principal, Áreas verdes"
-                            className="h-12"
+                            placeholder="Ej: Pórtico principal"
+                            className="h-10 md:h-12"
                           />
-                          <p className="text-xs text-muted-foreground">Zona o área donde trabajará (opcional)</p>
+                          <p className="text-xs text-muted-foreground">Zona donde trabajará (opcional)</p>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label htmlFor="fecha" className="text-base font-semibold">Fecha de Contratación *</Label>
+                        <div className="space-y-2 md:space-y-3">
+                          <Label htmlFor="fecha" className="text-sm md:text-base font-semibold">Fecha de Contratación *</Label>
                           <Input
                             id="fecha"
                             type="date"
                             value={formData.fechaContratacion}
                             onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
                             required
-                            className="h-12"
+                            className="h-10 md:h-12"
                           />
                           <p className="text-xs text-muted-foreground">Fecha de inicio de labores</p>
                         </div>
 
-                        <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg border">
+                        <div className="flex items-center justify-between p-3 md:p-4 bg-muted/30 rounded-lg border">
                           <div className="space-y-1">
-                            <Label htmlFor="activo" className="text-base font-medium cursor-pointer">Personal Activo</Label>
-                            <p className="text-xs text-muted-foreground">El personal está actualmente en servicio</p>
+                            <Label htmlFor="activo" className="text-sm md:text-base font-medium cursor-pointer">Personal Activo</Label>
+                            <p className="text-xs text-muted-foreground hidden md:block">Está actualmente en servicio</p>
                           </div>
                           <Switch
                             id="activo"
@@ -481,14 +484,13 @@ export default function Planilla() {
                         </div>
                       </TabsContent>
 
-                      {/* Tab: Datos Laborales */}
-                      <TabsContent value="laborales" className="space-y-6 mt-0">
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="space-y-3">
-                            <Label htmlFor="sueldo" className="text-base font-semibold">Sueldo Mensual</Label>
+                       {/* Tab: Datos Laborales */}
+                      <TabsContent value="laborales" className="space-y-4 md:space-y-6 mt-0">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                          <div className="space-y-2 md:space-y-3">
+                            <Label htmlFor="sueldo" className="text-sm md:text-base font-semibold">Sueldo Mensual</Label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">S/</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">S/</span>
                               <Input
                                 id="sueldo"
                                 type="number"
@@ -496,38 +498,38 @@ export default function Planilla() {
                                 value={formData.sueldo}
                                 onChange={(e) => setFormData({ ...formData, sueldo: e.target.value })}
                                 placeholder="0.00"
-                                className="h-12 pl-10"
+                                className="h-10 md:h-12 pl-8 md:pl-10"
                               />
                             </div>
-                            <p className="text-xs text-muted-foreground">Remuneración mensual (opcional)</p>
+                            <p className="text-xs text-muted-foreground">Remuneración (opcional)</p>
                           </div>
 
-                          <div className="space-y-3">
-                            <Label htmlFor="tipoContrato" className="text-base font-semibold">Tipo de Contrato</Label>
+                          <div className="space-y-2 md:space-y-3">
+                            <Label htmlFor="tipoContrato" className="text-sm md:text-base font-semibold">Tipo de Contrato</Label>
                             <Select
                               value={formData.tipoContrato}
                               onValueChange={(value: any) => setFormData({ ...formData, tipoContrato: value })}
                             >
-                              <SelectTrigger className="h-12">
+                              <SelectTrigger className="h-10 md:h-12">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="planilla">Planilla</SelectItem>
-                                <SelectItem value="recibo_honorarios">Recibo por Honorarios</SelectItem>
+                                <SelectItem value="recibo_honorarios">Recibo Honorarios</SelectItem>
                                 <SelectItem value="temporal">Temporal</SelectItem>
                                 <SelectItem value="indefinido">Indefinido</SelectItem>
                               </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">Modalidad de contratación</p>
+                            <p className="text-xs text-muted-foreground">Modalidad</p>
                           </div>
 
-                          <div className="space-y-3">
-                            <Label htmlFor="frecuencia" className="text-base font-semibold">Frecuencia de Pago</Label>
+                          <div className="space-y-2 md:space-y-3">
+                            <Label htmlFor="frecuencia" className="text-sm md:text-base font-semibold">Frecuencia de Pago</Label>
                             <Select
                               value={formData.frecuenciaPago}
                               onValueChange={(value: any) => setFormData({ ...formData, frecuenciaPago: value })}
                             >
-                              <SelectTrigger className="h-12">
+                              <SelectTrigger className="h-10 md:h-12">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -536,31 +538,31 @@ export default function Planilla() {
                                 <SelectItem value="mensual">Mensual</SelectItem>
                               </SelectContent>
                             </Select>
-                            <p className="text-xs text-muted-foreground">Periodicidad del pago</p>
+                            <p className="text-xs text-muted-foreground">Periodicidad</p>
                           </div>
                         </div>
 
-                        <Separator className="my-6" />
+                        <Separator className="my-4 md:my-6" />
 
-                        <div className="space-y-3">
-                          <Label htmlFor="observaciones" className="text-base font-semibold">Observaciones</Label>
+                        <div className="space-y-2 md:space-y-3">
+                          <Label htmlFor="observaciones" className="text-sm md:text-base font-semibold">Observaciones</Label>
                           <Input
                             id="observaciones"
                             value={formData.observaciones}
                             onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                            placeholder="Información adicional relevante sobre el personal"
-                            className="h-12"
+                            placeholder="Información adicional"
+                            className="h-10 md:h-12"
                           />
                           <p className="text-xs text-muted-foreground">Notas adicionales (opcional)</p>
                         </div>
                       </TabsContent>
 
                       {/* Tab: Acceso al Sistema */}
-                      <TabsContent value="acceso" className="space-y-6 mt-0">
-                        <div className="flex items-center justify-between p-5 bg-muted/30 rounded-lg border-2 border-dashed">
+                      <TabsContent value="acceso" className="space-y-4 md:space-y-6 mt-0">
+                        <div className="flex items-center justify-between p-3 md:p-5 bg-muted/30 rounded-lg border-2 border-dashed">
                           <div className="space-y-1">
-                            <Label htmlFor="acceso2" className="text-base font-semibold cursor-pointer">Permitir Acceso al Sistema</Label>
-                            <p className="text-sm text-muted-foreground">Habilitar inicio de sesión en el sistema</p>
+                            <Label htmlFor="acceso2" className="text-sm md:text-base font-semibold cursor-pointer">Permitir Acceso</Label>
+                            <p className="text-xs md:text-sm text-muted-foreground">Inicio de sesión al sistema</p>
                           </div>
                           <Switch
                             id="acceso2"
@@ -570,11 +572,11 @@ export default function Planilla() {
                         </div>
 
                         {formData.tieneAccesoSistema && (
-                          <div className="space-y-5 border-2 rounded-xl p-6 bg-card">
-                            <div className="flex items-center justify-between mb-4">
+                          <div className="space-y-3 md:space-y-5 border-2 rounded-xl p-3 md:p-6 bg-card">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:mb-4">
                               <div>
-                                <Label className="text-lg font-semibold">Horarios de Acceso al Sistema</Label>
-                                <p className="text-sm text-muted-foreground mt-1">Define los días y horarios permitidos</p>
+                                <Label className="text-base md:text-lg font-semibold">Horarios de Acceso</Label>
+                                <p className="text-xs md:text-sm text-muted-foreground mt-1">Define días y horarios</p>
                               </div>
                               <Button
                                 type="button"
@@ -589,27 +591,29 @@ export default function Planilla() {
                                   }));
                                   setFormData({ ...formData, horariosAcceso: newHorarios });
                                 }}
-                                className="gap-2"
+                                className="gap-2 w-full md:w-auto"
                               >
-                                <Clock className="h-4 w-4" />
+                                <Clock className="h-3 w-3 md:h-4 md:w-4" />
                                 24h Todos
                               </Button>
                             </div>
                             
-                            <div className="space-y-3">
+                            <div className="space-y-2 md:space-y-3">
                               {formData.horariosAcceso.map((horario, index) => (
-                                <div key={horario.dia} className="flex items-center gap-4 p-4 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
-                                  <Checkbox
-                                    checked={horario.activo}
-                                    onCheckedChange={(checked) => {
-                                      const newHorarios = [...formData.horariosAcceso];
-                                      newHorarios[index].activo = checked as boolean;
-                                      setFormData({ ...formData, horariosAcceso: newHorarios });
-                                    }}
-                                    className="h-5 w-5"
-                                  />
-                                  <span className="w-28 text-sm font-medium">{DIAS_SEMANA[index].label}</span>
-                                  <div className="flex items-center gap-3 flex-1">
+                                <div key={horario.dia} className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4 p-3 md:p-4 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
+                                  <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <Checkbox
+                                      checked={horario.activo}
+                                      onCheckedChange={(checked) => {
+                                        const newHorarios = [...formData.horariosAcceso];
+                                        newHorarios[index].activo = checked as boolean;
+                                        setFormData({ ...formData, horariosAcceso: newHorarios });
+                                      }}
+                                      className="h-4 w-4 md:h-5 md:w-5"
+                                    />
+                                    <span className="w-20 md:w-28 text-xs md:text-sm font-medium">{DIAS_SEMANA[index].label}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 md:gap-3 flex-1 w-full">
                                     <Input
                                       type="time"
                                       value={horario.horaInicio}
@@ -619,9 +623,9 @@ export default function Planilla() {
                                         setFormData({ ...formData, horariosAcceso: newHorarios });
                                       }}
                                       disabled={!horario.activo}
-                                      className="flex-1 h-10"
+                                      className="flex-1 h-9 md:h-10 text-xs md:text-sm"
                                     />
-                                    <span className="text-sm text-muted-foreground font-medium">hasta</span>
+                                    <span className="text-xs md:text-sm text-muted-foreground font-medium">a</span>
                                     <Input
                                       type="time"
                                       value={horario.horaFin}
@@ -631,25 +635,25 @@ export default function Planilla() {
                                         setFormData({ ...formData, horariosAcceso: newHorarios });
                                       }}
                                       disabled={!horario.activo}
-                                      className="flex-1 h-10"
+                                      className="flex-1 h-9 md:h-10 text-xs md:text-sm"
                                     />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        const newHorarios = [...formData.horariosAcceso];
+                                        newHorarios[index].horaInicio = "00:00";
+                                        newHorarios[index].horaFin = "23:59";
+                                        setFormData({ ...formData, horariosAcceso: newHorarios });
+                                      }}
+                                      disabled={!horario.activo}
+                                      className="text-xs gap-1 h-8 md:h-9 px-2 md:px-3"
+                                    >
+                                      <Clock className="h-3 w-3" />
+                                      <span className="hidden md:inline">24h</span>
+                                    </Button>
                                   </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      const newHorarios = [...formData.horariosAcceso];
-                                      newHorarios[index].horaInicio = "00:00";
-                                      newHorarios[index].horaFin = "23:59";
-                                      setFormData({ ...formData, horariosAcceso: newHorarios });
-                                    }}
-                                    disabled={!horario.activo}
-                                    className="text-xs gap-1 h-9 px-3"
-                                  >
-                                    <Clock className="h-3 w-3" />
-                                    24h
-                                  </Button>
                                 </div>
                               ))}
                             </div>
@@ -657,25 +661,25 @@ export default function Planilla() {
                         )}
 
                         {!formData.tieneAccesoSistema && (
-                          <div className="text-center py-12 px-4 border-2 border-dashed rounded-xl bg-muted/10">
-                            <ShieldCheck className="h-16 w-16 mx-auto text-muted-foreground/40 mb-4" />
-                            <p className="text-muted-foreground">Activa "Permitir Acceso al Sistema" para configurar horarios</p>
+                          <div className="text-center py-8 md:py-12 px-4 border-2 border-dashed rounded-xl bg-muted/10">
+                            <ShieldCheck className="h-12 w-12 md:h-16 md:w-16 mx-auto text-muted-foreground/40 mb-3 md:mb-4" />
+                            <p className="text-xs md:text-sm text-muted-foreground">Activa "Permitir Acceso" para configurar horarios</p>
                           </div>
                         )}
                       </TabsContent>
                     </Tabs>
 
-                    <Separator className="my-6" />
+                    <Separator className="my-4 md:my-6" />
 
-                    <div className="flex justify-end gap-3 pt-2">
-                      <Button type="button" variant="outline" size="lg" onClick={() => {
+                    <div className="flex flex-col-reverse md:flex-row justify-end gap-2 md:gap-3 pt-2">
+                      <Button type="button" variant="outline" size="lg" className="w-full md:w-auto" onClick={() => {
                         setDialogOpen(false);
                         setEditingPersonal(null);
                       }}>
                         Cancelar
                       </Button>
-                      <Button type="submit" size="lg" className="min-w-[150px]">
-                        {editingPersonal ? 'Actualizar Personal' : 'Agregar Personal'}
+                      <Button type="submit" size="lg" className="w-full md:w-auto md:min-w-[150px]">
+                        {editingPersonal ? 'Actualizar' : 'Agregar'}
                       </Button>
                     </div>
                   </form>
