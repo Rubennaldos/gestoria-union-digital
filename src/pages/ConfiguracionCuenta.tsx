@@ -331,6 +331,7 @@ const ConfiguracionCuenta: React.FC = () => {
 
           {/* Tab Perfil */}
           <TabsContent value="perfil" className="space-y-4 mt-4">
+            {/* Información Personal Básica */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -391,6 +392,83 @@ const ConfiguracionCuenta: React.FC = () => {
                       className="bg-muted"
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Fecha de Cumpleaños
+                    </Label>
+                    <Input
+                      value={empadronado?.cumpleanos || "No registrado"}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Género
+                    </Label>
+                    <Input
+                      value={empadronado?.genero || "No especificado"}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Familia/Etapa
+                    </Label>
+                    <Input
+                      value={empadronado?.familia || "No asignado"}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Estado del Terreno
+                    </Label>
+                    <Input
+                      value={
+                        empadronado?.estadoVivienda === "construida"
+                          ? "Construida"
+                          : empadronado?.estadoVivienda === "construccion"
+                          ? "En Construcción"
+                          : empadronado?.estadoVivienda === "terreno"
+                          ? "Terreno"
+                          : "No especificado"
+                      }
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Lock className="h-3 w-3" />
+                    Dirección
+                  </Label>
+                  <Input
+                    value={
+                      empadronado?.direccionDomicilio ||
+                      (empadronado?.manzana && empadronado?.lote
+                        ? `Mz ${empadronado.manzana} Lt ${empadronado.lote}${
+                            empadronado.etapa ? ` - ${empadronado.etapa}` : ""
+                          }`
+                        : "No registrada")
+                    }
+                    disabled
+                    className="bg-muted"
+                  />
                 </div>
 
                 <Separator />
@@ -449,6 +527,106 @@ const ConfiguracionCuenta: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Teléfonos de Contacto */}
+            {empadronado?.telefonos && empadronado.telefonos.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    📱 Teléfonos de Contacto
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {empadronado.telefonos.map((tel, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 p-3 bg-accent/30 rounded-lg"
+                      >
+                        <span className="font-medium text-sm">
+                          Teléfono {index + 1}:
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {typeof tel === "string" ? tel : tel.numero}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Vehículos */}
+            {empadronado?.vehiculos && empadronado.vehiculos.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    🚗 Vehículos Registrados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {empadronado.vehiculos.map((vehiculo, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-4 bg-accent/30 rounded-lg border"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/10 rounded-full">
+                            <span className="text-2xl">
+                              {vehiculo.tipo === "vehiculo" ? "🚗" : "🏍️"}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-semibold">{vehiculo.placa}</p>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {vehiculo.tipo}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Miembros de Familia */}
+            {empadronado?.miembrosFamilia && empadronado.miembrosFamilia.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    👨‍👩‍👧‍👦 Miembros de la Familia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {empadronado.miembrosFamilia.map((miembro, index) => (
+                      <div
+                        key={index}
+                        className="p-4 bg-accent/30 rounded-lg border"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <p className="font-semibold">
+                              {miembro.nombre} {miembro.apellidos}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {miembro.parentezco}
+                            </p>
+                            {miembro.cumpleanos && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                🎂 {miembro.cumpleanos}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Tab Contraseña */}
