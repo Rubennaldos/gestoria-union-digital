@@ -32,6 +32,7 @@ import Seguridad from "./pages/Seguridad";
 import AdminSeguridad from "./pages/AdminSeguridad";
 import Finanzas from "./pages/Finanzas";
 import ConfiguracionCuenta from "./pages/ConfiguracionCuenta";
+import Planilla from "./pages/Planilla";
 
 const queryClient = new QueryClient();
 
@@ -244,6 +245,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <ConfiguracionCuenta />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Planilla de Personal */}
+              <Route
+                path="/planilla"
+                element={
+                  <ProtectedRoute>
+                    <Planilla />
                   </ProtectedRoute>
                 }
               />
