@@ -13,6 +13,7 @@ import { signInWithEmailOrUsername } from '@/services/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { Shield, Mail, Lock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import securityGuardImage from '@/assets/security-guard-stop.png';
 
 // 🔸 Leemos el flag directo del servicio RTDB
 import { isBootstrapInitialized } from '@/services/rtdb';
@@ -98,8 +99,11 @@ export default function Login() {
     } catch (err: any) {
       const msg = String(err?.message || '').toLowerCase();
       let errorMessage = 'Error al iniciar sesión';
+      let isScheduleError = false;
+      
       if (msg.includes('horario_no_permitido')) {
         errorMessage = 'Estás fuera de tu horario laboral, contáctate con el encargado de seguridad.';
+        isScheduleError = true;
       } else if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
         errorMessage = 'Tu acceso está deshabilitado, contacta a Presidencia.';
       } else if (msg.includes('user-not-found') || msg.includes('usuario no encontrado')) {
@@ -110,6 +114,11 @@ export default function Login() {
         errorMessage = 'Email inválido';
       }
       setError(errorMessage);
+      
+      if (isScheduleError) {
+        // Scroll to top to show the image
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } finally {
       setLoading(false);
     }
@@ -203,8 +212,15 @@ export default function Login() {
               />
 
               {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                <Alert variant="destructive" className="flex flex-col items-center gap-4 py-6">
+                  {error.includes('horario laboral') && (
+                    <img 
+                      src={securityGuardImage} 
+                      alt="Personal de Seguridad" 
+                      className="w-32 h-32 object-contain"
+                    />
+                  )}
+                  <AlertDescription className="text-center text-base">{error}</AlertDescription>
                 </Alert>
               )}
 
