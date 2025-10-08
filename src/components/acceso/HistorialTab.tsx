@@ -172,18 +172,18 @@ export function HistorialTab() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="visitas" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="visitas" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Visitas ({visitas.length})
+            <TabsList className="grid w-full grid-cols-3 h-auto">
+              <TabsTrigger value="visitas" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 px-2">
+                <Users className="h-4 w-4 shrink-0" />
+                <span className="text-xs sm:text-sm truncate">Visitas ({visitas.length})</span>
               </TabsTrigger>
-              <TabsTrigger value="trabajadores" className="flex items-center gap-2">
-                <HardHat className="h-4 w-4" />
-                Trabajadores ({trabajadores.length})
+              <TabsTrigger value="trabajadores" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 px-2">
+                <HardHat className="h-4 w-4 shrink-0" />
+                <span className="text-xs sm:text-sm truncate">Trabajadores ({trabajadores.length})</span>
               </TabsTrigger>
-              <TabsTrigger value="proveedores" className="flex items-center gap-2">
-                <Truck className="h-4 w-4" />
-                Proveedores ({proveedores.length})
+              <TabsTrigger value="proveedores" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 px-2">
+                <Truck className="h-4 w-4 shrink-0" />
+                <span className="text-xs sm:text-sm truncate">Proveedores ({proveedores.length})</span>
               </TabsTrigger>
             </TabsList>
 

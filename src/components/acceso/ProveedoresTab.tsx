@@ -35,11 +35,6 @@ export function ProveedoresTab() {
       toast({ title: "No hay vecino vinculado", description: "Tu usuario no está vinculado a un empadronado.", variant: "destructive" });
       return false;
     }
-    // Solo pedir placa si es vehicular
-    if (tipoAcceso === "vehicular" && !placa.trim()) {
-      toast({ title: "Placa requerida", description: "Debe ingresar la placa del vehículo", variant: "destructive" });
-      return false;
-    }
     if (!esRapido && !empresa.trim()) {
       toast({ title: "Empresa requerida", description: "Debe especificar la empresa o servicio", variant: "destructive" });
       return false;
@@ -116,7 +111,7 @@ export function ProveedoresTab() {
 
           {tipoAcceso === "vehicular" && (
             <div className="space-y-2">
-              <Label htmlFor="placa-prov">Placa del Vehículo *</Label>
+              <Label htmlFor="placa-prov">Placa del Vehículo (opcional)</Label>
               <Input id="placa-prov" value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="ABC-123" className="text-lg font-mono" />
             </div>
           )}
