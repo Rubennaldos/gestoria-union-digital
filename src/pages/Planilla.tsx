@@ -56,7 +56,11 @@ export default function Planilla() {
     areaAsignada: "",
     fechaContratacion: new Date().toISOString().split('T')[0],
     activo: true,
+    sueldo: "",
+    tipoContrato: "indefinido" as const,
+    frecuenciaPago: "mensual" as const,
     tieneAccesoSistema: false,
+    observaciones: "",
     horariosAcceso: DIAS_SEMANA.map(dia => ({
       dia: dia.value as any,
       horaInicio: "08:00",
@@ -105,8 +109,12 @@ export default function Planilla() {
         areaAsignada: formData.areaAsignada || undefined,
         fechaContratacion: new Date(formData.fechaContratacion).getTime(),
         activo: formData.activo,
+        sueldo: formData.sueldo ? parseFloat(formData.sueldo) : undefined,
+        tipoContrato: formData.tipoContrato,
+        frecuenciaPago: formData.frecuenciaPago,
         tieneAccesoSistema: formData.tieneAccesoSistema,
         horariosAcceso: formData.horariosAcceso,
+        observaciones: formData.observaciones || undefined,
       }, user.uid);
       
       toast({
@@ -124,7 +132,11 @@ export default function Planilla() {
         areaAsignada: "",
         fechaContratacion: new Date().toISOString().split('T')[0],
         activo: true,
+        sueldo: "",
+        tipoContrato: "indefinido" as const,
+        frecuenciaPago: "mensual" as const,
         tieneAccesoSistema: false,
+        observaciones: "",
         horariosAcceso: DIAS_SEMANA.map(dia => ({
           dia: dia.value as any,
           horaInicio: "08:00",
@@ -287,6 +299,65 @@ export default function Planilla() {
                       />
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="sueldo">Sueldo Mensual (Opcional)</Label>
+                        <Input
+                          id="sueldo"
+                          type="number"
+                          step="0.01"
+                          value={formData.sueldo}
+                          onChange={(e) => setFormData({ ...formData, sueldo: e.target.value })}
+                          placeholder="0.00"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="tipoContrato">Tipo de Contrato</Label>
+                        <Select
+                          value={formData.tipoContrato}
+                          onValueChange={(value: any) => setFormData({ ...formData, tipoContrato: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="planilla">Planilla</SelectItem>
+                            <SelectItem value="recibo_honorarios">Recibo por Honorarios</SelectItem>
+                            <SelectItem value="temporal">Temporal</SelectItem>
+                            <SelectItem value="indefinido">Indefinido</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="frecuencia">Frecuencia de Pago</Label>
+                        <Select
+                          value={formData.frecuenciaPago}
+                          onValueChange={(value: any) => setFormData({ ...formData, frecuenciaPago: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="semanal">Semanal</SelectItem>
+                            <SelectItem value="quincenal">Quincenal</SelectItem>
+                            <SelectItem value="mensual">Mensual</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="observaciones">Observaciones (Opcional)</Label>
+                      <Input
+                        id="observaciones"
+                        value={formData.observaciones}
+                        onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                        placeholder="Información adicional relevante"
+                      />
+                    </div>
+
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="activo"
@@ -372,10 +443,11 @@ export default function Planilla() {
                     <TableHead>Nombre</TableHead>
                     <TableHead>DNI</TableHead>
                     <TableHead>Función</TableHead>
-                    <TableHead>Área</TableHead>
+                    <TableHead>Sueldo</TableHead>
+                    <TableHead>Contrato</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Acceso Sistema</TableHead>
+                    <TableHead>Horario Sistema</TableHead>
                     <TableHead>Puede Acceder</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -384,8 +456,38 @@ export default function Planilla() {
                     <TableRow key={p.id}>
                       <TableCell className="font-medium">{p.nombreCompleto}</TableCell>
                       <TableCell>{p.dni}</TableCell>
-                      <TableCell>{p.funcion}</TableCell>
-                      <TableCell>{p.areaAsignada || "-"}</TableCell>
+                      <TableCell>
+                        <div className="max-w-[200px]">
+                          <div className="font-medium">{p.funcion}</div>
+                          {p.areaAsignada && (
+                            <div className="text-xs text-muted-foreground">{p.areaAsignada}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {p.sueldo ? (
+                          <div>
+                            <div className="font-medium">S/ {p.sueldo.toFixed(2)}</div>
+                            <div className="text-xs text-muted-foreground capitalize">
+                              {p.frecuenciaPago || 'mensual'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {p.tipoContrato ? (
+                          <Badge variant="outline">
+                            {p.tipoContrato === 'planilla' && 'Planilla'}
+                            {p.tipoContrato === 'recibo_honorarios' && 'Recibo Honorarios'}
+                            {p.tipoContrato === 'temporal' && 'Temporal'}
+                            {p.tipoContrato === 'indefinido' && 'Indefinido'}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={p.tipoPersonal === 'personal_seguridad' ? 'default' : 'secondary'}>
                           {p.tipoPersonal === 'personal_seguridad' ? 'Seguridad' : 'Residente'}
@@ -398,19 +500,37 @@ export default function Planilla() {
                       </TableCell>
                       <TableCell>
                         {p.tieneAccesoSistema ? (
-                          <Badge variant="outline" className="bg-blue-50">
-                            <Clock className="mr-1 h-3 w-3" />
-                            Sí
-                          </Badge>
+                          <div className="text-xs">
+                            {p.horariosAcceso.filter(h => h.activo).length > 0 ? (
+                              <div className="space-y-1">
+                                {p.horariosAcceso.filter(h => h.activo).slice(0, 2).map((h, i) => (
+                                  <div key={i} className="text-muted-foreground">
+                                    {h.dia.substring(0, 3).toUpperCase()}: {h.horaInicio} - {h.horaFin}
+                                  </div>
+                                ))}
+                                {p.horariosAcceso.filter(h => h.activo).length > 2 && (
+                                  <div className="text-muted-foreground">
+                                    +{p.horariosAcceso.filter(h => h.activo).length - 2} más
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">Sin horarios</span>
+                            )}
+                          </div>
                         ) : (
-                          <Badge variant="secondary">No</Badge>
+                          <Badge variant="secondary">Sin acceso</Badge>
                         )}
                       </TableCell>
                       <TableCell>
-                        {puedeAccederAhora(p) ? (
-                          <Badge className="bg-green-600">Puede Acceder</Badge>
+                        {p.tieneAccesoSistema ? (
+                          puedeAccederAhora(p) ? (
+                            <Badge className="bg-green-600">Puede Acceder</Badge>
+                          ) : (
+                            <Badge variant="secondary">Fuera de Horario</Badge>
+                          )
                         ) : (
-                          <Badge variant="secondary">Fuera de Horario</Badge>
+                          <Badge variant="secondary">N/A</Badge>
                         )}
                       </TableCell>
                     </TableRow>

@@ -18,9 +18,17 @@ export interface PersonalPlanilla {
   fechaContratacion: number; // timestamp
   activo: boolean;
   
+  // Datos económicos
+  sueldo?: number; // Salario mensual en la moneda local
+  tipoContrato?: 'planilla' | 'recibo_honorarios' | 'temporal' | 'indefinido';
+  frecuenciaPago?: 'semanal' | 'quincenal' | 'mensual';
+  
   // Control de accesos al sistema
   tieneAccesoSistema: boolean;
   horariosAcceso: HorarioAcceso[]; // horarios en los que puede ingresar al sistema
+  
+  // Observaciones
+  observaciones?: string;
   
   // Metadata
   createdAt: number;
@@ -35,8 +43,12 @@ export interface CreatePersonalPlanillaForm {
   areaAsignada?: string;
   fechaContratacion: number;
   activo: boolean;
+  sueldo?: number;
+  tipoContrato?: 'planilla' | 'recibo_honorarios' | 'temporal' | 'indefinido';
+  frecuenciaPago?: 'semanal' | 'quincenal' | 'mensual';
   tieneAccesoSistema: boolean;
   horariosAcceso: HorarioAcceso[];
+  observaciones?: string;
 }
 
 export interface UpdatePersonalPlanillaForm extends Partial<CreatePersonalPlanillaForm> {}
