@@ -193,28 +193,6 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Configuración Personal - Siempre visible */}
-        <div className="bg-card border rounded-lg p-4">
-          <h3 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-            <Settings className="h-5 w-5 text-primary" />
-            Mi Cuenta
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <a
-              href="/configuracion-cuenta"
-              className="flex items-center gap-3 p-4 rounded-lg border hover:border-primary hover:bg-accent/50 transition-all duration-200 group"
-            >
-              <div className="p-2 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                <Settings className="h-5 w-5 text-primary" />
-              </div>
-              <div className="text-left">
-                <p className="font-medium text-foreground">Configuración de Cuenta</p>
-                <p className="text-xs text-muted-foreground">Gestiona tu perfil y seguridad</p>
-              </div>
-            </a>
-          </div>
-        </div>
-
         {/* Quick Access Section - Only Mobile */}
         {isMobile && (
           <QuickAccessSection
