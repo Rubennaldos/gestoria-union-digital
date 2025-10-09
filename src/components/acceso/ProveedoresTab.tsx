@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
+import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
 import { registrarProveedor, enviarMensajeWhatsApp } from "@/services/acceso";
 import { useAuth } from "@/contexts/AuthContext";
 import { ref, get } from "firebase/database";
@@ -22,6 +23,7 @@ export function ProveedoresTab() {
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [aceptaReglamento, setAceptaReglamento] = useState(false);
   const [textoReglamento, setTextoReglamento] = useState("");
+  const [mostrarReglamento, setMostrarReglamento] = useState(false);
 
   const { toast } = useToast();
   const { user, profile } = useAuth();
@@ -155,29 +157,25 @@ export function ProveedoresTab() {
           <Separator />
 
           {textoReglamento && (
-            <div className="space-y-3 bg-muted/50 p-4 rounded-lg border">
-              <div className="flex items-start gap-3">
-                <FileText className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                <div className="space-y-2 flex-1">
-                  <Label className="text-sm font-semibold">Acuerdos y Compromisos</Label>
-                  <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
-                    {textoReglamento}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="acepta-reglamento-proveedor"
-                  checked={aceptaReglamento}
-                  onCheckedChange={(checked) => setAceptaReglamento(checked as boolean)}
-                />
-                <Label
-                  htmlFor="acepta-reglamento-proveedor"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            <div className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg border">
+              <Checkbox
+                id="acepta-reglamento-proveedor"
+                checked={aceptaReglamento}
+                onCheckedChange={(checked) => setAceptaReglamento(checked as boolean)}
+              />
+              <Label
+                htmlFor="acepta-reglamento-proveedor"
+                className="text-sm leading-none cursor-pointer flex-1"
+              >
+                Acepto los{" "}
+                <button
+                  type="button"
+                  onClick={() => setMostrarReglamento(true)}
+                  className="text-primary underline hover:text-primary/80 font-medium"
                 >
-                  Acepto el reglamento interno
-                </Label>
-              </div>
+                  términos y condiciones
+                </button>
+              </Label>
             </div>
           )}
 
@@ -199,6 +197,13 @@ export function ProveedoresTab() {
             <p className="text-sm text-muted-foreground">Por favor espere la confirmación de vigilancia.</p>
           </div>
         }
+      />
+
+      <ReglamentoDialog
+        open={mostrarReglamento}
+        onOpenChange={setMostrarReglamento}
+        texto={textoReglamento}
+        onAceptar={() => setAceptaReglamento(true)}
       />
     </div>
   );
