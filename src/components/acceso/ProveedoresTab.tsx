@@ -1,22 +1,27 @@
 // src/components/acceso/ProveedoresTab.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { registrarProveedor, enviarMensajeWhatsApp } from "@/services/acceso";
 import { useAuth } from "@/contexts/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { fs } from "@/config/firebase";
 
 export function ProveedoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placa, setPlaca] = useState("");
   const [empresa, setEmpresa] = useState("");
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [aceptaReglamento, setAceptaReglamento] = useState(false);
+  const [textoReglamento, setTextoReglamento] = useState("");
 
   const { toast } = useToast();
   const { user, profile } = useAuth();
@@ -24,6 +29,23 @@ export function ProveedoresTab() {
   // Usar empadronadoId directamente del perfil
   const empadronadoId = profile?.empadronadoId || "";
   const cargandoEmp = !profile;
+
+  useEffect(() => {
+    cargarReglamento();
+  }, []);
+
+  const cargarReglamento = async () => {
+    try {
+      const docRef = doc(fs, "configuracion", "reglamento_acceso");
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setTextoReglamento(docSnap.data().texto || "");
+      }
+    } catch (error) {
+      console.error("Error al cargar reglamento:", error);
+    }
+  };
 
   const serviciosRapidos = [
     { id: "gas", label: "Gas", icon: Zap, color: "bg-orange-500" },
@@ -37,6 +59,14 @@ export function ProveedoresTab() {
     }
     if (!esRapido && !empresa.trim()) {
       toast({ title: "Empresa requerida", description: "Debe especificar la empresa o servicio", variant: "destructive" });
+      return false;
+    }
+    if (!aceptaReglamento) {
+      toast({
+        title: "Reglamento no aceptado",
+        description: "Debe aceptar el reglamento interno para continuar",
+        variant: "destructive",
+      });
       return false;
     }
     return true;
@@ -71,6 +101,7 @@ export function ProveedoresTab() {
       setMostrarConfirmacion(true);
       if (tipoServicio === "otro") setEmpresa("");
       if (tipoAcceso === "vehicular") setPlaca("");
+      setAceptaReglamento(false);
 
       toast({ title: "Registro exitoso", description: "Se envió la solicitud a vigilancia" });
     } catch (error: any) {
@@ -122,6 +153,33 @@ export function ProveedoresTab() {
           </div>
 
           <Separator />
+
+          {textoReglamento && (
+            <div className="space-y-3 bg-muted/50 p-4 rounded-lg border">
+              <div className="flex items-start gap-3">
+                <FileText className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <Label className="text-sm font-semibold">Acuerdos y Compromisos</Label>
+                  <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {textoReglamento}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox
+                  id="acepta-reglamento-proveedor"
+                  checked={aceptaReglamento}
+                  onCheckedChange={(checked) => setAceptaReglamento(checked as boolean)}
+                />
+                <Label
+                  htmlFor="acepta-reglamento-proveedor"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Acepto el reglamento interno
+                </Label>
+              </div>
+            </div>
+          )}
 
           <Button onClick={registrarProveedorGeneral} className="w-full h-12 flex items-center gap-2" size="lg">
             <Send className="h-5 w-5" />

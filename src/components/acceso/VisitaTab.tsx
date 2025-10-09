@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Car, User, Star, Send, Clock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Car, User, Star, Send, Clock, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
 import { Visitante, FavoritoUsuario } from "@/types/acceso";
+import { doc, getDoc } from "firebase/firestore";
+import { fs } from "@/config/firebase";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -21,12 +24,31 @@ export function VisitaTab() {
   const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: "1", nombre: "", dni: "" }]);
   const [menores, setMenores] = useState(0);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [aceptaReglamento, setAceptaReglamento] = useState(false);
+  const [textoReglamento, setTextoReglamento] = useState("");
   const { toast } = useToast();
   const { user, profile } = useAuth();
 
   // Usar empadronadoId directamente del perfil
   const empadronadoId = profile?.empadronadoId || "";
   const cargandoEmp = !profile;
+
+  useEffect(() => {
+    cargarReglamento();
+  }, []);
+
+  const cargarReglamento = async () => {
+    try {
+      const docRef = doc(fs, "configuracion", "reglamento_acceso");
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setTextoReglamento(docSnap.data().texto || "");
+      }
+    } catch (error) {
+      console.error("Error al cargar reglamento:", error);
+    }
+  };
 
   const agregarVisitante = () => {
     setVisitantes((prev) => [...prev, { id: Date.now().toString(), nombre: "", dni: "" }]);
@@ -52,6 +74,14 @@ export function VisitaTab() {
       toast({
         title: "No se pudo identificar al vecino",
         description: "Tu usuario no está vinculado a un empadronado. Contacta al administrador.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (!aceptaReglamento) {
+      toast({
+        title: "Reglamento no aceptado",
+        description: "Debe aceptar el reglamento interno para continuar",
         variant: "destructive",
       });
       return false;
@@ -91,6 +121,7 @@ export function VisitaTab() {
       setPlaca("");
       setVisitantes([{ id: "1", nombre: "", dni: "" }]);
       setMenores(0);
+      setAceptaReglamento(false);
     } catch (error: any) {
       console.error("guardarYRegistrar error:", error);
       toast({
@@ -231,6 +262,33 @@ export function VisitaTab() {
           </div>
 
           <Separator />
+
+          {textoReglamento && (
+            <div className="space-y-3 bg-muted/50 p-4 rounded-lg border">
+              <div className="flex items-start gap-3">
+                <FileText className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <Label className="text-sm font-semibold">Acuerdos y Compromisos</Label>
+                  <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {textoReglamento}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox
+                  id="acepta-reglamento-visita"
+                  checked={aceptaReglamento}
+                  onCheckedChange={(checked) => setAceptaReglamento(checked as boolean)}
+                />
+                <Label
+                  htmlFor="acepta-reglamento-visita"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Acepto el reglamento interno
+                </Label>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Button

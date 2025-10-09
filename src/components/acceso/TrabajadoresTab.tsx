@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -14,13 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Car, User, Star, Send, Clock, Zap } from "lucide-react";
+import { Plus, Car, User, Star, Send, Clock, Zap, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { MaestroObraRapidoModal } from "@/components/acceso/MaestroObraRapidoModal";
 import { registrarTrabajadores, enviarMensajeWhatsApp, obtenerMaestrosObra } from "@/services/acceso";
 import { Trabajador, MaestroObra } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { fs } from "@/config/firebase";
 
 export function TrabajadoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
@@ -30,6 +33,8 @@ export function TrabajadoresTab() {
   const [maestrosObra, setMaestrosObra] = useState<MaestroObra[]>([]);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [mostrarModalRapido, setMostrarModalRapido] = useState(false);
+  const [aceptaReglamento, setAceptaReglamento] = useState(false);
+  const [textoReglamento, setTextoReglamento] = useState("");
 
   const { toast } = useToast();
   const { user, profile } = useAuth();
@@ -38,7 +43,24 @@ export function TrabajadoresTab() {
   const empadronadoId = profile?.empadronadoId || "";
   const cargandoEmp = !profile;
 
-  useEffect(() => { void cargarMaestrosObra(); }, []);
+  useEffect(() => { 
+    void cargarMaestrosObra();
+    void cargarReglamento();
+  }, []);
+
+  const cargarReglamento = async () => {
+    try {
+      const docRef = doc(fs, "configuracion", "reglamento_acceso");
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        setTextoReglamento(docSnap.data().texto || "");
+      }
+    } catch (error) {
+      console.error("Error al cargar reglamento:", error);
+    }
+  };
+
   const cargarMaestrosObra = async () => {
     try { setMaestrosObra(await obtenerMaestrosObra()); } catch (e) { console.error(e); }
   };
@@ -74,6 +96,14 @@ export function TrabajadoresTab() {
       toast({ title: "Error", description: "Debe seleccionar un maestro de obra", variant: "destructive" });
       return false;
     }
+    if (!aceptaReglamento) {
+      toast({
+        title: "Reglamento no aceptado",
+        description: "Debe aceptar el reglamento interno para continuar",
+        variant: "destructive",
+      });
+      return false;
+    }
     return true;
   };
 
@@ -98,6 +128,10 @@ export function TrabajadoresTab() {
       enviarMensajeWhatsApp({ telefono: "", mensaje: `Autorizo ingreso de personal. Código: ${id}` });
 
       setMostrarConfirmacion(true);
+      setPlaca("");
+      setMaestroObraId("");
+      setTrabajadores([]);
+      setAceptaReglamento(false);
       toast({ title: "Registro exitoso", description: "Se envió la solicitud a vigilancia" });
     } catch (error: any) {
       console.error("registrarTrabajadores error:", error);
@@ -207,6 +241,35 @@ export function TrabajadoresTab() {
               </Card>
             ))}
           </div>
+
+          <Separator />
+
+          {textoReglamento && (
+            <div className="space-y-3 bg-muted/50 p-4 rounded-lg border">
+              <div className="flex items-start gap-3">
+                <FileText className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <Label className="text-sm font-semibold">Acuerdos y Compromisos</Label>
+                  <p className="text-xs text-muted-foreground whitespace-pre-line leading-relaxed">
+                    {textoReglamento}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox
+                  id="acepta-reglamento-trabajo"
+                  checked={aceptaReglamento}
+                  onCheckedChange={(checked) => setAceptaReglamento(checked as boolean)}
+                />
+                <Label
+                  htmlFor="acepta-reglamento-trabajo"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Acepto el reglamento interno
+                </Label>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Button type="button" variant="outline" className="flex items-center gap-2 h-12">

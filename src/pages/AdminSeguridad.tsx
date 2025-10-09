@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import BackButton from "@/components/layout/BackButton";
-import { Shield, Clock, Users, Ban, FileText, AlertTriangle } from "lucide-react";
+import { Shield, Clock, Users, Ban, FileText, AlertTriangle, ScrollText } from "lucide-react";
 import { AuditoriaAccesos } from "@/components/admin-seguridad/AuditoriaAccesos";
 import { GestionMaestrosObra } from "@/components/admin-seguridad/GestionMaestrosObra";
 import { SolicitudesMaestros } from "@/components/admin-seguridad/SolicitudesMaestros";
 import { ControlTrabajadores } from "@/components/admin-seguridad/ControlTrabajadores";
 import { SancionesSeguridad } from "@/components/admin-seguridad/SancionesSeguridad";
+import { ReglamentoInterno } from "@/components/admin-seguridad/ReglamentoInterno";
 import { Can } from "@/components/auth/Can";
 
 const AdminSeguridad = () => {
@@ -57,26 +58,30 @@ const AdminSeguridad = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="auditoria" className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
-                  Auditoría
+                  <span className="hidden sm:inline">Auditoría</span>
                 </TabsTrigger>
                 <TabsTrigger value="maestros" className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  Maestros
+                  <span className="hidden sm:inline">Maestros</span>
                 </TabsTrigger>
                 <TabsTrigger value="solicitudes" className="flex items-center gap-1">
                   <FileText className="h-4 w-4" />
-                  Solicitudes
+                  <span className="hidden sm:inline">Solicitudes</span>
                 </TabsTrigger>
                 <TabsTrigger value="trabajadores" className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  Trabajadores
+                  <span className="hidden sm:inline">Trabajadores</span>
                 </TabsTrigger>
                 <TabsTrigger value="sanciones" className="flex items-center gap-1">
                   <Ban className="h-4 w-4" />
-                  Sanciones
+                  <span className="hidden sm:inline">Sanciones</span>
+                </TabsTrigger>
+                <TabsTrigger value="reglamento" className="flex items-center gap-1">
+                  <ScrollText className="h-4 w-4" />
+                  <span className="hidden sm:inline">Reglamento</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -98,6 +103,10 @@ const AdminSeguridad = () => {
 
               <TabsContent value="sanciones" className="mt-6">
                 <SancionesSeguridad />
+              </TabsContent>
+
+              <TabsContent value="reglamento" className="mt-6">
+                <ReglamentoInterno />
               </TabsContent>
             </Tabs>
           </CardContent>
