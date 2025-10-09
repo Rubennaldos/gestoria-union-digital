@@ -22,8 +22,8 @@ import { MaestroObraRapidoModal } from "@/components/acceso/MaestroObraRapidoMod
 import { registrarTrabajadores, enviarMensajeWhatsApp, obtenerMaestrosObra } from "@/services/acceso";
 import { Trabajador, MaestroObra } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, getDoc } from "firebase/firestore";
-import { fs } from "@/config/firebase";
+import { ref, get } from "firebase/database";
+import { db } from "@/config/firebase";
 
 export function TrabajadoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
@@ -50,11 +50,11 @@ export function TrabajadoresTab() {
 
   const cargarReglamento = async () => {
     try {
-      const docRef = doc(fs, "configuracion", "reglamento_acceso");
-      const docSnap = await getDoc(docRef);
+      const reglamentoRef = ref(db, "configuracion/reglamento_acceso");
+      const snapshot = await get(reglamentoRef);
       
-      if (docSnap.exists()) {
-        setTextoReglamento(docSnap.data().texto || "");
+      if (snapshot.exists()) {
+        setTextoReglamento(snapshot.val().texto || "");
       }
     } catch (error) {
       console.error("Error al cargar reglamento:", error);

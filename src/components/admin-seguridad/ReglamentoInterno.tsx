@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FileText, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { fs } from "@/config/firebase";
+import { ref, get, set } from "firebase/database";
+import { db } from "@/config/firebase";
 
 const REGLAMENTO_DEFAULT = `Al autorizar el ingreso, usted acepta:
 
@@ -27,11 +27,11 @@ export function ReglamentoInterno() {
 
   const cargarReglamento = async () => {
     try {
-      const docRef = doc(fs, "configuracion", "reglamento_acceso");
-      const docSnap = await getDoc(docRef);
+      const reglamentoRef = ref(db, "configuracion/reglamento_acceso");
+      const snapshot = await get(reglamentoRef);
       
-      if (docSnap.exists()) {
-        setTexto(docSnap.data().texto || REGLAMENTO_DEFAULT);
+      if (snapshot.exists()) {
+        setTexto(snapshot.val().texto || REGLAMENTO_DEFAULT);
       }
     } catch (error) {
       console.error("Error al cargar reglamento:", error);
@@ -50,8 +50,8 @@ export function ReglamentoInterno() {
 
     setGuardando(true);
     try {
-      const docRef = doc(fs, "configuracion", "reglamento_acceso");
-      await setDoc(docRef, {
+      const reglamentoRef = ref(db, "configuracion/reglamento_acceso");
+      await set(reglamentoRef, {
         texto: texto.trim(),
         actualizadoEn: new Date().toISOString(),
       });

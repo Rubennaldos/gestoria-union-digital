@@ -13,8 +13,8 @@ import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { BuscadorFavoritos } from "@/components/acceso/BuscadorFavoritos";
 import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
 import { Visitante, FavoritoUsuario } from "@/types/acceso";
-import { doc, getDoc } from "firebase/firestore";
-import { fs } from "@/config/firebase";
+import { ref, get } from "firebase/database";
+import { db } from "@/config/firebase";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -39,11 +39,11 @@ export function VisitaTab() {
 
   const cargarReglamento = async () => {
     try {
-      const docRef = doc(fs, "configuracion", "reglamento_acceso");
-      const docSnap = await getDoc(docRef);
+      const reglamentoRef = ref(db, "configuracion/reglamento_acceso");
+      const snapshot = await get(reglamentoRef);
       
-      if (docSnap.exists()) {
-        setTextoReglamento(docSnap.data().texto || "");
+      if (snapshot.exists()) {
+        setTextoReglamento(snapshot.val().texto || "");
       }
     } catch (error) {
       console.error("Error al cargar reglamento:", error);
