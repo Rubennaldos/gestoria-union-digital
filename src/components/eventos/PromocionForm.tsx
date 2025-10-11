@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,7 +21,12 @@ interface PromocionFormProps {
 }
 
 export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionFormProps) => {
-  const [activa, setActiva] = useState(promocion?.activa || false);
+  const [activa, setActiva] = useState(!!promocion?.activa);
+  
+  // Sincronizar el estado cuando cambia la promoción desde fuera
+  useEffect(() => {
+    setActiva(!!promocion?.activa);
+  }, [promocion?.activa]);
 
   const getTipoPromocionLabel = (tipo: TipoPromocion) => {
     const labels: Record<TipoPromocion, string> = {
