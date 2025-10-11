@@ -22,13 +22,13 @@ export const crearEvento = async (eventoData: FormularioEvento, uid: string): Pr
     fechaInicio: new Date(eventoData.fechaInicio).getTime(),
     fechaFin: eventoData.fechaFin && !eventoData.fechaFinIndefinida 
       ? new Date(eventoData.fechaFin).getTime() 
-      : undefined,
+      : null,
     fechaFinIndefinida: eventoData.fechaFinIndefinida,
     sesiones: sesionesConId,
     instructor: eventoData.instructor,
-    cuposMaximos: eventoData.cuposIlimitados ? undefined : eventoData.cuposMaximos,
+    cuposMaximos: eventoData.cuposIlimitados ? null : eventoData.cuposMaximos,
     cuposIlimitados: eventoData.cuposIlimitados,
-    cuposDisponibles: eventoData.cuposIlimitados ? undefined : eventoData.cuposMaximos,
+    cuposDisponibles: eventoData.cuposIlimitados ? null : eventoData.cuposMaximos,
     precio: eventoData.precio,
     promocion: eventoData.promocion,
     imagen: eventoData.imagen,
