@@ -97,7 +97,12 @@ export const actualizarEvento = async (
   if (eventoData.materialesIncluidos !== undefined) updates.materialesIncluidos = eventoData.materialesIncluidos;
   if (eventoData.imagen !== undefined) updates.imagen = eventoData.imagen;
   if (eventoData.estado !== undefined) updates.estado = eventoData.estado;
-  if (eventoData.promocion !== undefined) updates.promocion = eventoData.promocion;
+  if (eventoData.promocion !== undefined) {
+    // Limpiar valores undefined de la promoción para Firebase
+    const promocionLimpia = eventoData.promocion ? 
+      JSON.parse(JSON.stringify(eventoData.promocion)) : null;
+    updates.promocion = promocionLimpia;
+  }
   
   if (eventoData.fechaFinIndefinida !== undefined) {
     updates.fechaFinIndefinida = eventoData.fechaFinIndefinida;

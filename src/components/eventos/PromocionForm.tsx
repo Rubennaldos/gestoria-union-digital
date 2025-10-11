@@ -228,15 +228,16 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
               <Select
                 value={promocion.tipoDescuento ?? ""}
                 onValueChange={(value: TipoDescuento) => {
-                  // actualización atómica: evita perder la selección
-                  onChange({
+                  // Limpiar valores al cambiar tipo (sin usar undefined)
+                  const nuevaPromocion: any = {
                     ...promocion,
                     tipoDescuento: value,
-                    // Limpiar valores al cambiar tipo
-                    montoDescuento: undefined,
-                    precioFinal: undefined,
-                    escalones: undefined,
-                  });
+                  };
+                  // Eliminar propiedades en lugar de usar undefined
+                  delete nuevaPromocion.montoDescuento;
+                  delete nuevaPromocion.precioFinal;
+                  delete nuevaPromocion.escalones;
+                  onChange(nuevaPromocion);
                 }}
               >
                 <SelectTrigger>
