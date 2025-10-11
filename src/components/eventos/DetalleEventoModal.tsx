@@ -6,13 +6,20 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, MapPin, User, Users, DollarSign, FileText, Package, Tag } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
+import { Calendar, Clock, MapPin, User, Users, DollarSign, FileText, Package, Tag, UserPlus, Trash2 } from "lucide-react";
 import { Evento } from "@/types/eventos";
 import { inscribirseEvento } from "@/services/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+
+interface PersonaInscrita {
+  nombre: string;
+  dni: string;
+}
 
 interface DetalleEventoModalProps {
   open: boolean;
@@ -28,10 +35,53 @@ export const DetalleEventoModal = ({
   onInscripcionExitosa,
 }: DetalleEventoModalProps) => {
   const { user } = useAuth();
-  const [acompanantes, setAcompanantes] = useState(0);
+  const [sesionSeleccionada, setSesionSeleccionada] = useState<string>("");
+  const [personas, setPersonas] = useState<PersonaInscrita[]>([{ nombre: "", dni: "" }]);
   const [observaciones, setObservaciones] = useState("");
-  const [codigoPromocion, setCodigoPromocion] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const agregarPersona = () => {
+    if (personas.length < 10) {
+      setPersonas([...personas, { nombre: "", dni: "" }]);
+    }
+  };
+
+  const eliminarPersona = (index: number) => {
+    if (personas.length > 1) {
+      setPersonas(personas.filter((_, i) => i !== index));
+    }
+  };
+
+  const actualizarPersona = (index: number, campo: 'nombre' | 'dni', valor: string) => {
+    const nuevasPersonas = [...personas];
+    nuevasPersonas[index][campo] = valor;
+    setPersonas(nuevasPersonas);
+  };
+
+  const calcularPrecioTotal = () => {
+    if (!sesionSeleccionada) return 0;
+    
+    const sesion = evento.sesiones.find(s => s.id === sesionSeleccionada);
+    if (!sesion) return 0;
+    
+    const precioUnitario = sesion.precio;
+    let total = 0;
+    
+    // Primera persona: precio completo
+    total += precioUnitario;
+    
+    // Segunda persona: 50% de descuento
+    if (personas.length > 1) {
+      total += precioUnitario * 0.5;
+    }
+    
+    // Resto de personas: precio completo
+    if (personas.length > 2) {
+      total += precioUnitario * (personas.length - 2);
+    }
+    
+    return total;
+  };
 
   const handleInscripcion = async () => {
     if (!user) {
@@ -39,12 +89,16 @@ export const DetalleEventoModal = ({
       return;
     }
 
-    // Validar código de promoción si existe
-    if (evento.promocion?.activa && codigoPromocion) {
-      if (codigoPromocion.toUpperCase() !== evento.promocion.codigo) {
-        toast.error("Código de promoción inválido");
-        return;
-      }
+    if (!sesionSeleccionada) {
+      toast.error("Debes seleccionar una sesión");
+      return;
+    }
+
+    // Validar que todas las personas tengan nombre y DNI
+    const personasIncompletas = personas.some(p => !p.nombre.trim() || !p.dni.trim());
+    if (personasIncompletas) {
+      toast.error("Completa el nombre y DNI de todas las personas");
+      return;
     }
 
     try {
@@ -53,8 +107,8 @@ export const DetalleEventoModal = ({
         evento.id,
         user.uid,
         user.displayName || user.email || "Usuario",
-        acompanantes,
-        observaciones
+        personas.length - 1, // acompañantes
+        `${observaciones}\n\nPersonas inscritas:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSesión: ${sesionSeleccionada}`
       );
 
       toast.success("¡Inscripción realizada exitosamente!");
@@ -62,9 +116,9 @@ export const DetalleEventoModal = ({
       onInscripcionExitosa();
       
       // Resetear form
-      setAcompanantes(0);
+      setSesionSeleccionada("");
+      setPersonas([{ nombre: "", dni: "" }]);
       setObservaciones("");
-      setCodigoPromocion("");
     } catch (error: any) {
       console.error("Error al inscribirse:", error);
       toast.error(error.message || "Error al realizar la inscripción");
@@ -97,76 +151,8 @@ export const DetalleEventoModal = ({
     return labels[categoria] || categoria;
   };
 
-  const totalPersonas = 1 + acompanantes;
-  
-  // Calcular precio aplicable según tipo de promoción
-  const calcularPrecioConPromocion = () => {
-    if (!evento.promocion?.activa) return evento.precio;
-    
-    const promo = evento.promocion;
-    
-    // Verificar condiciones específicas
-    if (promo.tipo === 'codigo') {
-      if (!codigoPromocion.trim()) {
-        return evento.precio; // No hay código ingresado
-      }
-      if (codigoPromocion.trim().toUpperCase() !== promo.codigo?.toUpperCase()) {
-        return evento.precio; // Código incorrecto
-      }
-    }
-    
-    if (promo.tipo === 'acompanantes') {
-      if (promo.minimoAcompanantes && acompanantes < promo.minimoAcompanantes) {
-        return evento.precio;
-      }
-      if (promo.maximoAcompanantes && acompanantes > promo.maximoAcompanantes) {
-        return evento.precio;
-      }
-    }
-    
-    if (promo.tipo === 'early_bird' && promo.fechaVencimiento) {
-      if (Date.now() > promo.fechaVencimiento) {
-        return evento.precio;
-      }
-    }
-    
-    // Aplicar descuento por escalones de precio
-    if (promo.tipoDescuento === 'escalonado' && promo.escalones && promo.escalones.length > 0) {
-      // Buscar el escalón que coincida con la cantidad de personas
-      const escalonAplicable = promo.escalones.find(e => e.cantidadPersonas === totalPersonas);
-      if (escalonAplicable) {
-        return escalonAplicable.precioPorPersona;
-      }
-      // Si no hay escalón exacto, buscar el más cercano menor
-      const escalonesOrdenados = [...promo.escalones].sort((a, b) => b.cantidadPersonas - a.cantidadPersonas);
-      const escalonMenor = escalonesOrdenados.find(e => e.cantidadPersonas <= totalPersonas);
-      if (escalonMenor) {
-        return escalonMenor.precioPorPersona;
-      }
-    }
-    
-    // Aplicar precio final fijo
-    if (promo.precioFinal !== undefined) {
-      return promo.precioFinal;
-    }
-    
-    // Aplicar descuento porcentual
-    if (promo.tipoDescuento === 'porcentaje' && promo.montoDescuento) {
-      return evento.precio * (1 - promo.montoDescuento / 100);
-    }
-    
-    return evento.precio;
-  };
-  
-  const precioAplicar = calcularPrecioConPromocion();
-  const costoTotal = precioAplicar * totalPersonas;
-  const tieneDescuento = precioAplicar < evento.precio;
-  
-  // Validar código de promoción específicamente
-  const codigoEsValido = evento.promocion?.activa && 
-    evento.promocion.tipo === 'codigo' && 
-    codigoPromocion.trim() && 
-    codigoPromocion.trim().toUpperCase() === evento.promocion.codigo?.toUpperCase();
+  const sesionSeleccionadaObj = evento.sesiones.find(s => s.id === sesionSeleccionada);
+  const precioTotal = calcularPrecioTotal();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -269,6 +255,12 @@ export const DetalleEventoModal = ({
                               <Clock className="h-3 w-3" />
                               {sesion.horaInicio} - {sesion.horaFin}
                             </span>
+                            {sesion.precio > 0 && (
+                              <span className="flex items-center gap-1 text-success font-semibold">
+                                <DollarSign className="h-3 w-3" />
+                                S/ {sesion.precio.toFixed(2)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -312,54 +304,100 @@ export const DetalleEventoModal = ({
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Inscripción</h3>
 
+            {/* Selección de Sesión */}
             <div className="space-y-2">
-              <Label htmlFor="acompanantes">Número de acompañantes</Label>
-              <Input
-                id="acompanantes"
-                type="number"
-                min="0"
-                max={!evento.cuposIlimitados && evento.cuposDisponibles ? evento.cuposDisponibles - 1 : 999}
-                value={acompanantes}
-                onChange={(e) => setAcompanantes(Math.max(0, parseInt(e.target.value) || 0))}
-                placeholder="0"
-              />
-              <p className="text-xs text-muted-foreground">
-                Total de personas: {totalPersonas}
-              </p>
+              <Label htmlFor="sesion">Selecciona una sesión *</Label>
+              <Select value={sesionSeleccionada} onValueChange={setSesionSeleccionada}>
+                <SelectTrigger id="sesion">
+                  <SelectValue placeholder="Elige el día y horario" />
+                </SelectTrigger>
+                <SelectContent>
+                  {evento.sesiones.map((sesion) => (
+                    <SelectItem key={sesion.id} value={sesion.id}>
+                      {sesion.lugar} - {format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })} ({sesion.horaInicio} - {sesion.horaFin}) - S/ {sesion.precio.toFixed(2)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {evento.promocion?.activa && evento.promocion.tipo === 'codigo' && (
-              <div className="space-y-2">
-                <Label htmlFor="codigoPromocion" className="flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
-                  Código de Promoción (opcional)
-                </Label>
-                <Input
-                  id="codigoPromocion"
-                  value={codigoPromocion}
-                  onChange={(e) => setCodigoPromocion(e.target.value.toUpperCase())}
-                  placeholder="Ingresa tu código"
-                />
-                {codigoPromocion.trim() && (
-                  codigoEsValido ? (
-                    <p className="text-xs text-success flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      ✓ Código válido - Descuento aplicado
-                    </p>
-                  ) : (
-                    <p className="text-xs text-destructive flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      Código inválido
-                    </p>
-                  )
-                )}
-                {evento.promocion.nombre && (
-                  <p className="text-xs text-muted-foreground">
-                    {evento.promocion.nombre}
-                  </p>
-                )}
+            {/* Personas Inscritas */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Datos de las personas *</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={agregarPersona}
+                  disabled={personas.length >= 10}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Agregar persona
+                </Button>
               </div>
-            )}
+
+              {personas.length <= 2 && (
+                <div className="bg-primary/10 p-3 rounded-lg">
+                  <p className="text-sm text-primary font-medium flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    ¡Promoción! La 2da persona obtiene 50% de descuento
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {personas.map((persona, index) => (
+                  <Card key={index}>
+                    <CardContent className="pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium">
+                            Persona {index + 1}
+                            {index === 1 && <Badge className="ml-2 bg-success">50% descuento</Badge>}
+                          </span>
+                          {personas.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => eliminarPersona(index)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor={`nombre-${index}`}>Nombre completo</Label>
+                            <Input
+                              id={`nombre-${index}`}
+                              value={persona.nombre}
+                              onChange={(e) => actualizarPersona(index, 'nombre', e.target.value)}
+                              placeholder="Ej: Juan Pérez"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor={`dni-${index}`}>DNI</Label>
+                            <Input
+                              id={`dni-${index}`}
+                              value={persona.dni}
+                              onChange={(e) => actualizarPersona(index, 'dni', e.target.value)}
+                              placeholder="12345678"
+                              maxLength={8}
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="observaciones">Observaciones (opcional)</Label>
@@ -372,21 +410,32 @@ export const DetalleEventoModal = ({
               />
             </div>
 
-            {evento.precio > 0 && (
+            {sesionSeleccionadaObj && sesionSeleccionadaObj.precio > 0 && (
               <div className="bg-muted/50 p-4 rounded-lg">
                 <div className="space-y-2">
-                  {tieneDescuento && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Precio regular:</span>
-                      <span className="line-through text-muted-foreground">
-                        S/ {(evento.precio * totalPersonas).toFixed(2)}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Precio por sesión:</span>
+                    <span className="text-muted-foreground">
+                      S/ {sesionSeleccionadaObj.precio.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  {personas.map((_, index) => (
+                    <div key={index} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Persona {index + 1}:</span>
+                      <span className={index === 1 ? "text-success font-medium" : ""}>
+                        S/ {(index === 1 ? sesionSeleccionadaObj.precio * 0.5 : sesionSeleccionadaObj.precio).toFixed(2)}
+                        {index === 1 && " (50% desc.)"}
                       </span>
                     </div>
-                  )}
+                  ))}
+                  
+                  <Separator />
+                  
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Costo Total:</span>
                     <span className="text-xl font-bold text-success">
-                      S/ {costoTotal.toFixed(2)}
+                      S/ {precioTotal.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -405,9 +454,8 @@ export const DetalleEventoModal = ({
               onClick={handleInscripcion}
               disabled={
                 loading ||
-                (!evento.cuposIlimitados &&
-                  evento.cuposDisponibles !== undefined &&
-                  evento.cuposDisponibles < totalPersonas)
+                !sesionSeleccionada ||
+                personas.some(p => !p.nombre.trim() || !p.dni.trim())
               }
               className="flex-1"
             >
