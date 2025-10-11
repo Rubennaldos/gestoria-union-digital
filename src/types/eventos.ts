@@ -20,11 +20,17 @@ export type TipoPromocion =
   | 'porcentaje'
   | 'custom';
 
-export type TipoDescuento = 'fijo' | 'porcentaje' | 'escalonado';
+export type TipoDescuento = 'fijo' | 'porcentaje' | 'escalonado' | 'por_paquete';
 
 export interface EscalonPrecio {
   cantidadPersonas: number; // Cantidad total de personas (1 + acompañantes)
   precioPorPersona: number; // Precio por persona en este escalón
+}
+
+export interface PaqueteSesiones {
+  cantidadSesiones: number; // Número de clases/sesiones
+  precioTotal: number; // Precio total del paquete
+  nombre?: string; // Ej: "Paquete Semanal", "Paquete Mensual"
 }
 
 export interface PromocionEvento {
@@ -43,6 +49,9 @@ export interface PromocionEvento {
   
   // Para precios escalonados por cantidad de personas
   escalones?: EscalonPrecio[];
+  
+  // Para paquetes de sesiones/días
+  paquetes?: PaqueteSesiones[];
   
   // Para promoción por acompañantes
   minimoAcompanantes?: number;

@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PromocionEvento, TipoPromocion, TipoDescuento, EscalonPrecio } from "@/types/eventos";
+import { PromocionEvento, TipoPromocion, TipoDescuento, EscalonPrecio, PaqueteSesiones } from "@/types/eventos";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -237,6 +237,7 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                   delete nuevaPromocion.montoDescuento;
                   delete nuevaPromocion.precioFinal;
                   delete nuevaPromocion.escalones;
+                  delete nuevaPromocion.paquetes;
                   onChange(nuevaPromocion);
                 }}
               >
@@ -247,6 +248,7 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                   <SelectItem value="fijo">Precio fijo final</SelectItem>
                   <SelectItem value="porcentaje">Porcentaje de descuento</SelectItem>
                   <SelectItem value="escalonado">Precio por cantidad de personas</SelectItem>
+                  <SelectItem value="por_paquete">Paquetes por sesiones/días</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -369,6 +371,121 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                         })}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+            ) : promocion.tipoDescuento === 'por_paquete' ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Paquetes de clases/sesiones</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const paquetes = promocion.paquetes || [];
+                      const siguienteCantidad = paquetes.length === 0 ? 1 : (paquetes[paquetes.length - 1].cantidadSesiones + 1);
+                      handleChange('paquetes', [
+                        ...paquetes,
+                        { cantidadSesiones: siguienteCantidad, precioTotal: precioBase * siguienteCantidad }
+                      ]);
+                    }}
+                  >
+                    Agregar paquete
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Define paquetes de clases con descuentos. Por ejemplo: 1 clase = S/50, 3 clases = S/120 (ahorro de S/30)
+                </p>
+                {(!promocion.paquetes || promocion.paquetes.length === 0) && (
+                  <div className="text-sm text-center text-muted-foreground p-6 border border-dashed rounded">
+                    <p className="font-medium mb-2">💡 Ejemplo de uso</p>
+                    <p className="text-xs">• 1 clase: S/50</p>
+                    <p className="text-xs">• 3 clases (semanal): S/120 (S/40 por clase)</p>
+                    <p className="text-xs">• 12 clases (mensual): S/400 (S/33 por clase)</p>
+                  </div>
+                )}
+                {promocion.paquetes && promocion.paquetes.length > 0 && (
+                  <div className="space-y-2">
+                    {promocion.paquetes.map((paquete, index) => (
+                      <div key={index} className="p-3 bg-muted/50 rounded-lg space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Cantidad de sesiones</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={paquete.cantidadSesiones}
+                                onChange={(e) => {
+                                  const nuevosPaquetes = [...(promocion.paquetes || [])];
+                                  nuevosPaquetes[index] = {
+                                    ...paquete,
+                                    cantidadSesiones: parseInt(e.target.value) || 1
+                                  };
+                                  handleChange('paquetes', nuevosPaquetes);
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Precio total (S/)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={paquete.precioTotal}
+                                onChange={(e) => {
+                                  const nuevosPaquetes = [...(promocion.paquetes || [])];
+                                  nuevosPaquetes[index] = {
+                                    ...paquete,
+                                    precioTotal: parseFloat(e.target.value) || 0
+                                  };
+                                  handleChange('paquetes', nuevosPaquetes);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const nuevosPaquetes = promocion.paquetes?.filter((_, i) => i !== index);
+                              handleChange('paquetes', nuevosPaquetes);
+                            }}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Nombre del paquete (opcional)</Label>
+                          <Input
+                            value={paquete.nombre || ''}
+                            onChange={(e) => {
+                              const nuevosPaquetes = [...(promocion.paquetes || [])];
+                              nuevosPaquetes[index] = {
+                                ...paquete,
+                                nombre: e.target.value
+                              };
+                              handleChange('paquetes', nuevosPaquetes);
+                            }}
+                            placeholder="Ej: Paquete Semanal, Paquete Mensual"
+                          />
+                        </div>
+                        {paquete.cantidadSesiones > 0 && paquete.precioTotal > 0 && precioBase > 0 && (
+                          <div className="text-xs bg-primary/5 p-2 rounded">
+                            <p className="text-muted-foreground">
+                              💰 Precio por clase: <span className="font-medium">S/ {(paquete.precioTotal / paquete.cantidadSesiones).toFixed(2)}</span>
+                              {paquete.precioTotal < (precioBase * paquete.cantidadSesiones) && (
+                                <span className="text-success ml-1">
+                                  (Ahorro: S/ {((precioBase * paquete.cantidadSesiones) - paquete.precioTotal).toFixed(2)})
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
