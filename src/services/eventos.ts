@@ -194,14 +194,16 @@ export const inscribirseEvento = async (
 
 export const obtenerInscripcionesPorEvento = async (eventoId: string): Promise<InscripcionEvento[]> => {
   const inscripcionesRef = ref(db, "inscripcionesEventos");
-  const q = query(inscripcionesRef, orderByChild("eventoId"), equalTo(eventoId));
-  const snapshot = await get(q);
+  const snapshot = await get(inscripcionesRef);
   
   if (!snapshot.exists()) return [];
   
   const inscripciones: InscripcionEvento[] = [];
   snapshot.forEach((childSnapshot) => {
-    inscripciones.push(childSnapshot.val());
+    const inscripcion = childSnapshot.val();
+    if (inscripcion.eventoId === eventoId) {
+      inscripciones.push(inscripcion);
+    }
   });
   
   return inscripciones.sort((a, b) => b.fechaInscripcion - a.fechaInscripcion);
@@ -209,14 +211,16 @@ export const obtenerInscripcionesPorEvento = async (eventoId: string): Promise<I
 
 export const obtenerInscripcionesPorEmpadronado = async (empadronadoId: string): Promise<InscripcionEvento[]> => {
   const inscripcionesRef = ref(db, "inscripcionesEventos");
-  const q = query(inscripcionesRef, orderByChild("empadronadoId"), equalTo(empadronadoId));
-  const snapshot = await get(q);
+  const snapshot = await get(inscripcionesRef);
   
   if (!snapshot.exists()) return [];
   
   const inscripciones: InscripcionEvento[] = [];
   snapshot.forEach((childSnapshot) => {
-    inscripciones.push(childSnapshot.val());
+    const inscripcion = childSnapshot.val();
+    if (inscripcion.empadronadoId === empadronadoId) {
+      inscripciones.push(inscripcion);
+    }
   });
   
   return inscripciones.sort((a, b) => b.fechaInscripcion - a.fechaInscripcion);
