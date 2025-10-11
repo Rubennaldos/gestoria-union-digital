@@ -106,8 +106,13 @@ export const DetalleEventoModal = ({
     const promo = evento.promocion;
     
     // Verificar condiciones específicas
-    if (promo.tipo === 'codigo' && codigoPromocion.toUpperCase() !== promo.codigo) {
-      return evento.precio;
+    if (promo.tipo === 'codigo') {
+      if (!codigoPromocion.trim()) {
+        return evento.precio; // No hay código ingresado
+      }
+      if (codigoPromocion.trim().toUpperCase() !== promo.codigo?.toUpperCase()) {
+        return evento.precio; // Código incorrecto
+      }
     }
     
     if (promo.tipo === 'acompanantes') {
@@ -140,6 +145,12 @@ export const DetalleEventoModal = ({
   const precioAplicar = calcularPrecioConPromocion();
   const costoTotal = precioAplicar * totalPersonas;
   const tieneDescuento = precioAplicar < evento.precio;
+  
+  // Validar código de promoción específicamente
+  const codigoEsValido = evento.promocion?.activa && 
+    evento.promocion.tipo === 'codigo' && 
+    codigoPromocion.trim() && 
+    codigoPromocion.trim().toUpperCase() === evento.promocion.codigo?.toUpperCase();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -301,7 +312,7 @@ export const DetalleEventoModal = ({
               </p>
             </div>
 
-            {evento.promocion?.activa && (
+            {evento.promocion?.activa && evento.promocion.tipo === 'codigo' && (
               <div className="space-y-2">
                 <Label htmlFor="codigoPromocion" className="flex items-center gap-2">
                   <Tag className="h-4 w-4" />
@@ -313,10 +324,22 @@ export const DetalleEventoModal = ({
                   onChange={(e) => setCodigoPromocion(e.target.value.toUpperCase())}
                   placeholder="Ingresa tu código"
                 />
-                {tieneDescuento && (
-                  <p className="text-xs text-success flex items-center gap-1">
-                    <Tag className="h-3 w-3" />
-                    ¡Descuento aplicado!
+                {codigoPromocion.trim() && (
+                  codigoEsValido ? (
+                    <p className="text-xs text-success flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      ✓ Código válido - Descuento aplicado
+                    </p>
+                  ) : (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      Código inválido
+                    </p>
+                  )
+                )}
+                {evento.promocion.nombre && (
+                  <p className="text-xs text-muted-foreground">
+                    {evento.promocion.nombre}
                   </p>
                 )}
               </div>
