@@ -88,13 +88,13 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
             <div className="space-y-2">
               <Label>Tipo de promoción</Label>
               <Select
-                value={promocion.tipo}
+                value={promocion.tipo ?? ""}
                 onValueChange={(value: TipoPromocion) => handleChange('tipo', value)}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4}>
                   <SelectItem value="codigo">{getTipoPromocionLabel('codigo')}</SelectItem>
                   <SelectItem value="acompanantes">{getTipoPromocionLabel('acompanantes')}</SelectItem>
                   <SelectItem value="early_bird">{getTipoPromocionLabel('early_bird')}</SelectItem>
@@ -226,19 +226,23 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
             <div className="space-y-2">
               <Label>Tipo de descuento</Label>
               <Select
-                value={promocion.tipoDescuento}
+                value={promocion.tipoDescuento ?? ""}
                 onValueChange={(value: TipoDescuento) => {
-                  handleChange('tipoDescuento', value);
-                  // Limpiar valores al cambiar tipo
-                  handleChange('montoDescuento', undefined);
-                  handleChange('precioFinal', undefined);
-                  handleChange('escalones', undefined);
+                  // actualización atómica: evita perder la selección
+                  onChange({
+                    ...promocion,
+                    tipoDescuento: value,
+                    // Limpiar valores al cambiar tipo
+                    montoDescuento: undefined,
+                    precioFinal: undefined,
+                    escalones: undefined,
+                  });
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4}>
                   <SelectItem value="fijo">Precio fijo final</SelectItem>
                   <SelectItem value="porcentaje">Porcentaje de descuento</SelectItem>
                   <SelectItem value="escalonado">Precio por cantidad de personas</SelectItem>
