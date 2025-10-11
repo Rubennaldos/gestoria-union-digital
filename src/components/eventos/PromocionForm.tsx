@@ -94,7 +94,7 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="pointer-events-auto">
+                <SelectContent>
                   <SelectItem value="codigo">{getTipoPromocionLabel('codigo')}</SelectItem>
                   <SelectItem value="acompanantes">{getTipoPromocionLabel('acompanantes')}</SelectItem>
                   <SelectItem value="early_bird">{getTipoPromocionLabel('early_bird')}</SelectItem>
@@ -238,7 +238,7 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="pointer-events-auto">
+                <SelectContent>
                   <SelectItem value="fijo">Precio fijo final</SelectItem>
                   <SelectItem value="porcentaje">Porcentaje de descuento</SelectItem>
                   <SelectItem value="escalonado">Precio por cantidad de personas</SelectItem>
