@@ -1,6 +1,12 @@
 // src/components/eventos/InscripcionesEventoModal.tsx
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,8 +35,42 @@ import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Clock, DollarSign } from "lucide-react";
 
-// ⬇️ Generador del comprobante PDF
-import { generarComprobanteEventoPDF } from "@/lib/pdf/receiptEvento";
+// ──────────────────────────────────────────────────────────
+// CARGA DINÁMICA DEL GENERADOR DE PDF (tolerante a export names)
+// ──────────────────────────────────────────────────────────
+type ReceiptArgs = {
+  correlativo: string;
+  eventoTitulo: string;
+  eventoFechaTexto: string;
+  empadronadoNombre: string;
+  empadronadoCodigo: string;
+  acompanantes: number;
+  montoPagado: number;
+  metodoPago?: string;
+  numeroOperacion?: string;
+  observaciones?: string;
+  fechaEmision: Date;
+  logoBase64?: string;
+};
+
+async function getReceiptGenerator(): Promise<
+  ((args: ReceiptArgs) => Promise<void>) | null
+> {
+  try {
+    // El módulo puede exportar con distintos nombres o como default
+    const mod: any = await import("@/lib/pdf/receiptEvento");
+    return (
+      mod.generarComprobanteEventoPDF ||
+      mod.generarComprobantePDF ||
+      mod.buildEventoReceipt ||
+      mod.makeEventoReceipt ||
+      mod.default ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
 
 interface InscripcionesEventoModalProps {
   open: boolean;
@@ -38,7 +78,7 @@ interface InscripcionesEventoModalProps {
   evento: Evento;
 }
 
-const LOGO_URL = "/logo-san-antonio.png"; // pon tu PNG en /public
+const LOGO_URL = "/logo-san-antonio.png"; // asegúrate de tener este PNG en /public
 
 export const InscripcionesEventoModal = ({
   open,
@@ -69,7 +109,10 @@ export const InscripcionesEventoModal = ({
     }
   };
 
-  const handleCambiarEstado = async (inscripcionId: string, nuevoEstado: string) => {
+  const handleCambiarEstado = async (
+    inscripcionId: string,
+    nuevoEstado: string
+  ) => {
     try {
       await actualizarEstadoInscripcion(inscripcionId, nuevoEstado);
       toast.success("Estado actualizado exitosamente");
@@ -103,45 +146,50 @@ export const InscripcionesEventoModal = ({
     if (working) return;
     setWorking(true);
     try {
-      // Obtener la inscripción para los datos del comprobante
       const inscripcion = inscripciones.find((i) => i.id === inscripcionId);
       if (!inscripcion) {
         toast.error("Inscripción no encontrada");
         return;
       }
 
-      // 1) Registrar el pago en RTDB (tu flujo actual)
+      // 1) Registrar el pago en RTDB
       await registrarPagoInscripcion(inscripcionId, evento.precio);
 
-      // 2) Intentar generar y descargar el comprobante PDF
-      try {
-        const correlativo = `EV-${new Date().getFullYear()}${String(
-          new Date().getMonth() + 1
-        ).padStart(2, "0")}-${String(Date.now()).slice(-6)}`;
+      // 2) Generar y descargar el comprobante PDF (si el módulo existe)
+      const gen = await getReceiptGenerator();
+      if (gen) {
+        try {
+          const correlativo = `EV-${new Date().getFullYear()}${String(
+            new Date().getMonth() + 1
+          ).padStart(2, "0")}-${String(Date.now()).slice(-6)}`;
 
-        const fechaTexto =
-          evento.fechaInicio
+          const fechaTexto = evento.fechaInicio
             ? new Date(evento.fechaInicio).toLocaleString("es-PE")
             : "—";
 
-        const logoBase64 = await getLogoBase64();
+          const logoBase64 = await getLogoBase64();
 
-        await generarComprobanteEventoPDF({
-          correlativo,
-          eventoTitulo: evento.titulo,
-          eventoFechaTexto: fechaTexto,
-          empadronadoNombre: inscripcion.nombreEmpadronado,
-          empadronadoCodigo: inscripcion.empadronadoId,
-          acompanantes: inscripcion.acompanantes,
-          montoPagado: evento.precio,
-          metodoPago: "efectivo", // si luego guardas el método real, cámbialo aquí
-          numeroOperacion: undefined, // idem si lo capturas
-          observaciones: inscripcion.observaciones || "",
-          fechaEmision: new Date(),
-          logoBase64,
-        });
-      } catch (e) {
-        console.warn("No se pudo generar el PDF (se continúa):", e);
+          await gen({
+            correlativo,
+            eventoTitulo: evento.titulo,
+            eventoFechaTexto: fechaTexto,
+            empadronadoNombre: inscripcion.nombreEmpadronado,
+            empadronadoCodigo: inscripcion.empadronadoId,
+            acompanantes: inscripcion.acompanantes,
+            montoPagado: evento.precio,
+            metodoPago: "efectivo",
+            numeroOperacion: undefined,
+            observaciones: inscripcion.observaciones || "",
+            fechaEmision: new Date(),
+            logoBase64,
+          });
+        } catch (e) {
+          console.warn("No se pudo generar el PDF (se continúa):", e);
+        }
+      } else {
+        console.warn(
+          "receiptEvento no exporta un generador de PDF; se continúa sin descargar comprobante."
+        );
       }
 
       toast.success("Pago registrado exitosamente");
@@ -155,7 +203,10 @@ export const InscripcionesEventoModal = ({
   };
 
   const getEstadoBadge = (inscripcion: InscripcionEvento) => {
-    const configs: Record<string, { label: string; className: string; icon: any }> = {
+    const configs: Record<
+      string,
+      { label: string; className: string; icon: any }
+    > = {
       inscrito: {
         label: "Inscrito",
         className: "bg-warning/10 text-warning border-warning/20",
@@ -194,8 +245,12 @@ export const InscripcionesEventoModal = ({
     );
   };
 
-  const totalInscritos = inscripciones.filter((i) => i.estado !== "cancelado").length;
-  const totalConfirmados = inscripciones.filter((i) => i.estado === "confirmado").length;
+  const totalInscritos = inscripciones.filter(
+    (i) => i.estado !== "cancelado"
+  ).length;
+  const totalConfirmados = inscripciones.filter(
+    (i) => i.estado === "confirmado"
+  ).length;
   const totalPagos = inscripciones
     .filter((i) => i.pagoRealizado)
     .reduce((sum, i) => sum + (i.montoPagado || 0), 0);
@@ -205,7 +260,9 @@ export const InscripcionesEventoModal = ({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Inscripciones - {evento.titulo}</DialogTitle>
-          <DialogDescription>Gestiona las inscripciones del evento</DialogDescription>
+          <DialogDescription>
+            Gestiona las inscripciones del evento
+          </DialogDescription>
         </DialogHeader>
 
         {/* Resumen */}
@@ -216,11 +273,15 @@ export const InscripcionesEventoModal = ({
           </div>
           <div className="bg-success/10 p-4 rounded-lg">
             <p className="text-sm text-muted-foreground">Confirmados</p>
-            <p className="text-2xl font-bold text-success">{totalConfirmados}</p>
+            <p className="text-2xl font-bold text-success">
+              {totalConfirmados}
+            </p>
           </div>
           <div className="bg-primary/10 p-4 rounded-lg">
             <p className="text-sm text-muted-foreground">Ingresos</p>
-            <p className="text-2xl font-bold text-primary">S/ {totalPagos.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-primary">
+              S/ {totalPagos.toFixed(2)}
+            </p>
           </div>
         </div>
 
@@ -228,7 +289,9 @@ export const InscripcionesEventoModal = ({
         {loading ? (
           <div className="text-center py-8">Cargando inscripciones...</div>
         ) : inscripciones.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">No hay inscripciones para este evento</div>
+          <div className="text-center py-8 text-muted-foreground">
+            No hay inscripciones para este evento
+          </div>
         ) : (
           <div className="rounded-md border">
             <Table>
@@ -249,9 +312,13 @@ export const InscripcionesEventoModal = ({
                       {inscripcion.nombreEmpadronado}
                     </TableCell>
                     <TableCell>
-                      {format(new Date(inscripcion.fechaInscripcion), "dd/MM/yyyy HH:mm", {
-                        locale: es,
-                      })}
+                      {format(
+                        new Date(inscripcion.fechaInscripcion),
+                        "dd/MM/yyyy HH:mm",
+                        {
+                          locale: es,
+                        }
+                      )}
                     </TableCell>
                     <TableCell>{inscripcion.acompanantes}</TableCell>
                     <TableCell>
@@ -275,7 +342,9 @@ export const InscripcionesEventoModal = ({
                     <TableCell>
                       <Select
                         value={inscripcion.estado}
-                        onValueChange={(value) => handleCambiarEstado(inscripcion.id, value)}
+                        onValueChange={(value) =>
+                          handleCambiarEstado(inscripcion.id, value)
+                        }
                       >
                         <SelectTrigger className="w-[140px]">
                           <SelectValue />

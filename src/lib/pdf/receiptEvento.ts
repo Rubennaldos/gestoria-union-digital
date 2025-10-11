@@ -1,193 +1,180 @@
-// src/lib/pdf/receiptEvento.ts
-import { jsPDF } from "jspdf";
+import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-/**
- * Genera y descarga un comprobante PDF de inscripción a evento.
- * NO usa Storage. El PDF se construye y se descarga en el cliente.
- *
- * @param args Datos mínimos necesarios para el comprobante
- */
-export async function generarComprobanteEventoPDF(args: {
-  correlativo: string;               // p.ej. "EV-000123"
+// Convierte una imagen (ruta pública) a dataURL para incrustar en el PDF
+async function urlToDataURL(url: string): Promise<string> {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+export type ComprobanteEventoInput = {
+  // Branding / emisor
+  emisorNombre: string;      // "Asociación Junta de Propietarios San Antonio de Pachacámac"
+  emisorRuc?: string;
+  emisorDireccion?: string;
+  emisorTelefono?: string;
+
+  // Logo en /public (por ejemplo /logo-jpusap.png)
+  logoPublicPath?: string;   // "/logo-jpusap.png"
+
+  // Comprobante
+  serie: string;             // "JP"
+  numero: string;            // "000123"
+
+  // Evento
   eventoTitulo: string;
-  eventoFechaTexto: string;          // ej "10/11/2025 19:00"
-  empadronadoNombre: string;         // titular
-  empadronadoCodigo: string;         // código/ID/ padrón
-  acompanantes: number;
-  montoPagado: number;               // S/
-  metodoPago: "efectivo" | "transferencia" | "yape" | "plin";
-  numeroOperacion?: string;
+  eventoFecha: string;       // "11/10/2025 10:00"
+  sesionSeleccionada?: string;  // opcional
+
+  // Inscripción / pagador
+  titularNombre: string;     // Nombre empadronado o titular
+  titularDni?: string;
+  acompanantes?: number;
   observaciones?: string;
-  fechaEmision: Date;                // new Date()
-  logoBase64?: string;               // opcional: dataURL del logo (PNG/JPG)
-}) {
-  const {
-    correlativo,
-    eventoTitulo,
-    eventoFechaTexto,
-    empadronadoNombre,
-    empadronadoCodigo,
-    acompanantes,
-    montoPagado,
-    metodoPago,
-    numeroOperacion,
-    observaciones,
-    fechaEmision,
-    logoBase64,
-  } = args;
 
-  // Helpers
-  const PEN = (n: number) =>
-    new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(n);
+  // Importes
+  moneda?: "PEN" | "USD";
+  montoTotal: number;
+  descuento?: number;  // opcional
+  montoPagado?: number; // opcional
 
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const pageW = doc.internal.pageSize.getWidth();
+  // Fecha de emisión
+  fechaEmision?: Date;
+};
 
-  // ===== Encabezado =====
-  // Logo (si lo envías en base64)
-  const y0 = 32;
-  if (logoBase64) {
-    try {
-      // ancho máximo 120px, alto máximo 60px
-      doc.addImage(logoBase64, "PNG", 40, y0, 120, 60, undefined, "SLOW");
-    } catch {
-      // si falla, continuar sin logo
-    }
+export async function generarComprobanteInscripcionPDF(data: ComprobanteEventoInput): Promise<Blob> {
+  const doc = new jsPDF("p", "pt", "a4");
+  const marginX = 40;
+  let cursorY = 40;
+
+  // Logo
+  try {
+    const logoPath = data.logoPublicPath || "/logo-jpusap.png";
+    const dataUrl = await urlToDataURL(logoPath);
+    doc.addImage(dataUrl, "PNG", marginX, cursorY, 120, 60);
+  } catch {
+    // sin logo no pasa nada
   }
 
+  // Emisor
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("ASOCIACIÓN - JUNTA DE PROPIETARIOS SAN ANTONIO DE PACHACÁMAC", pageW / 2, y0 + 16, { align: "center" });
-
+  doc.text(data.emisorNombre, marginX + 140, cursorY + 14);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text("Rubro: Gestión y administración vecinal", pageW / 2, y0 + 30, { align: "center" });
-
-  // Caja de comprobante
-  const boxW = 210;
-  const boxH = 46;
-  const boxX = pageW - boxW - 40;
-  const boxY = y0 + 10;
-
-  doc.setDrawColor(60);
-  doc.setLineWidth(0.8);
-  doc.roundedRect(boxX, boxY, boxW, boxH, 6, 6);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("COMPROBANTE DE INSCRIPCIÓN", boxX + boxW / 2, boxY + 16, { align: "center" });
-  doc.setTextColor(200, 30, 30);
-  doc.setFontSize(13);
-  doc.text(`# ${correlativo}`, boxX + boxW / 2, boxY + 34, { align: "center" });
-  doc.setTextColor(0, 0, 0);
-
-  // ===== Datos de emisión =====
-  let y = y0 + 90;
-  doc.setFontSize(10);
-  doc.text(`Fecha de emisión: ${formatearFecha(fechaEmision)}`, 40, y);
-  y += 18;
-
-  // ===== Datos del titular =====
-  doc.setFont("helvetica", "bold");
-  doc.text("Datos del Empadronado", 40, y);
-  doc.setFont("helvetica", "normal");
-
-  autoTable(doc, {
-    startY: y + 8,
-    styles: { fontSize: 10, halign: "left", cellPadding: 6 },
-    theme: "plain",
-    columnStyles: { 0: { fontStyle: "bold", textColor: [60, 60, 60] } },
-    body: [
-      ["Nombre", empadronadoNombre],
-      ["Código/Registro", empadronadoCodigo],
-      ["Acompañantes", String(acompanantes)],
-    ],
-  });
-
-  // ===== Datos del evento =====
-  let after = (doc as any).lastAutoTable?.finalY ?? y + 8;
-  after += 14;
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Detalle del Evento", 40, after);
-  doc.setFont("helvetica", "normal");
-
-  autoTable(doc, {
-    startY: after + 8,
-    styles: { fontSize: 10, cellPadding: 6 },
-    theme: "striped",
-    headStyles: { fillColor: [230, 242, 235], textColor: [0, 0, 0] },
-    head: [["Evento", "Fecha/Hora"]],
-    body: [[eventoTitulo, eventoFechaTexto]],
-  });
-
-  // ===== Pago =====
-  after = (doc as any).lastAutoTable?.finalY ?? after + 8;
-  after += 14;
-
-  doc.setFont("helvetica", "bold");
-  doc.text("Información de Pago", 40, after);
-  doc.setFont("helvetica", "normal");
-
-  const pagoRows = [
-    ["Monto pagado", PEN(montoPagado)],
-    ["Método", capitalize(metodoPago)],
-  ] as (string | number)[][];
-
-  if (numeroOperacion) pagoRows.push(["N° Operación", numeroOperacion]);
-
-  autoTable(doc, {
-    startY: after + 8,
-    styles: { fontSize: 10, cellPadding: 6 },
-    theme: "plain",
-    columnStyles: { 0: { fontStyle: "bold", textColor: [60, 60, 60] } },
-    body: pagoRows as any,
-  });
-
-  // ===== Observaciones =====
-  after = (doc as any).lastAutoTable?.finalY ?? after + 8;
-  if (observaciones && observaciones.trim()) {
-    after += 12;
-    doc.setFont("helvetica", "bold");
-    doc.text("Observaciones", 40, after);
-    doc.setFont("helvetica", "normal");
-    const maxWidth = pageW - 80;
-    const lines = doc.splitTextToSize(observaciones, maxWidth);
-    doc.text(lines, 40, after + 16);
-    after = after + 16 + lines.length * 12;
+  let emisorLineY = cursorY + 32;
+  if (data.emisorRuc) {
+    doc.text(`RUC: ${data.emisorRuc}`, marginX + 140, emisorLineY);
+    emisorLineY += 14;
+  }
+  if (data.emisorDireccion) {
+    doc.text(data.emisorDireccion, marginX + 140, emisorLineY);
+    emisorLineY += 14;
+  }
+  if (data.emisorTelefono) {
+    doc.text(`Tel: ${data.emisorTelefono}`, marginX + 140, emisorLineY);
+    emisorLineY += 14;
   }
 
-  // ===== Pie =====
-  after += 24;
-  doc.setDrawColor(200);
-  doc.line(40, after, pageW - 40, after);
-  after += 14;
-  doc.setFontSize(9);
-  doc.setTextColor(100);
+  // Caja del comprobante (serie / número)
+  doc.setDrawColor(60, 60, 60);
+  doc.setLineWidth(1);
+  doc.rect(380, cursorY, 170, 60);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("COMPROBANTE", 465, cursorY + 20, { align: "center" });
+  doc.setFontSize(11);
+  doc.text(`${data.serie}-${data.numero}`, 465, cursorY + 40, { align: "center" });
+
+  cursorY += 80;
+
+  // Datos del evento
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Evento", marginX, cursorY);
+  doc.setFont("helvetica", "normal");
+  cursorY += 16;
+  doc.text(`Título: ${data.eventoTitulo}`, marginX, cursorY);
+  cursorY += 14;
+  doc.text(`Fecha: ${data.eventoFecha}`, marginX, cursorY);
+  cursorY += 14;
+  if (data.sesionSeleccionada) {
+    doc.text(`Sesión: ${data.sesionSeleccionada}`, marginX, cursorY);
+    cursorY += 14;
+  }
+
+  cursorY += 8;
+
+  // Titular / participante
+  doc.setFont("helvetica", "bold");
+  doc.text("Datos del titular", marginX, cursorY);
+  doc.setFont("helvetica", "normal");
+  cursorY += 16;
+  doc.text(`Nombre: ${data.titularNombre}`, marginX, cursorY);
+  cursorY += 14;
+  if (data.titularDni) {
+    doc.text(`DNI: ${data.titularDni}`, marginX, cursorY);
+    cursorY += 14;
+  }
+  if (data.acompanantes !== undefined) {
+    doc.text(`Acompañantes: ${data.acompanantes}`, marginX, cursorY);
+    cursorY += 14;
+  }
+  if (data.observaciones) {
+    doc.text(`Obs: ${data.observaciones}`, marginX, cursorY, { maxWidth: 500 });
+    cursorY += 28;
+  } else {
+    cursorY += 8;
+  }
+
+  // Tabla de importes
+  autoTable(doc, {
+    startY: cursorY,
+    head: [["Descripción", "Monto"]],
+    body: [
+      ["Inscripción al evento", formatoMoneda(data.montoTotal, data.moneda)],
+      ...(data.descuento ? [["Descuento", `- ${formatoMoneda(data.descuento, data.moneda)}`]] : []),
+      ...(data.montoPagado !== undefined ? [["Monto pagado", formatoMoneda(data.montoPagado, data.moneda)]] : [])
+    ],
+    headStyles: { fillColor: [28, 74, 141] },
+    styles: { halign: "right" },
+    columnStyles: { 0: { halign: "left" } }
+  });
+
+  // Total
+  const finalY = (doc as any).lastAutoTable.finalY || cursorY + 20;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
   doc.text(
-    "Este comprobante acredita la inscripción al evento. Guárdelo para cualquier validación posterior.",
-    40,
-    after
+    `TOTAL: ${formatoMoneda(
+      (data.montoPagado ?? data.montoTotal) - (data.descuento ?? 0),
+      data.moneda
+    )}`,
+    520,
+    finalY + 30,
+    { align: "right" }
   );
-  doc.setTextColor(0);
 
-  // Descargar
-  const fileName = `Comprobante_${correlativo}.pdf`;
-  doc.save(fileName);
+  // Fecha
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const fe = data.fechaEmision || new Date();
+  doc.text(
+    `Emitido: ${fe.toLocaleDateString("es-PE")} ${fe.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}`,
+    marginX,
+    finalY + 30
+  );
+
+  // Salida como Blob (lo descarga quien llama)
+  return doc.output("blob");
 }
 
-// =====================
-// Utils locales
-// =====================
-function capitalize(s: string) {
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-
-function formatearFecha(d: Date) {
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+function formatoMoneda(n: number, m: "PEN" | "USD" = "PEN") {
+  return new Intl.NumberFormat("es-PE", { style: "currency", currency: m }).format(n);
 }
