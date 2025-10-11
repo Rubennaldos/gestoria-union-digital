@@ -201,15 +201,33 @@ const Eventos = () => {
                     <Calendar className="h-4 w-4" />
                     <span>
                       {format(new Date(evento.fechaInicio), "dd MMM yyyy", { locale: es })}
+                      {evento.fechaFin && !evento.fechaFinIndefinida && (
+                        <> - {format(new Date(evento.fechaFin), "dd MMM", { locale: es })}</>
+                      )}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {evento.horaInicio} - {evento.horaFin}
-                    </span>
-                  </div>
+                  {evento.sesiones && evento.sesiones.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>
+                          {evento.sesiones[0].horaInicio} - {evento.sesiones[0].horaFin}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span className="line-clamp-1">{evento.sesiones[0].lugar}</span>
+                      </div>
+
+                      {evento.sesiones.length > 1 && (
+                        <p className="text-xs text-muted-foreground">
+                          +{evento.sesiones.length - 1} sesión(es) más
+                        </p>
+                      )}
+                    </>
+                  )}
 
                   {evento.instructor && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -218,21 +236,21 @@ const Eventos = () => {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span className="line-clamp-1">{evento.lugar}</span>
-                  </div>
-
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div className="flex items-center gap-2 text-sm">
                       <Users className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">
-                        {evento.cuposDisponibles} cupos
+                        {evento.cuposIlimitados
+                          ? "Ilimitados"
+                          : `${evento.cuposDisponibles} cupos`}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-sm font-semibold text-success">
                       <DollarSign className="h-4 w-4" />
                       {evento.precio === 0 ? "Gratis" : `S/ ${evento.precio.toFixed(2)}`}
+                      {evento.promocion?.activa && (
+                        <span className="text-xs text-warning">(Promo)</span>
+                      )}
                     </div>
                   </div>
                 </CardContent>

@@ -1,6 +1,6 @@
 import { ref, push, get, set, update, remove, query, orderByChild, equalTo } from "firebase/database";
 import { db } from "@/config/firebase";
-import { Evento, InscripcionEvento, FormularioEvento, EstadisticasEventos } from "@/types/eventos";
+import { Evento, InscripcionEvento, FormularioEvento, EstadisticasEventos, SesionEvento } from "@/types/eventos";
 
 // ========== EVENTOS ==========
 
@@ -8,12 +8,33 @@ export const crearEvento = async (eventoData: FormularioEvento, uid: string): Pr
   const eventosRef = ref(db, "eventos");
   const nuevoEventoRef = push(eventosRef);
   
+  // Agregar IDs a las sesiones
+  const sesionesConId: SesionEvento[] = eventoData.sesiones.map((sesion, index) => ({
+    ...sesion,
+    id: `${nuevoEventoRef.key}_sesion_${index}`,
+  }));
+  
   const evento: Evento = {
     id: nuevoEventoRef.key!,
-    ...eventoData,
+    titulo: eventoData.titulo,
+    descripcion: eventoData.descripcion,
+    categoria: eventoData.categoria,
     fechaInicio: new Date(eventoData.fechaInicio).getTime(),
-    fechaFin: new Date(eventoData.fechaFin).getTime(),
-    cuposDisponibles: eventoData.cuposMaximos,
+    fechaFin: eventoData.fechaFin && !eventoData.fechaFinIndefinida 
+      ? new Date(eventoData.fechaFin).getTime() 
+      : undefined,
+    fechaFinIndefinida: eventoData.fechaFinIndefinida,
+    sesiones: sesionesConId,
+    instructor: eventoData.instructor,
+    cuposMaximos: eventoData.cuposIlimitados ? undefined : eventoData.cuposMaximos,
+    cuposIlimitados: eventoData.cuposIlimitados,
+    cuposDisponibles: eventoData.cuposIlimitados ? undefined : eventoData.cuposMaximos,
+    precio: eventoData.precio,
+    promocion: eventoData.promocion,
+    imagen: eventoData.imagen,
+    requisitos: eventoData.requisitos,
+    materialesIncluidos: eventoData.materialesIncluidos,
+    estado: eventoData.estado,
     fechaCreacion: Date.now(),
     creadoPor: uid,
   };
@@ -43,8 +64,8 @@ export const obtenerEventosActivos = async (): Promise<Evento[]> => {
   return eventos.filter(
     (evento) => 
       evento.estado === 'activo' && 
-      evento.fechaFin >= ahora &&
-      evento.cuposDisponibles > 0
+      (evento.fechaFinIndefinida || !evento.fechaFin || evento.fechaFin >= ahora) &&
+      (evento.cuposIlimitados || (evento.cuposDisponibles && evento.cuposDisponibles > 0))
   );
 };
 
@@ -63,16 +84,51 @@ export const actualizarEvento = async (
   const eventoRef = ref(db, `eventos/${eventoId}`);
   
   const updates: any = {
-    ...eventoData,
     ultimaModificacion: Date.now(),
     modificadoPor: uid,
   };
   
+  if (eventoData.titulo !== undefined) updates.titulo = eventoData.titulo;
+  if (eventoData.descripcion !== undefined) updates.descripcion = eventoData.descripcion;
+  if (eventoData.categoria !== undefined) updates.categoria = eventoData.categoria;
+  if (eventoData.instructor !== undefined) updates.instructor = eventoData.instructor;
+  if (eventoData.precio !== undefined) updates.precio = eventoData.precio;
+  if (eventoData.requisitos !== undefined) updates.requisitos = eventoData.requisitos;
+  if (eventoData.materialesIncluidos !== undefined) updates.materialesIncluidos = eventoData.materialesIncluidos;
+  if (eventoData.imagen !== undefined) updates.imagen = eventoData.imagen;
+  if (eventoData.estado !== undefined) updates.estado = eventoData.estado;
+  if (eventoData.promocion !== undefined) updates.promocion = eventoData.promocion;
+  
+  if (eventoData.fechaFinIndefinida !== undefined) {
+    updates.fechaFinIndefinida = eventoData.fechaFinIndefinida;
+  }
+  
+  if (eventoData.cuposIlimitados !== undefined) {
+    updates.cuposIlimitados = eventoData.cuposIlimitados;
+    if (eventoData.cuposIlimitados) {
+      updates.cuposMaximos = null;
+      updates.cuposDisponibles = null;
+    } else if (eventoData.cuposMaximos !== undefined) {
+      updates.cuposMaximos = eventoData.cuposMaximos;
+    }
+  }
+  
+  if (eventoData.sesiones !== undefined) {
+    const sesionesConId: SesionEvento[] = eventoData.sesiones.map((sesion, index) => ({
+      ...sesion,
+      id: `${eventoId}_sesion_${index}`,
+    }));
+    updates.sesiones = sesionesConId;
+  }
+  
   if (eventoData.fechaInicio) {
     updates.fechaInicio = new Date(eventoData.fechaInicio).getTime();
   }
-  if (eventoData.fechaFin) {
+  
+  if (eventoData.fechaFin && !eventoData.fechaFinIndefinida) {
     updates.fechaFin = new Date(eventoData.fechaFin).getTime();
+  } else if (eventoData.fechaFinIndefinida) {
+    updates.fechaFin = null;
   }
   
   await update(eventoRef, updates);
@@ -100,8 +156,11 @@ export const inscribirseEvento = async (
   // Verificar cupos disponibles
   const evento = await obtenerEventoPorId(eventoId);
   if (!evento) throw new Error("Evento no encontrado");
-  if (evento.cuposDisponibles < (1 + acompanantes)) {
-    throw new Error("No hay cupos suficientes disponibles");
+  
+  if (!evento.cuposIlimitados && evento.cuposDisponibles !== undefined) {
+    if (evento.cuposDisponibles < (1 + acompanantes)) {
+      throw new Error("No hay cupos suficientes disponibles");
+    }
   }
   
   // Crear inscripción
@@ -122,11 +181,13 @@ export const inscribirseEvento = async (
   
   await set(nuevaInscripcionRef, inscripcion);
   
-  // Actualizar cupos disponibles
-  const nuevosCupos = evento.cuposDisponibles - (1 + acompanantes);
-  await update(ref(db, `eventos/${eventoId}`), {
-    cuposDisponibles: nuevosCupos,
-  });
+  // Actualizar cupos disponibles solo si no son ilimitados
+  if (!evento.cuposIlimitados && evento.cuposDisponibles !== undefined) {
+    const nuevosCupos = evento.cuposDisponibles - (1 + acompanantes);
+    await update(ref(db, `eventos/${eventoId}`), {
+      cuposDisponibles: nuevosCupos,
+    });
+  }
   
   return nuevaInscripcionRef.key!;
 };
@@ -193,16 +254,18 @@ export const cancelarInscripcion = async (inscripcionId: string, eventoId: strin
   // Cancelar inscripción
   await update(inscripcionRef, { estado: 'cancelado' });
   
-  // Liberar cupos
+  // Liberar cupos solo si el evento no tiene cupos ilimitados
   const eventoRef = ref(db, `eventos/${eventoId}`);
   const eventoSnapshot = await get(eventoRef);
   
   if (eventoSnapshot.exists()) {
     const evento = eventoSnapshot.val() as Evento;
-    const cuposLiberados = 1 + inscripcion.acompanantes;
-    await update(eventoRef, {
-      cuposDisponibles: evento.cuposDisponibles + cuposLiberados,
-    });
+    if (!evento.cuposIlimitados && evento.cuposDisponibles !== undefined) {
+      const cuposLiberados = 1 + inscripcion.acompanantes;
+      await update(eventoRef, {
+        cuposDisponibles: evento.cuposDisponibles + cuposLiberados,
+      });
+    }
   }
 };
 

@@ -4,20 +4,36 @@ export type CategoriaEvento = 'deportivo' | 'cultural' | 'educativo' | 'social' 
 export type EstadoEvento = 'activo' | 'inactivo' | 'finalizado' | 'cancelado';
 export type EstadoInscripcion = 'inscrito' | 'confirmado' | 'cancelado' | 'asistio' | 'no_asistio';
 
+export interface SesionEvento {
+  id: string;
+  lugar: string;
+  fecha: number;
+  horaInicio: string;
+  horaFin: string;
+}
+
+export interface PromocionEvento {
+  activa: boolean;
+  codigo: string;
+  precioPromocional: number;
+  fechaVencimiento?: number;
+}
+
 export interface Evento {
   id: string;
   titulo: string;
   descripcion: string;
   categoria: CategoriaEvento;
   fechaInicio: number;
-  fechaFin: number;
-  horaInicio: string; // HH:mm
-  horaFin: string; // HH:mm
-  lugar: string;
-  instructor?: string; // Profesor/instructor del evento
-  cuposMaximos: number;
-  cuposDisponibles: number;
+  fechaFin?: number; // Opcional para eventos indefinidos
+  fechaFinIndefinida: boolean;
+  sesiones: SesionEvento[]; // Múltiples lugares y horarios
+  instructor?: string;
+  cuposMaximos?: number; // Opcional para sin límite
+  cuposIlimitados: boolean;
+  cuposDisponibles?: number;
   precio: number;
+  promocion?: PromocionEvento;
   imagen?: string;
   requisitos?: string;
   materialesIncluidos?: string;
@@ -47,13 +63,14 @@ export interface FormularioEvento {
   descripcion: string;
   categoria: CategoriaEvento;
   fechaInicio: string;
-  fechaFin: string;
-  horaInicio: string;
-  horaFin: string;
-  lugar: string;
+  fechaFin?: string;
+  fechaFinIndefinida: boolean;
+  sesiones: Omit<SesionEvento, 'id'>[];
   instructor?: string;
-  cuposMaximos: number;
+  cuposMaximos?: number;
+  cuposIlimitados: boolean;
   precio: number;
+  promocion?: PromocionEvento;
   requisitos?: string;
   materialesIncluidos?: string;
   imagen?: string;

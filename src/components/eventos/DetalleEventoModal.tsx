@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, Clock, MapPin, User, Users, DollarSign, FileText, Package } from "lucide-react";
+import { Calendar, Clock, MapPin, User, Users, DollarSign, FileText, Package, Tag } from "lucide-react";
 import { Evento } from "@/types/eventos";
 import { inscribirseEvento } from "@/services/eventos";
 import { format } from "date-fns";
@@ -30,12 +30,21 @@ export const DetalleEventoModal = ({
   const { user } = useAuth();
   const [acompanantes, setAcompanantes] = useState(0);
   const [observaciones, setObservaciones] = useState("");
+  const [codigoPromocion, setCodigoPromocion] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleInscripcion = async () => {
     if (!user) {
       toast.error("Debes iniciar sesión para inscribirte");
       return;
+    }
+
+    // Validar código de promoción si existe
+    if (evento.promocion?.activa && codigoPromocion) {
+      if (codigoPromocion.toUpperCase() !== evento.promocion.codigo) {
+        toast.error("Código de promoción inválido");
+        return;
+      }
     }
 
     try {
@@ -55,6 +64,7 @@ export const DetalleEventoModal = ({
       // Resetear form
       setAcompanantes(0);
       setObservaciones("");
+      setCodigoPromocion("");
     } catch (error: any) {
       console.error("Error al inscribirse:", error);
       toast.error(error.message || "Error al realizar la inscripción");
@@ -88,11 +98,16 @@ export const DetalleEventoModal = ({
   };
 
   const totalPersonas = 1 + acompanantes;
-  const costoTotal = evento.precio * totalPersonas;
+  const precioAplicar = 
+    evento.promocion?.activa && codigoPromocion.toUpperCase() === evento.promocion.codigo
+      ? evento.promocion.precioPromocional
+      : evento.precio;
+  const costoTotal = precioAplicar * totalPersonas;
+  const tieneDescuento = precioAplicar < evento.precio;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -120,55 +135,45 @@ export const DetalleEventoModal = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <Calendar className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Fecha</p>
+                  <p className="text-sm text-muted-foreground">Período</p>
                   <p className="font-medium">
                     {format(new Date(evento.fechaInicio), "dd 'de' MMMM, yyyy", { locale: es })}
+                    {evento.fechaFin && !evento.fechaFinIndefinida && (
+                      <> - {format(new Date(evento.fechaFin), "dd 'de' MMM", { locale: es })}</>
+                    )}
+                    {evento.fechaFinIndefinida && <> (Sin fecha fin)</>}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Horario</p>
-                  <p className="font-medium">
-                    {evento.horaInicio} - {evento.horaFin}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <MapPin className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Lugar</p>
-                  <p className="font-medium">{evento.lugar}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
               {evento.instructor && (
                 <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-muted-foreground" />
+                  <User className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                   <div>
                     <p className="text-sm text-muted-foreground">Instructor</p>
                     <p className="font-medium">{evento.instructor}</p>
                   </div>
                 </div>
               )}
+            </div>
 
+            <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <Users className="h-5 w-5 text-muted-foreground" />
+                <Users className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Cupos disponibles</p>
-                  <p className="font-medium">{evento.cuposDisponibles} lugares</p>
+                  <p className="text-sm text-muted-foreground">Cupos</p>
+                  <p className="font-medium">
+                    {evento.cuposIlimitados
+                      ? "Ilimitados"
+                      : `${evento.cuposDisponibles} disponibles`}
+                  </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-muted-foreground" />
+                <DollarSign className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                 <div>
                   <p className="text-sm text-muted-foreground">Inversión</p>
                   <p className="font-semibold text-success text-lg">
@@ -178,6 +183,38 @@ export const DetalleEventoModal = ({
               </div>
             </div>
           </div>
+
+          {/* Sesiones del evento */}
+          {evento.sesiones && evento.sesiones.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="font-semibold mb-3">Sesiones Programadas</h3>
+                <div className="space-y-2">
+                  {evento.sesiones.map((sesion, index) => (
+                    <div key={sesion.id} className="bg-muted/50 p-3 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                        <div className="flex-1">
+                          <p className="font-medium">{sesion.lugar}</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {sesion.horaInicio} - {sesion.horaFin}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {(evento.requisitos || evento.materialesIncluidos) && (
             <>
@@ -218,7 +255,7 @@ export const DetalleEventoModal = ({
                 id="acompanantes"
                 type="number"
                 min="0"
-                max={evento.cuposDisponibles - 1}
+                max={!evento.cuposIlimitados && evento.cuposDisponibles ? evento.cuposDisponibles - 1 : 999}
                 value={acompanantes}
                 onChange={(e) => setAcompanantes(Math.max(0, parseInt(e.target.value) || 0))}
                 placeholder="0"
@@ -227,6 +264,27 @@ export const DetalleEventoModal = ({
                 Total de personas: {totalPersonas}
               </p>
             </div>
+
+            {evento.promocion?.activa && (
+              <div className="space-y-2">
+                <Label htmlFor="codigoPromocion" className="flex items-center gap-2">
+                  <Tag className="h-4 w-4" />
+                  Código de Promoción (opcional)
+                </Label>
+                <Input
+                  id="codigoPromocion"
+                  value={codigoPromocion}
+                  onChange={(e) => setCodigoPromocion(e.target.value.toUpperCase())}
+                  placeholder="Ingresa tu código"
+                />
+                {tieneDescuento && (
+                  <p className="text-xs text-success flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    ¡Descuento aplicado!
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="observaciones">Observaciones (opcional)</Label>
@@ -241,13 +299,23 @@ export const DetalleEventoModal = ({
 
             {evento.precio > 0 && (
               <div className="bg-muted/50 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Costo Total:</span>
-                  <span className="text-xl font-bold text-success">
-                    S/ {costoTotal.toFixed(2)}
-                  </span>
+                <div className="space-y-2">
+                  {tieneDescuento && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Precio regular:</span>
+                      <span className="line-through text-muted-foreground">
+                        S/ {(evento.precio * totalPersonas).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Costo Total:</span>
+                    <span className="text-xl font-bold text-success">
+                      S/ {costoTotal.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-2">
                   El pago se realizará al confirmar tu inscripción
                 </p>
               </div>
@@ -260,7 +328,12 @@ export const DetalleEventoModal = ({
             </Button>
             <Button
               onClick={handleInscripcion}
-              disabled={loading || evento.cuposDisponibles < totalPersonas}
+              disabled={
+                loading ||
+                (!evento.cuposIlimitados &&
+                  evento.cuposDisponibles !== undefined &&
+                  evento.cuposDisponibles < totalPersonas)
+              }
               className="flex-1"
             >
               {loading ? "Inscribiendo..." : "Confirmar Inscripción"}
