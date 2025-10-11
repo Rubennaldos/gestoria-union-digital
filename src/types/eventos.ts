@@ -20,7 +20,12 @@ export type TipoPromocion =
   | 'porcentaje'
   | 'custom';
 
-export type TipoDescuento = 'fijo' | 'porcentaje';
+export type TipoDescuento = 'fijo' | 'porcentaje' | 'escalonado';
+
+export interface EscalonPrecio {
+  cantidadPersonas: number; // Cantidad total de personas (1 + acompañantes)
+  precioPorPersona: number; // Precio por persona en este escalón
+}
 
 export interface PromocionEvento {
   activa: boolean;
@@ -35,6 +40,9 @@ export interface PromocionEvento {
   tipoDescuento: TipoDescuento;
   montoDescuento?: number; // Monto fijo o porcentaje
   precioFinal?: number; // Precio final (alternativa al descuento)
+  
+  // Para precios escalonados por cantidad de personas
+  escalones?: EscalonPrecio[];
   
   // Para promoción por acompañantes
   minimoAcompanantes?: number;

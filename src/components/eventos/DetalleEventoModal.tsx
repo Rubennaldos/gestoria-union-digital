@@ -130,11 +130,27 @@ export const DetalleEventoModal = ({
       }
     }
     
-    // Aplicar descuento
+    // Aplicar descuento por escalones de precio
+    if (promo.tipoDescuento === 'escalonado' && promo.escalones && promo.escalones.length > 0) {
+      // Buscar el escalón que coincida con la cantidad de personas
+      const escalonAplicable = promo.escalones.find(e => e.cantidadPersonas === totalPersonas);
+      if (escalonAplicable) {
+        return escalonAplicable.precioPorPersona;
+      }
+      // Si no hay escalón exacto, buscar el más cercano menor
+      const escalonesOrdenados = [...promo.escalones].sort((a, b) => b.cantidadPersonas - a.cantidadPersonas);
+      const escalonMenor = escalonesOrdenados.find(e => e.cantidadPersonas <= totalPersonas);
+      if (escalonMenor) {
+        return escalonMenor.precioPorPersona;
+      }
+    }
+    
+    // Aplicar precio final fijo
     if (promo.precioFinal !== undefined) {
       return promo.precioFinal;
     }
     
+    // Aplicar descuento porcentual
     if (promo.tipoDescuento === 'porcentaje' && promo.montoDescuento) {
       return evento.precio * (1 - promo.montoDescuento / 100);
     }

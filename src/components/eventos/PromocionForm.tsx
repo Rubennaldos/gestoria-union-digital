@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PromocionEvento, TipoPromocion, TipoDescuento } from "@/types/eventos";
+import { PromocionEvento, TipoPromocion, TipoDescuento, EscalonPrecio } from "@/types/eventos";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -232,6 +232,7 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                   // Limpiar valores al cambiar tipo
                   handleChange('montoDescuento', undefined);
                   handleChange('precioFinal', undefined);
+                  handleChange('escalones', undefined);
                 }}
               >
                 <SelectTrigger>
@@ -240,6 +241,7 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                 <SelectContent>
                   <SelectItem value="fijo">Precio fijo final</SelectItem>
                   <SelectItem value="porcentaje">Porcentaje de descuento</SelectItem>
+                  <SelectItem value="escalonado">Precio por cantidad de personas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -259,8 +261,110 @@ export const PromocionForm = ({ promocion, precioBase, onChange }: PromocionForm
                 {promocion.montoDescuento && precioBase > 0 && (
                   <p className="text-sm text-muted-foreground">
                     <Info className="inline h-3 w-3 mr-1" />
-                    Precio final: S/ {(precioBase * (1 - promocion.montoDescuento / 100)).toFixed(2)}
+                    Precio por persona: S/ {(precioBase * (1 - promocion.montoDescuento / 100)).toFixed(2)}
                   </p>
+                )}
+              </div>
+            ) : promocion.tipoDescuento === 'escalonado' ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Precios por cantidad de personas</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const escalones = promocion.escalones || [];
+                      handleChange('escalones', [
+                        ...escalones,
+                        { cantidadPersonas: escalones.length + 1, precioPorPersona: precioBase }
+                      ]);
+                    }}
+                  >
+                    Agregar escalón
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Define el precio por persona según la cantidad total (incluyendo el titular)
+                </p>
+                {(!promocion.escalones || promocion.escalones.length === 0) && (
+                  <p className="text-sm text-center text-muted-foreground p-4 border border-dashed rounded">
+                    Agrega escalones de precio para comenzar
+                  </p>
+                )}
+                {promocion.escalones && promocion.escalones.length > 0 && (
+                  <div className="space-y-2">
+                    {promocion.escalones.map((escalon, index) => (
+                      <div key={index} className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                        <div className="flex-1 grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Cantidad de personas</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={escalon.cantidadPersonas}
+                              onChange={(e) => {
+                                const nuevosEscalones = [...(promocion.escalones || [])];
+                                nuevosEscalones[index] = {
+                                  ...escalon,
+                                  cantidadPersonas: parseInt(e.target.value) || 1
+                                };
+                                handleChange('escalones', nuevosEscalones);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Precio por persona (S/)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={escalon.precioPorPersona}
+                              onChange={(e) => {
+                                const nuevosEscalones = [...(promocion.escalones || [])];
+                                nuevosEscalones[index] = {
+                                  ...escalon,
+                                  precioPorPersona: parseFloat(e.target.value) || 0
+                                };
+                                handleChange('escalones', nuevosEscalones);
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const nuevosEscalones = promocion.escalones?.filter((_, i) => i !== index);
+                            handleChange('escalones', nuevosEscalones);
+                          }}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ))}
+                    {precioBase > 0 && promocion.escalones.length > 0 && (
+                      <div className="text-xs space-y-1 p-3 bg-primary/5 rounded-lg">
+                        <p className="font-medium">Ejemplo de precios totales:</p>
+                        {promocion.escalones.slice(0, 3).map((escalon) => {
+                          const total = escalon.cantidadPersonas * escalon.precioPorPersona;
+                          const ahorro = (escalon.cantidadPersonas * precioBase) - total;
+                          return (
+                            <p key={escalon.cantidadPersonas} className="text-muted-foreground">
+                              • {escalon.cantidadPersonas} {escalon.cantidadPersonas === 1 ? 'persona' : 'personas'}: 
+                              S/ {total.toFixed(2)}
+                              {ahorro > 0 && (
+                                <span className="text-success ml-1">
+                                  (Ahorro: S/ {ahorro.toFixed(2)})
+                                </span>
+                              )}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (
