@@ -30,7 +30,7 @@ export const crearEvento = async (eventoData: FormularioEvento, uid: string): Pr
     cuposIlimitados: eventoData.cuposIlimitados,
     cuposDisponibles: eventoData.cuposIlimitados ? null : eventoData.cuposMaximos,
     precio: eventoData.precio,
-    promocion: eventoData.promocion,
+    ...(eventoData.promocion && { promocion: eventoData.promocion }),
     imagen: eventoData.imagen,
     requisitos: eventoData.requisitos,
     materialesIncluidos: eventoData.materialesIncluidos,
@@ -97,10 +97,9 @@ export const actualizarEvento = async (
   if (eventoData.materialesIncluidos !== undefined) updates.materialesIncluidos = eventoData.materialesIncluidos;
   if (eventoData.imagen !== undefined) updates.imagen = eventoData.imagen;
   if (eventoData.estado !== undefined) updates.estado = eventoData.estado;
-  if (eventoData.promocion !== undefined) {
+  if (eventoData.promocion) {
     // Limpiar valores undefined de la promoción para Firebase
-    const promocionLimpia = eventoData.promocion ? 
-      JSON.parse(JSON.stringify(eventoData.promocion)) : null;
+    const promocionLimpia = JSON.parse(JSON.stringify(eventoData.promocion));
     updates.promocion = promocionLimpia;
   }
   
