@@ -1,3 +1,4 @@
+// src/components/eventos/InscripcionesEventoModal.tsx
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -18,17 +19,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Evento, InscripcionEvento } from "@/types/eventos";
-import { obtenerInscripcionesPorEvento, actualizarEstadoInscripcion, registrarPagoInscripcion } from "@/services/eventos";
+import {
+  obtenerInscripcionesPorEvento,
+  actualizarEstadoInscripcion,
+  registrarPagoInscripcion,
+} from "@/services/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, Clock, DollarSign } from "lucide-react";
+
+// ⬇️ Generador del comprobante PDF
+import { generarComprobanteEventoPDF } from "@/lib/pdf/receiptEvento";
 
 interface InscripcionesEventoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   evento: Evento;
 }
+
+const LOGO_URL = "/logo-san-antonio.png"; // pon tu PNG en /public
 
 export const InscripcionesEventoModal = ({
   open,
@@ -37,11 +47,13 @@ export const InscripcionesEventoModal = ({
 }: InscripcionesEventoModalProps) => {
   const [inscripciones, setInscripciones] = useState<InscripcionEvento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
 
   useEffect(() => {
     if (open) {
       cargarInscripciones();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const cargarInscripciones = async () => {
@@ -68,14 +80,77 @@ export const InscripcionesEventoModal = ({
     }
   };
 
-  const handleRegistrarPago = async (inscripcionId: string) => {
+  const blobToDataURL = (blob: Blob) =>
+    new Promise<string>((res, rej) => {
+      const fr = new FileReader();
+      fr.onloadend = () => res(fr.result as string);
+      fr.onerror = rej;
+      fr.readAsDataURL(blob);
+    });
+
+  const getLogoBase64 = async (): Promise<string | undefined> => {
     try {
+      const resp = await fetch(LOGO_URL);
+      if (!resp.ok) return undefined;
+      const blob = await resp.blob();
+      return await blobToDataURL(blob);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const handleRegistrarPago = async (inscripcionId: string) => {
+    if (working) return;
+    setWorking(true);
+    try {
+      // Obtener la inscripción para los datos del comprobante
+      const inscripcion = inscripciones.find((i) => i.id === inscripcionId);
+      if (!inscripcion) {
+        toast.error("Inscripción no encontrada");
+        return;
+      }
+
+      // 1) Registrar el pago en RTDB (tu flujo actual)
       await registrarPagoInscripcion(inscripcionId, evento.precio);
+
+      // 2) Intentar generar y descargar el comprobante PDF
+      try {
+        const correlativo = `EV-${new Date().getFullYear()}${String(
+          new Date().getMonth() + 1
+        ).padStart(2, "0")}-${String(Date.now()).slice(-6)}`;
+
+        const fechaTexto =
+          evento.fechaInicio
+            ? new Date(evento.fechaInicio).toLocaleString("es-PE")
+            : "—";
+
+        const logoBase64 = await getLogoBase64();
+
+        await generarComprobanteEventoPDF({
+          correlativo,
+          eventoTitulo: evento.titulo,
+          eventoFechaTexto: fechaTexto,
+          empadronadoNombre: inscripcion.nombreEmpadronado,
+          empadronadoCodigo: inscripcion.empadronadoId,
+          acompanantes: inscripcion.acompanantes,
+          montoPagado: evento.precio,
+          metodoPago: "efectivo", // si luego guardas el método real, cámbialo aquí
+          numeroOperacion: undefined, // idem si lo capturas
+          observaciones: inscripcion.observaciones || "",
+          fechaEmision: new Date(),
+          logoBase64,
+        });
+      } catch (e) {
+        console.warn("No se pudo generar el PDF (se continúa):", e);
+      }
+
       toast.success("Pago registrado exitosamente");
       cargarInscripciones();
     } catch (error) {
       console.error("Error al registrar pago:", error);
       toast.error("Error al registrar el pago");
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -119,10 +194,10 @@ export const InscripcionesEventoModal = ({
     );
   };
 
-  const totalInscritos = inscripciones.filter(i => i.estado !== 'cancelado').length;
-  const totalConfirmados = inscripciones.filter(i => i.estado === 'confirmado').length;
+  const totalInscritos = inscripciones.filter((i) => i.estado !== "cancelado").length;
+  const totalConfirmados = inscripciones.filter((i) => i.estado === "confirmado").length;
   const totalPagos = inscripciones
-    .filter(i => i.pagoRealizado)
+    .filter((i) => i.pagoRealizado)
     .reduce((sum, i) => sum + (i.montoPagado || 0), 0);
 
   return (
@@ -130,9 +205,7 @@ export const InscripcionesEventoModal = ({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Inscripciones - {evento.titulo}</DialogTitle>
-          <DialogDescription>
-            Gestiona las inscripciones del evento
-          </DialogDescription>
+          <DialogDescription>Gestiona las inscripciones del evento</DialogDescription>
         </DialogHeader>
 
         {/* Resumen */}
@@ -155,9 +228,7 @@ export const InscripcionesEventoModal = ({
         {loading ? (
           <div className="text-center py-8">Cargando inscripciones...</div>
         ) : inscripciones.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No hay inscripciones para este evento
-          </div>
+          <div className="text-center py-8 text-muted-foreground">No hay inscripciones para este evento</div>
         ) : (
           <div className="rounded-md border">
             <Table>
@@ -194,8 +265,9 @@ export const InscripcionesEventoModal = ({
                           size="sm"
                           variant="outline"
                           onClick={() => handleRegistrarPago(inscripcion.id)}
+                          disabled={working}
                         >
-                          Registrar pago
+                          {working ? "Procesando..." : "Registrar pago"}
                         </Button>
                       )}
                     </TableCell>

@@ -1,8 +1,19 @@
 // Tipos para el módulo de Eventos
 
-export type CategoriaEvento = 'deportivo' | 'cultural' | 'educativo' | 'social' | 'recreativo' | 'otro';
-export type EstadoEvento = 'activo' | 'inactivo' | 'finalizado' | 'cancelado';
-export type EstadoInscripcion = 'inscrito' | 'confirmado' | 'cancelado' | 'asistio' | 'no_asistio';
+export type CategoriaEvento =
+  | "deportivo"
+  | "cultural"
+  | "educativo"
+  | "social"
+  | "recreativo"
+  | "otro";
+export type EstadoEvento = "activo" | "inactivo" | "finalizado" | "cancelado";
+export type EstadoInscripcion =
+  | "inscrito"
+  | "confirmado"
+  | "cancelado"
+  | "asistio"
+  | "no_asistio";
 
 export interface SesionEvento {
   id: string;
@@ -13,15 +24,19 @@ export interface SesionEvento {
   precio: number; // Precio unitario por sesión
 }
 
-export type TipoPromocion = 
-  | 'codigo' 
-  | 'acompanantes' 
-  | 'early_bird' 
-  | 'grupal' 
-  | 'porcentaje'
-  | 'custom';
+export type TipoPromocion =
+  | "codigo"
+  | "acompanantes"
+  | "early_bird"
+  | "grupal"
+  | "porcentaje"
+  | "custom";
 
-export type TipoDescuento = 'fijo' | 'porcentaje' | 'escalonado' | 'por_paquete';
+export type TipoDescuento =
+  | "fijo"
+  | "porcentaje"
+  | "escalonado"
+  | "por_paquete";
 
 export interface EscalonPrecio {
   cantidadPersonas: number; // Cantidad total de personas (1 + acompañantes)
@@ -39,31 +54,31 @@ export interface PromocionEvento {
   tipo: TipoPromocion;
   nombre: string;
   descripcion?: string;
-  
+
   // Para promoción por código
   codigo?: string;
-  
+
   // Para descuentos
   tipoDescuento: TipoDescuento;
   montoDescuento?: number; // Monto fijo o porcentaje
   precioFinal?: number; // Precio final (alternativa al descuento)
-  
+
   // Para precios escalonados por cantidad de personas
   escalones?: EscalonPrecio[];
-  
+
   // Para paquetes de sesiones/días
   paquetes?: PaqueteSesiones[];
-  
+
   // Para promoción por acompañantes
   minimoAcompanantes?: number;
   maximoAcompanantes?: number;
-  
+
   // Para promoción early bird
   fechaVencimiento?: number;
-  
+
   // Para promoción grupal
   minimoInscripciones?: number;
-  
+
   // Para condiciones personalizadas
   condicionCustom?: string;
 }
@@ -105,6 +120,8 @@ export interface InscripcionEvento {
   pagoRealizado: boolean;
   fechaPago?: number;
   montoPagado?: number;
+  /** id del comprobante PDF generado (receipts/{id}) */
+  comprobanteId?: string;
 }
 
 export interface FormularioEvento {
@@ -114,7 +131,7 @@ export interface FormularioEvento {
   fechaInicio: string;
   fechaFin?: string;
   fechaFinIndefinida: boolean;
-  sesiones: Omit<SesionEvento, 'id'>[];
+  sesiones: Omit<SesionEvento, "id">[];
   instructor?: string;
   cuposMaximos?: number;
   cuposIlimitados: boolean;
@@ -136,4 +153,49 @@ export interface EstadisticasEventos {
     titulo: string;
     inscritos: number;
   };
+}
+
+/* ====== Comprobante por inscripción (eventos) ====== */
+export interface EventReceiptOrg {
+  name: string; // "Asociación Junta de Propietarios San Antonio de Pachacamac"
+  ruc?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  logoPath?: string; // /logo-san-antonio.png (public)
+}
+
+export interface EventReceiptCustomer {
+  empadronadoId: string;
+  name: string;
+  dni?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface EventReceiptItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+export interface EventReceipt {
+  id: string; // key RTDB
+  code: string; // correlativo legible (p.ej. REC-2025-000123)
+  issuedAt: number; // ts
+  org: EventReceiptOrg;
+  customer: EventReceiptCustomer;
+  event: {
+    id: string;
+    name: string;
+    date?: string; // ISO (opcional)
+  };
+  items: EventReceiptItem[];
+  total: number;
+  currency: "PEN";
+  paymentMethod?: "efectivo" | "transferencia" | "yape" | "plin" | "otro";
+  notes?: string | null;
+  // vínculos
+  inscripcionId: string;
 }
