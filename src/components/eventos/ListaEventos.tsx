@@ -153,46 +153,52 @@ export const ListaEventos = ({
                 </TableCell>
                 <TableCell>{getEstadoBadge(evento.estado)}</TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onVerInscripciones(evento)}>
-                        <Users className="h-4 w-4 mr-2" />
-                        Ver inscripciones
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onEditar(evento)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                      {evento.estado === "activo" && (
-                        <DropdownMenuItem
-                          onClick={() => handleCambiarEstado(evento.id, "finalizado")}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Marcar como finalizado
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onVerInscripciones(evento)}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Inscritos
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEditar(evento)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar
                         </DropdownMenuItem>
-                      )}
-                      {evento.estado !== "activo" && (
+                        {evento.estado === "activo" && (
+                          <DropdownMenuItem
+                            onClick={() => handleCambiarEstado(evento.id, "finalizado")}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Marcar como finalizado
+                          </DropdownMenuItem>
+                        )}
+                        {evento.estado !== "activo" && (
+                          <DropdownMenuItem
+                            onClick={() => handleCambiarEstado(evento.id, "activo")}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Activar evento
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
-                          onClick={() => handleCambiarEstado(evento.id, "activo")}
+                          onClick={() => setEventoAEliminar(evento)}
+                          className="text-destructive"
                         >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Activar evento
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Eliminar
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        onClick={() => setEventoAEliminar(evento)}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
