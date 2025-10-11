@@ -13,8 +13,6 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { SesionesEventoForm } from "./SesionesEventoForm";
 import { ImageUploader } from "./ImageUploader";
-import { Tag } from "lucide-react";
-import { PromocionForm } from "./PromocionForm";
 
 interface NuevoEventoModalProps {
   open: boolean;
@@ -227,53 +225,31 @@ export const NuevoEventoModal = ({ open, onOpenChange, onSuccess }: NuevoEventoM
 
           <Separator />
 
-          {/* Cupos y Precios */}
+          {/* Cupos */}
           <div className="space-y-4">
-            <h3 className="font-semibold">Cupos y Precios</h3>
+            <h3 className="font-semibold">Cupos</h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="cuposMaximos">Cupos Máximos</Label>
-                <Input
-                  id="cuposMaximos"
-                  type="number"
-                  min="0"
-                  value={formData.cuposMaximos}
-                  onChange={(e) => setFormData({ ...formData, cuposMaximos: parseInt(e.target.value) || 0 })}
-                  disabled={formData.cuposIlimitados}
+            <div className="space-y-2">
+              <Label htmlFor="cuposMaximos">Cupos Máximos por Sesión</Label>
+              <Input
+                id="cuposMaximos"
+                type="number"
+                min="0"
+                value={formData.cuposMaximos}
+                onChange={(e) => setFormData({ ...formData, cuposMaximos: parseInt(e.target.value) || 0 })}
+                disabled={formData.cuposIlimitados}
+              />
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="cuposIlimitados"
+                  checked={formData.cuposIlimitados}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, cuposIlimitados: !!checked })
+                  }
                 />
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="cuposIlimitados"
-                    checked={formData.cuposIlimitados}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, cuposIlimitados: !!checked })
-                    }
-                  />
-                  <Label htmlFor="cuposIlimitados" className="text-sm font-normal cursor-pointer">
-                    Sin límite de cupos
-                  </Label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="precio">Precio (S/)</Label>
-                <Input
-                  id="precio"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.precio}
-                  onChange={(e) => setFormData({ ...formData, precio: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-
-              <div className="md:col-span-2 space-y-2">
-                <PromocionForm
-                  promocion={formData.promocion}
-                  precioBase={formData.precio}
-                  onChange={(promo) => setFormData({ ...formData, promocion: promo })}
-                />
+                <Label htmlFor="cuposIlimitados" className="text-sm font-normal cursor-pointer">
+                  Sin límite de cupos
+                </Label>
               </div>
             </div>
           </div>

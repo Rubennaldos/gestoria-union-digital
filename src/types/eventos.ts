@@ -10,6 +10,7 @@ export interface SesionEvento {
   fecha: number;
   horaInicio: string;
   horaFin: string;
+  precio: number; // Precio unitario por sesión
 }
 
 export type TipoPromocion = 

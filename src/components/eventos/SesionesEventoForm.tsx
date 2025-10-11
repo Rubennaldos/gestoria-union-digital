@@ -19,6 +19,7 @@ export const SesionesEventoForm = ({ sesiones, onChange }: SesionesEventoFormPro
         fecha: Date.now(),
         horaInicio: "",
         horaFin: "",
+        precio: 0,
       },
     ]);
   };
@@ -117,6 +118,19 @@ export const SesionesEventoForm = ({ sesiones, onChange }: SesionesEventoFormPro
                     type="time"
                     value={sesion.horaFin}
                     onChange={(e) => actualizarSesion(index, 'horaFin', e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={`precio-${index}`}>Precio (S/)</Label>
+                  <Input
+                    id={`precio-${index}`}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={sesion.precio || 0}
+                    onChange={(e) => actualizarSesion(index, 'precio', parseFloat(e.target.value) || 0)}
+                    required
                   />
                 </div>
               </div>
