@@ -98,10 +98,46 @@ export const DetalleEventoModal = ({
   };
 
   const totalPersonas = 1 + acompanantes;
-  const precioAplicar = 
-    evento.promocion?.activa && codigoPromocion.toUpperCase() === evento.promocion.codigo
-      ? evento.promocion.precioPromocional
-      : evento.precio;
+  
+  // Calcular precio aplicable según tipo de promoción
+  const calcularPrecioConPromocion = () => {
+    if (!evento.promocion?.activa) return evento.precio;
+    
+    const promo = evento.promocion;
+    
+    // Verificar condiciones específicas
+    if (promo.tipo === 'codigo' && codigoPromocion.toUpperCase() !== promo.codigo) {
+      return evento.precio;
+    }
+    
+    if (promo.tipo === 'acompanantes') {
+      if (promo.minimoAcompanantes && acompanantes < promo.minimoAcompanantes) {
+        return evento.precio;
+      }
+      if (promo.maximoAcompanantes && acompanantes > promo.maximoAcompanantes) {
+        return evento.precio;
+      }
+    }
+    
+    if (promo.tipo === 'early_bird' && promo.fechaVencimiento) {
+      if (Date.now() > promo.fechaVencimiento) {
+        return evento.precio;
+      }
+    }
+    
+    // Aplicar descuento
+    if (promo.precioFinal !== undefined) {
+      return promo.precioFinal;
+    }
+    
+    if (promo.tipoDescuento === 'porcentaje' && promo.montoDescuento) {
+      return evento.precio * (1 - promo.montoDescuento / 100);
+    }
+    
+    return evento.precio;
+  };
+  
+  const precioAplicar = calcularPrecioConPromocion();
   const costoTotal = precioAplicar * totalPersonas;
   const tieneDescuento = precioAplicar < evento.precio;
 

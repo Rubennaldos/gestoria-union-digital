@@ -12,11 +12,42 @@ export interface SesionEvento {
   horaFin: string;
 }
 
+export type TipoPromocion = 
+  | 'codigo' 
+  | 'acompanantes' 
+  | 'early_bird' 
+  | 'grupal' 
+  | 'porcentaje'
+  | 'custom';
+
+export type TipoDescuento = 'fijo' | 'porcentaje';
+
 export interface PromocionEvento {
   activa: boolean;
-  codigo: string;
-  precioPromocional: number;
+  tipo: TipoPromocion;
+  nombre: string;
+  descripcion?: string;
+  
+  // Para promoción por código
+  codigo?: string;
+  
+  // Para descuentos
+  tipoDescuento: TipoDescuento;
+  montoDescuento?: number; // Monto fijo o porcentaje
+  precioFinal?: number; // Precio final (alternativa al descuento)
+  
+  // Para promoción por acompañantes
+  minimoAcompanantes?: number;
+  maximoAcompanantes?: number;
+  
+  // Para promoción early bird
   fechaVencimiento?: number;
+  
+  // Para promoción grupal
+  minimoInscripciones?: number;
+  
+  // Para condiciones personalizadas
+  condicionCustom?: string;
 }
 
 export interface Evento {

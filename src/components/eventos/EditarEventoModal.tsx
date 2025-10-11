@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { SesionesEventoForm } from "./SesionesEventoForm";
 import { ImageUploader } from "./ImageUploader";
 import { Tag } from "lucide-react";
+import { PromocionForm } from "./PromocionForm";
 
 interface EditarEventoModalProps {
   open: boolean;
@@ -31,7 +32,6 @@ export const EditarEventoModal = ({
 }: EditarEventoModalProps) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [mostrarPromocion, setMostrarPromocion] = useState(false);
   const [formData, setFormData] = useState<FormularioEvento>({
     titulo: "",
     descripcion: "",
@@ -76,7 +76,6 @@ export const EditarEventoModal = ({
         imagen: evento.imagen || "",
         estado: evento.estado,
       });
-      setMostrarPromocion(!!evento.promocion);
     }
   }, [evento]);
 
@@ -281,72 +280,11 @@ export const EditarEventoModal = ({
               </div>
 
               <div className="md:col-span-2 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="mostrarPromocion"
-                    checked={mostrarPromocion}
-                    onCheckedChange={(checked) => {
-                      setMostrarPromocion(!!checked);
-                      if (!checked) {
-                        setFormData({ ...formData, promocion: undefined });
-                      } else if (!formData.promocion) {
-                        setFormData({
-                          ...formData,
-                          promocion: {
-                            activa: true,
-                            codigo: "",
-                            precioPromocional: 0,
-                          },
-                        });
-                      }
-                    }}
-                  />
-                  <Label htmlFor="mostrarPromocion" className="cursor-pointer flex items-center gap-2">
-                    <Tag className="h-4 w-4" />
-                    Agregar promoción con código
-                  </Label>
-                </div>
-
-                {mostrarPromocion && (
-                  <div className="bg-muted/50 p-4 rounded-lg space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="codigoPromocion">Código de Promoción</Label>
-                        <Input
-                          id="codigoPromocion"
-                          value={formData.promocion?.codigo || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              promocion: { ...formData.promocion!, codigo: e.target.value.toUpperCase() },
-                            })
-                          }
-                          placeholder="Ej: VERANO2025"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="precioPromocional">Precio Promocional (S/)</Label>
-                        <Input
-                          id="precioPromocional"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.promocion?.precioPromocional || 0}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              promocion: {
-                                ...formData.promocion!,
-                                precioPromocional: parseFloat(e.target.value) || 0,
-                              },
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <PromocionForm
+                  promocion={formData.promocion}
+                  precioBase={formData.precio}
+                  onChange={(promo) => setFormData({ ...formData, promocion: promo })}
+                />
               </div>
             </div>
           </div>
