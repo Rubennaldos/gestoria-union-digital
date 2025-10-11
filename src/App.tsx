@@ -33,6 +33,8 @@ import AdminSeguridad from "./pages/AdminSeguridad";
 import Finanzas from "./pages/Finanzas";
 import ConfiguracionCuenta from "./pages/ConfiguracionCuenta";
 import Planilla from "./pages/Planilla";
+import Eventos from "./pages/Eventos";
+import AdminEventos from "./pages/AdminEventos";
 
 const queryClient = new QueryClient();
 
@@ -255,6 +257,26 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Planilla />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Eventos */}
+              <Route
+                path="/eventos"
+                element={
+                  <ProtectedRoute>
+                    <Eventos />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Administración de Eventos */}
+              <Route
+                path="/admin-eventos"
+                element={
+                  <ProtectedRoute>
+                    <AdminEventos />
                   </ProtectedRoute>
                 }
               />
