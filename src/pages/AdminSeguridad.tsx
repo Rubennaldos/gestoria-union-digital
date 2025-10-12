@@ -13,6 +13,7 @@ import { ControlTrabajadores } from "@/components/admin-seguridad/ControlTrabaja
 import { SancionesSeguridad } from "@/components/admin-seguridad/SancionesSeguridad";
 import { ReglamentoInterno } from "@/components/admin-seguridad/ReglamentoInterno";
 import { Can } from "@/components/auth/Can";
+import { useAuthz } from "@/contexts/AuthzContext";
 
 import { AutorizacionesSeguridad as AutorizacionesAdmin } from "@/components/seguridad/AutorizacionesSeguridad";
 
@@ -20,13 +21,29 @@ const AdminSeguridad = () => {
   const [activeTab, setActiveTab] = useState("autorizaciones");
   const { toast } = useToast();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { can } = useAuthz();
+
+  // Verificar si el usuario tiene permisos de administración de seguridad
+  const hasAdminPermission = can("admin_seguridad", "read");
 
   useEffect(() => {
-    // Verificar si las notificaciones están activas al cargar
-    setNotificationsEnabled(notificationService.isRunning());
-  }, []);
+    // Solo verificar notificaciones si tiene permisos
+    if (hasAdminPermission) {
+      setNotificationsEnabled(notificationService.isRunning());
+    }
+  }, [hasAdminPermission]);
 
   const toggleNotifications = async () => {
+    // Verificar permisos del módulo primero
+    if (!hasAdminPermission) {
+      toast({
+        title: "Sin permisos",
+        description: "No tienes permisos para recibir notificaciones de este módulo",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (notificationsEnabled) {
       notificationService.stop();
       setNotificationsEnabled(false);
@@ -40,18 +57,28 @@ const AdminSeguridad = () => {
       if (permission === "denied") {
         toast({
           title: "Permisos denegados",
-          description: "Activa las notificaciones en la configuración de tu navegador",
+          description: "Activa las notificaciones en la configuración de tu navegador para recibir alertas",
           variant: "destructive",
         });
         return;
       }
 
       await notificationService.start();
-      setNotificationsEnabled(true);
-      toast({
-        title: "Notificaciones activadas",
-        description: "Recibirás alertas cuando haya nuevas solicitudes de acceso",
-      });
+      
+      // Verificar si realmente se activó
+      if (notificationService.isRunning()) {
+        setNotificationsEnabled(true);
+        toast({
+          title: "✅ Notificaciones activadas",
+          description: "Recibirás alertas con sonido cuando haya nuevas solicitudes de acceso",
+        });
+      } else {
+        toast({
+          title: "Error al activar",
+          description: "No se pudieron activar las notificaciones. Verifica los permisos del navegador",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -99,26 +126,28 @@ const AdminSeguridad = () => {
                   Gestión completa de seguridad, auditoría y sanciones
                 </CardDescription>
               </div>
-              <Button
-                variant={notificationsEnabled ? "default" : "outline"}
-                size="lg"
-                onClick={toggleNotifications}
-                className="gap-2"
-              >
-                {notificationsEnabled ? (
-                  <>
-                    <Bell className="h-5 w-5" />
-                    <span className="hidden sm:inline">Notificaciones Activas</span>
-                    <span className="sm:hidden">ON</span>
-                  </>
-                ) : (
-                  <>
-                    <BellOff className="h-5 w-5" />
-                    <span className="hidden sm:inline">Activar Notificaciones</span>
-                    <span className="sm:hidden">OFF</span>
-                  </>
-                )}
-              </Button>
+              {hasAdminPermission && (
+                <Button
+                  variant={notificationsEnabled ? "default" : "outline"}
+                  size="lg"
+                  onClick={toggleNotifications}
+                  className="gap-2"
+                >
+                  {notificationsEnabled ? (
+                    <>
+                      <Bell className="h-5 w-5 animate-pulse" />
+                      <span className="hidden sm:inline">Notificaciones Activas</span>
+                      <span className="sm:hidden">ON</span>
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="h-5 w-5" />
+                      <span className="hidden sm:inline">Activar Notificaciones</span>
+                      <span className="sm:hidden">OFF</span>
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>

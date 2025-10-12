@@ -135,14 +135,21 @@ export class NotificationService {
       icon: "/favicon.ico",
       badge: "/favicon.ico",
       tag: options.tag,
-      requireInteraction: true, // Mantiene la notificación visible hasta que el usuario interactúe
-      silent: false,
+      requireInteraction: true,
       data: options.data,
     });
 
+    // Reproducir sonido de notificación
+    try {
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuFzvLZiTYHGGS56+u');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log('No se pudo reproducir sonido:', e));
+    } catch (e) {
+      console.log('Error al reproducir sonido:', e);
+    }
+
     notification.onclick = () => {
       window.focus();
-      // Navegar a la pestaña de autorizaciones
       if (window.location.hash !== "#/admin-seguridad") {
         window.location.hash = "#/admin-seguridad";
       }
