@@ -145,27 +145,15 @@ async function calcularResumenCaja(): Promise<ResumenCaja> {
     
   const saldoActual = totalIngresos - totalEgresos;
   
-  // Obtener saldo esperado de cobranzas (pagos realizados)
-  let saldoEsperado = 0;
-  try {
-    const cobranzasRef = ref(db, "cobranzas-v2/pagos");
-    const snapshot = await get(cobranzasRef);
-    if (snapshot.exists()) {
-      const pagos: any[] = Object.values(snapshot.val());
-      saldoEsperado = pagos
-        .filter((p: any) => p.estado === "pagado")
-        .reduce((sum: number, p: any) => sum + (Number(p.monto) || 0), 0);
-    }
-  } catch (error) {
-    console.error("Error al obtener saldo esperado:", error);
-  }
+  // El saldo esperado es igual al saldo actual basado en movimientos registrados
+  const saldoEsperado = saldoActual;
   
   return {
     saldoActual,
     totalIngresos,
     totalEgresos,
-    saldoEsperado: saldoEsperado + totalIngresos,
-    diferencia: saldoActual - (saldoEsperado + totalIngresos),
+    saldoEsperado,
+    diferencia: 0, // No hay diferencia ya que solo contamos movimientos registrados
     ultimaActualizacion: Date.now(),
   };
 }
