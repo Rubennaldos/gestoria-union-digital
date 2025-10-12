@@ -55,123 +55,145 @@ export class NotificationService {
 
   private setupListeners() {
     console.log("[NotificationService] Configurando listeners de Firebase...");
+    console.log("[NotificationService] Base de datos:", db);
+    
     // Escuchar visitas pendientes
     const visitasRef = ref(db, "acceso/visitas");
-    const visitasListener = onValue(visitasRef, (snapshot) => {
-      console.log("[NotificationService] Evento recibido de visitas");
-      if (!this.isActive) {
-        console.log("[NotificationService] Servicio inactivo, ignorando evento");
-        return;
-      }
-      
-      const data = snapshot.val();
-      console.log("[NotificationService] Datos de visitas:", data ? Object.keys(data).length + " registros" : "sin datos");
-      if (!data) return;
+    console.log("[NotificationService] Referencia de visitas creada:", visitasRef);
+    
+    const visitasListener = onValue(
+      visitasRef, 
+      (snapshot) => {
+        console.log("[NotificationService] Evento recibido de visitas");
+        if (!this.isActive) {
+          console.log("[NotificationService] Servicio inactivo, ignorando evento");
+          return;
+        }
+        
+        const data = snapshot.val();
+        console.log("[NotificationService] Datos de visitas:", data ? Object.keys(data).length + " registros" : "sin datos");
+        if (!data) return;
 
-      // En la primera carga, solo registrar IDs sin notificar
-      if (this.isFirstLoad) {
-        console.log("[NotificationService] Primera carga - registrando IDs existentes sin notificar");
+        // En la primera carga, solo registrar IDs sin notificar
+        if (this.isFirstLoad) {
+          console.log("[NotificationService] Primera carga - registrando IDs existentes sin notificar");
+          Object.entries(data).forEach(([id, registro]: [string, any]) => {
+            if (registro.estado === "pendiente") {
+              this.notifiedIds.add(id);
+              console.log("[NotificationService] Registrado ID existente:", id);
+            }
+          });
+          this.isFirstLoad = false;
+          return;
+        }
+
+        // En cargas subsecuentes, notificar solo nuevas solicitudes
         Object.entries(data).forEach(([id, registro]: [string, any]) => {
-          if (registro.estado === "pendiente") {
+          if (
+            registro.estado === "pendiente" &&
+            !this.notifiedIds.has(id)
+          ) {
+            console.log("[NotificationService] Nueva solicitud de visita detectada:", id);
             this.notifiedIds.add(id);
-            console.log("[NotificationService] Registrado ID existente:", id);
+            this.sendNotification({
+              title: "🔔 Nueva Solicitud de Visita",
+              body: `${registro.solicitadoPorNombre || "Un asociado"} solicita autorización para visitante(s)`,
+              tag: `visita-${id}`,
+              data: { tipo: "visita", id, registro },
+            });
           }
         });
-        this.isFirstLoad = false;
-        return;
+      },
+      (error) => {
+        console.error("[NotificationService] Error en listener de visitas:", error);
       }
-
-      // En cargas subsecuentes, notificar solo nuevas solicitudes
-      Object.entries(data).forEach(([id, registro]: [string, any]) => {
-        if (
-          registro.estado === "pendiente" &&
-          !this.notifiedIds.has(id)
-        ) {
-          console.log("[NotificationService] Nueva solicitud de visita detectada:", id);
-          this.notifiedIds.add(id);
-          this.sendNotification({
-            title: "🔔 Nueva Solicitud de Visita",
-            body: `${registro.solicitadoPorNombre || "Un asociado"} solicita autorización para visitante(s)`,
-            tag: `visita-${id}`,
-            data: { tipo: "visita", id, registro },
-          });
-        }
-      });
-    });
+    );
 
     // Escuchar trabajadores pendientes
     const trabajadoresRef = ref(db, "acceso/trabajadores");
     let isFirstLoadTrabajadores = true;
-    const trabajadoresListener = onValue(trabajadoresRef, (snapshot) => {
-      if (!this.isActive) return;
-      
-      const data = snapshot.val();
-      if (!data) return;
+    const trabajadoresListener = onValue(
+      trabajadoresRef, 
+      (snapshot) => {
+        if (!this.isActive) return;
+        
+        const data = snapshot.val();
+        if (!data) return;
 
-      // En la primera carga, solo registrar IDs sin notificar
-      if (isFirstLoadTrabajadores) {
+        // En la primera carga, solo registrar IDs sin notificar
+        if (isFirstLoadTrabajadores) {
+          Object.entries(data).forEach(([id, registro]: [string, any]) => {
+            if (registro.estado === "pendiente") {
+              this.notifiedIds.add(id);
+            }
+          });
+          isFirstLoadTrabajadores = false;
+          return;
+        }
+
+        // En cargas subsecuentes, notificar solo nuevas solicitudes
         Object.entries(data).forEach(([id, registro]: [string, any]) => {
-          if (registro.estado === "pendiente") {
+          if (
+            registro.estado === "pendiente" &&
+            !this.notifiedIds.has(id)
+          ) {
             this.notifiedIds.add(id);
+            this.sendNotification({
+              title: "🔔 Nueva Solicitud de Trabajadores",
+              body: `${registro.solicitadoPorNombre || "Un asociado"} solicita autorización para trabajador(es)`,
+              tag: `trabajador-${id}`,
+              data: { tipo: "trabajador", id, registro },
+            });
           }
         });
-        isFirstLoadTrabajadores = false;
-        return;
+      },
+      (error) => {
+        console.error("[NotificationService] Error en listener de trabajadores:", error);
       }
-
-      // En cargas subsecuentes, notificar solo nuevas solicitudes
-      Object.entries(data).forEach(([id, registro]: [string, any]) => {
-        if (
-          registro.estado === "pendiente" &&
-          !this.notifiedIds.has(id)
-        ) {
-          this.notifiedIds.add(id);
-          this.sendNotification({
-            title: "🔔 Nueva Solicitud de Trabajadores",
-            body: `${registro.solicitadoPorNombre || "Un asociado"} solicita autorización para trabajador(es)`,
-            tag: `trabajador-${id}`,
-            data: { tipo: "trabajador", id, registro },
-          });
-        }
-      });
-    });
+    );
 
     // Escuchar proveedores pendientes
     const proveedoresRef = ref(db, "acceso/proveedores");
     let isFirstLoadProveedores = true;
-    const proveedoresListener = onValue(proveedoresRef, (snapshot) => {
-      if (!this.isActive) return;
-      
-      const data = snapshot.val();
-      if (!data) return;
+    const proveedoresListener = onValue(
+      proveedoresRef, 
+      (snapshot) => {
+        if (!this.isActive) return;
+        
+        const data = snapshot.val();
+        if (!data) return;
 
-      // En la primera carga, solo registrar IDs sin notificar
-      if (isFirstLoadProveedores) {
+        // En la primera carga, solo registrar IDs sin notificar
+        if (isFirstLoadProveedores) {
+          Object.entries(data).forEach(([id, registro]: [string, any]) => {
+            if (registro.estado === "pendiente") {
+              this.notifiedIds.add(id);
+            }
+          });
+          isFirstLoadProveedores = false;
+          return;
+        }
+
+        // En cargas subsecuentes, notificar solo nuevas solicitudes
         Object.entries(data).forEach(([id, registro]: [string, any]) => {
-          if (registro.estado === "pendiente") {
+          if (
+            registro.estado === "pendiente" &&
+            !this.notifiedIds.has(id)
+          ) {
             this.notifiedIds.add(id);
+            this.sendNotification({
+              title: "🔔 Nueva Solicitud de Proveedor",
+              body: `${registro.solicitadoPorNombre || "Un asociado"} solicita autorización para ${registro.empresa || "proveedor"}`,
+              tag: `proveedor-${id}`,
+              data: { tipo: "proveedor", id, registro },
+            });
           }
         });
-        isFirstLoadProveedores = false;
-        return;
+      },
+      (error) => {
+        console.error("[NotificationService] Error en listener de proveedores:", error);
       }
-
-      // En cargas subsecuentes, notificar solo nuevas solicitudes
-      Object.entries(data).forEach(([id, registro]: [string, any]) => {
-        if (
-          registro.estado === "pendiente" &&
-          !this.notifiedIds.has(id)
-        ) {
-          this.notifiedIds.add(id);
-          this.sendNotification({
-            title: "🔔 Nueva Solicitud de Proveedor",
-            body: `${registro.solicitadoPorNombre || "Un asociado"} solicita autorización para ${registro.empresa || "proveedor"}`,
-            tag: `proveedor-${id}`,
-            data: { tipo: "proveedor", id, registro },
-          });
-        }
-      });
-    });
+    );
 
     this.listeners = [
       () => off(visitasRef, "value", visitasListener),
