@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Users, UserCheck, Shield, Eye, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Clock, Users, UserCheck, Shield, Eye, Check, Search } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { getEmpadronado, getEmpadronados } from "@/services/empadronados";
@@ -53,6 +54,7 @@ export const HistorialAutorizaciones = () => {
   const [empMap, setEmpMap] = useState<Record<string, Empadronado | null>>({});
   const [selectedAuth, setSelectedAuth] = useState<AutorizacionAprobada | null>(null);
   const [detalleOpen, setDetalleOpen] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
   const { data: visitas } = useFirebaseData<Record<string, RegistroVisita>>("acceso/visitas");
   const { data: trabajadores } =
@@ -154,16 +156,31 @@ export const HistorialAutorizaciones = () => {
 
   return (
     <div className="space-y-4">
+      {/* Buscador */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre, apellido, DNI, padrón, empresa o placa..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Historial de Autorizaciones</h3>
           <p className="text-sm text-muted-foreground">
-            {items.length} autorizaciones aprobadas
+            {items.length} {busqueda.trim() ? "resultados encontrados" : "autorizaciones aprobadas"}
           </p>
         </div>
         <Badge variant="outline" className="flex items-center gap-1">
-          <Check className="h-3 w-3" />
-          {items.length} autorizadas
+          <Check className="h-3 w-4" />
+          {items.length} {busqueda.trim() ? "resultados" : "autorizadas"}
         </Badge>
       </div>
 
