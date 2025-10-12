@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, Wallet, AlertTriangle, DollarSign } from "lucide-react";
-import { obtenerResumenCaja } from "@/services/finanzas";
+import { obtenerResumenCaja, actualizarResumenCaja } from "@/services/finanzas";
 import { ResumenCaja as ResumenCajaType } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -18,6 +18,8 @@ export const ResumenCaja = () => {
   const cargarResumen = async () => {
     try {
       setCargando(true);
+      // Forzar recálculo del resumen para asegurar datos actualizados
+      await actualizarResumenCaja();
       const data = await obtenerResumenCaja();
       setResumen(data);
     } catch (error) {
@@ -96,7 +98,7 @@ export const ResumenCaja = () => {
           <CardContent>
             <div className="text-2xl font-bold">S/ {resumen.saldoEsperado.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Según cobranzas + otros ingresos
+              Ingresos - Egresos registrados
             </p>
           </CardContent>
         </Card>
