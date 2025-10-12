@@ -256,29 +256,33 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
                     )}
                   </div>
 
-                  {inscripcion.pagoRealizado && (
-                    <div className="pt-3 border-t">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">Pago confirmado</p>
-                          <p className="text-sm text-muted-foreground">
-                            S/ {inscripcion.montoPagado?.toFixed(2) || inscripcion.evento.precio.toFixed(2)}
-                          </p>
-                        </div>
-                        {inscripcion.comprobanteId && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => descargarComprobante(inscripcion)}
-                            disabled={descargando === inscripcion.id}
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            {descargando === inscripcion.id ? "Descargando..." : "Descargar Comprobante"}
-                          </Button>
+                  {/* Siempre mostrar opción de descarga si hay comprobanteId o si el pago fue realizado */}
+                  <div className="pt-3 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        {inscripcion.pagoRealizado && (
+                          <>
+                            <p className="text-sm font-medium">Pago confirmado</p>
+                            <p className="text-sm text-muted-foreground">
+                              S/ {inscripcion.montoPagado?.toFixed(2) || inscripcion.evento.precio.toFixed(2)}
+                            </p>
+                          </>
+                        )}
+                        {!inscripcion.pagoRealizado && inscripcion.evento.precio === 0 && (
+                          <p className="text-sm font-medium text-success">Evento gratuito</p>
                         )}
                       </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => descargarComprobante(inscripcion)}
+                        disabled={descargando === inscripcion.id}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {descargando === inscripcion.id ? "Descargando..." : "Descargar Comprobante"}
+                      </Button>
                     </div>
-                  )}
+                  </div>
                 </>
               )}
             </CardContent>

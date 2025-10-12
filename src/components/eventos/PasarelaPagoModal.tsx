@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, Upload, Building2, Smartphone } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CalendarIcon, Upload, Building2, Smartphone, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -18,6 +19,12 @@ interface PasarelaPagoModalProps {
   montoTotal: number;
   onPagoConfirmado: (fechaPago: Date, archivoComprobante: File) => void;
 }
+
+type MedioPago = {
+  tipo: 'banco' | 'billetera';
+  nombre: string;
+  cuenta: string;
+};
 
 const BANCOS_PERUANOS = [
   { nombre: "BCP", cuentas: ["191-12345678-0-00"] },
@@ -40,6 +47,9 @@ export const PasarelaPagoModal = ({
   const [fechaPago, setFechaPago] = useState<Date>();
   const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [medioSeleccionado, setMedioSeleccionado] = useState<MedioPago | null>(null);
+  const [numeroOperacion, setNumeroOperacion] = useState("");
+  const [sinNumeroOperacion, setSinNumeroOperacion] = useState(false);
 
   const handleArchivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,9 +72,25 @@ export const PasarelaPagoModal = ({
     }
   };
 
+  const handleSeleccionarMedio = (medio: MedioPago) => {
+    setMedioSeleccionado(medio);
+    setNumeroOperacion("");
+    setSinNumeroOperacion(false);
+  };
+
   const handleConfirmarPago = () => {
+    if (!medioSeleccionado) {
+      toast.error("Debes seleccionar un medio de pago");
+      return;
+    }
+
     if (!fechaPago) {
       toast.error("Debes seleccionar la fecha de pago");
+      return;
+    }
+
+    if (!sinNumeroOperacion && !numeroOperacion.trim()) {
+      toast.error("Debes ingresar el número de operación o marcar que no lo tienes");
       return;
     }
 
@@ -102,32 +128,46 @@ export const PasarelaPagoModal = ({
               <h3 className="font-semibold text-lg">Cuentas Bancarias</h3>
             </div>
             <div className="space-y-3">
-              {BANCOS_PERUANOS.map((banco) => (
-                <Card key={banco.nombre} className="hover:border-primary/50 transition-colors">
-                  <CardContent className="pt-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">{banco.nombre}</p>
-                        {banco.cuentas.map((cuenta, idx) => (
-                          <p key={idx} className="text-sm text-muted-foreground font-mono">
-                            {cuenta}
-                          </p>
-                        ))}
+              {BANCOS_PERUANOS.map((banco) => {
+                const isSelected = medioSeleccionado?.tipo === 'banco' && medioSeleccionado.nombre === banco.nombre;
+                return (
+                  <Card 
+                    key={banco.nombre} 
+                    className={cn(
+                      "hover:border-primary/50 transition-all cursor-pointer",
+                      isSelected && "border-primary bg-primary/5"
+                    )}
+                    onClick={() => handleSeleccionarMedio({ tipo: 'banco', nombre: banco.nombre, cuenta: banco.cuentas[0] })}
+                  >
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                          <div>
+                            <p className="font-semibold">{banco.nombre}</p>
+                            {banco.cuentas.map((cuenta, idx) => (
+                              <p key={idx} className="text-sm text-muted-foreground font-mono">
+                                {cuenta}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(banco.cuentas[0]);
+                            toast.success("Número de cuenta copiado");
+                          }}
+                        >
+                          Copiar
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(banco.cuentas[0]);
-                          toast.success("Número de cuenta copiado");
-                        }}
-                      >
-                        Copiar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
 
@@ -138,31 +178,109 @@ export const PasarelaPagoModal = ({
               <h3 className="font-semibold text-lg">Billeteras Digitales</h3>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {BILLETERAS_DIGITALES.map((billetera) => (
-                <Card key={billetera.nombre} className="hover:border-primary/50 transition-colors">
-                  <CardContent className="pt-4">
-                    <div className="text-center">
-                      <p className="font-semibold mb-1">{billetera.nombre}</p>
-                      <p className="text-sm text-muted-foreground font-mono">
-                        {billetera.numero}
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2 w-full"
-                        onClick={() => {
-                          navigator.clipboard.writeText(billetera.numero);
-                          toast.success("Número copiado");
-                        }}
-                      >
-                        Copiar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {BILLETERAS_DIGITALES.map((billetera) => {
+                const isSelected = medioSeleccionado?.tipo === 'billetera' && medioSeleccionado.nombre === billetera.nombre;
+                return (
+                  <Card 
+                    key={billetera.nombre} 
+                    className={cn(
+                      "hover:border-primary/50 transition-all cursor-pointer",
+                      isSelected && "border-primary bg-primary/5"
+                    )}
+                    onClick={() => handleSeleccionarMedio({ tipo: 'billetera', nombre: billetera.nombre, cuenta: billetera.numero })}
+                  >
+                    <CardContent className="pt-4">
+                      <div className="text-center relative">
+                        {isSelected && (
+                          <CheckCircle2 className="h-5 w-5 text-primary absolute top-0 right-0" />
+                        )}
+                        <p className="font-semibold mb-1">{billetera.nombre}</p>
+                        <p className="text-sm text-muted-foreground font-mono">
+                          {billetera.numero}
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(billetera.numero);
+                            toast.success("Número copiado");
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
+
+          {/* Información del medio seleccionado */}
+          {medioSeleccionado && (
+            <Card className="bg-primary/5 border-primary">
+              <CardContent className="pt-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Medio de pago seleccionado</p>
+                      <p className="font-semibold text-lg">{medioSeleccionado.nombre}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(medioSeleccionado.cuenta);
+                        toast.success("Cuenta copiada");
+                      }}
+                    >
+                      Copiar cuenta
+                    </Button>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <p className="text-sm text-muted-foreground mb-2">Cuenta depositada</p>
+                    <p className="font-mono text-sm bg-background px-3 py-2 rounded border">
+                      {medioSeleccionado.cuenta}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Número de Operación */}
+          {medioSeleccionado && (
+            <div className="space-y-3">
+              <Label htmlFor="numeroOperacion">Número de operación</Label>
+              <Input
+                id="numeroOperacion"
+                placeholder="Ingresa el número de operación"
+                value={numeroOperacion}
+                onChange={(e) => setNumeroOperacion(e.target.value)}
+                disabled={sinNumeroOperacion}
+              />
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  id="sinNumero"
+                  checked={sinNumeroOperacion}
+                  onCheckedChange={(checked) => {
+                    setSinNumeroOperacion(checked as boolean);
+                    if (checked) setNumeroOperacion("");
+                  }}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <label
+                    htmlFor="sinNumero"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Soy consciente y acepto que mi comprobante no tenga número de operación para facilitar mi pago
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Fecha de Pago */}
           <div className="space-y-2">
@@ -238,7 +356,7 @@ export const PasarelaPagoModal = ({
             </Button>
             <Button
               onClick={handleConfirmarPago}
-              disabled={loading || !fechaPago || !archivoComprobante}
+              disabled={loading || !medioSeleccionado || !fechaPago || !archivoComprobante || (!sinNumeroOperacion && !numeroOperacion.trim())}
               className="flex-1"
             >
               {loading ? "Procesando..." : "Confirmar Pago"}
