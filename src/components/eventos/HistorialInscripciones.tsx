@@ -32,7 +32,10 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
   const cargarInscripciones = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Buscando inscripciones para empadronadoId:', empadronadoId);
+      
       const data = await obtenerInscripcionesPorEmpadronado(empadronadoId);
+      console.log('📋 Inscripciones encontradas:', data.length);
       
       // Cargar los detalles de cada evento
       const inscripcionesConEvento = await Promise.all(
@@ -81,23 +84,35 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
         let enSesiones = false;
 
         lines.forEach(line => {
-          if (line.includes('PERSONAS INSCRITAS:')) {
+          const trimmedLine = line.trim();
+          
+          if (trimmedLine.includes('PERSONAS INSCRITAS:')) {
             enPersonas = true;
             enSesiones = false;
-          } else if (line.includes('SESIONES SELECCIONADAS:')) {
+          } else if (trimmedLine.includes('SESIONES SELECCIONADAS:')) {
             enPersonas = false;
             enSesiones = true;
-          } else if (enPersonas && line.includes('DNI:')) {
-            const match = line.match(/- (.+) - DNI: (\d+)/);
+          } else if (enPersonas && trimmedLine.match(/^\d+\./)) {
+            // Formato: "1. Nombre - DNI: 12345678"
+            const match = trimmedLine.match(/\d+\.\s*(.+?)\s*-\s*DNI:\s*(\d+)/);
             if (match) {
-              personas.push({ nombre: match[1], dni: match[2] });
+              personas.push({ nombre: match[1].trim(), dni: match[2] });
             }
-          } else if (enSesiones && line.includes('Lugar:')) {
-            const lugarMatch = line.match(/Lugar: (.+)/);
-            if (lugarMatch) {
-              const lugar = lugarMatch[1];
-              // Buscar la siguiente línea con fecha y precio
-              sesiones.push({ lugar });
+          } else if (enSesiones && trimmedLine.length > 0 && !trimmedLine.includes('PERSONAS')) {
+            // Formato: "Lugar - DD/MM/YYYY (HH:MM - HH:MM)"
+            const sesionMatch = trimmedLine.match(/^(.+?)\s*-\s*(\d{2}\/\d{2}\/\d{4})\s*\((\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\)/);
+            if (sesionMatch) {
+              const [_, lugar, fecha, horaInicio, horaFin] = sesionMatch;
+              const [dia, mes, anio] = fecha.split('/');
+              const fechaTimestamp = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia)).getTime();
+              
+              sesiones.push({ 
+                lugar: lugar.trim(), 
+                fecha: fechaTimestamp,
+                horaInicio: horaInicio,
+                horaFin: horaFin,
+                precio: 0
+              });
             }
           }
         });

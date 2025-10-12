@@ -38,7 +38,7 @@ export const DetalleEventoModal = ({
   evento,
   onInscripcionExitosa,
 }: DetalleEventoModalProps) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [sesionesSeleccionadas, setSesionesSeleccionadas] = useState<string[]>([]);
   const [personas, setPersonas] = useState<PersonaInscrita[]>([{ nombre: "", dni: "" }]);
   const [observaciones, setObservaciones] = useState("");
@@ -137,13 +137,19 @@ export const DetalleEventoModal = ({
         return `${sesion.lugar} - ${format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })} (${sesion.horaInicio} - ${sesion.horaFin})`;
       }).join('\n');
 
+      // Usar empadronadoId del perfil si existe, sino usar uid
+      const empadronadoId = profile?.empadronadoId || user.uid;
+      const nombreEmpadronado = user.displayName || user.email || "Usuario";
+
+      console.log('📝 Inscribiendo con empadronadoId:', empadronadoId);
+
       // Inscribir al evento
       await inscribirseEvento(
         evento.id,
-        user.uid,
-        user.displayName || user.email || "Usuario",
+        empadronadoId,
+        nombreEmpadronado,
         personas.length - 1,
-        `${observaciones}\n\nPersonas inscritas:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSesiones seleccionadas:\n${sesionesInfo}`
+        `${observaciones}\n\nPERSONAS INSCRITAS:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSESIONES SELECCIONADAS:\n${sesionesInfo}`
       );
 
       // Si hay pago, generar voucher y registrar en finanzas
