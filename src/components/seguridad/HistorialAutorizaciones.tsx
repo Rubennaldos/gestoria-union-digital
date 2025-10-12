@@ -144,15 +144,64 @@ export const HistorialAutorizaciones = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autorizaciones]);
 
-  const items = useMemo<AutorizacionAprobada[]>(
-    () =>
-      autorizaciones.map((a) => {
-        const empId = (a.data as any)?.empadronadoId;
-        const emp = empId ? empMap[empId] : null;
-        return { ...a, empadronado: emp };
-      }),
-    [autorizaciones, empMap]
-  );
+  const items = useMemo<AutorizacionAprobada[]>(() => {
+    // Mapear con empadronados
+    const itemsConEmp = autorizaciones.map((a) => {
+      const empId = (a.data as any)?.empadronadoId;
+      const emp = empId ? empMap[empId] : null;
+      return { ...a, empadronado: emp };
+    });
+
+    // Si no hay búsqueda, retornar todos
+    if (!busqueda.trim()) return itemsConEmp;
+
+    // Filtrar por búsqueda
+    const searchLower = busqueda.toLowerCase();
+    return itemsConEmp.filter((item) => {
+      // Buscar en datos del empadronado
+      if (item.empadronado) {
+        const nombreCompleto = `${item.empadronado.nombre} ${item.empadronado.apellidos}`.toLowerCase();
+        const padron = (item.empadronado.numeroPadron?.toString() || "").toLowerCase();
+        if (nombreCompleto.includes(searchLower) || padron.includes(searchLower)) {
+          return true;
+        }
+      }
+
+      // Buscar en visitantes
+      if (item.tipo === "visitante") {
+        const visitantes = (item.data as RegistroVisita).visitantes || [];
+        const found = visitantes.some((v) => {
+          const nombre = (v.nombre || "").toLowerCase();
+          const dni = (v.dni || "").toLowerCase();
+          return nombre.includes(searchLower) || dni.includes(searchLower);
+        });
+        if (found) return true;
+      }
+
+      // Buscar en trabajadores
+      if (item.tipo === "trabajador") {
+        const trabajadores = (item.data as any).trabajadores || [];
+        const found = trabajadores.some((t: any) => {
+          const nombre = (t.nombre || "").toLowerCase();
+          const dni = (t.dni || "").toLowerCase();
+          return nombre.includes(searchLower) || dni.includes(searchLower);
+        });
+        if (found) return true;
+      }
+
+      // Buscar en proveedores
+      if (item.tipo === "proveedor") {
+        const empresa = ((item.data as RegistroProveedor).empresa || "").toLowerCase();
+        if (empresa.includes(searchLower)) return true;
+      }
+
+      // Buscar en placa
+      const placa = ((item.data as any).placa || "").toLowerCase();
+      if (placa.includes(searchLower)) return true;
+
+      return false;
+    });
+  }, [autorizaciones, empMap, busqueda]);
 
   return (
     <div className="space-y-4">
