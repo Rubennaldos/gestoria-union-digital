@@ -55,24 +55,13 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
   };
 
   const descargarComprobante = async (inscripcion: InscripcionConEvento) => {
-    if (!inscripcion.evento || !inscripcion.comprobanteId) {
-      toast.error("No se encontró el comprobante");
+    if (!inscripcion.evento) {
+      toast.error("No se encontró la información del evento");
       return;
     }
 
     try {
       setDescargando(inscripcion.id);
-
-      // Obtener datos del comprobante desde Firebase
-      const receiptRef = ref(db, `receipts/${inscripcion.comprobanteId}`);
-      const receiptSnap = await get(receiptRef);
-
-      if (!receiptSnap.exists()) {
-        toast.error("Comprobante no encontrado");
-        return;
-      }
-
-      const receiptData = receiptSnap.val();
 
       // Parsear las observaciones para obtener personas y sesiones
       let personas: Array<{ nombre: string; dni: string }> = [];
@@ -127,22 +116,39 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
       if (sesiones.length === 0 && inscripcion.evento.sesiones) {
         sesiones = inscripcion.evento.sesiones.map(s => ({
           lugar: s.lugar,
-          fecha: new Date(s.fecha).toISOString(),
+          fecha: s.fecha,
           horaInicio: s.horaInicio,
           horaFin: s.horaFin,
           precio: s.precio
         }));
       }
 
+      // Generar número de voucher
+      let numeroVoucher = `INS-${inscripcion.id.slice(-8).toUpperCase()}`;
+      
+      // Si hay comprobanteId, intentar obtener el código del receipt
+      if (inscripcion.comprobanteId) {
+        try {
+          const receiptRef = ref(db, `receipts/${inscripcion.comprobanteId}`);
+          const receiptSnap = await get(receiptRef);
+          if (receiptSnap.exists()) {
+            const receiptData = receiptSnap.val();
+            numeroVoucher = receiptData.code || numeroVoucher;
+          }
+        } catch (error) {
+          console.log("No se pudo obtener el receipt, usando número generado");
+        }
+      }
+
       // Generar PDF
       const voucherData = {
         eventoTitulo: inscripcion.evento.titulo,
-        eventoCategoria: inscripcion.evento.categoria,
+        eventoCategoria: getCategoriaLabel(inscripcion.evento.categoria),
         personas,
         sesiones,
-        montoTotal: inscripcion.montoPagado || inscripcion.evento.precio,
+        montoTotal: inscripcion.montoPagado || inscripcion.evento.precio || 0,
         fechaPago: new Date(inscripcion.fechaPago || inscripcion.fechaInscripcion),
-        numeroVoucher: receiptData.code || `INS-${inscripcion.id.slice(-8)}`,
+        numeroVoucher,
       };
 
       const pdfBlob = await generarVoucherEvento(voucherData);
@@ -151,7 +157,7 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `comprobante-${inscripcion.evento.titulo.replace(/\s+/g, '-')}-${voucherData.numeroVoucher}.pdf`;
+      link.download = `comprobante-${inscripcion.evento.titulo.replace(/\s+/g, '-')}-${numeroVoucher}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -164,6 +170,18 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
     } finally {
       setDescargando(null);
     }
+  };
+
+  const getCategoriaLabel = (categoria: string) => {
+    const labels: Record<string, string> = {
+      deportivo: "Deportivo",
+      cultural: "Cultural",
+      educativo: "Educativo",
+      social: "Social",
+      recreativo: "Recreativo",
+      otro: "Otro",
+    };
+    return labels[categoria] || categoria;
   };
 
   const getEstadoBadge = (estado: string) => {
