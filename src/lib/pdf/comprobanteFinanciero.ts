@@ -63,10 +63,11 @@ export async function generarComprobanteFinanciero(
   
   yPos += 10;
 
+  const fechaValida = data.fecha && !isNaN(new Date(data.fecha).getTime());
   const infoGeneral = [
     ["Tipo", data.tipo === "ingreso" ? "INGRESO" : "EGRESO"],
     ["Categoría", data.categoria],
-    ["Fecha", format(new Date(data.fecha), "dd/MM/yyyy", { locale: es })],
+    ["Fecha", fechaValida ? format(new Date(data.fecha), "dd/MM/yyyy", { locale: es }) : "Fecha inválida"],
     ["Monto", `S/ ${data.monto.toFixed(2)}`],
   ];
 
@@ -188,8 +189,9 @@ export async function generarComprobanteFinanciero(
   doc.text(`Registrado por: ${data.registradoPorNombre}`, 20, yPos);
   
   yPos += 5;
+  const createdAtValido = data.createdAt && !isNaN(new Date(data.createdAt).getTime());
   doc.text(
-    `Fecha de registro: ${format(new Date(data.createdAt), "dd/MM/yyyy HH:mm", { locale: es })}`,
+    `Fecha de registro: ${createdAtValido ? format(new Date(data.createdAt), "dd/MM/yyyy HH:mm", { locale: es }) : "No disponible"}`,
     20,
     yPos
   );

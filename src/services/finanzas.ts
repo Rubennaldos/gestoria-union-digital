@@ -86,7 +86,11 @@ export async function obtenerMovimientos(filtros?: {
   }
   
   // Ordenar por fecha más reciente primero
-  movimientos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  movimientos.sort((a, b) => {
+    const fechaA = a.fecha ? new Date(a.fecha).getTime() : 0;
+    const fechaB = b.fecha ? new Date(b.fecha).getTime() : 0;
+    return fechaB - fechaA;
+  });
   
   return movimientos;
 }

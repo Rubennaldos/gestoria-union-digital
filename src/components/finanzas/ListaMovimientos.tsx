@@ -95,7 +95,9 @@ export const ListaMovimientos = ({ onVerDetalle, refreshKey, filtroTipo }: Lista
               {movimientos.map((movimiento) => (
                 <TableRow key={movimiento.id}>
                   <TableCell className="font-medium">
-                    {format(new Date(movimiento.fecha), "dd/MM/yyyy", { locale: es })}
+                    {movimiento.fecha && !isNaN(new Date(movimiento.fecha).getTime())
+                      ? format(new Date(movimiento.fecha), "dd/MM/yyyy", { locale: es })
+                      : "Fecha inválida"}
                   </TableCell>
                   <TableCell>
                     <Badge
