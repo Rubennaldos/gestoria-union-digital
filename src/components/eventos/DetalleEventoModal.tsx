@@ -16,6 +16,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { PasarelaPagoModal } from "./PasarelaPagoModal";
+import { generarVoucherEvento, archivoABase64 } from "@/lib/pdf/voucherEvento";
+import { crearMovimientoFinanciero } from "@/services/finanzas";
 
 interface PersonaInscrita {
   nombre: string;
@@ -40,6 +43,7 @@ export const DetalleEventoModal = ({
   const [personas, setPersonas] = useState<PersonaInscrita[]>([{ nombre: "", dni: "" }]);
   const [observaciones, setObservaciones] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mostrarPasarelaPago, setMostrarPasarelaPago] = useState(false);
 
   const agregarPersona = () => {
     if (personas.length < 10) {
@@ -95,7 +99,7 @@ export const DetalleEventoModal = ({
     return total;
   };
 
-  const handleInscripcion = async () => {
+  const handleInscripcion = () => {
     if (!user) {
       toast.error("Debes iniciar sesión para inscribirte");
       return;
@@ -113,6 +117,18 @@ export const DetalleEventoModal = ({
       return;
     }
 
+    // Si hay precio, mostrar pasarela de pago
+    if (precioTotal > 0) {
+      setMostrarPasarelaPago(true);
+    } else {
+      // Inscripción gratuita directa
+      procesarInscripcion(new Date(), null);
+    }
+  };
+
+  const procesarInscripcion = async (fechaPago: Date, archivoComprobante: File | null) => {
+    if (!user) return;
+
     try {
       setLoading(true);
       const sesionesInfo = sesionesSeleccionadas.map(sesionId => {
@@ -121,15 +137,74 @@ export const DetalleEventoModal = ({
         return `${sesion.lugar} - ${format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })} (${sesion.horaInicio} - ${sesion.horaFin})`;
       }).join('\n');
 
+      // Inscribir al evento
       await inscribirseEvento(
         evento.id,
         user.uid,
         user.displayName || user.email || "Usuario",
-        personas.length - 1, // acompañantes
+        personas.length - 1,
         `${observaciones}\n\nPersonas inscritas:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSesiones seleccionadas:\n${sesionesInfo}`
       );
 
-      toast.success("¡Inscripción realizada exitosamente!");
+      // Si hay pago, generar voucher y registrar en finanzas
+      if (precioTotal > 0 && archivoComprobante) {
+        const comprobanteBase64 = await archivoABase64(archivoComprobante);
+        
+        const sesionesData = sesionesSeleccionadas.map(sesionId => {
+          const sesion = evento.sesiones.find(s => s.id === sesionId);
+          return sesion ? {
+            lugar: sesion.lugar,
+            fecha: sesion.fecha,
+            horaInicio: sesion.horaInicio,
+            horaFin: sesion.horaFin,
+            precio: sesion.precio
+          } : null;
+        }).filter(Boolean) as any[];
+
+        const numeroVoucher = `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+        // Generar PDF del voucher
+        const voucherBlob = await generarVoucherEvento({
+          eventoTitulo: evento.titulo,
+          eventoCategoria: getCategoriaLabel(evento.categoria),
+          personas,
+          sesiones: sesionesData,
+          montoTotal: precioTotal,
+          fechaPago,
+          numeroVoucher,
+          comprobanteBase64,
+        });
+
+        // Registrar en finanzas
+        await crearMovimientoFinanciero({
+          tipo: "ingreso",
+          categoria: "evento",
+          monto: precioTotal,
+          descripcion: `Inscripción: ${evento.titulo} - ${personas.map(p => p.nombre).join(', ')}`,
+          fecha: fechaPago.toISOString(),
+          comprobantes: [],
+          registradoPor: user.uid,
+          registradoPorNombre: user.displayName || user.email || "Usuario",
+          numeroComprobante: numeroVoucher,
+          observaciones: `Voucher: ${numeroVoucher}\nComprobante adjunto`,
+        });
+
+        // Descargar voucher
+        const url = URL.createObjectURL(voucherBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `voucher_${numeroVoucher}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast.success("¡Inscripción completada! Descargando comprobante...");
+      } else {
+        toast.success("¡Inscripción realizada exitosamente!");
+      }
+
+      setMostrarPasarelaPago(false);
       onOpenChange(false);
       onInscripcionExitosa();
       
@@ -520,6 +595,13 @@ export const DetalleEventoModal = ({
           </div>
         </div>
       </DialogContent>
+
+      <PasarelaPagoModal
+        open={mostrarPasarelaPago}
+        onOpenChange={setMostrarPasarelaPago}
+        montoTotal={precioTotal}
+        onPagoConfirmado={procesarInscripcion}
+      />
     </Dialog>
   );
 };
