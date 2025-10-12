@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import BackButton from "@/components/layout/BackButton";
-import { Shield, Clock, Users, Ban, FileText, AlertTriangle, ScrollText } from "lucide-react";
+import { Shield, Clock, Users, Ban, FileText, AlertTriangle, ScrollText, Bell, BellOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/services/notifications";
 import { AuditoriaAccesos } from "@/components/admin-seguridad/AuditoriaAccesos";
 import { GestionMaestrosObra } from "@/components/admin-seguridad/GestionMaestrosObra";
 import { SolicitudesMaestros } from "@/components/admin-seguridad/SolicitudesMaestros";
@@ -15,6 +18,42 @@ import { AutorizacionesSeguridad as AutorizacionesAdmin } from "@/components/seg
 
 const AdminSeguridad = () => {
   const [activeTab, setActiveTab] = useState("autorizaciones");
+  const { toast } = useToast();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  useEffect(() => {
+    // Verificar si las notificaciones están activas al cargar
+    setNotificationsEnabled(notificationService.isRunning());
+  }, []);
+
+  const toggleNotifications = async () => {
+    if (notificationsEnabled) {
+      notificationService.stop();
+      setNotificationsEnabled(false);
+      toast({
+        title: "Notificaciones desactivadas",
+        description: "Ya no recibirás alertas de nuevas solicitudes",
+      });
+    } else {
+      const permission = notificationService.getPermissionStatus();
+      
+      if (permission === "denied") {
+        toast({
+          title: "Permisos denegados",
+          description: "Activa las notificaciones en la configuración de tu navegador",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await notificationService.start();
+      setNotificationsEnabled(true);
+      toast({
+        title: "Notificaciones activadas",
+        description: "Recibirás alertas cuando haya nuevas solicitudes de acceso",
+      });
+    }
+  };
 
   return (
     <Can module="admin_seguridad" level="read" fallback={
@@ -50,13 +89,37 @@ const AdminSeguridad = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Panel de Control
-            </CardTitle>
-            <CardDescription>
-              Gestión completa de seguridad, auditoría y sanciones
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Panel de Control
+                </CardTitle>
+                <CardDescription>
+                  Gestión completa de seguridad, auditoría y sanciones
+                </CardDescription>
+              </div>
+              <Button
+                variant={notificationsEnabled ? "default" : "outline"}
+                size="lg"
+                onClick={toggleNotifications}
+                className="gap-2"
+              >
+                {notificationsEnabled ? (
+                  <>
+                    <Bell className="h-5 w-5" />
+                    <span className="hidden sm:inline">Notificaciones Activas</span>
+                    <span className="sm:hidden">ON</span>
+                  </>
+                ) : (
+                  <>
+                    <BellOff className="h-5 w-5" />
+                    <span className="hidden sm:inline">Activar Notificaciones</span>
+                    <span className="sm:hidden">OFF</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
