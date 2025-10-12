@@ -35,13 +35,19 @@ export const HistorialSeguridad = () => {
     // Procesar ingresos/salidas
     if (ingresos) {
       Object.entries(ingresos).forEach(([id, registro]) => {
-        const fechaRegistro = new Date(registro.horaIngreso || registro.fechaCreacion).toISOString().split('T')[0];
+        const fechaValor = registro.horaIngreso || registro.fechaCreacion;
+        if (!fechaValor) return; // Skip if no date
+        
+        const fecha = new Date(fechaValor);
+        if (isNaN(fecha.getTime())) return; // Skip invalid dates
+        
+        const fechaRegistro = fecha.toISOString().split('T')[0];
         
         if (fechaRegistro === filtroFecha) {
           registros.push({
             id,
             tipo: registro.tipo,
-            fecha: registro.horaIngreso || registro.fechaCreacion,
+            fecha: fechaValor,
             horaIngreso: registro.horaIngreso,
             horaSalida: registro.horaSalida,
             estado: registro.estado,
@@ -54,7 +60,12 @@ export const HistorialSeguridad = () => {
     // Procesar registros manuales
     if (registrosManuales) {
       Object.entries(registrosManuales).forEach(([id, registro]) => {
-        const fechaRegistro = new Date(registro.fechaCreacion).toISOString().split('T')[0];
+        if (!registro.fechaCreacion) return; // Skip if no date
+        
+        const fecha = new Date(registro.fechaCreacion);
+        if (isNaN(fecha.getTime())) return; // Skip invalid dates
+        
+        const fechaRegistro = fecha.toISOString().split('T')[0];
         
         if (fechaRegistro === filtroFecha) {
           registros.push({
