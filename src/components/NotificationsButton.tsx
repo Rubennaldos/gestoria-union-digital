@@ -1,3 +1,4 @@
+// src/components/NotificationsButton.tsx
 import { useState } from "react";
 import { requestAndGetFcmToken } from "@/messaging";
 
@@ -14,9 +15,8 @@ export function NotificationsButton() {
           if (!token) {
             alert("No se pudo activar notificaciones. Revisa permisos del navegador.");
           } else {
-            // Aquí podrías guardar el token en tu DB si quieres envíos dirigidos
             console.log("✅ FCM token:", token);
-            alert("Notificaciones activadas ✅");
+            alert("Token del dispositivo:\n\n" + token); // 👈 así lo ves en el CELULAR también
           }
         } finally {
           setLoading(false);
