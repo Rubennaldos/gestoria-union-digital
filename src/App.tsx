@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +9,10 @@ import { AuthzProvider } from "@/contexts/AuthzContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminCreator } from "@/components/auth/AdminCreator";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
+
+// 🔔 NUEVO: botón e init de notificaciones
+import { NotificationsButton } from "@/components/NotificationsButton";
+import { ensureMessagingReady } from "@/messaging";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -42,11 +46,32 @@ const App: React.FC = () => {
   // Check for updates every minute
   useVersionCheck(60000);
 
+  // 🔔 Prepara el SW y el listener de mensajes en foreground (no pide permiso aquí)
+  useEffect(() => {
+    ensureMessagingReady();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
+
+        {/* Barra superior simple con el botón de notificaciones */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 12px",
+            borderBottom: "1px solid #eee",
+            background: "#fff",
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>Administración de Seguridad</span>
+          <NotificationsButton />
+        </div>
+
         {/* 👇 NINGÚN Router aquí. El Router va en main.tsx */}
         <AuthProvider>
           <AuthzProvider>

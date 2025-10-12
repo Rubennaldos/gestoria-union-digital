@@ -3,13 +3,10 @@ import { createRoot } from "react-dom/client";
 import { HashRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
-
-// Provider existente
 import { BillingConfigProvider } from "@/contexts/BillingConfigContext";
 
-// ✅ Prepara Firebase Messaging SIN pedir permisos todavía
 import { ensureMessagingReady } from "./messaging";
-ensureMessagingReady();
+ensureMessagingReady(); // solo prepara
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

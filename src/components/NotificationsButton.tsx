@@ -14,7 +14,8 @@ export function NotificationsButton() {
           if (!token) {
             alert("No se pudo activar notificaciones. Revisa permisos del navegador.");
           } else {
-            // TODO: si quieres, guarda el token en tu DB
+            // Aquí podrías guardar el token en tu DB si quieres envíos dirigidos
+            console.log("✅ FCM token:", token);
             alert("Notificaciones activadas ✅");
           }
         } finally {

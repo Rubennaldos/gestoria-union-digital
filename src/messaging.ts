@@ -2,21 +2,25 @@
 import { app } from "@/config/firebase";
 import { getMessaging, getToken, onMessage, isSupported, Messaging } from "firebase/messaging";
 
-let messaging: Messaging | null = null;
-let swReady: ServiceWorkerRegistration | null = null;
+const VAPID_PUBLIC =
+  "BGz2N4BNA_O6ySqUFRrCz8pr8H8Ao-u-PhTTIhj2NfyHsLjfGY95eqW-7UM0wAOOnteZpX720o-vDX26lryyNoE";
 
+let messaging: Messaging | null = null;
+let swReg: ServiceWorkerRegistration | null = null;
+let foregroundHooked = false;
+
+/** Prepara SW + listeners (NO pide permisos). Llamar 1 vez al arrancar. */
 export async function ensureMessagingReady() {
   if (!(await isSupported())) {
     console.warn("Firebase Messaging no soportado en este navegador.");
     return null;
   }
   if (!messaging) messaging = getMessaging(app);
-  if (!swReady) {
+  if (!swReg) {
     const swPath = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
-    swReady = await navigator.serviceWorker.register(swPath);
+    swReg = await navigator.serviceWorker.register(swPath);
   }
-  // listener foreground (una sola vez)
-  if (messaging) {
+  if (!foregroundHooked && messaging) {
     onMessage(messaging, (payload) => {
       const n = payload.notification || {};
       try {
@@ -25,38 +29,38 @@ export async function ensureMessagingReady() {
           icon: n.icon || "/icons/icon-192.png",
         });
       } catch {
-        // En algunos browsers, muestra un fallback si no hay permiso
         console.log("Mensaje foreground:", payload);
       }
     });
+    foregroundHooked = true;
   }
-  return { messaging, swReady };
+  return { messaging, swReg };
 }
 
-// Llama a esta función SOLO desde un handler de click del usuario.
+/** Llamar SOLO desde el onClick de “Activar Notificaciones”. */
 export async function requestAndGetFcmToken() {
   const ready = await ensureMessagingReady();
-  if (!ready || !ready.messaging || !ready.swReady) return null;
+  if (!ready || !ready.messaging || !ready.swReg) return null;
 
-  // Solicitar permiso dentro del gesto de usuario
   const permission = await Notification.requestPermission();
   if (permission !== "granted") {
     console.warn("Permiso no concedido:", permission);
     return null;
   }
 
-  const vapidKey =
-    "BGz2N4BNA_O6ySqUFRrCz8pr8H8Ao-u-PhTTIhj2NfyHsLjfGY95eqW-7UM0wAOOnteZpX720o-vDX26lryyNoE";
-
   try {
     const token = await getToken(ready.messaging, {
-      vapidKey,
-      serviceWorkerRegistration: ready.swReady,
+      vapidKey: VAPID_PUBLIC,
+      serviceWorkerRegistration: ready.swReg,
     });
+    if (!token) {
+      console.warn("No se obtuvo token FCM.");
+      return null;
+    }
     console.log("✅ FCM token:", token);
     return token;
-  } catch (err: any) {
-    console.error("getToken error:", err?.code || err, err?.message);
+  } catch (e) {
+    console.error("getToken error:", e);
     return null;
   }
 }
