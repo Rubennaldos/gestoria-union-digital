@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, Clock, MapPin, User, Users, DollarSign, FileText, Package, Tag, UserPlus, Trash2 } from "lucide-react";
 import { Evento } from "@/types/eventos";
 import { inscribirseEvento } from "@/services/eventos";
@@ -35,7 +36,7 @@ export const DetalleEventoModal = ({
   onInscripcionExitosa,
 }: DetalleEventoModalProps) => {
   const { user } = useAuth();
-  const [sesionSeleccionada, setSesionSeleccionada] = useState<string>("");
+  const [sesionesSeleccionadas, setSesionesSeleccionadas] = useState<string[]>([]);
   const [personas, setPersonas] = useState<PersonaInscrita[]>([{ nombre: "", dni: "" }]);
   const [observaciones, setObservaciones] = useState("");
   const [loading, setLoading] = useState(false);
@@ -58,27 +59,38 @@ export const DetalleEventoModal = ({
     setPersonas(nuevasPersonas);
   };
 
+  const toggleSesion = (sesionId: string) => {
+    setSesionesSeleccionadas(prev => 
+      prev.includes(sesionId)
+        ? prev.filter(id => id !== sesionId)
+        : [...prev, sesionId]
+    );
+  };
+
   const calcularPrecioTotal = () => {
-    if (!sesionSeleccionada) return 0;
+    if (sesionesSeleccionadas.length === 0) return 0;
     
-    const sesion = evento.sesiones.find(s => s.id === sesionSeleccionada);
-    if (!sesion) return 0;
-    
-    const precioUnitario = sesion.precio;
     let total = 0;
     
-    // Primera persona: precio completo
-    total += precioUnitario;
-    
-    // Segunda persona: 50% de descuento
-    if (personas.length > 1) {
-      total += precioUnitario * 0.5;
-    }
-    
-    // Resto de personas: precio completo
-    if (personas.length > 2) {
-      total += precioUnitario * (personas.length - 2);
-    }
+    sesionesSeleccionadas.forEach(sesionId => {
+      const sesion = evento.sesiones.find(s => s.id === sesionId);
+      if (!sesion) return;
+      
+      const precioUnitario = sesion.precio;
+      
+      // Primera persona: precio completo
+      total += precioUnitario;
+      
+      // Segunda persona: 50% de descuento
+      if (personas.length > 1) {
+        total += precioUnitario * 0.5;
+      }
+      
+      // Resto de personas: precio completo
+      if (personas.length > 2) {
+        total += precioUnitario * (personas.length - 2);
+      }
+    });
     
     return total;
   };
@@ -89,8 +101,8 @@ export const DetalleEventoModal = ({
       return;
     }
 
-    if (!sesionSeleccionada) {
-      toast.error("Debes seleccionar una sesión");
+    if (sesionesSeleccionadas.length === 0) {
+      toast.error("Debes seleccionar al menos una sesión");
       return;
     }
 
@@ -103,12 +115,18 @@ export const DetalleEventoModal = ({
 
     try {
       setLoading(true);
+      const sesionesInfo = sesionesSeleccionadas.map(sesionId => {
+        const sesion = evento.sesiones.find(s => s.id === sesionId);
+        if (!sesion) return '';
+        return `${sesion.lugar} - ${format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })} (${sesion.horaInicio} - ${sesion.horaFin})`;
+      }).join('\n');
+
       await inscribirseEvento(
         evento.id,
         user.uid,
         user.displayName || user.email || "Usuario",
         personas.length - 1, // acompañantes
-        `${observaciones}\n\nPersonas inscritas:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSesión: ${sesionSeleccionada}`
+        `${observaciones}\n\nPersonas inscritas:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSesiones seleccionadas:\n${sesionesInfo}`
       );
 
       toast.success("¡Inscripción realizada exitosamente!");
@@ -116,7 +134,7 @@ export const DetalleEventoModal = ({
       onInscripcionExitosa();
       
       // Resetear form
-      setSesionSeleccionada("");
+      setSesionesSeleccionadas([]);
       setPersonas([{ nombre: "", dni: "" }]);
       setObservaciones("");
     } catch (error: any) {
@@ -151,8 +169,11 @@ export const DetalleEventoModal = ({
     return labels[categoria] || categoria;
   };
 
-  const sesionSeleccionadaObj = evento.sesiones.find(s => s.id === sesionSeleccionada);
   const precioTotal = calcularPrecioTotal();
+  const hayPrecio = sesionesSeleccionadas.some(sesionId => {
+    const sesion = evento.sesiones.find(s => s.id === sesionId);
+    return sesion && sesion.precio > 0;
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -304,21 +325,49 @@ export const DetalleEventoModal = ({
           <div className="space-y-4">
             <h3 className="font-semibold text-lg">Inscripción</h3>
 
-            {/* Selección de Sesión */}
-            <div className="space-y-2">
-              <Label htmlFor="sesion">Selecciona una sesión *</Label>
-              <Select value={sesionSeleccionada} onValueChange={setSesionSeleccionada}>
-                <SelectTrigger id="sesion">
-                  <SelectValue placeholder="Elige el día y horario" />
-                </SelectTrigger>
-                <SelectContent>
-                  {evento.sesiones.map((sesion) => (
-                    <SelectItem key={sesion.id} value={sesion.id}>
-                      {sesion.lugar} - {format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })} ({sesion.horaInicio} - {sesion.horaFin}) - S/ {sesion.precio.toFixed(2)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            {/* Selección de Sesiones */}
+            <div className="space-y-3">
+              <Label>Selecciona las sesiones *</Label>
+              <div className="space-y-2">
+                {evento.sesiones.map((sesion) => (
+                  <div
+                    key={sesion.id}
+                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                      sesionesSeleccionadas.includes(sesion.id)
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                    onClick={() => toggleSesion(sesion.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={sesionesSeleccionadas.includes(sesion.id)}
+                        onCheckedChange={() => toggleSesion(sesion.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium">{sesion.lugar}</p>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {sesion.horaInicio} - {sesion.horaFin}
+                          </span>
+                          {sesion.precio > 0 && (
+                            <span className="flex items-center gap-1 text-success font-semibold">
+                              <DollarSign className="h-3 w-3" />
+                              S/ {sesion.precio.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Personas Inscritas */}
@@ -410,36 +459,43 @@ export const DetalleEventoModal = ({
               />
             </div>
 
-            {sesionSeleccionadaObj && sesionSeleccionadaObj.precio > 0 && (
+            {hayPrecio && (
               <div className="bg-muted/50 p-4 rounded-lg">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Precio por sesión:</span>
-                    <span className="text-muted-foreground">
-                      S/ {sesionSeleccionadaObj.precio.toFixed(2)}
-                    </span>
-                  </div>
+                <div className="space-y-3">
+                  <div className="font-medium mb-2">Resumen de costos:</div>
                   
-                  {personas.map((_, index) => (
-                    <div key={index} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Persona {index + 1}:</span>
-                      <span className={index === 1 ? "text-success font-medium" : ""}>
-                        S/ {(index === 1 ? sesionSeleccionadaObj.precio * 0.5 : sesionSeleccionadaObj.precio).toFixed(2)}
-                        {index === 1 && " (50% desc.)"}
-                      </span>
-                    </div>
-                  ))}
+                  {sesionesSeleccionadas.map(sesionId => {
+                    const sesion = evento.sesiones.find(s => s.id === sesionId);
+                    if (!sesion || sesion.precio === 0) return null;
+                    
+                    return (
+                      <div key={sesionId} className="space-y-2 pb-2 border-b border-border last:border-0">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          {sesion.lugar} - {format(new Date(sesion.fecha), "dd/MM", { locale: es })}
+                        </div>
+                        {personas.map((_, index) => (
+                          <div key={index} className="flex items-center justify-between text-sm pl-3">
+                            <span className="text-muted-foreground">Persona {index + 1}:</span>
+                            <span className={index === 1 ? "text-success font-medium" : ""}>
+                              S/ {(index === 1 ? sesion.precio * 0.5 : sesion.precio).toFixed(2)}
+                              {index === 1 && " (50% desc.)"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
                   
-                  <Separator />
+                  <Separator className="my-2" />
                   
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">Costo Total:</span>
-                    <span className="text-xl font-bold text-success">
+                    <span className="font-medium text-lg">Costo Total:</span>
+                    <span className="text-2xl font-bold text-success">
                       S/ {precioTotal.toFixed(2)}
                     </span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground mt-3">
                   El pago se realizará al confirmar tu inscripción
                 </p>
               </div>
@@ -454,7 +510,7 @@ export const DetalleEventoModal = ({
               onClick={handleInscripcion}
               disabled={
                 loading ||
-                !sesionSeleccionada ||
+                sesionesSeleccionadas.length === 0 ||
                 personas.some(p => !p.nombre.trim() || !p.dni.trim())
               }
               className="flex-1"
