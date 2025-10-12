@@ -7,11 +7,9 @@ import "./index.css";
 // Provider existente
 import { BillingConfigProvider } from "@/contexts/BillingConfigContext";
 
-// ⬇️ NUEVO: inicializador de Firebase Cloud Messaging
-import { initMessaging } from "./messaging";
-
-// Inicia FCM (no bloquea el render). Imprime el token en consola si todo va bien.
-initMessaging();
+// ✅ Prepara Firebase Messaging SIN pedir permisos todavía
+import { ensureMessagingReady } from "./messaging";
+ensureMessagingReady();
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
