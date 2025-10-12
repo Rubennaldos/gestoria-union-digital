@@ -2,10 +2,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileDown, ExternalLink, TrendingUp, TrendingDown } from "lucide-react";
+import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download } from "lucide-react";
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { generarComprobanteFinanciero } from "@/lib/pdf/comprobanteFinanciero";
+import { toast } from "sonner";
+import { useState } from "react";
 
 interface DetalleMovimientoModalProps {
   movimiento: MovimientoFinanciero | null;
@@ -34,21 +37,73 @@ export const DetalleMovimientoModal = ({
   open,
   onOpenChange,
 }: DetalleMovimientoModalProps) => {
+  const [descargando, setDescargando] = useState(false);
+
   if (!movimiento) return null;
+
+  const descargarComprobante = async () => {
+    try {
+      setDescargando(true);
+      
+      const pdfBlob = await generarComprobanteFinanciero({
+        id: movimiento.id,
+        tipo: movimiento.tipo,
+        categoria: categoriasLabels[movimiento.categoria] || movimiento.categoria,
+        monto: movimiento.monto,
+        descripcion: movimiento.descripcion,
+        fecha: movimiento.fecha,
+        numeroComprobante: movimiento.numeroComprobante,
+        beneficiario: movimiento.beneficiario,
+        proveedor: movimiento.proveedor,
+        observaciones: movimiento.observaciones,
+        registradoPorNombre: movimiento.registradoPorNombre,
+        createdAt: movimiento.createdAt,
+        comprobantes: movimiento.comprobantes,
+      });
+
+      // Descargar el PDF
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `comprobante-${movimiento.tipo}-${movimiento.id.slice(-8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Comprobante descargado correctamente");
+    } catch (error) {
+      console.error("Error al descargar comprobante:", error);
+      toast.error("Error al descargar el comprobante");
+    } finally {
+      setDescargando(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            {movimiento.tipo === "ingreso" ? (
-              <TrendingUp className="h-6 w-6 text-green-600" />
-            ) : (
-              <TrendingDown className="h-6 w-6 text-red-600" />
-            )}
-            <DialogTitle>
-              Detalle de {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
-            </DialogTitle>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {movimiento.tipo === "ingreso" ? (
+                <TrendingUp className="h-6 w-6 text-green-600" />
+              ) : (
+                <TrendingDown className="h-6 w-6 text-red-600" />
+              )}
+              <DialogTitle>
+                Detalle de {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
+              </DialogTitle>
+            </div>
+            <Button
+              onClick={descargarComprobante}
+              disabled={descargando}
+              size="sm"
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {descargando ? "Descargando..." : "Descargar PDF"}
+            </Button>
           </div>
         </DialogHeader>
 
