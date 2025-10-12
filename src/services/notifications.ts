@@ -8,32 +8,41 @@ export class NotificationService {
   private isFirstLoad = true;
 
   async requestPermission(): Promise<boolean> {
+    console.log("[NotificationService] Verificando permisos...");
     if (!("Notification" in window)) {
-      console.warn("Este navegador no soporta notificaciones");
+      console.warn("[NotificationService] Este navegador no soporta notificaciones");
       return false;
     }
 
+    console.log("[NotificationService] Estado actual de permisos:", Notification.permission);
     if (Notification.permission === "granted") {
+      console.log("[NotificationService] Permisos ya otorgados");
       return true;
     }
 
     if (Notification.permission !== "denied") {
+      console.log("[NotificationService] Solicitando permisos...");
       const permission = await Notification.requestPermission();
+      console.log("[NotificationService] Resultado de solicitud:", permission);
       return permission === "granted";
     }
 
+    console.warn("[NotificationService] Permisos denegados");
     return false;
   }
 
   async start() {
+    console.log("[NotificationService] Iniciando servicio...");
     const hasPermission = await this.requestPermission();
     if (!hasPermission) {
-      console.warn("No se otorgaron permisos de notificación");
+      console.warn("[NotificationService] No se otorgaron permisos de notificación");
       return;
     }
 
     this.isActive = true;
+    console.log("[NotificationService] Servicio activado, configurando listeners...");
     this.setupListeners();
+    console.log("[NotificationService] Listeners configurados correctamente");
   }
 
   stop() {
@@ -45,19 +54,27 @@ export class NotificationService {
   }
 
   private setupListeners() {
+    console.log("[NotificationService] Configurando listeners de Firebase...");
     // Escuchar visitas pendientes
     const visitasRef = ref(db, "acceso/visitas");
     const visitasListener = onValue(visitasRef, (snapshot) => {
-      if (!this.isActive) return;
+      console.log("[NotificationService] Evento recibido de visitas");
+      if (!this.isActive) {
+        console.log("[NotificationService] Servicio inactivo, ignorando evento");
+        return;
+      }
       
       const data = snapshot.val();
+      console.log("[NotificationService] Datos de visitas:", data ? Object.keys(data).length + " registros" : "sin datos");
       if (!data) return;
 
       // En la primera carga, solo registrar IDs sin notificar
       if (this.isFirstLoad) {
+        console.log("[NotificationService] Primera carga - registrando IDs existentes sin notificar");
         Object.entries(data).forEach(([id, registro]: [string, any]) => {
           if (registro.estado === "pendiente") {
             this.notifiedIds.add(id);
+            console.log("[NotificationService] Registrado ID existente:", id);
           }
         });
         this.isFirstLoad = false;
@@ -70,6 +87,7 @@ export class NotificationService {
           registro.estado === "pendiente" &&
           !this.notifiedIds.has(id)
         ) {
+          console.log("[NotificationService] Nueva solicitud de visita detectada:", id);
           this.notifiedIds.add(id);
           this.sendNotification({
             title: "🔔 Nueva Solicitud de Visita",
@@ -168,33 +186,46 @@ export class NotificationService {
     tag: string;
     data: any;
   }) {
-    if (Notification.permission !== "granted") return;
-
-    const notification = new Notification(options.title, {
-      body: options.body,
-      icon: "/favicon.ico",
-      badge: "/favicon.ico",
-      tag: options.tag,
-      requireInteraction: true,
-      data: options.data,
-    });
-
-    // Reproducir sonido de notificación
-    try {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuFzvLZiTYHGGS56+u');
-      audio.volume = 0.5;
-      audio.play().catch(e => console.log('No se pudo reproducir sonido:', e));
-    } catch (e) {
-      console.log('Error al reproducir sonido:', e);
+    console.log("[NotificationService] Enviando notificación:", options.title);
+    if (Notification.permission !== "granted") {
+      console.warn("[NotificationService] No se puede enviar notificación - permisos no otorgados");
+      return;
     }
 
-    notification.onclick = () => {
-      window.focus();
-      if (window.location.hash !== "#/admin-seguridad") {
-        window.location.hash = "#/admin-seguridad";
+    try {
+      const notification = new Notification(options.title, {
+        body: options.body,
+        icon: "/favicon.ico",
+        badge: "/favicon.ico",
+        tag: options.tag,
+        requireInteraction: true,
+        data: options.data,
+      });
+
+      console.log("[NotificationService] Notificación creada exitosamente");
+
+      // Reproducir sonido de notificación
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuFzvLZiTYHGGS56+u');
+        audio.volume = 0.5;
+        audio.play()
+          .then(() => console.log("[NotificationService] Sonido reproducido"))
+          .catch(e => console.log('[NotificationService] No se pudo reproducir sonido:', e));
+      } catch (e) {
+        console.log('[NotificationService] Error al reproducir sonido:', e);
       }
-      notification.close();
-    };
+
+      notification.onclick = () => {
+        console.log("[NotificationService] Notificación clickeada");
+        window.focus();
+        if (window.location.hash !== "#/admin-seguridad") {
+          window.location.hash = "#/admin-seguridad";
+        }
+        notification.close();
+      };
+    } catch (error) {
+      console.error("[NotificationService] Error al crear notificación:", error);
+    }
   }
 
   isRunning(): boolean {
