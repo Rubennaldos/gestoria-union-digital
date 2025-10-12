@@ -92,21 +92,33 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
   doc.setFontSize(11);
   doc.setTextColor(...primaryColor);
   doc.text("PERSONAS INSCRITAS:", 20, yPos);
-  yPos += 7;
+  yPos += 5;
+
+  // Recuadro para personas
+  const personasHeight = data.personas.length * 7 + 5;
+  doc.setFillColor(...lightGray);
+  doc.roundedRect(20, yPos, pageWidth - 40, personasHeight, 2, 2, 'F');
+  yPos += 5;
 
   doc.setFontSize(9);
   doc.setTextColor(60);
   data.personas.forEach((persona, index) => {
     doc.text(`${index + 1}. ${persona.nombre} - DNI: ${persona.dni}`, 25, yPos);
-    yPos += 6;
+    yPos += 7;
   });
-  yPos += 5;
+  yPos += 8;
 
   // Sesiones Seleccionadas
   doc.setFontSize(11);
   doc.setTextColor(...primaryColor);
   doc.text("SESIONES PROGRAMADAS:", 20, yPos);
-  yPos += 7;
+  yPos += 5;
+
+  // Recuadro para sesiones
+  const sesionesHeight = data.sesiones.length * 18 + 5;
+  doc.setFillColor(...lightGray);
+  doc.roundedRect(20, yPos, pageWidth - 40, sesionesHeight, 2, 2, 'F');
+  yPos += 5;
 
   doc.setFontSize(9);
   doc.setTextColor(60);
@@ -116,7 +128,7 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
     doc.text(`   Fecha: ${format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })} | Horario: ${sesion.horaInicio} - ${sesion.horaFin}`, 25, yPos);
     yPos += 5;
     doc.text(`   Precio: S/ ${sesion.precio.toFixed(2)}`, 25, yPos);
-    yPos += 7;
+    yPos += 8;
   });
 
   // Resumen de Pago
@@ -139,22 +151,36 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
 
   // Comprobante de Pago (si existe)
   if (data.comprobanteBase64) {
-    yPos += 5;
+    yPos += 10;
+    
+    // Título del comprobante
     doc.setFontSize(11);
     doc.setTextColor(...primaryColor);
-    doc.text("COMPROBANTE DE PAGO:", 20, yPos);
-    yPos += 7;
+    doc.text("COMPROBANTE DE PAGO ADJUNTO:", 20, yPos);
+    yPos += 8;
     
     try {
-      // Agregar imagen del comprobante
-      const maxWidth = pageWidth - 80;
-      const maxHeight = 80;
-      doc.addImage(data.comprobanteBase64, 'JPEG', pageWidth / 2 - maxWidth / 2, yPos, maxWidth, maxHeight);
-      yPos += maxHeight + 10;
+      // Marco para el comprobante
+      const comprobanteWidth = pageWidth - 50;
+      const comprobanteHeight = 70;
+      const comprobanteX = 25;
+      
+      // Fondo blanco para el comprobante
+      doc.setFillColor(255, 255, 255);
+      doc.roundedRect(comprobanteX - 5, yPos - 5, comprobanteWidth + 10, comprobanteHeight + 10, 3, 3, 'F');
+      
+      // Borde
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(comprobanteX - 5, yPos - 5, comprobanteWidth + 10, comprobanteHeight + 10, 3, 3, 'S');
+      
+      // Agregar imagen del comprobante centrada
+      doc.addImage(data.comprobanteBase64, 'JPEG', comprobanteX, yPos, comprobanteWidth, comprobanteHeight);
+      yPos += comprobanteHeight + 15;
     } catch (error) {
       doc.setFontSize(9);
       doc.setTextColor(100);
-      doc.text("(Comprobante adjunto)", 25, yPos);
+      doc.text("(Comprobante adjunto en el registro)", 25, yPos);
       yPos += 10;
     }
   }
