@@ -11,8 +11,10 @@ import { SancionesSeguridad } from "@/components/admin-seguridad/SancionesSeguri
 import { ReglamentoInterno } from "@/components/admin-seguridad/ReglamentoInterno";
 import { Can } from "@/components/auth/Can";
 
+import { AutorizacionesSeguridad as AutorizacionesAdmin } from "@/components/seguridad/AutorizacionesSeguridad";
+
 const AdminSeguridad = () => {
-  const [activeTab, setActiveTab] = useState("auditoria");
+  const [activeTab, setActiveTab] = useState("autorizaciones");
 
   return (
     <Can module="admin_seguridad" level="read" fallback={
@@ -58,7 +60,11 @@ const AdminSeguridad = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-6">
+              <TabsList className="grid w-full grid-cols-7">
+                <TabsTrigger value="autorizaciones" className="flex items-center gap-1">
+                  <FileText className="h-4 w-4" />
+                  <span className="hidden sm:inline">Autorizaciones</span>
+                </TabsTrigger>
                 <TabsTrigger value="auditoria" className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   <span className="hidden sm:inline">Auditoría</span>
@@ -84,6 +90,10 @@ const AdminSeguridad = () => {
                   <span className="hidden sm:inline">Reglamento</span>
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="autorizaciones" className="mt-6">
+                <AutorizacionesAdmin />
+              </TabsContent>
 
               <TabsContent value="auditoria" className="mt-6">
                 <AuditoriaAccesos />

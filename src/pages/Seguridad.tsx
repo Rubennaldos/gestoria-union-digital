@@ -8,7 +8,7 @@ import { AlertTriangle, Shield, Users, Clock, UserCheck, FileText, Camera, Searc
 import { RegistroManualVisitas } from "@/components/seguridad/RegistroManualVisitas";
 import { RegistroManualTrabajadores } from "@/components/seguridad/RegistroManualTrabajadores";
 import { RegistroManualProveedores } from "@/components/seguridad/RegistroManualProveedores";
-import { AutorizacionesSeguridad } from "@/components/seguridad/AutorizacionesSeguridad";
+import { HistorialAutorizaciones } from "@/components/seguridad/HistorialAutorizaciones";
 import { ControlIngresoSalida } from "@/components/seguridad/ControlIngresoSalida";
 import { HistorialSeguridad } from "@/components/seguridad/HistorialSeguridad";
 import { BuscadorInteligente } from "@/components/seguridad/BuscadorInteligente";
@@ -72,8 +72,8 @@ const Seguridad = () => {
                   className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
                 >
                   <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Autorizaciones</span>
-                  <span className="sm:hidden">Autorizac.</span>
+                  <span className="hidden sm:inline">Historial Autorizaciones</span>
+                  <span className="sm:hidden">Historial</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="ingreso-salida" 
@@ -118,7 +118,7 @@ const Seguridad = () => {
               </TabsList>
 
               <TabsContent value="autorizaciones" className="mt-3 md:mt-6">
-                <AutorizacionesSeguridad />
+                <HistorialAutorizaciones />
               </TabsContent>
 
               <TabsContent value="ingreso-salida" className="mt-3 md:mt-6">
