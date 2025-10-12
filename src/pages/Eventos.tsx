@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Calendar, MapPin, Users, DollarSign, Clock, User, ChevronRight, Search, Filter } from "lucide-react";
+import { Calendar, MapPin, Users, DollarSign, Clock, User, ChevronRight, Search, Filter, History } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { obtenerEventosActivos } from "@/services/eventos";
 import { Evento } from "@/types/eventos";
@@ -13,9 +14,12 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { DetalleEventoModal } from "@/components/eventos/DetalleEventoModal";
+import { HistorialInscripciones } from "@/components/eventos/HistorialInscripciones";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Eventos = () => {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [eventosFiltrados, setEventosFiltrados] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +27,7 @@ const Eventos = () => {
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [tabActiva, setTabActiva] = useState<string>("eventos");
 
   useEffect(() => {
     cargarEventos();
@@ -123,148 +128,177 @@ const Eventos = () => {
           </p>
         </div>
 
-        {/* Filtros */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar eventos..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
-                <SelectTrigger className="w-full md:w-[200px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  <SelectItem value="deportivo">Deportivo</SelectItem>
-                  <SelectItem value="cultural">Cultural</SelectItem>
-                  <SelectItem value="educativo">Educativo</SelectItem>
-                  <SelectItem value="social">Social</SelectItem>
-                  <SelectItem value="recreativo">Recreativo</SelectItem>
-                  <SelectItem value="otro">Otro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs value={tabActiva} onValueChange={setTabActiva} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="eventos">
+              <Calendar className="h-4 w-4 mr-2" />
+              Eventos Disponibles
+            </TabsTrigger>
+            <TabsTrigger value="historial">
+              <History className="h-4 w-4 mr-2" />
+              Mis Inscripciones
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Grid de Eventos */}
-        {eventosFiltrados.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center py-12">
-              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                {busqueda || categoriaFiltro !== "todas"
-                  ? "No se encontraron eventos con los filtros seleccionados"
-                  : "No hay eventos disponibles en este momento"}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {eventosFiltrados.map((evento) => (
-              <Card
-                key={evento.id}
-                className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
-                onClick={() => abrirDetalleEvento(evento)}
-              >
-                {evento.imagen && (
-                  <div className="h-48 overflow-hidden bg-muted">
-                    <img
-                      src={evento.imagen}
-                      alt={evento.titulo}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          <TabsContent value="eventos" className="space-y-6">
+            {/* Filtros */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar eventos..."
+                      value={busqueda}
+                      onChange={(e) => setBusqueda(e.target.value)}
+                      className="pl-10"
                     />
                   </div>
-                )}
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg line-clamp-2">{evento.titulo}</CardTitle>
-                    <Badge className={getCategoriaColor(evento.categoria)}>
-                      {getCategoriaLabel(evento.categoria)}
-                    </Badge>
-                  </div>
-                  <CardDescription className="line-clamp-2">
-                    {evento.descripcion}
-                  </CardDescription>
-                </CardHeader>
+                  <Select value={categoriaFiltro} onValueChange={setCategoriaFiltro}>
+                    <SelectTrigger className="w-full md:w-[200px]">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="deportivo">Deportivo</SelectItem>
+                      <SelectItem value="cultural">Cultural</SelectItem>
+                      <SelectItem value="educativo">Educativo</SelectItem>
+                      <SelectItem value="social">Social</SelectItem>
+                      <SelectItem value="recreativo">Recreativo</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {format(new Date(evento.fechaInicio), "dd MMM yyyy", { locale: es })}
-                      {evento.fechaFin && !evento.fechaFinIndefinida && (
-                        <> - {format(new Date(evento.fechaFin), "dd MMM", { locale: es })}</>
-                      )}
-                    </span>
-                  </div>
+            {/* Grid de Eventos */}
+            {eventosFiltrados.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center py-12">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">
+                    {busqueda || categoriaFiltro !== "todas"
+                      ? "No se encontraron eventos con los filtros seleccionados"
+                      : "No hay eventos disponibles en este momento"}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {eventosFiltrados.map((evento) => (
+                  <Card
+                    key={evento.id}
+                    className="overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                    onClick={() => abrirDetalleEvento(evento)}
+                  >
+                    {evento.imagen && (
+                      <div className="h-48 overflow-hidden bg-muted">
+                        <img
+                          src={evento.imagen}
+                          alt={evento.titulo}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      </div>
+                    )}
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-lg line-clamp-2">{evento.titulo}</CardTitle>
+                        <Badge className={getCategoriaColor(evento.categoria)}>
+                          {getCategoriaLabel(evento.categoria)}
+                        </Badge>
+                      </div>
+                      <CardDescription className="line-clamp-2">
+                        {evento.descripcion}
+                      </CardDescription>
+                    </CardHeader>
 
-                  {evento.sesiones && evento.sesiones.length > 0 && (
-                    <>
+                    <CardContent className="space-y-3">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
+                        <Calendar className="h-4 w-4" />
                         <span>
-                          {evento.sesiones[0].horaInicio} - {evento.sesiones[0].horaFin}
+                          {format(new Date(evento.fechaInicio), "dd MMM yyyy", { locale: es })}
+                          {evento.fechaFin && !evento.fechaFinIndefinida && (
+                            <> - {format(new Date(evento.fechaFin), "dd MMM", { locale: es })}</>
+                          )}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span className="line-clamp-1">{evento.sesiones[0].lugar}</span>
+                      {evento.sesiones && evento.sesiones.length > 0 && (
+                        <>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-4 w-4" />
+                            <span>
+                              {evento.sesiones[0].horaInicio} - {evento.sesiones[0].horaFin}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <MapPin className="h-4 w-4" />
+                            <span className="line-clamp-1">{evento.sesiones[0].lugar}</span>
+                          </div>
+
+                          {evento.sesiones.length > 1 && (
+                            <p className="text-xs text-muted-foreground">
+                              +{evento.sesiones.length - 1} sesión(es) más
+                            </p>
+                          )}
+                        </>
+                      )}
+
+                      {evento.instructor && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <User className="h-4 w-4" />
+                          <span>{evento.instructor}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">
+                            {evento.cuposIlimitados
+                              ? "Ilimitados"
+                              : `${evento.cuposDisponibles} cupos`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-success">
+                          <DollarSign className="h-4 w-4" />
+                          {evento.precio === 0 ? "Gratis" : `S/ ${evento.precio.toFixed(2)}`}
+                          {evento.promocion?.activa && (
+                            <span className="text-xs text-warning">(Promo)</span>
+                          )}
+                        </div>
                       </div>
+                    </CardContent>
 
-                      {evento.sesiones.length > 1 && (
-                        <p className="text-xs text-muted-foreground">
-                          +{evento.sesiones.length - 1} sesión(es) más
-                        </p>
-                      )}
-                    </>
-                  )}
+                    <CardFooter>
+                      <Button className="w-full group" onClick={() => abrirDetalleEvento(evento)}>
+                        Inscríbete ahora
+                        <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-                  {evento.instructor && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <User className="h-4 w-4" />
-                      <span>{evento.instructor}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">
-                        {evento.cuposIlimitados
-                          ? "Ilimitados"
-                          : `${evento.cuposDisponibles} cupos`}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-success">
-                      <DollarSign className="h-4 w-4" />
-                      {evento.precio === 0 ? "Gratis" : `S/ ${evento.precio.toFixed(2)}`}
-                      {evento.promocion?.activa && (
-                        <span className="text-xs text-warning">(Promo)</span>
-                      )}
-                    </div>
-                  </div>
+          <TabsContent value="historial" className="space-y-6">
+            {profile?.empadronadoId ? (
+              <HistorialInscripciones empadronadoId={profile.empadronadoId} />
+            ) : (
+              <Card>
+                <CardContent className="pt-6 text-center py-12">
+                  <p className="text-muted-foreground">
+                    Debes tener un empadronado vinculado para ver tu historial de inscripciones
+                  </p>
                 </CardContent>
-
-                <CardFooter>
-                  <Button className="w-full group" onClick={() => abrirDetalleEvento(evento)}>
-                    Inscríbete ahora
-                    <ChevronRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </CardFooter>
               </Card>
-            ))}
-          </div>
-        )}
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       <BottomNavigation />
