@@ -5,6 +5,7 @@ export class NotificationService {
   private listeners: Array<() => void> = [];
   private notifiedIds = new Set<string>();
   private isActive = false;
+  private isFirstLoad = true;
 
   async requestPermission(): Promise<boolean> {
     if (!("Notification" in window)) {
@@ -40,6 +41,7 @@ export class NotificationService {
     this.listeners.forEach((unsubscribe) => unsubscribe());
     this.listeners = [];
     this.notifiedIds.clear();
+    this.isFirstLoad = true;
   }
 
   private setupListeners() {
@@ -51,6 +53,18 @@ export class NotificationService {
       const data = snapshot.val();
       if (!data) return;
 
+      // En la primera carga, solo registrar IDs sin notificar
+      if (this.isFirstLoad) {
+        Object.entries(data).forEach(([id, registro]: [string, any]) => {
+          if (registro.estado === "pendiente") {
+            this.notifiedIds.add(id);
+          }
+        });
+        this.isFirstLoad = false;
+        return;
+      }
+
+      // En cargas subsecuentes, notificar solo nuevas solicitudes
       Object.entries(data).forEach(([id, registro]: [string, any]) => {
         if (
           registro.estado === "pendiente" &&
@@ -69,12 +83,25 @@ export class NotificationService {
 
     // Escuchar trabajadores pendientes
     const trabajadoresRef = ref(db, "acceso/trabajadores");
+    let isFirstLoadTrabajadores = true;
     const trabajadoresListener = onValue(trabajadoresRef, (snapshot) => {
       if (!this.isActive) return;
       
       const data = snapshot.val();
       if (!data) return;
 
+      // En la primera carga, solo registrar IDs sin notificar
+      if (isFirstLoadTrabajadores) {
+        Object.entries(data).forEach(([id, registro]: [string, any]) => {
+          if (registro.estado === "pendiente") {
+            this.notifiedIds.add(id);
+          }
+        });
+        isFirstLoadTrabajadores = false;
+        return;
+      }
+
+      // En cargas subsecuentes, notificar solo nuevas solicitudes
       Object.entries(data).forEach(([id, registro]: [string, any]) => {
         if (
           registro.estado === "pendiente" &&
@@ -93,12 +120,25 @@ export class NotificationService {
 
     // Escuchar proveedores pendientes
     const proveedoresRef = ref(db, "acceso/proveedores");
+    let isFirstLoadProveedores = true;
     const proveedoresListener = onValue(proveedoresRef, (snapshot) => {
       if (!this.isActive) return;
       
       const data = snapshot.val();
       if (!data) return;
 
+      // En la primera carga, solo registrar IDs sin notificar
+      if (isFirstLoadProveedores) {
+        Object.entries(data).forEach(([id, registro]: [string, any]) => {
+          if (registro.estado === "pendiente") {
+            this.notifiedIds.add(id);
+          }
+        });
+        isFirstLoadProveedores = false;
+        return;
+      }
+
+      // En cargas subsecuentes, notificar solo nuevas solicitudes
       Object.entries(data).forEach(([id, registro]: [string, any]) => {
         if (
           registro.estado === "pendiente" &&
