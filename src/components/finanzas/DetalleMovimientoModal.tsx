@@ -2,13 +2,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download } from "lucide-react";
+import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download, Eye, Calendar, CreditCard, Hash, CheckCircle, XCircle, Users } from "lucide-react";
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { generarComprobanteFinanciero } from "@/lib/pdf/comprobanteFinanciero";
+import { generarVoucherEvento, archivoABase64 } from "@/lib/pdf/voucherEvento";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { get, ref } from "firebase/database";
+import { db } from "@/config/firebase";
+import { InscripcionEvento, Evento } from "@/types/eventos";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface DetalleMovimientoModalProps {
   movimiento: MovimientoFinanciero | null;
@@ -32,14 +37,178 @@ const categoriasLabels: Record<string, string> = {
   otro: "Otro",
 };
 
+interface InscripcionDetallada extends InscripcionEvento {
+  evento?: Evento;
+  medioPago?: string;
+  numeroOperacion?: string;
+  comprobanteImagenUrl?: string;
+}
+
 export const DetalleMovimientoModal = ({
   movimiento,
   open,
   onOpenChange,
 }: DetalleMovimientoModalProps) => {
   const [descargando, setDescargando] = useState(false);
+  const [inscripciones, setInscripciones] = useState<InscripcionDetallada[]>([]);
+  const [cargandoInscripciones, setCargandoInscripciones] = useState(false);
+  const [imagenComprobanteModal, setImagenComprobanteModal] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open && movimiento && movimiento.categoria === "evento" && movimiento.tipo === "ingreso") {
+      cargarInscripcionesEvento();
+    } else {
+      setInscripciones([]);
+    }
+  }, [open, movimiento]);
+
+  const cargarInscripcionesEvento = async () => {
+    if (!movimiento?.descripcion) return;
+    
+    try {
+      setCargandoInscripciones(true);
+      
+      // Extraer el ID del evento de la descripción
+      const match = movimiento.descripcion.match(/Inscripción: (.+)/);
+      if (!match) return;
+
+      const eventoTitulo = match[1].trim();
+      
+      // Buscar todas las inscripciones
+      const inscripcionesRef = ref(db, "inscripcionesEventos");
+      const inscripcionesSnap = await get(inscripcionesRef);
+      
+      if (!inscripcionesSnap.exists()) return;
+
+      const inscripcionesData: InscripcionDetallada[] = [];
+      
+      for (const [key, value] of Object.entries(inscripcionesSnap.val())) {
+        const inscripcion = value as InscripcionEvento;
+        
+        // Cargar el evento correspondiente
+        const eventoRef = ref(db, `eventos/${inscripcion.eventoId}`);
+        const eventoSnap = await get(eventoRef);
+        
+        if (eventoSnap.exists()) {
+          const evento = { id: eventoSnap.key!, ...eventoSnap.val() } as Evento;
+          
+          // Solo incluir si el título coincide y ha realizado pago
+          if (evento.titulo === eventoTitulo && inscripcion.pagoRealizado) {
+            // Intentar obtener información adicional del comprobante
+            let medioPago = "No especificado";
+            let numeroOperacion = "No especificado";
+            let comprobanteImagenUrl: string | undefined;
+            
+            if (inscripcion.comprobanteId) {
+              const comprobanteRef = ref(db, `receipts/${inscripcion.comprobanteId}`);
+              const comprobanteSnap = await get(comprobanteRef);
+              
+              if (comprobanteSnap.exists()) {
+                const comprobante = comprobanteSnap.val();
+                medioPago = comprobante.paymentMethod || "No especificado";
+                numeroOperacion = comprobante.transactionNumber || "No especificado";
+                comprobanteImagenUrl = comprobante.paymentProofUrl;
+              }
+            }
+            
+            // Intentar obtener de observaciones si está allí
+            if (inscripcion.observaciones) {
+              try {
+                const obs = JSON.parse(inscripcion.observaciones);
+                if (obs.medioPago) medioPago = obs.medioPago;
+                if (obs.numeroOperacion) numeroOperacion = obs.numeroOperacion;
+                if (obs.comprobanteUrl) comprobanteImagenUrl = obs.comprobanteUrl;
+              } catch (e) {
+                // Si no es JSON válido, ignorar
+              }
+            }
+            
+            inscripcionesData.push({
+              ...inscripcion,
+              id: key,
+              evento,
+              medioPago,
+              numeroOperacion,
+              comprobanteImagenUrl
+            });
+          }
+        }
+      }
+      
+      setInscripciones(inscripcionesData);
+    } catch (error) {
+      console.error("Error al cargar inscripciones:", error);
+      toast.error("Error al cargar detalles de inscripciones");
+    } finally {
+      setCargandoInscripciones(false);
+    }
+  };
 
   if (!movimiento) return null;
+
+  const descargarComprobanteInscripcion = async (inscripcion: InscripcionDetallada) => {
+    try {
+      if (!inscripcion.evento) {
+        toast.error("No se encontró información del evento");
+        return;
+      }
+
+      // Parsear personas y sesiones de observaciones
+      let personas: Array<{nombre: string, dni: string}> = [];
+      let sesiones: Array<{lugar: string, fecha: string, horaInicio: string, horaFin: string, precio: number}> = [];
+      let comprobanteBase64: string | undefined;
+
+      if (inscripcion.observaciones) {
+        try {
+          const obs = JSON.parse(inscripcion.observaciones);
+          personas = obs.personas || [];
+          sesiones = obs.sesiones || [];
+          if (inscripcion.comprobanteImagenUrl) {
+            // Convertir URL a base64
+            const response = await fetch(inscripcion.comprobanteImagenUrl);
+            const blob = await response.blob();
+            comprobanteBase64 = await archivoABase64(new File([blob], "comprobante.jpg"));
+          }
+        } catch (e) {
+          console.error("Error al parsear observaciones:", e);
+        }
+      }
+
+      const pdfBlob = await generarVoucherEvento({
+        eventoTitulo: inscripcion.evento.titulo,
+        eventoCategoria: inscripcion.evento.categoria,
+        personas: personas.length > 0 ? personas : [{
+          nombre: inscripcion.nombreEmpadronado,
+          dni: "No especificado"
+        }],
+        sesiones: sesiones.length > 0 ? sesiones : inscripcion.evento.sesiones.map(s => ({
+          lugar: s.lugar,
+          fecha: new Date(s.fecha).toISOString(),
+          horaInicio: s.horaInicio,
+          horaFin: s.horaFin,
+          precio: s.precio
+        })),
+        montoTotal: inscripcion.montoPagado || 0,
+        fechaPago: new Date(inscripcion.fechaPago || Date.now()),
+        numeroVoucher: inscripcion.comprobanteId || inscripcion.id,
+        comprobanteBase64
+      });
+
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Comprobante-${inscripcion.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Comprobante descargado correctamente");
+    } catch (error) {
+      console.error("Error al descargar comprobante:", error);
+      toast.error("Error al descargar el comprobante");
+    }
+  };
 
   const descargarComprobante = async () => {
     try {
@@ -248,6 +417,113 @@ export const DetalleMovimientoModal = ({
             </>
           )}
 
+          {/* Detalles de Inscritos (Solo para eventos) */}
+          {movimiento.categoria === "evento" && movimiento.tipo === "ingreso" && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Detalles de Inscritos
+                </h3>
+                
+                {cargandoInscripciones ? (
+                  <p className="text-sm text-muted-foreground">Cargando inscripciones...</p>
+                ) : inscripciones.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No se encontraron inscripciones</p>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Empadronado</TableHead>
+                          <TableHead>Fecha Evento</TableHead>
+                          <TableHead>Monto</TableHead>
+                          <TableHead>Medio de Pago</TableHead>
+                          <TableHead>N° Operación</TableHead>
+                          <TableHead>Comprobante</TableHead>
+                          <TableHead>Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {inscripciones.map((inscripcion) => (
+                          <TableRow key={inscripcion.id}>
+                            <TableCell className="font-medium">
+                              {inscripcion.nombreEmpadronado}
+                              {inscripcion.acompanantes > 0 && (
+                                <Badge variant="outline" className="ml-2">
+                                  +{inscripcion.acompanantes}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                {inscripcion.evento?.fechaInicio
+                                  ? format(new Date(inscripcion.evento.fechaInicio), "dd/MM/yyyy", { locale: es })
+                                  : "No especificada"}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-semibold text-green-600">
+                              S/ {inscripcion.montoPagado?.toFixed(2) || "0.00"}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-sm">
+                                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                {inscripcion.medioPago}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2 text-sm">
+                                {inscripcion.numeroOperacion === "No especificado" ? (
+                                  <>
+                                    <XCircle className="h-4 w-4 text-red-500" />
+                                    <span className="text-muted-foreground">No proporcionado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                    <span>{inscripcion.numeroOperacion}</span>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {inscripcion.comprobanteImagenUrl ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setImagenComprobanteModal(inscripcion.comprobanteImagenUrl!)}
+                                  className="gap-2"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  Ver
+                                </Button>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">Sin imagen</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => descargarComprobanteInscripcion(inscripcion)}
+                                className="gap-2"
+                              >
+                                <Download className="h-4 w-4" />
+                                PDF
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           <Separator />
 
           {/* Información de Registro */}
@@ -267,6 +543,24 @@ export const DetalleMovimientoModal = ({
             </div>
           </div>
         </div>
+
+        {/* Modal para ver imagen de comprobante */}
+        {imagenComprobanteModal && (
+          <Dialog open={!!imagenComprobanteModal} onOpenChange={() => setImagenComprobanteModal(null)}>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Comprobante de Pago</DialogTitle>
+              </DialogHeader>
+              <div className="flex justify-center">
+                <img
+                  src={imagenComprobanteModal}
+                  alt="Comprobante de pago"
+                  className="max-w-full h-auto rounded-lg"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </DialogContent>
     </Dialog>
   );
