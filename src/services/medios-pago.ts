@@ -32,7 +32,7 @@ export async function guardarMediosPago(
   const datosGuardar: ConfiguracionMediosPago = {
     ...configuracion,
     ultimaActualizacion: Date.now(),
-    actualizadoPor: usuarioId,
+    ...(usuarioId && { actualizadoPor: usuarioId }),
   };
   
   await set(mediosRef, datosGuardar);
