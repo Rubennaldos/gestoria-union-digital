@@ -74,7 +74,8 @@ export const DetalleMovimientoModal = ({
       console.log("Cargando inscripciones para movimiento:", movimiento);
       
       // Extraer el nombre del evento de la descripción
-      const match = movimiento.descripcion.match(/Inscripción:\s*(.+)/);
+      // Formato: "Inscripción: [Nombre del Evento] - [nombres de personas]"
+      const match = movimiento.descripcion.match(/Inscripción:\s*([^-]+)/);
       if (!match) {
         console.log("No se pudo extraer el nombre del evento de la descripción:", movimiento.descripcion);
         return;
