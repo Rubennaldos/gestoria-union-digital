@@ -202,7 +202,7 @@ export const DetalleEventoModal = ({
           comprobanteBase64,
         });
 
-        // Registrar en finanzas
+        // Registrar en finanzas con toda la información del evento
         await crearMovimientoFinanciero({
           tipo: "ingreso",
           categoria: "evento",
@@ -213,8 +213,17 @@ export const DetalleEventoModal = ({
           registradoPor: user.uid,
           registradoPorNombre: user.displayName || user.email || "Usuario",
           numeroComprobante: numeroVoucher,
-          observaciones: `Voucher: ${numeroVoucher}\nComprobante adjunto`,
-        });
+          observaciones: JSON.stringify({
+            eventoTitulo: evento.titulo,
+            eventoCategoria: getCategoriaLabel(evento.categoria),
+            personas,
+            sesiones: sesionesData,
+            voucherCode: numeroVoucher,
+            fechaRegistro: fechaPago.getTime(),
+            correo: user.email,
+            comprobanteBase64
+          }),
+        }, [archivoComprobante]);
 
         // Descargar voucher
         const url = URL.createObjectURL(voucherBlob);
