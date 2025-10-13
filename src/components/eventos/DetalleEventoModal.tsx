@@ -14,6 +14,7 @@ import { Evento } from "@/types/eventos";
 import { inscribirseEvento } from "@/services/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasarelaPagoModal } from "./PasarelaPagoModal";
@@ -290,9 +291,9 @@ export const DetalleEventoModal = ({
                 <div>
                   <p className="text-sm text-muted-foreground">Período</p>
                   <p className="font-medium">
-                    {format(new Date(evento.fechaInicio), "dd 'de' MMMM, yyyy", { locale: es })}
+                    {format(toZonedTime(new Date(evento.fechaInicio), "America/Lima"), "dd 'de' MMMM, yyyy", { locale: es })}
                     {evento.fechaFin && !evento.fechaFinIndefinida && (
-                      <> - {format(new Date(evento.fechaFin), "dd 'de' MMM", { locale: es })}</>
+                      <> - {format(toZonedTime(new Date(evento.fechaFin), "America/Lima"), "dd 'de' MMM", { locale: es })}</>
                     )}
                     {evento.fechaFinIndefinida && <> (Sin fecha fin)</>}
                   </p>
@@ -351,7 +352,7 @@ export const DetalleEventoModal = ({
                           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
-                              {format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })}
+                              {format(toZonedTime(new Date(sesion.fecha), "America/Lima"), "dd/MM/yyyy", { locale: es })}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
@@ -426,17 +427,17 @@ export const DetalleEventoModal = ({
                         onCheckedChange={() => toggleSesion(sesion.id)}
                         className="mt-0.5"
                       />
-                      <div className="flex-1">
-                        <p className="font-medium">{sesion.lugar}</p>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(sesion.fecha), "dd/MM/yyyy", { locale: es })}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {sesion.horaInicio} - {sesion.horaFin}
-                          </span>
+                        <div className="flex-1">
+                          <p className="font-medium">{sesion.lugar}</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(toZonedTime(new Date(sesion.fecha), "America/Lima"), "dd/MM/yyyy", { locale: es })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {sesion.horaInicio} - {sesion.horaFin}
+                            </span>
                           {sesion.precio > 0 && (
                             <span className="flex items-center gap-1 text-success font-semibold">
                               <DollarSign className="h-3 w-3" />

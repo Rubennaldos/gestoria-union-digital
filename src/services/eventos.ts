@@ -17,6 +17,7 @@ import {
   EstadisticasEventos,
   SesionEvento,
 } from "@/types/eventos";
+import { toZonedTime } from "date-fns-tz";
 
 // ========== EVENTOS ==========
 
@@ -35,16 +36,20 @@ export const crearEvento = async (
     })
   );
 
+  // Convertir fechas a zona horaria de Perú (America/Lima)
+  const TIMEZONE = "America/Lima";
+  const fechaInicioPeruana = toZonedTime(new Date(eventoData.fechaInicio), TIMEZONE);
+  const fechaFinPeruana = eventoData.fechaFin && !eventoData.fechaFinIndefinida
+    ? toZonedTime(new Date(eventoData.fechaFin), TIMEZONE)
+    : null;
+
   const evento: Evento = {
     id: nuevoEventoRef.key!,
     titulo: eventoData.titulo,
     descripcion: eventoData.descripcion,
     categoria: eventoData.categoria,
-    fechaInicio: new Date(eventoData.fechaInicio).getTime(),
-    fechaFin:
-      eventoData.fechaFin && !eventoData.fechaFinIndefinida
-        ? new Date(eventoData.fechaFin).getTime()
-        : null,
+    fechaInicio: fechaInicioPeruana.getTime(),
+    fechaFin: fechaFinPeruana ? fechaFinPeruana.getTime() : null,
     fechaFinIndefinida: eventoData.fechaFinIndefinida,
     sesiones: sesionesConId,
     instructor: eventoData.instructor,
@@ -162,11 +167,15 @@ export const actualizarEvento = async (
   }
 
   if (eventoData.fechaInicio) {
-    updates.fechaInicio = new Date(eventoData.fechaInicio).getTime();
+    const TIMEZONE = "America/Lima";
+    const fechaInicioPeruana = toZonedTime(new Date(eventoData.fechaInicio), TIMEZONE);
+    updates.fechaInicio = fechaInicioPeruana.getTime();
   }
 
   if (eventoData.fechaFin && !eventoData.fechaFinIndefinida) {
-    updates.fechaFin = new Date(eventoData.fechaFin).getTime();
+    const TIMEZONE = "America/Lima";
+    const fechaFinPeruana = toZonedTime(new Date(eventoData.fechaFin), TIMEZONE);
+    updates.fechaFin = fechaFinPeruana.getTime();
   } else if (eventoData.fechaFinIndefinida) {
     updates.fechaFin = null;
   }

@@ -30,6 +30,7 @@ import { Evento } from "@/types/eventos";
 import { eliminarEvento, cambiarEstadoEvento } from "@/services/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { toast } from "sonner";
 
 interface ListaEventosProps {
@@ -142,7 +143,7 @@ export const ListaEventos = ({
                 </TableCell>
                 <TableCell>{getCategoriaLabel(evento.categoria)}</TableCell>
                 <TableCell>
-                  {format(new Date(evento.fechaInicio), "dd/MM/yyyy", { locale: es })}
+                  {format(toZonedTime(new Date(evento.fechaInicio), "America/Lima"), "dd/MM/yyyy", { locale: es })}
                 </TableCell>
                 <TableCell>
                   <span className="font-medium">{evento.cuposDisponibles}</span> /{" "}

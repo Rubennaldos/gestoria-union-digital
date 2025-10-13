@@ -12,6 +12,7 @@ import { obtenerEventosActivos } from "@/services/eventos";
 import { Evento } from "@/types/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { toast } from "sonner";
 import { DetalleEventoModal } from "@/components/eventos/DetalleEventoModal";
 import { HistorialInscripciones } from "@/components/eventos/HistorialInscripciones";
@@ -218,9 +219,9 @@ const Eventos = () => {
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4" />
                         <span>
-                          {format(new Date(evento.fechaInicio), "dd MMM yyyy", { locale: es })}
+                          {format(toZonedTime(new Date(evento.fechaInicio), "America/Lima"), "dd MMM yyyy", { locale: es })}
                           {evento.fechaFin && !evento.fechaFinIndefinida && (
-                            <> - {format(new Date(evento.fechaFin), "dd MMM", { locale: es })}</>
+                            <> - {format(toZonedTime(new Date(evento.fechaFin), "America/Lima"), "dd MMM", { locale: es })}</>
                           )}
                         </span>
                       </div>

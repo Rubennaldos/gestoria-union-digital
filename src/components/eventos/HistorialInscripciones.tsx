@@ -7,6 +7,7 @@ import { obtenerInscripcionesPorEmpadronado, obtenerEventoPorId } from "@/servic
 import { InscripcionEvento, Evento } from "@/types/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { toast } from "sonner";
 import { ref, get } from "firebase/database";
 import { db } from "@/config/firebase";
@@ -230,7 +231,7 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
                     {inscripcion.evento?.titulo || "Evento no disponible"}
                   </CardTitle>
                   <CardDescription>
-                    Inscrito el {format(new Date(inscripcion.fechaInscripcion), "dd/MM/yyyy HH:mm", { locale: es })}
+                    Inscrito el {format(toZonedTime(new Date(inscripcion.fechaInscripcion), "America/Lima"), "dd/MM/yyyy HH:mm", { locale: es })}
                   </CardDescription>
                 </div>
                 <Badge variant={estadoBadge.variant}>
@@ -246,7 +247,7 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
                       <span>
-                        {format(new Date(inscripcion.evento.fechaInicio), "dd MMM yyyy", { locale: es })}
+                        {format(toZonedTime(new Date(inscripcion.evento.fechaInicio), "America/Lima"), "dd MMM yyyy", { locale: es })}
                       </span>
                     </div>
 
