@@ -17,7 +17,7 @@ import {
   EstadisticasEventos,
   SesionEvento,
 } from "@/types/eventos";
-import { toZonedTime } from "date-fns-tz";
+import { fromZonedTime } from "date-fns-tz";
 
 // ========== EVENTOS ==========
 
@@ -36,11 +36,13 @@ export const crearEvento = async (
     })
   );
 
-  // Convertir fechas a zona horaria de Perú (America/Lima)
+  // Convertir fechas desde zona horaria de Perú (America/Lima) a UTC
   const TIMEZONE = "America/Lima";
-  const fechaInicioPeruana = toZonedTime(new Date(eventoData.fechaInicio), TIMEZONE);
+  
+  // Parsear las fechas como si estuvieran en hora de Perú
+  const fechaInicioPeruana = fromZonedTime(eventoData.fechaInicio, TIMEZONE);
   const fechaFinPeruana = eventoData.fechaFin && !eventoData.fechaFinIndefinida
-    ? toZonedTime(new Date(eventoData.fechaFin), TIMEZONE)
+    ? fromZonedTime(eventoData.fechaFin, TIMEZONE)
     : null;
 
   const evento: Evento = {
@@ -168,13 +170,13 @@ export const actualizarEvento = async (
 
   if (eventoData.fechaInicio) {
     const TIMEZONE = "America/Lima";
-    const fechaInicioPeruana = toZonedTime(new Date(eventoData.fechaInicio), TIMEZONE);
+    const fechaInicioPeruana = fromZonedTime(eventoData.fechaInicio, TIMEZONE);
     updates.fechaInicio = fechaInicioPeruana.getTime();
   }
 
   if (eventoData.fechaFin && !eventoData.fechaFinIndefinida) {
     const TIMEZONE = "America/Lima";
-    const fechaFinPeruana = toZonedTime(new Date(eventoData.fechaFin), TIMEZONE);
+    const fechaFinPeruana = fromZonedTime(eventoData.fechaFin, TIMEZONE);
     updates.fechaFin = fechaFinPeruana.getTime();
   } else if (eventoData.fechaFinIndefinida) {
     updates.fechaFin = null;
