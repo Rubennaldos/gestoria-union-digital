@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, BarChart3, Calendar } from "lucide-react";
+import { Plus, TrendingUp, TrendingDown, BarChart3, Calendar, CreditCard } from "lucide-react";
 import { ResumenCaja } from "@/components/finanzas/ResumenCaja";
+import { ConfiguracionMediosPago } from "@/components/finanzas/ConfiguracionMediosPago";
 import { NuevoMovimientoModal } from "@/components/finanzas/NuevoMovimientoModal";
 import { NuevoEventoModal } from "@/components/finanzas/NuevoEventoModal";
 import { ListaMovimientos } from "@/components/finanzas/ListaMovimientos";
@@ -67,20 +68,24 @@ export default function Finanzas() {
       {/* Resumen de Caja */}
       <ResumenCaja key={refreshKey} />
 
-      {/* Tabs de Movimientos */}
+      {/* Tabs de Movimientos y Configuración */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Movimientos Financieros
+            Gestión Financiera
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="todos" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="todos">Todos</TabsTrigger>
               <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
               <TabsTrigger value="egresos">Egresos</TabsTrigger>
+              <TabsTrigger value="medios-pago">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Medios de Pago
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="todos" className="mt-4">
@@ -104,6 +109,10 @@ export default function Finanzas() {
                 refreshKey={refreshKey}
                 filtroTipo="egreso"
               />
+            </TabsContent>
+
+            <TabsContent value="medios-pago" className="mt-4">
+              <ConfiguracionMediosPago />
             </TabsContent>
           </Tabs>
         </CardContent>

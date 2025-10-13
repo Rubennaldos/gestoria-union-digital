@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { obtenerMediosPago } from "@/services/medios-pago";
+import { CuentaBancaria, BilleteraDigital } from "@/types/medios-pago";
 
 interface PasarelaPagoModalProps {
   open: boolean;
@@ -26,18 +28,6 @@ type MedioPago = {
   cuenta: string;
 };
 
-const BANCOS_PERUANOS = [
-  { nombre: "BCP", cuentas: ["191-12345678-0-00"] },
-  { nombre: "Interbank", cuentas: ["200-12345678"] },
-  { nombre: "BBVA", cuentas: ["0011-0123-0112345678"] },
-  { nombre: "Scotiabank", cuentas: ["000-1234567"] },
-];
-
-const BILLETERAS_DIGITALES = [
-  { nombre: "Yape", numero: "987654321" },
-  { nombre: "Plin", numero: "987654321" },
-];
-
 export const PasarelaPagoModal = ({
   open,
   onOpenChange,
@@ -50,6 +40,27 @@ export const PasarelaPagoModal = ({
   const [medioSeleccionado, setMedioSeleccionado] = useState<MedioPago | null>(null);
   const [numeroOperacion, setNumeroOperacion] = useState("");
   const [sinNumeroOperacion, setSinNumeroOperacion] = useState(false);
+  
+  // Cargar medios de pago configurados
+  const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
+  const [billeterasDigitales, setBilleterasDigitales] = useState<BilleteraDigital[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      cargarMediosPago();
+    }
+  }, [open]);
+
+  const cargarMediosPago = async () => {
+    try {
+      const configuracion = await obtenerMediosPago();
+      setCuentasBancarias(configuracion.cuentasBancarias.filter(c => c.activo) || []);
+      setBilleterasDigitales(configuracion.billeterasDigitales.filter(b => b.activo) || []);
+    } catch (error) {
+      console.error("Error al cargar medios de pago:", error);
+      toast.error("Error al cargar medios de pago");
+    }
+  };
 
   const handleArchivoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -122,101 +133,114 @@ export const PasarelaPagoModal = ({
           </Card>
 
           {/* Cuentas Bancarias */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Building2 className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold text-lg">Cuentas Bancarias</h3>
-            </div>
-            <div className="space-y-3">
-              {BANCOS_PERUANOS.map((banco) => {
-                const isSelected = medioSeleccionado?.tipo === 'banco' && medioSeleccionado.nombre === banco.nombre;
-                return (
-                  <Card 
-                    key={banco.nombre} 
-                    className={cn(
-                      "hover:border-primary/50 transition-all cursor-pointer",
-                      isSelected && "border-primary bg-primary/5"
-                    )}
-                    onClick={() => handleSeleccionarMedio({ tipo: 'banco', nombre: banco.nombre, cuenta: banco.cuentas[0] })}
-                  >
-                    <CardContent className="pt-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
-                          <div>
-                            <p className="font-semibold">{banco.nombre}</p>
-                            {banco.cuentas.map((cuenta, idx) => (
-                              <p key={idx} className="text-sm text-muted-foreground font-mono">
-                                {cuenta}
+          {cuentasBancarias.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold text-lg">Cuentas Bancarias</h3>
+              </div>
+              <div className="space-y-3">
+                {cuentasBancarias.map((banco) => {
+                  const isSelected = medioSeleccionado?.tipo === 'banco' && medioSeleccionado.nombre === banco.nombreBanco;
+                  return (
+                    <Card 
+                      key={banco.id} 
+                      className={cn(
+                        "hover:border-primary/50 transition-all cursor-pointer",
+                        isSelected && "border-primary bg-primary/5"
+                      )}
+                      onClick={() => handleSeleccionarMedio({ tipo: 'banco', nombre: banco.nombreBanco, cuenta: banco.numeroCuenta })}
+                    >
+                      <CardContent className="pt-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                            <div>
+                              <p className="font-semibold">{banco.nombreBanco}</p>
+                              <p className="text-sm text-muted-foreground font-mono">
+                                {banco.numeroCuenta}
                               </p>
-                            ))}
+                            </div>
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(banco.numeroCuenta);
+                              toast.success("Número de cuenta copiado");
+                            }}
+                          >
+                            Copiar
+                          </Button>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(banco.cuentas[0]);
-                            toast.success("Número de cuenta copiado");
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Billeteras Digitales */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Smartphone className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold text-lg">Billeteras Digitales</h3>
+          {billeterasDigitales.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Smartphone className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold text-lg">Billeteras Digitales</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {billeterasDigitales.map((billetera) => {
+                  const isSelected = medioSeleccionado?.tipo === 'billetera' && medioSeleccionado.nombre === billetera.nombreBilletera;
+                  return (
+                    <Card 
+                      key={billetera.id} 
+                      className={cn(
+                        "hover:border-primary/50 transition-all cursor-pointer",
+                        isSelected && "border-primary bg-primary/5"
+                      )}
+                      onClick={() => handleSeleccionarMedio({ tipo: 'billetera', nombre: billetera.nombreBilletera, cuenta: billetera.numeroTelefono })}
+                    >
+                      <CardContent className="pt-4">
+                        <div className="text-center relative">
+                          {isSelected && (
+                            <CheckCircle2 className="h-5 w-5 text-primary absolute top-0 right-0" />
+                          )}
+                          <p className="font-semibold mb-1">{billetera.nombreBilletera}</p>
+                          <p className="text-sm text-muted-foreground font-mono">
+                            {billetera.numeroTelefono}
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(billetera.numeroTelefono);
+                              toast.success("Número copiado");
+                            }}
+                          >
+                            Copiar
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {BILLETERAS_DIGITALES.map((billetera) => {
-                const isSelected = medioSeleccionado?.tipo === 'billetera' && medioSeleccionado.nombre === billetera.nombre;
-                return (
-                  <Card 
-                    key={billetera.nombre} 
-                    className={cn(
-                      "hover:border-primary/50 transition-all cursor-pointer",
-                      isSelected && "border-primary bg-primary/5"
-                    )}
-                    onClick={() => handleSeleccionarMedio({ tipo: 'billetera', nombre: billetera.nombre, cuenta: billetera.numero })}
-                  >
-                    <CardContent className="pt-4">
-                      <div className="text-center relative">
-                        {isSelected && (
-                          <CheckCircle2 className="h-5 w-5 text-primary absolute top-0 right-0" />
-                        )}
-                        <p className="font-semibold mb-1">{billetera.nombre}</p>
-                        <p className="text-sm text-muted-foreground font-mono">
-                          {billetera.numero}
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(billetera.numero);
-                            toast.success("Número copiado");
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
+          )}
+
+          {/* Mensaje si no hay medios configurados */}
+          {cuentasBancarias.length === 0 && billeterasDigitales.length === 0 && (
+            <Card className="border-dashed">
+              <CardContent className="pt-6 text-center">
+                <p className="text-muted-foreground">
+                  No hay medios de pago configurados. Por favor, contacta al administrador.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Información del medio seleccionado */}
           {medioSeleccionado && (
