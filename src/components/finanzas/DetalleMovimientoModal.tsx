@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -63,18 +63,13 @@ export const DetalleMovimientoModal = ({
   }, [open, movimiento]);
 
   const cargarInscripcionesEvento = async () => {
-    if (!movimiento?.descripcion) return;
+    if (!movimiento?.numeroComprobante) return;
     
     try {
       setCargandoInscripciones(true);
       
-      // Extraer el ID del evento de la descripción
-      const match = movimiento.descripcion.match(/Inscripción: (.+)/);
-      if (!match) return;
-
-      const eventoTitulo = match[1].trim();
-      
-      // Buscar todas las inscripciones
+      // El numeroComprobante contiene el código del voucher (ej: EVT-1760367148501-TZWSPZF4I)
+      // Buscar la inscripción que corresponde a este comprobante
       const inscripcionesRef = ref(db, "inscripcionesEventos");
       const inscripcionesSnap = await get(inscripcionesRef);
       
@@ -85,33 +80,36 @@ export const DetalleMovimientoModal = ({
       for (const [key, value] of Object.entries(inscripcionesSnap.val())) {
         const inscripcion = value as InscripcionEvento;
         
-        // Cargar el evento correspondiente
-        const eventoRef = ref(db, `eventos/${inscripcion.eventoId}`);
-        const eventoSnap = await get(eventoRef);
+        // Buscar por comprobanteId o por observaciones que contengan el número de comprobante
+        let coincide = false;
         
-        if (eventoSnap.exists()) {
-          const evento = { id: eventoSnap.key!, ...eventoSnap.val() } as Evento;
+        if (inscripcion.observaciones) {
+          try {
+            const obs = JSON.parse(inscripcion.observaciones);
+            if (obs.voucherCode === movimiento.numeroComprobante) {
+              coincide = true;
+            }
+          } catch (e) {
+            // Si no es JSON, buscar como string
+            if (inscripcion.observaciones.includes(movimiento.numeroComprobante)) {
+              coincide = true;
+            }
+          }
+        }
+        
+        if (coincide && inscripcion.pagoRealizado) {
+          // Cargar el evento correspondiente
+          const eventoRef = ref(db, `eventos/${inscripcion.eventoId}`);
+          const eventoSnap = await get(eventoRef);
           
-          // Solo incluir si el título coincide y ha realizado pago
-          if (evento.titulo === eventoTitulo && inscripcion.pagoRealizado) {
-            // Intentar obtener información adicional del comprobante
+          if (eventoSnap.exists()) {
+            const evento = { id: eventoSnap.key!, ...eventoSnap.val() } as Evento;
+            
+            // Obtener información adicional del comprobante
             let medioPago = "No especificado";
             let numeroOperacion = "No especificado";
             let comprobanteImagenUrl: string | undefined;
             
-            if (inscripcion.comprobanteId) {
-              const comprobanteRef = ref(db, `receipts/${inscripcion.comprobanteId}`);
-              const comprobanteSnap = await get(comprobanteRef);
-              
-              if (comprobanteSnap.exists()) {
-                const comprobante = comprobanteSnap.val();
-                medioPago = comprobante.paymentMethod || "No especificado";
-                numeroOperacion = comprobante.transactionNumber || "No especificado";
-                comprobanteImagenUrl = comprobante.paymentProofUrl;
-              }
-            }
-            
-            // Intentar obtener de observaciones si está allí
             if (inscripcion.observaciones) {
               try {
                 const obs = JSON.parse(inscripcion.observaciones);
@@ -274,6 +272,9 @@ export const DetalleMovimientoModal = ({
               {descargando ? "Descargando..." : "Descargar PDF"}
             </Button>
           </div>
+          <DialogDescription className="sr-only">
+            Información detallada del movimiento financiero
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -422,7 +423,7 @@ export const DetalleMovimientoModal = ({
             <>
               <Separator />
               <div>
-                <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   Detalles de Inscritos
                 </h3>
@@ -432,92 +433,183 @@ export const DetalleMovimientoModal = ({
                 ) : inscripciones.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No se encontraron inscripciones</p>
                 ) : (
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Empadronado</TableHead>
-                          <TableHead>Fecha Evento</TableHead>
-                          <TableHead>Monto</TableHead>
-                          <TableHead>Medio de Pago</TableHead>
-                          <TableHead>N° Operación</TableHead>
-                          <TableHead>Comprobante</TableHead>
-                          <TableHead>Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {inscripciones.map((inscripcion) => (
-                          <TableRow key={inscripcion.id}>
-                            <TableCell className="font-medium">
-                              {inscripcion.nombreEmpadronado}
-                              {inscripcion.acompanantes > 0 && (
-                                <Badge variant="outline" className="ml-2">
-                                  +{inscripcion.acompanantes}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2 text-sm">
+                  <div className="space-y-4">
+                    {inscripciones.map((inscripcion) => {
+                      // Parsear personas y sesiones de observaciones
+                      let personas: Array<{nombre: string, dni: string}> = [];
+                      let sesiones: Array<{lugar: string, fecha: string, horaInicio: string, horaFin: string}> = [];
+                      let correo = "";
+                      
+                      if (inscripcion.observaciones) {
+                        try {
+                          const obs = JSON.parse(inscripcion.observaciones);
+                          personas = obs.personas || [];
+                          sesiones = obs.sesiones || [];
+                          correo = obs.correo || "";
+                        } catch (e) {
+                          console.error("Error al parsear observaciones:", e);
+                        }
+                      }
+                      
+                      return (
+                        <div key={inscripcion.id} className="border rounded-lg p-4 space-y-4 bg-card">
+                          {/* Encabezado con info de registro */}
+                          <div className="flex justify-between items-start pb-3 border-b">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                                {inscripcion.evento?.fechaInicio
-                                  ? format(new Date(inscripcion.evento.fechaInicio), "dd/MM/yyyy", { locale: es })
-                                  : "No especificada"}
+                                <span className="text-sm font-medium">
+                                  Fecha de Registro: {format(new Date(inscripcion.fechaInscripcion), "dd/MM/yyyy HH:mm", { locale: es })}
+                                </span>
                               </div>
-                            </TableCell>
-                            <TableCell className="font-semibold text-green-600">
-                              S/ {inscripcion.montoPagado?.toFixed(2) || "0.00"}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2 text-sm">
-                                <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                {inscripcion.medioPago}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2 text-sm">
-                                {inscripcion.numeroOperacion === "No especificado" ? (
-                                  <>
-                                    <XCircle className="h-4 w-4 text-red-500" />
-                                    <span className="text-muted-foreground">No proporcionado</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="h-4 w-4 text-green-500" />
-                                    <span>{inscripcion.numeroOperacion}</span>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {inscripcion.comprobanteImagenUrl ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setImagenComprobanteModal(inscripcion.comprobanteImagenUrl!)}
-                                  className="gap-2"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                  Ver
-                                </Button>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">Sin imagen</span>
+                              {correo && (
+                                <div className="flex items-center gap-2">
+                                  <Hash className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm text-muted-foreground">{correo}</span>
+                                </div>
                               )}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => descargarComprobanteInscripcion(inscripcion)}
-                                className="gap-2"
-                              >
-                                <Download className="h-4 w-4" />
-                                PDF
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                            </div>
+                            <Badge variant={inscripcion.pagoRealizado ? "default" : "secondary"}>
+                              {inscripcion.estado}
+                            </Badge>
+                          </div>
+                          
+                          {/* Personas Inscritas */}
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              Personas Inscritas
+                            </h4>
+                            {personas.length > 0 ? (
+                              <div className="bg-muted/50 rounded-md p-3 space-y-2">
+                                {personas.map((persona, idx) => (
+                                  <div key={idx} className="flex justify-between items-center text-sm">
+                                    <span className="font-medium">{persona.nombre}</span>
+                                    <span className="text-muted-foreground">DNI: {persona.dni}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="bg-muted/50 rounded-md p-3">
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="font-medium">{inscripcion.nombreEmpadronado}</span>
+                                  <span className="text-muted-foreground">
+                                    {inscripcion.acompanantes > 0 ? `+ ${inscripcion.acompanantes} acompañantes` : "Sin acompañantes"}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Sesiones Seleccionadas */}
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <Calendar className="h-4 w-4" />
+                              Días y Horarios Seleccionados
+                            </h4>
+                            {sesiones.length > 0 ? (
+                              <div className="space-y-2">
+                                {sesiones.map((sesion, idx) => (
+                                  <div key={idx} className="bg-muted/50 rounded-md p-3">
+                                    <div className="flex justify-between items-start text-sm">
+                                      <div>
+                                        <p className="font-medium">{sesion.lugar}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {format(new Date(sesion.fecha), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-xs font-medium">{sesion.horaInicio} - {sesion.horaFin}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : inscripcion.evento?.sesiones ? (
+                              <div className="space-y-2">
+                                {inscripcion.evento.sesiones.map((sesion, idx) => (
+                                  <div key={idx} className="bg-muted/50 rounded-md p-3">
+                                    <div className="flex justify-between items-start text-sm">
+                                      <div>
+                                        <p className="font-medium">{sesion.lugar}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {format(new Date(sesion.fecha), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })}
+                                        </p>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-xs font-medium">{sesion.horaInicio} - {sesion.horaFin}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No hay sesiones disponibles</p>
+                            )}
+                          </div>
+                          
+                          {/* Información de Pago */}
+                          <div className="pt-3 border-t">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Monto Pagado</p>
+                                <p className="font-bold text-green-600">S/ {inscripcion.montoPagado?.toFixed(2) || "0.00"}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Medio de Pago</p>
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                  <p className="text-sm font-medium">{inscripcion.medioPago}</p>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">N° Operación</p>
+                                <div className="flex items-center gap-2">
+                                  {inscripcion.numeroOperacion === "No especificado" ? (
+                                    <>
+                                      <XCircle className="h-4 w-4 text-red-500" />
+                                      <p className="text-sm text-muted-foreground">No proporcionado</p>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                      <p className="text-sm font-medium">{inscripcion.numeroOperacion}</p>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Comprobante</p>
+                                <div className="flex gap-2">
+                                  {inscripcion.comprobanteImagenUrl ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setImagenComprobanteModal(inscripcion.comprobanteImagenUrl!)}
+                                      className="gap-2"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                      Ver Imagen
+                                    </Button>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">Sin imagen</span>
+                                  )}
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => descargarComprobanteInscripcion(inscripcion)}
+                                    className="gap-2"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                    PDF
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -550,6 +642,9 @@ export const DetalleMovimientoModal = ({
             <DialogContent className="max-w-4xl">
               <DialogHeader>
                 <DialogTitle>Comprobante de Pago</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Imagen del comprobante de pago adjunto
+                </DialogDescription>
               </DialogHeader>
               <div className="flex justify-center">
                 <img
