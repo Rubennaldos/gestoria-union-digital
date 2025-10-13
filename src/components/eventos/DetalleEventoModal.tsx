@@ -20,6 +20,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { PasarelaPagoModal } from "./PasarelaPagoModal";
 import { generarVoucherEvento, archivoABase64 } from "@/lib/pdf/voucherEvento";
 import { crearMovimientoFinanciero } from "@/services/finanzas";
+import { ref, update } from "firebase/database";
+import { db } from "@/config/firebase";
 
 interface PersonaInscrita {
   nombre: string;
@@ -145,7 +147,7 @@ export const DetalleEventoModal = ({
       console.log('📝 Inscribiendo con empadronadoId:', empadronadoId);
 
       // Inscribir al evento
-      await inscribirseEvento(
+      const inscripcionId = await inscribirseEvento(
         evento.id,
         empadronadoId,
         nombreEmpadronado,
@@ -169,6 +171,24 @@ export const DetalleEventoModal = ({
         }).filter(Boolean) as any[];
 
         const numeroVoucher = `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+        // Actualizar inscripción con información de pago
+        const inscripcionRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
+        await update(inscripcionRef, {
+          pagoRealizado: true,
+          montoPagado: precioTotal,
+          fechaPago: fechaPago.getTime(),
+          estado: "confirmado",
+          observaciones: JSON.stringify({
+            observaciones: observaciones,
+            personas,
+            sesiones: sesionesData,
+            medioPago: "transferencia",
+            numeroOperacion: "Pendiente de verificación",
+            voucherCode: numeroVoucher,
+            correo: user.email
+          })
+        });
 
         // Generar PDF del voucher
         const voucherBlob = await generarVoucherEvento({
