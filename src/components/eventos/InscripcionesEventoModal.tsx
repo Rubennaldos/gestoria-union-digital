@@ -1,4 +1,3 @@
-// src/components/eventos/InscripcionesEventoModal.tsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -17,68 +16,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Evento, InscripcionEvento } from "@/types/eventos";
 import {
   obtenerInscripcionesPorEvento,
-  actualizarEstadoInscripcion,
-  registrarPagoInscripcion,
 } from "@/services/eventos";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Clock, DollarSign } from "lucide-react";
-
-// ──────────────────────────────────────────────────────────
-// CARGA DINÁMICA DEL GENERADOR DE PDF (tolerante a export names)
-// ──────────────────────────────────────────────────────────
-type ReceiptArgs = {
-  correlativo: string;
-  eventoTitulo: string;
-  eventoFechaTexto: string;
-  empadronadoNombre: string;
-  empadronadoCodigo: string;
-  acompanantes: number;
-  montoPagado: number;
-  metodoPago?: string;
-  numeroOperacion?: string;
-  observaciones?: string;
-  fechaEmision: Date;
-  logoBase64?: string;
-};
-
-async function getReceiptGenerator(): Promise<
-  ((args: ReceiptArgs) => Promise<void>) | null
-> {
-  try {
-    // El módulo puede exportar con distintos nombres o como default
-    const mod: any = await import("@/lib/pdf/receiptEvento");
-    return (
-      mod.generarComprobanteEventoPDF ||
-      mod.generarComprobantePDF ||
-      mod.buildEventoReceipt ||
-      mod.makeEventoReceipt ||
-      mod.default ||
-      null
-    );
-  } catch {
-    return null;
-  }
-}
+import { CheckCircle2, Trash2, Edit } from "lucide-react";
+import { ref, remove } from "firebase/database";
+import { db } from "@/config/firebase";
 
 interface InscripcionesEventoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   evento: Evento;
 }
-
-const LOGO_URL = "/logo-san-antonio.png"; // asegúrate de tener este PNG en /public
 
 export const InscripcionesEventoModal = ({
   open,
@@ -109,151 +62,33 @@ export const InscripcionesEventoModal = ({
     }
   };
 
-  const handleCambiarEstado = async (
-    inscripcionId: string,
-    nuevoEstado: string
-  ) => {
+  const handleEliminarInscripcion = async (inscripcionId: string) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar esta inscripción?")) {
+      return;
+    }
+    
     try {
-      await actualizarEstadoInscripcion(inscripcionId, nuevoEstado);
-      toast.success("Estado actualizado exitosamente");
+      setWorking(true);
+      // Eliminar la inscripción de Firebase
+      const inscripcionRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
+      await remove(inscripcionRef);
+      
+      toast.success("Inscripción eliminada exitosamente");
       cargarInscripciones();
     } catch (error) {
-      console.error("Error al cambiar estado:", error);
-      toast.error("Error al actualizar el estado");
-    }
-  };
-
-  const blobToDataURL = (blob: Blob) =>
-    new Promise<string>((res, rej) => {
-      const fr = new FileReader();
-      fr.onloadend = () => res(fr.result as string);
-      fr.onerror = rej;
-      fr.readAsDataURL(blob);
-    });
-
-  const getLogoBase64 = async (): Promise<string | undefined> => {
-    try {
-      const resp = await fetch(LOGO_URL);
-      if (!resp.ok) return undefined;
-      const blob = await resp.blob();
-      return await blobToDataURL(blob);
-    } catch {
-      return undefined;
-    }
-  };
-
-  const handleRegistrarPago = async (inscripcionId: string) => {
-    if (working) return;
-    setWorking(true);
-    try {
-      const inscripcion = inscripciones.find((i) => i.id === inscripcionId);
-      if (!inscripcion) {
-        toast.error("Inscripción no encontrada");
-        return;
-      }
-
-      // 1) Registrar el pago en RTDB
-      await registrarPagoInscripcion(inscripcionId, evento.precio);
-
-      // 2) Generar y descargar el comprobante PDF (si el módulo existe)
-      const gen = await getReceiptGenerator();
-      if (gen) {
-        try {
-          const correlativo = `EV-${new Date().getFullYear()}${String(
-            new Date().getMonth() + 1
-          ).padStart(2, "0")}-${String(Date.now()).slice(-6)}`;
-
-          const fechaTexto = evento.fechaInicio
-            ? new Date(evento.fechaInicio).toLocaleString("es-PE")
-            : "—";
-
-          const logoBase64 = await getLogoBase64();
-
-          await gen({
-            correlativo,
-            eventoTitulo: evento.titulo,
-            eventoFechaTexto: fechaTexto,
-            empadronadoNombre: inscripcion.nombreEmpadronado,
-            empadronadoCodigo: inscripcion.empadronadoId,
-            acompanantes: inscripcion.acompanantes,
-            montoPagado: evento.precio,
-            metodoPago: "efectivo",
-            numeroOperacion: undefined,
-            observaciones: inscripcion.observaciones || "",
-            fechaEmision: new Date(),
-            logoBase64,
-          });
-        } catch (e) {
-          console.warn("No se pudo generar el PDF (se continúa):", e);
-        }
-      } else {
-        console.warn(
-          "receiptEvento no exporta un generador de PDF; se continúa sin descargar comprobante."
-        );
-      }
-
-      toast.success("Pago registrado exitosamente");
-      cargarInscripciones();
-    } catch (error) {
-      console.error("Error al registrar pago:", error);
-      toast.error("Error al registrar el pago");
+      console.error("Error al eliminar inscripción:", error);
+      toast.error("Error al eliminar la inscripción");
     } finally {
       setWorking(false);
     }
-  };
-
-  const getEstadoBadge = (inscripcion: InscripcionEvento) => {
-    const configs: Record<
-      string,
-      { label: string; className: string; icon: any }
-    > = {
-      inscrito: {
-        label: "Inscrito",
-        className: "bg-warning/10 text-warning border-warning/20",
-        icon: Clock,
-      },
-      confirmado: {
-        label: "Confirmado",
-        className: "bg-success/10 text-success border-success/20",
-        icon: CheckCircle2,
-      },
-      cancelado: {
-        label: "Cancelado",
-        className: "bg-destructive/10 text-destructive border-destructive/20",
-        icon: XCircle,
-      },
-      asistio: {
-        label: "Asistió",
-        className: "bg-primary/10 text-primary border-primary/20",
-        icon: CheckCircle2,
-      },
-      no_asistio: {
-        label: "No Asistió",
-        className: "bg-muted text-muted-foreground",
-        icon: XCircle,
-      },
-    };
-
-    const config = configs[inscripcion.estado] || configs.inscrito;
-    const Icon = config.icon;
-
-    return (
-      <Badge className={config.className}>
-        <Icon className="h-3 w-3 mr-1" />
-        {config.label}
-      </Badge>
-    );
   };
 
   const totalInscritos = inscripciones.filter(
     (i) => i.estado !== "cancelado"
   ).length;
   const totalConfirmados = inscripciones.filter(
-    (i) => i.estado === "confirmado"
+    (i) => i.pagoRealizado
   ).length;
-  const totalPagos = inscripciones
-    .filter((i) => i.pagoRealizado)
-    .reduce((sum, i) => sum + (i.montoPagado || 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -266,21 +101,15 @@ export const InscripcionesEventoModal = ({
         </DialogHeader>
 
         {/* Resumen */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-muted/50 p-4 rounded-lg">
             <p className="text-sm text-muted-foreground">Total Inscritos</p>
             <p className="text-2xl font-bold">{totalInscritos}</p>
           </div>
           <div className="bg-success/10 p-4 rounded-lg">
-            <p className="text-sm text-muted-foreground">Confirmados</p>
+            <p className="text-sm text-muted-foreground">Con Pago Confirmado</p>
             <p className="text-2xl font-bold text-success">
               {totalConfirmados}
-            </p>
-          </div>
-          <div className="bg-primary/10 p-4 rounded-lg">
-            <p className="text-sm text-muted-foreground">Ingresos</p>
-            <p className="text-2xl font-bold text-primary">
-              S/ {totalPagos.toFixed(2)}
             </p>
           </div>
         </div>
@@ -300,8 +129,7 @@ export const InscripcionesEventoModal = ({
                   <TableHead>Empadronado</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Acompañantes</TableHead>
-                  <TableHead>Pago</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>Monto</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -324,39 +152,32 @@ export const InscripcionesEventoModal = ({
                     <TableCell>
                       {inscripcion.pagoRealizado ? (
                         <Badge className="bg-success/10 text-success border-success/20">
-                          <DollarSign className="h-3 w-3 mr-1" />
-                          S/ {inscripcion.montoPagado?.toFixed(2)}
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          S/ {inscripcion.montoPagado?.toFixed(2) || "0.00"}
                         </Badge>
                       ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleRegistrarPago(inscripcion.id)}
-                          disabled={working}
-                        >
-                          {working ? "Procesando..." : "Registrar pago"}
-                        </Button>
+                        <span className="text-muted-foreground text-sm">Sin pago</span>
                       )}
                     </TableCell>
-                    <TableCell>{getEstadoBadge(inscripcion)}</TableCell>
                     <TableCell>
-                      <Select
-                        value={inscripcion.estado}
-                        onValueChange={(value) =>
-                          handleCambiarEstado(inscripcion.id, value)
-                        }
-                      >
-                        <SelectTrigger className="w-[140px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="inscrito">Inscrito</SelectItem>
-                          <SelectItem value="confirmado">Confirmado</SelectItem>
-                          <SelectItem value="asistio">Asistió</SelectItem>
-                          <SelectItem value="no_asistio">No Asistió</SelectItem>
-                          <SelectItem value="cancelado">Cancelado</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toast.info("Función de edición próximamente")}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEliminarInscripcion(inscripcion.id)}
+                          disabled={working}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
