@@ -26,8 +26,10 @@ export const ConfiguracionMediosPago = () => {
   // Nuevas cuentas/billeteras
   const [nuevoBanco, setNuevoBanco] = useState("");
   const [nuevaCuenta, setNuevaCuenta] = useState("");
+  const [nuevoTitularBanco, setNuevoTitularBanco] = useState("");
   const [nuevaBilletera, setNuevaBilletera] = useState("");
   const [nuevoNumero, setNuevoNumero] = useState("");
+  const [nuevoTitularBilletera, setNuevoTitularBilletera] = useState("");
 
   useEffect(() => {
     cargarMediosPago();
@@ -47,7 +49,7 @@ export const ConfiguracionMediosPago = () => {
   };
 
   const handleAgregarBanco = async () => {
-    if (!nuevoBanco.trim() || !nuevaCuenta.trim()) {
+    if (!nuevoBanco.trim() || !nuevaCuenta.trim() || !nuevoTitularBanco.trim()) {
       toast.error("Completa todos los campos");
       return;
     }
@@ -56,11 +58,13 @@ export const ConfiguracionMediosPago = () => {
       await agregarCuentaBancaria({
         nombreBanco: nuevoBanco.trim(),
         numeroCuenta: nuevaCuenta.trim(),
+        titular: nuevoTitularBanco.trim(),
         activo: true,
       });
       
       setNuevoBanco("");
       setNuevaCuenta("");
+      setNuevoTitularBanco("");
       await cargarMediosPago();
       toast.success("Cuenta bancaria agregada");
     } catch (error) {
@@ -70,7 +74,7 @@ export const ConfiguracionMediosPago = () => {
   };
 
   const handleAgregarBilletera = async () => {
-    if (!nuevaBilletera.trim() || !nuevoNumero.trim()) {
+    if (!nuevaBilletera.trim() || !nuevoNumero.trim() || !nuevoTitularBilletera.trim()) {
       toast.error("Completa todos los campos");
       return;
     }
@@ -79,11 +83,13 @@ export const ConfiguracionMediosPago = () => {
       await agregarBilleteraDigital({
         nombreBilletera: nuevaBilletera.trim(),
         numeroTelefono: nuevoNumero.trim(),
+        titular: nuevoTitularBilletera.trim(),
         activo: true,
       });
       
       setNuevaBilletera("");
       setNuevoNumero("");
+      setNuevoTitularBilletera("");
       await cargarMediosPago();
       toast.success("Billetera digital agregada");
     } catch (error) {
@@ -169,6 +175,9 @@ export const ConfiguracionMediosPago = () => {
                 <p className="text-sm text-muted-foreground font-mono">
                   {cuenta.numeroCuenta}
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  Titular: {cuenta.titular}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -195,24 +204,35 @@ export const ConfiguracionMediosPago = () => {
           {/* Agregar nueva cuenta */}
           <div className="p-4 border-2 border-dashed rounded-lg space-y-3">
             <p className="font-semibold text-sm">Agregar nueva cuenta bancaria</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <Label htmlFor="nuevoBanco">Nombre del banco</Label>
                 <Input
                   id="nuevoBanco"
-                  placeholder="Ej: BCP"
+                  placeholder="Ej: BANCO DE CREDITO DEL PERU ( BCP)"
                   value={nuevoBanco}
                   onChange={(e) => setNuevoBanco(e.target.value)}
                 />
               </div>
-              <div>
-                <Label htmlFor="nuevaCuenta">Número de cuenta</Label>
-                <Input
-                  id="nuevaCuenta"
-                  placeholder="Ej: 191-12345678-0-00"
-                  value={nuevaCuenta}
-                  onChange={(e) => setNuevaCuenta(e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="nuevaCuenta">Número de cuenta</Label>
+                  <Input
+                    id="nuevaCuenta"
+                    placeholder="Ej: 193-0464"
+                    value={nuevaCuenta}
+                    onChange={(e) => setNuevaCuenta(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nuevoTitularBanco">Titular de la cuenta</Label>
+                  <Input
+                    id="nuevoTitularBanco"
+                    placeholder="Ej: Juan Pérez"
+                    value={nuevoTitularBanco}
+                    onChange={(e) => setNuevoTitularBanco(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
             <Button onClick={handleAgregarBanco} className="w-full">
@@ -246,6 +266,9 @@ export const ConfiguracionMediosPago = () => {
                 <p className="text-sm text-muted-foreground font-mono">
                   {billetera.numeroTelefono}
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  Titular: {billetera.titular}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -274,7 +297,7 @@ export const ConfiguracionMediosPago = () => {
           {/* Agregar nueva billetera */}
           <div className="p-4 border-2 border-dashed rounded-lg space-y-3">
             <p className="font-semibold text-sm">Agregar nueva billetera digital</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <Label htmlFor="nuevaBilletera">Nombre de la billetera</Label>
                 <Input
@@ -284,14 +307,25 @@ export const ConfiguracionMediosPago = () => {
                   onChange={(e) => setNuevaBilletera(e.target.value)}
                 />
               </div>
-              <div>
-                <Label htmlFor="nuevoNumero">Número de teléfono</Label>
-                <Input
-                  id="nuevoNumero"
-                  placeholder="Ej: 987654321"
-                  value={nuevoNumero}
-                  onChange={(e) => setNuevoNumero(e.target.value)}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="nuevoNumero">Número de teléfono</Label>
+                  <Input
+                    id="nuevoNumero"
+                    placeholder="Ej: 987654321"
+                    value={nuevoNumero}
+                    onChange={(e) => setNuevoNumero(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="nuevoTitularBilletera">Titular de la billetera</Label>
+                  <Input
+                    id="nuevoTitularBilletera"
+                    placeholder="Ej: María García"
+                    value={nuevoTitularBilletera}
+                    onChange={(e) => setNuevoTitularBilletera(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
             <Button onClick={handleAgregarBilletera} className="w-full">

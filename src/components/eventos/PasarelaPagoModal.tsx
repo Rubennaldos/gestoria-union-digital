@@ -160,6 +160,9 @@ export const PasarelaPagoModal = ({
                               <p className="text-sm text-muted-foreground font-mono">
                                 {banco.numeroCuenta}
                               </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {banco.titular}
+                              </p>
                             </div>
                           </div>
                           <Button
@@ -209,6 +212,9 @@ export const PasarelaPagoModal = ({
                           <p className="font-semibold mb-1">{billetera.nombreBilletera}</p>
                           <p className="text-sm text-muted-foreground font-mono">
                             {billetera.numeroTelefono}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {billetera.titular}
                           </p>
                           <Button
                             variant="outline"

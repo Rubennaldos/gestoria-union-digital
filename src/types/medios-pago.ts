@@ -4,6 +4,7 @@ export interface CuentaBancaria {
   id: string;
   nombreBanco: string;
   numeroCuenta: string;
+  titular: string; // Nombre del titular de la cuenta
   activo: boolean;
   orden: number;
 }
@@ -12,6 +13,7 @@ export interface BilleteraDigital {
   id: string;
   nombreBilletera: string;
   numeroTelefono: string;
+  titular: string; // Nombre del titular de la billetera
   activo: boolean;
   orden: number;
 }
