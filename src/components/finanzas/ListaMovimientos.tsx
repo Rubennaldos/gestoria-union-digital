@@ -3,14 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Eye, FileText, TrendingUp, TrendingDown } from "lucide-react";
+import { FileText, TrendingUp, TrendingDown, Pencil, Trash2 } from "lucide-react";
 import { obtenerMovimientos } from "@/services/finanzas";
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface ListaMovimientosProps {
   onVerDetalle: (movimiento: MovimientoFinanciero) => void;
+  onEditar?: (movimiento: MovimientoFinanciero) => void;
+  onEliminar?: (movimientoId: string) => void;
   refreshKey?: number;
   filtroTipo?: "ingreso" | "egreso";
 }
@@ -34,7 +37,7 @@ const categoriasLabels: Record<string, string> = {
   otro: "Otro",
 };
 
-export const ListaMovimientos = ({ onVerDetalle, refreshKey, filtroTipo }: ListaMovimientosProps) => {
+export const ListaMovimientos = ({ onVerDetalle, onEditar, onEliminar, refreshKey, filtroTipo }: ListaMovimientosProps) => {
   const [movimientos, setMovimientos] = useState<MovimientoFinanciero[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -52,6 +55,18 @@ export const ListaMovimientos = ({ onVerDetalle, refreshKey, filtroTipo }: Lista
     } finally {
       setCargando(false);
     }
+  };
+
+  const handleEliminar = (e: React.MouseEvent, movimientoId: string) => {
+    e.stopPropagation(); // Evitar que se abra el detalle
+    if (confirm("¿Estás seguro de que deseas eliminar este movimiento?")) {
+      onEliminar?.(movimientoId);
+    }
+  };
+
+  const handleEditar = (e: React.MouseEvent, movimiento: MovimientoFinanciero) => {
+    e.stopPropagation(); // Evitar que se abra el detalle
+    onEditar?.(movimiento);
   };
 
   if (cargando) {
@@ -93,7 +108,11 @@ export const ListaMovimientos = ({ onVerDetalle, refreshKey, filtroTipo }: Lista
             </TableHeader>
             <TableBody>
               {movimientos.map((movimiento) => (
-                <TableRow key={movimiento.id}>
+                <TableRow 
+                  key={movimiento.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => onVerDetalle(movimiento)}
+                >
                   <TableCell className="font-medium">
                     {movimiento.fecha && !isNaN(new Date(movimiento.fecha).getTime())
                       ? format(new Date(movimiento.fecha), "dd/MM/yyyy", { locale: es })
@@ -135,13 +154,25 @@ export const ListaMovimientos = ({ onVerDetalle, refreshKey, filtroTipo }: Lista
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onVerDetalle(movimiento)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleEditar(e, movimiento)}
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleEliminar(e, movimiento.id)}
+                        className="text-destructive hover:text-destructive"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

@@ -11,6 +11,9 @@ import { ListaMovimientos } from "@/components/finanzas/ListaMovimientos";
 import { DetalleMovimientoModal } from "@/components/finanzas/DetalleMovimientoModal";
 import { MovimientoFinanciero } from "@/types/finanzas";
 import MiBreadcrumb from "@/components/layout/MiBreadcrumb";
+import { toast } from "sonner";
+import { ref, remove } from "firebase/database";
+import { db } from "@/config/firebase";
 
 export default function Finanzas() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,6 +40,23 @@ export default function Finanzas() {
   const handleVerDetalle = (movimiento: MovimientoFinanciero) => {
     setMovimientoSeleccionado(movimiento);
     setDetalleOpen(true);
+  };
+
+  const handleEditar = (movimiento: MovimientoFinanciero) => {
+    toast.info("Función de edición próximamente");
+    // Aquí se implementará la lógica de edición
+  };
+
+  const handleEliminar = async (movimientoId: string) => {
+    try {
+      const movimientoRef = ref(db, `movimientos/${movimientoId}`);
+      await remove(movimientoRef);
+      toast.success("Movimiento eliminado exitosamente");
+      handleSuccess();
+    } catch (error) {
+      console.error("Error al eliminar movimiento:", error);
+      toast.error("Error al eliminar el movimiento");
+    }
   };
 
   return (
@@ -91,6 +111,8 @@ export default function Finanzas() {
             <TabsContent value="todos" className="mt-4">
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
+                onEditar={handleEditar}
+                onEliminar={handleEliminar}
                 refreshKey={refreshKey}
               />
             </TabsContent>
@@ -98,6 +120,8 @@ export default function Finanzas() {
             <TabsContent value="ingresos" className="mt-4">
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
+                onEditar={handleEditar}
+                onEliminar={handleEliminar}
                 refreshKey={refreshKey}
                 filtroTipo="ingreso"
               />
@@ -106,6 +130,8 @@ export default function Finanzas() {
             <TabsContent value="egresos" className="mt-4">
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
+                onEditar={handleEditar}
+                onEliminar={handleEliminar}
                 refreshKey={refreshKey}
                 filtroTipo="egreso"
               />
