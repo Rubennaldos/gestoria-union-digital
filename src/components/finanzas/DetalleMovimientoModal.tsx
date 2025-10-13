@@ -63,47 +63,50 @@ export const DetalleMovimientoModal = ({
   }, [open, movimiento]);
 
   const cargarInscripcionesEvento = async () => {
-    if (!movimiento?.numeroComprobante) return;
+    if (!movimiento?.descripcion) {
+      console.log("No hay descripción en el movimiento");
+      return;
+    }
     
     try {
       setCargandoInscripciones(true);
       
-      // El numeroComprobante contiene el código del voucher (ej: EVT-1760367148501-TZWSPZF4I)
-      // Buscar la inscripción que corresponde a este comprobante
+      console.log("Cargando inscripciones para movimiento:", movimiento);
+      
+      // Extraer el nombre del evento de la descripción
+      const match = movimiento.descripcion.match(/Inscripción:\s*(.+)/);
+      if (!match) {
+        console.log("No se pudo extraer el nombre del evento de la descripción:", movimiento.descripcion);
+        return;
+      }
+
+      const eventoNombre = match[1].trim();
+      console.log("Buscando inscripciones para evento:", eventoNombre);
+      
+      // Buscar todas las inscripciones
       const inscripcionesRef = ref(db, "inscripcionesEventos");
       const inscripcionesSnap = await get(inscripcionesRef);
       
-      if (!inscripcionesSnap.exists()) return;
+      if (!inscripcionesSnap.exists()) {
+        console.log("No hay inscripciones en la base de datos");
+        return;
+      }
 
       const inscripcionesData: InscripcionDetallada[] = [];
       
       for (const [key, value] of Object.entries(inscripcionesSnap.val())) {
         const inscripcion = value as InscripcionEvento;
         
-        // Buscar por comprobanteId o por observaciones que contengan el número de comprobante
-        let coincide = false;
+        // Cargar el evento correspondiente
+        const eventoRef = ref(db, `eventos/${inscripcion.eventoId}`);
+        const eventoSnap = await get(eventoRef);
         
-        if (inscripcion.observaciones) {
-          try {
-            const obs = JSON.parse(inscripcion.observaciones);
-            if (obs.voucherCode === movimiento.numeroComprobante) {
-              coincide = true;
-            }
-          } catch (e) {
-            // Si no es JSON, buscar como string
-            if (inscripcion.observaciones.includes(movimiento.numeroComprobante)) {
-              coincide = true;
-            }
-          }
-        }
-        
-        if (coincide && inscripcion.pagoRealizado) {
-          // Cargar el evento correspondiente
-          const eventoRef = ref(db, `eventos/${inscripcion.eventoId}`);
-          const eventoSnap = await get(eventoRef);
+        if (eventoSnap.exists()) {
+          const evento = { id: eventoSnap.key!, ...eventoSnap.val() } as Evento;
           
-          if (eventoSnap.exists()) {
-            const evento = { id: eventoSnap.key!, ...eventoSnap.val() } as Evento;
+          // Verificar si el nombre del evento coincide y tiene pago realizado
+          if (evento.titulo === eventoNombre && inscripcion.pagoRealizado) {
+            console.log("Encontrada inscripción:", inscripcion);
             
             // Obtener información adicional del comprobante
             let medioPago = "No especificado";
@@ -113,11 +116,12 @@ export const DetalleMovimientoModal = ({
             if (inscripcion.observaciones) {
               try {
                 const obs = JSON.parse(inscripcion.observaciones);
+                console.log("Observaciones parseadas:", obs);
                 if (obs.medioPago) medioPago = obs.medioPago;
                 if (obs.numeroOperacion) numeroOperacion = obs.numeroOperacion;
                 if (obs.comprobanteUrl) comprobanteImagenUrl = obs.comprobanteUrl;
               } catch (e) {
-                // Si no es JSON válido, ignorar
+                console.log("No se pudieron parsear las observaciones como JSON");
               }
             }
             
@@ -133,6 +137,7 @@ export const DetalleMovimientoModal = ({
         }
       }
       
+      console.log("Total de inscripciones encontradas:", inscripcionesData.length);
       setInscripciones(inscripcionesData);
     } catch (error) {
       console.error("Error al cargar inscripciones:", error);
