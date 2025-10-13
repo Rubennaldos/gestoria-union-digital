@@ -151,7 +151,16 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
 
   // Comprobante de Pago (si existe)
   if (data.comprobanteBase64) {
-    yPos += 10;
+    // Verificar si hay espacio suficiente, si no agregar nueva página
+    const espacioNecesario = 100;
+    const espacioDisponible = doc.internal.pageSize.getHeight() - yPos - 30;
+    
+    if (espacioDisponible < espacioNecesario) {
+      doc.addPage();
+      yPos = 20;
+    } else {
+      yPos += 10;
+    }
     
     // Título del comprobante
     doc.setFontSize(11);
@@ -160,23 +169,57 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
     yPos += 8;
     
     try {
-      // Marco para el comprobante
-      const comprobanteWidth = pageWidth - 50;
-      const comprobanteHeight = 70;
-      const comprobanteX = 25;
+      // Crear una imagen temporal para obtener las dimensiones reales
+      const img = new Image();
+      img.src = data.comprobanteBase64;
+      
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // Continuar aunque falle
+      });
+      
+      // Calcular dimensiones proporcionales
+      const maxWidth = pageWidth - 50;
+      const maxHeight = 100;
+      
+      let imgWidth = img.width;
+      let imgHeight = img.height;
+      
+      // Si la imagen es válida, calcular proporción
+      if (imgWidth > 0 && imgHeight > 0) {
+        const aspectRatio = imgWidth / imgHeight;
+        
+        // Ajustar al ancho máximo
+        if (imgWidth > maxWidth) {
+          imgWidth = maxWidth;
+          imgHeight = imgWidth / aspectRatio;
+        }
+        
+        // Si aún es muy alta, ajustar a la altura máxima
+        if (imgHeight > maxHeight) {
+          imgHeight = maxHeight;
+          imgWidth = imgHeight * aspectRatio;
+        }
+      } else {
+        // Valores por defecto si no se puede obtener dimensiones
+        imgWidth = maxWidth;
+        imgHeight = 80;
+      }
+      
+      const comprobanteX = (pageWidth - imgWidth) / 2; // Centrar horizontalmente
       
       // Fondo blanco para el comprobante
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(comprobanteX - 5, yPos - 5, comprobanteWidth + 10, comprobanteHeight + 10, 3, 3, 'F');
+      doc.roundedRect(comprobanteX - 5, yPos - 5, imgWidth + 10, imgHeight + 10, 3, 3, 'F');
       
       // Borde
       doc.setDrawColor(...primaryColor);
       doc.setLineWidth(0.5);
-      doc.roundedRect(comprobanteX - 5, yPos - 5, comprobanteWidth + 10, comprobanteHeight + 10, 3, 3, 'S');
+      doc.roundedRect(comprobanteX - 5, yPos - 5, imgWidth + 10, imgHeight + 10, 3, 3, 'S');
       
-      // Agregar imagen del comprobante centrada
-      doc.addImage(data.comprobanteBase64, 'JPEG', comprobanteX, yPos, comprobanteWidth, comprobanteHeight);
-      yPos += comprobanteHeight + 15;
+      // Agregar imagen del comprobante centrada y proporcional
+      doc.addImage(data.comprobanteBase64, 'JPEG', comprobanteX, yPos, imgWidth, imgHeight);
+      yPos += imgHeight + 15;
     } catch (error) {
       doc.setFontSize(9);
       doc.setTextColor(100);
