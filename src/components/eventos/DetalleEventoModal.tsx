@@ -401,8 +401,134 @@ export const DetalleEventoModal = ({
 
           <Separator />
 
-          {/* Formulario de Inscripción */}
-          {/* ... (tu formulario tal cual estaba) ... */}
+          {/* Selección de sesiones */}
+          <div>
+            <h3 className="font-semibold mb-3">Selecciona las sesiones a las que deseas inscribirte</h3>
+            <div className="space-y-2">
+              {evento.sesiones.map((sesion) => (
+                <div key={sesion.id} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <Checkbox
+                    checked={sesionesSeleccionadas.includes(sesion.id)}
+                    onCheckedChange={() => toggleSesion(sesion.id)}
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <p className="font-medium">{sesion.lugar}</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(toZonedTime(new Date(sesion.fecha), "America/Lima"), "dd/MM/yyyy", { locale: es })}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {sesion.horaInicio} - {sesion.horaFin}
+                      </span>
+                      {sesion.precio > 0 && (
+                        <span className="flex items-center gap-1 text-success font-semibold">
+                          <DollarSign className="h-3 w-3" /> S/ {sesion.precio.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Personas a inscribir */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold">Personas a inscribir</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={agregarPersona}
+                disabled={personas.length >= 10}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Agregar persona
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {personas.map((persona, index) => (
+                <Card key={index}>
+                  <CardContent className="pt-4">
+                    <div className="flex gap-3">
+                      <div className="flex-1 space-y-3">
+                        <div>
+                          <Label htmlFor={`nombre-${index}`}>Nombre completo</Label>
+                          <Input
+                            id={`nombre-${index}`}
+                            value={persona.nombre}
+                            onChange={(e) => actualizarPersona(index, "nombre", e.target.value)}
+                            placeholder="Ingresa el nombre completo"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`dni-${index}`}>DNI</Label>
+                          <Input
+                            id={`dni-${index}`}
+                            value={persona.dni}
+                            onChange={(e) => actualizarPersona(index, "dni", e.target.value)}
+                            placeholder="Ingresa el DNI"
+                            maxLength={8}
+                          />
+                        </div>
+                      </div>
+                      {personas.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => eliminarPersona(index)}
+                          className="mt-6"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {hayPrecio && personas.length > 1 && (
+              <p className="text-sm text-muted-foreground mt-2">
+                💡 La segunda persona tiene 50% de descuento. A partir de la tercera, precio normal.
+              </p>
+            )}
+          </div>
+
+          {/* Observaciones */}
+          <div>
+            <Label htmlFor="observaciones">Observaciones (opcional)</Label>
+            <Textarea
+              id="observaciones"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+              placeholder="Agrega cualquier comentario o solicitud especial..."
+              rows={3}
+            />
+          </div>
+
+          {/* Resumen de precio */}
+          {precioTotal > 0 && (
+            <Card className="bg-success/5 border-success/20">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total a pagar</p>
+                    <p className="text-2xl font-bold text-success">S/ {precioTotal.toFixed(2)}</p>
+                  </div>
+                  <Tag className="h-8 w-8 text-success" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex gap-3 pt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
