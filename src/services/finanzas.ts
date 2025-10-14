@@ -45,9 +45,14 @@ export async function crearMovimientoFinanciero(
 
   let comprobantes: Comprobante[] = [];
 
-  // Subir archivos si existen
+  // Subir archivos si existen - pero no fallar si hay error de CORS
   if (archivos && archivos.length > 0) {
-    comprobantes = await Promise.all(archivos.map((archivo) => subirComprobante(archivo, id)));
+    try {
+      comprobantes = await Promise.all(archivos.map((archivo) => subirComprobante(archivo, id)));
+    } catch (error) {
+      console.error("Error al subir comprobantes (CORS):", error);
+      // Continuar sin comprobantes subidos - el base64 está en observaciones
+    }
   }
 
   const movimiento: MovimientoFinanciero = {
