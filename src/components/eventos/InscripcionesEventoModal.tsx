@@ -53,7 +53,64 @@ export const InscripcionesEventoModal = ({
     try {
       setLoading(true);
       const data = await obtenerInscripcionesPorEvento(evento.id);
-      setInscripciones(data);
+      
+      // Expandir inscripciones antiguas con acompañantes
+      const inscripcionesExpandidas: InscripcionEvento[] = [];
+      
+      for (const inscripcion of data) {
+        // Si tiene observaciones en formato JSON con personas, expandir
+        if (inscripcion.observaciones && inscripcion.observaciones.includes('"personas"')) {
+          try {
+            const obs = JSON.parse(inscripcion.observaciones);
+            if (obs.personas && Array.isArray(obs.personas)) {
+              // Crear una inscripción por cada persona
+              obs.personas.forEach((persona: any, index: number) => {
+                inscripcionesExpandidas.push({
+                  ...inscripcion,
+                  id: `${inscripcion.id}_persona_${index}`,
+                  nombreEmpadronado: persona.nombre,
+                  dni: persona.dni,
+                  montoPagado: inscripcion.montoPagado ? inscripcion.montoPagado / obs.personas.length : 0,
+                  acompanantes: 0
+                });
+              });
+              continue;
+            }
+          } catch (e) {
+            // Si falla el parse, usar el formato original
+          }
+        }
+        
+        // Si tiene acompañantes en el formato antiguo (sin personas en JSON)
+        if (inscripcion.acompanantes > 0 && inscripcion.observaciones) {
+          // Intentar extraer personas del texto
+          const personasMatch = inscripcion.observaciones.match(/PERSONAS INSCRITAS:\n([\s\S]+?)\n\nSESIONES/);
+          if (personasMatch) {
+            const personasTexto = personasMatch[1];
+            const lineasPersonas = personasTexto.split('\n').filter(l => l.trim());
+            
+            lineasPersonas.forEach((linea, index) => {
+              const match = linea.match(/\d+\.\s*(.+?)\s*-\s*DNI:\s*(.+)/);
+              if (match) {
+                inscripcionesExpandidas.push({
+                  ...inscripcion,
+                  id: `${inscripcion.id}_acomp_${index}`,
+                  nombreEmpadronado: match[1].trim(),
+                  dni: match[2].trim(),
+                  montoPagado: inscripcion.montoPagado ? inscripcion.montoPagado / lineasPersonas.length : 0,
+                  acompanantes: 0
+                });
+              }
+            });
+            continue;
+          }
+        }
+        
+        // Agregar inscripción normal
+        inscripcionesExpandidas.push(inscripcion);
+      }
+      
+      setInscripciones(inscripcionesExpandidas);
     } catch (error) {
       console.error("Error al cargar inscripciones:", error);
       toast.error("Error al cargar las inscripciones");
