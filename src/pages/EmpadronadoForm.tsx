@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link, Shield } from "lucide-react";
+import { ArrowLeft, Save, Plus, X, Home, Eye, EyeOff, Link } from "lucide-react";
 import { CreateEmpadronadoForm, Empadronado, FamilyMember, PhoneNumber, Vehicle } from "@/types/empadronados";
 import {
   createEmpadronado,
@@ -18,14 +18,10 @@ import {
   getEmpadronado,
   isNumeroPadronUnique,
   unlinkAuthFromEmpadronado,
-  generateNextPersonalSeguridadPadron,
 } from "@/services/empadronados";
 import { createAccountForEmpadronado } from "@/services/auth";
-import { uploadPersonalSeguridadDocuments } from "@/services/storage";
 import { listRoles } from "@/services/rtdb";
 import { Role } from "@/types/auth";
-import { ref, update } from "firebase/database";
-import { db } from "@/config/firebase";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,13 +77,6 @@ const EmpadronadoForm: React.FC = () => {
 
   const [roles, setRoles] = useState<Role[]>([]);
 
-  // Estados para archivos de personal de seguridad
-  const [dniFrontalFile, setDniFrontalFile] = useState<File | null>(null);
-  const [dniReversoFile, setDniReversoFile] = useState<File | null>(null);
-  const [reciboLuzFile, setReciboLuzFile] = useState<File | null>(null);
-  const [uploadingFiles, setUploadingFiles] = useState(false);
-  const [newTelefonoEmergencia, setNewTelefonoEmergencia] = useState("");
-
   // Form state
   const [formData, setFormData] = useState<CreateEmpadronadoForm>({
     numeroPadron: "",
@@ -108,11 +97,6 @@ const EmpadronadoForm: React.FC = () => {
     estadoVivienda: "terreno",
     cumpleanos: "",
     observaciones: "",
-    tipoRegistro: "residente", // Por defecto es residente
-    telefonosEmergencia: [],
-    tipoSangre: "",
-    direccionDomicilio: "",
-    exentoCobroMensual: false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -123,13 +107,8 @@ const EmpadronadoForm: React.FC = () => {
 
     if (isEditing && id) {
       loadEmpadronado();
-    } else {
-      // Si es nuevo y personal de seguridad, generar número automáticamente
-      if (formData.tipoRegistro === "personal_seguridad") {
-        generatePersonalSeguridadPadron();
-      }
     }
-  }, [id, isEditing, formData.tipoRegistro]);
+  }, [id, isEditing]);
 
   const loadRoles = async () => {
     try {
@@ -140,14 +119,6 @@ const EmpadronadoForm: React.FC = () => {
     }
   };
 
-  const generatePersonalSeguridadPadron = async () => {
-    try {
-      const nextPadron = await generateNextPersonalSeguridadPadron();
-      setFormData((prev) => ({ ...prev, numeroPadron: nextPadron }));
-    } catch (error) {
-      console.error("Error generating padron:", error);
-    }
-  };
 
   const loadEmpadronado = async () => {
     if (!id) return;
@@ -216,39 +187,16 @@ const EmpadronadoForm: React.FC = () => {
   const validateForm = async (): Promise<boolean> => {
     const newErrors: Record<string, string> = {};
 
-    const esPersonalSeguridad = formData.tipoRegistro === "personal_seguridad";
-
     // Validaciones básicas
     if (!formData.numeroPadron.trim()) newErrors.numeroPadron = "Número de padrón requerido";
     if (!formData.nombre.trim()) newErrors.nombre = "Nombre requerido";
     if (!formData.apellidos.trim()) newErrors.apellidos = "Apellidos requeridos";
     if (!formData.dni.trim()) newErrors.dni = "DNI requerido";
     if (formData.dni.trim() && formData.dni.length !== 8) newErrors.dni = "El DNI debe tener 8 dígitos";
-
-    // Solo validar familia si es residente
-    if (!esPersonalSeguridad && !formData.familia.trim()) {
-      newErrors.familia = "Familia requerida";
-    }
-
+    if (!formData.familia.trim()) newErrors.familia = "Familia requerida";
     if (!formData.cumpleanos.trim()) newErrors.cumpleanos = "Cumpleaños requerido";
-
-    // Validaciones específicas para personal de seguridad
-    if (esPersonalSeguridad) {
-      if (!formData.direccionDomicilio?.trim()) {
-        newErrors.direccionDomicilio = "Dirección de domicilio requerida";
-      }
-
-      // Validar archivos solo si no está editando (en edición son opcionales)
-      if (!isEditing) {
-        if (!dniFrontalFile) newErrors.dniFrontal = "DNI frontal requerido";
-        if (!dniReversoFile) newErrors.dniReverso = "DNI reverso requerido";
-        if (!reciboLuzFile) newErrors.reciboLuz = "Recibo de luz requerido";
-      }
-    } else {
-      // Validaciones para residentes
-      if (!formData.manzana?.trim()) newErrors.manzana = "Manzana requerida";
-      if (!formData.lote?.trim()) newErrors.lote = "Lote requerido";
-    }
+    if (!formData.manzana?.trim()) newErrors.manzana = "Manzana requerida";
+    if (!formData.lote?.trim()) newErrors.lote = "Lote requerido";
 
     // Validar formato de cumpleaños (DD/MM/YYYY)
     if (formData.cumpleanos && !/^\d{2}\/\d{2}\/\d{4}$/.test(formData.cumpleanos)) {
@@ -356,24 +304,6 @@ const EmpadronadoForm: React.FC = () => {
         ...(formData.etapa?.trim() && {
           etapa: formData.etapa.trim(),
         }),
-        // Campos específicos para personal de seguridad
-        ...(formData.tipoRegistro === "personal_seguridad" && {
-          tipoRegistro: "personal_seguridad" as const,
-          ...(formData.tipoSangre?.trim() && {
-            tipoSangre: formData.tipoSangre.trim(),
-          }),
-          ...(formData.direccionDomicilio?.trim() && {
-            direccionDomicilio: formData.direccionDomicilio.trim(),
-          }),
-          exentoCobroMensual: formData.exentoCobroMensual || false,
-          ...(formData.telefonosEmergencia?.filter((t) => t.numero?.trim()).length > 0 && {
-            telefonosEmergencia: formData.telefonosEmergencia
-              .filter((t) => t.numero?.trim())
-              .map((t) => ({
-                numero: t.numero.trim(),
-              })),
-          }),
-        }),
       };
 
       let success = false;
@@ -388,42 +318,6 @@ const EmpadronadoForm: React.FC = () => {
         empadronadoId = await createEmpadronado(submitData, "admin-user");
         success = Boolean(empadronadoId);
         console.log("Empadronado creado con ID:", empadronadoId, "Success:", success);
-      }
-
-      // Si es personal de seguridad y hay archivos, subirlos
-      if (
-        success &&
-        formData.tipoRegistro === "personal_seguridad" &&
-        (dniFrontalFile || dniReversoFile || reciboLuzFile)
-      ) {
-        try {
-          setUploadingFiles(true);
-          const documentURLs = await uploadPersonalSeguridadDocuments(empadronadoId, {
-            dniFrontal: dniFrontalFile || undefined,
-            dniReverso: dniReversoFile || undefined,
-            reciboLuz: reciboLuzFile || undefined,
-          });
-
-          // Actualizar empadronado con URLs de documentos usando firebase directly
-          const empadronadoRef = ref(db, `empadronados/${empadronadoId}`);
-          await update(empadronadoRef, {
-            documentoDniFrontal: documentURLs.dniFrontalURL || null,
-            documentoDniReverso: documentURLs.dniReversoURL || null,
-            documentoReciboLuz: documentURLs.reciboLuzURL || null,
-            updatedAt: Date.now(),
-          });
-
-          console.log("Documentos subidos exitosamente");
-        } catch (uploadError: any) {
-          console.error("Error subiendo documentos:", uploadError);
-          toast({
-            title: "Advertencia",
-            description: `Empadronado ${isEditing ? "actualizado" : "creado"}, pero hubo un error al subir los documentos: ${uploadError.message}`,
-            variant: "destructive",
-          });
-        } finally {
-          setUploadingFiles(false);
-        }
       }
 
       // Si se creó/actualizó el empadronado exitosamente y está habilitada la creación de cuenta
@@ -640,87 +534,6 @@ const EmpadronadoForm: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
-        {/* Tipo de Registro - Mobile Optimized */}
-        <Card className="overflow-hidden">
-          <CardHeader className="p-4 md:p-6">
-            <CardTitle className="flex flex-col sm:flex-row sm:items-center gap-2 text-base md:text-lg">
-              <span>Tipo de Registro</span>
-              {formData.tipoRegistro === "personal_seguridad" && (
-                <Badge variant="secondary" className="text-xs w-fit">
-                  Personal de Seguridad
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription className="text-xs md:text-sm">
-              Selecciona si es un residente o personal de seguridad
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setFormData((prev) => ({ 
-                    ...prev, 
-                    tipoRegistro: "residente",
-                    numeroPadron: !isEditing && prev.tipoRegistro === "personal_seguridad" ? "" : prev.numeroPadron,
-                    exentoCobroMensual: false,
-                  }));
-                  setCreateUserAccount(false);
-                }}
-                className={`p-3 md:p-4 border-2 rounded-lg transition-all active:scale-95 ${
-                  formData.tipoRegistro === "residente"
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border hover:border-primary/50 hover:bg-accent/50"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <Home className="h-5 w-5 md:h-6 md:w-6 shrink-0 mt-0.5" />
-                  <div className="text-left">
-                    <p className="font-medium text-sm md:text-base">Residente</p>
-                    <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                      Persona que vive en la urbanización
-                    </p>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  const nextPadron = await generateNextPersonalSeguridadPadron();
-                  setFormData((prev) => ({
-                    ...prev,
-                    tipoRegistro: "personal_seguridad",
-                    numeroPadron: nextPadron,
-                    familia: "Personal de Seguridad",
-                    vive: false,
-                    estadoVivienda: "terreno",
-                    exentoCobroMensual: true,
-                  }));
-                  setCreateUserAccount(true);
-                  setUserAccountData((prev) => ({ ...prev, roleId: "seguridad" }));
-                }}
-                className={`p-3 md:p-4 border-2 rounded-lg transition-all active:scale-95 ${
-                  formData.tipoRegistro === "personal_seguridad"
-                    ? "border-primary bg-primary/5 shadow-sm"
-                    : "border-border hover:border-primary/50 hover:bg-accent/50"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 md:h-6 md:w-6 shrink-0 mt-0.5" />
-                  <div className="text-left">
-                    <p className="font-medium text-sm md:text-base">Personal de Seguridad</p>
-                    <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-                      Guardias y personal de vigilancia
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Información básica - Mobile Optimized */}
         <Card className="overflow-hidden">
           <CardHeader className="p-4 md:p-6">
@@ -734,22 +547,14 @@ const EmpadronadoForm: React.FC = () => {
             <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="numeroPadron" className="text-xs md:text-sm font-medium">
-                  Número de Padrón o Registro *
-                  {formData.tipoRegistro === "personal_seguridad" && (
-                    <span className="block text-xs text-muted-foreground font-normal mt-0.5">
-                      (Generado automáticamente)
-                    </span>
-                  )}
+                  Número de Padrón *
                 </Label>
                 <Input
                   id="numeroPadron"
                   value={formData.numeroPadron}
                   onChange={(e) => setFormData((prev) => ({ ...prev, numeroPadron: e.target.value }))}
-                  placeholder={formData.tipoRegistro === "personal_seguridad" ? "PS 001" : "001"}
-                  readOnly={formData.tipoRegistro === "personal_seguridad"}
-                  className={`h-10 md:h-11 text-sm md:text-base ${
-                    formData.tipoRegistro === "personal_seguridad" ? "bg-muted" : ""
-                  }`}
+                  placeholder="001"
+                  className="h-10 md:h-11 text-sm md:text-base"
                 />
                 {errors.numeroPadron && (
                   <p className="text-xs text-destructive mt-1">{errors.numeroPadron}</p>
@@ -811,19 +616,17 @@ const EmpadronadoForm: React.FC = () => {
 
             {/* Familia, Género, Cumpleaños */}
             <div className="space-y-4 md:space-y-0 md:grid md:grid-cols-3 md:gap-4">
-              {formData.tipoRegistro === "residente" && (
-                <div className="space-y-2">
-                  <Label htmlFor="familia" className="text-xs md:text-sm font-medium">Familia *</Label>
-                  <Input
-                    id="familia"
-                    value={formData.familia}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, familia: e.target.value }))}
-                    placeholder="Familia García"
-                    className="h-10 md:h-11 text-sm md:text-base"
-                  />
-                  {errors.familia && <p className="text-xs text-destructive mt-1">{errors.familia}</p>}
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="familia" className="text-xs md:text-sm font-medium">Familia *</Label>
+                <Input
+                  id="familia"
+                  value={formData.familia}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, familia: e.target.value }))}
+                  placeholder="Familia García"
+                  className="h-10 md:h-11 text-sm md:text-base"
+                />
+                {errors.familia && <p className="text-xs text-destructive mt-1">{errors.familia}</p>}
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="genero" className="text-xs md:text-sm font-medium">Género</Label>
@@ -879,9 +682,8 @@ const EmpadronadoForm: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Miembros de Familia - Solo para residentes */}
-        {formData.tipoRegistro === "residente" && (
-          <Card>
+        {/* Miembros de Familia */}
+        <Card>
             <CardHeader>
               <CardTitle>Miembros de la Familia</CardTitle>
               <CardDescription>Agregar otros miembros que viven en la familia</CardDescription>
@@ -938,11 +740,9 @@ const EmpadronadoForm: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        )}
 
-        {/* Contacto - Solo para residentes */}
-        {formData.tipoRegistro === "residente" && (
-          <Card>
+        {/* Contacto */}
+        <Card>
             <CardHeader>
               <CardTitle>Contacto</CardTitle>
               <CardDescription>Información de contacto y ubicación</CardDescription>
@@ -1066,11 +866,9 @@ const EmpadronadoForm: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* Vivienda y Residencia - Solo para residentes */}
-        {formData.tipoRegistro === "residente" && (
-          <Card>
+        {/* Vivienda y Residencia */}
+        <Card>
             <CardHeader>
               <CardTitle>Vivienda y Residencia</CardTitle>
               <CardDescription>Estado de la vivienda y residencia</CardDescription>
@@ -1107,197 +905,33 @@ const EmpadronadoForm: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* Observaciones / Afectaciones de Salud */}
+        {/* Observaciones */}
         <Card>
           <CardHeader>
-            <CardTitle>
-              {formData.tipoRegistro === "personal_seguridad" ? "Afectaciones de Salud" : "Observaciones"}
-            </CardTitle>
-            <CardDescription>
-              {formData.tipoRegistro === "personal_seguridad"
-                ? "Registro de condiciones médicas, alergias o limitaciones físicas relevantes para emergencias"
-                : "Información adicional relevante"}
-            </CardDescription>
+            <CardTitle>Observaciones</CardTitle>
+            <CardDescription>Información adicional relevante</CardDescription>
           </CardHeader>
           <CardContent>
             <Textarea
               value={formData.observaciones}
               onChange={(e) => setFormData((prev) => ({ ...prev, observaciones: e.target.value }))}
-              placeholder={
-                formData.tipoRegistro === "personal_seguridad"
-                  ? "Ej: Alergia a penicilina, hipertensión arterial, asma, diabetes tipo 2..."
-                  : "Cualquier información adicional importante..."
-              }
+              placeholder="Cualquier información adicional importante..."
               rows={4}
             />
           </CardContent>
         </Card>
-
-        {/* Información Adicional - Solo Personal de Seguridad */}
-        {formData.tipoRegistro === "personal_seguridad" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Información Adicional de Personal de Seguridad</CardTitle>
-              <CardDescription>Datos específicos para el personal de seguridad</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="tipoSangre">Tipo de Sangre</Label>
-                  <Input
-                    id="tipoSangre"
-                    value={formData.tipoSangre}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, tipoSangre: e.target.value }))}
-                    placeholder="O+, A-, etc."
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="direccionDomicilio">Dirección de Domicilio *</Label>
-                  <Input
-                    id="direccionDomicilio"
-                    value={formData.direccionDomicilio}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, direccionDomicilio: e.target.value }))}
-                    placeholder="Av. Principal 123, Distrito"
-                  />
-                  {errors.direccionDomicilio && (
-                    <p className="text-sm text-destructive mt-1">{errors.direccionDomicilio}</p>
-                  )}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <Label>Teléfonos de Emergencia</Label>
-                <div className="space-y-2">
-                  {formData.telefonosEmergencia?.map((telefono, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={telefono.numero}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            telefonosEmergencia: prev.telefonosEmergencia?.map((t, i) =>
-                              i === index ? { numero: e.target.value } : t,
-                            ),
-                          }))
-                        }
-                        placeholder="Teléfono de emergencia"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            telefonosEmergencia: prev.telefonosEmergencia?.filter((_, i) => i !== index),
-                          }))
-                        }
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <Input
-                      value={newTelefonoEmergencia}
-                      onChange={(e) => setNewTelefonoEmergencia(e.target.value)}
-                      placeholder="Agregar teléfono de emergencia"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (newTelefonoEmergencia.trim()) {
-                          setFormData((prev) => ({
-                            ...prev,
-                            telefonosEmergencia: [
-                              ...(prev.telefonosEmergencia || []),
-                              { numero: newTelefonoEmergencia },
-                            ],
-                          }));
-                          setNewTelefonoEmergencia("");
-                        }
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <h3 className="font-medium text-sm">Documentos (PDF, JPG o PNG)</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="dniFrontal">DNI Frontal *</Label>
-                    <Input
-                      id="dniFrontal"
-                      type="file"
-                      accept="image/jpeg,image/png,image/jpg,application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setDniFrontalFile(file);
-                      }}
-                    />
-                    {dniFrontalFile && <p className="text-xs text-muted-foreground mt-1">✓ {dniFrontalFile.name}</p>}
-                    {errors.dniFrontal && <p className="text-sm text-destructive mt-1">{errors.dniFrontal}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="dniReverso">DNI Reverso *</Label>
-                    <Input
-                      id="dniReverso"
-                      type="file"
-                      accept="image/jpeg,image/png,image/jpg,application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setDniReversoFile(file);
-                      }}
-                    />
-                    {dniReversoFile && <p className="text-xs text-muted-foreground mt-1">✓ {dniReversoFile.name}</p>}
-                    {errors.dniReverso && <p className="text-sm text-destructive mt-1">{errors.dniReverso}</p>}
-                  </div>
-
-                  <div>
-                    <Label htmlFor="reciboLuz">Recibo de Luz *</Label>
-                    <Input
-                      id="reciboLuz"
-                      type="file"
-                      accept="image/jpeg,image/png,image/jpg,application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setReciboLuzFile(file);
-                      }}
-                    />
-                    {reciboLuzFile && <p className="text-xs text-muted-foreground mt-1">✓ {reciboLuzFile.name}</p>}
-                    {errors.reciboLuz && <p className="text-sm text-destructive mt-1">{errors.reciboLuz}</p>}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Cuenta de Usuario del Sistema */}
         <Card>
           <CardHeader>
             <CardTitle>Cuenta de Usuario del Sistema</CardTitle>
             <CardDescription>
-              {formData.tipoRegistro === "personal_seguridad"
-                ? "El personal de seguridad debe tener una cuenta para acceder al sistema"
-                : hasExistingAccount
-                  ? "Este empadronado ya tiene una cuenta de acceso vinculada"
-                  : isEditing
-                    ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
-                    : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"}
+              {hasExistingAccount
+                ? "Este empadronado ya tiene una cuenta de acceso vinculada"
+                : isEditing
+                  ? "Crear o vincular una cuenta para que el asociado pueda acceder al sistema"
+                  : "Crear automáticamente una cuenta para que el asociado pueda acceder al sistema"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1536,10 +1170,7 @@ const EmpadronadoForm: React.FC = () => {
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                {isEditing 
-                  ? (formData.tipoRegistro === "personal_seguridad" ? "Actualizar Perfil" : "Actualizar Empadronado")
-                  : (formData.tipoRegistro === "personal_seguridad" ? "Crear Perfil de Seguridad" : "Crear Empadronado")
-                }
+                {isEditing ? "Actualizar Empadronado" : "Crear Empadronado"}
               </>
             )}
           </Button>
