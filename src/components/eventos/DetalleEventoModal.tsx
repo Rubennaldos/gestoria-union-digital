@@ -211,28 +211,34 @@ export const DetalleEventoModal = ({
           comprobanteBase64,
         });
 
-        // Registrar en finanzas con toda la información del evento
-        await crearMovimientoFinanciero({
-          tipo: "ingreso",
-          categoria: "evento",
-          monto: precioTotal,
-          descripcion: `Inscripción: ${evento.titulo} - ${personas.map(p => p.nombre).join(', ')}`,
-          fecha: fechaPago.toISOString(),
-          comprobantes: [],
-          registradoPor: user.uid,
-          registradoPorNombre: user.displayName || user.email || "Usuario",
-          numeroComprobante: numeroVoucher,
-          observaciones: JSON.stringify({
-            eventoTitulo: evento.titulo,
-            eventoCategoria: getCategoriaLabel(evento.categoria),
-            personas,
-            sesiones: sesionesData,
-            voucherCode: numeroVoucher,
-            fechaRegistro: fechaPago.getTime(),
-            correo: user.email,
-            comprobanteBase64
-          }),
-        }, [archivoComprobante]);
+        // Registrar en finanzas - crear un movimiento por cada persona
+        for (const persona of personas) {
+          await crearMovimientoFinanciero({
+            tipo: "ingreso",
+            categoria: "evento",
+            monto: montoPorPersona,
+            descripcion: `Inscripción: ${evento.titulo} - ${persona.nombre}`,
+            fecha: fechaPago.toISOString(),
+            comprobantes: [],
+            registradoPor: user.uid,
+            registradoPorNombre: user.displayName || user.email || "Usuario",
+            numeroComprobante: numeroVoucher,
+            observaciones: JSON.stringify({
+              eventoTitulo: evento.titulo,
+              eventoCategoria: getCategoriaLabel(evento.categoria),
+              persona: {
+                nombre: persona.nombre,
+                dni: persona.dni
+              },
+              sesiones: sesionesData,
+              voucherCode: numeroVoucher,
+              fechaRegistro: fechaPago.getTime(),
+              correo: user.email,
+              comprobanteBase64,
+              grupoInscripcion: numeroVoucher
+            }),
+          }, [archivoComprobante]);
+        }
 
         // Descargar voucher
         const url = URL.createObjectURL(voucherBlob);
