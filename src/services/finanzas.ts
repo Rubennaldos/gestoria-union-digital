@@ -1,11 +1,6 @@
 // src/services/finanzas.ts
 import { ref, push, set, get, update, remove } from "firebase/database";
-import {
-  ref as storageRef,
-  uploadBytesResumable,
-  getDownloadURL,
-} from "firebase/storage";
-import { db, storage } from "@/config/firebase";
+import { db } from "@/config/firebase";
 import {
   MovimientoFinanciero,
   ResumenCaja,
@@ -13,41 +8,37 @@ import {
   Comprobante,
 } from "@/types/finanzas";
 
-/* ============ Subir comprobante a Storage (CORREGIDO) ============ */
+/**
+ * RTDB-only:
+ * - NO sube archivos.
+ * - Guarda SOLO metadatos del comprobante.
+ * - Si más adelante quieres adjuntar archivos reales,
+ *   se puede reactivar Storage o usar otro backend.
+ */
 export async function subirComprobante(
   file: File,
   movimientoId: string
 ): Promise<Comprobante> {
   const timestamp = Date.now();
-  const safeName = file.name.replace(/[^\w\.\-]+/g, "_");
-  const fileName = `${timestamp}-${safeName}`;
-  const path = `finanzas/comprobantes/${movimientoId}/${fileName}`;
-  const fileRef = storageRef(storage, path);
 
-  // metadata ayuda a los preflight y a servir con el tipo correcto
-  const task = uploadBytesResumable(fileRef, file, {
-    contentType: file.type || "application/octet-stream",
-    cacheControl: "public,max-age=31536000,immutable",
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    task.on(
-      "state_changed",
-      () => {},
-      (err) => reject(err),
-      () => resolve()
-    );
-  });
-
-  const url = await getDownloadURL(task.snapshot.ref);
-
-  return {
+  // Guardamos únicamente metadatos (sin URL real)
+  const meta: Comprobante = {
     nombre: file.name,
-    url,
+    url: "", // sin archivo
     tipo: file.type,
     tamano: file.size,
     fechaSubida: timestamp,
   };
+
+  // (Opcional) persistir metadatos del comprobante como hoja hija del movimiento
+  // para facilitar conteo/consulta.
+  const compRef = ref(
+    db,
+    `finanzas/comprobantes/${movimientoId}/${timestamp}`
+  );
+  await set(compRef, meta);
+
+  return meta;
 }
 
 /* ========================= Crear movimiento ========================= */
@@ -78,12 +69,19 @@ export async function crearMovimientoFinanciero(
 }
 
 /* ========================= Listar movimientos ========================= */
-type FiltrosLista = { tipo?: "ingreso" | "egreso"; fechaInicio?: string; fechaFin?: string };
+type FiltrosLista = {
+  tipo?: "ingreso" | "egreso";
+  fechaInicio?: string;
+  fechaFin?: string;
+};
 
-export async function obtenerMovimientos(filtros?: FiltrosLista): Promise<MovimientoFinanciero[]> {
+export async function obtenerMovimientos(
+  filtros?: FiltrosLista
+): Promise<MovimientoFinanciero[]> {
   const mainPath = "finanzas/movimientos";
   let snapshot = await get(ref(db, mainPath));
 
+  // Fallbacks si en tu RTDB hay otras rutas antiguas
   if (!snapshot.exists()) {
     const alt1 = await get(ref(db, "movimientos"));
     if (alt1.exists()) snapshot = alt1;
@@ -96,19 +94,21 @@ export async function obtenerMovimientos(filtros?: FiltrosLista): Promise<Movimi
   if (!snapshot.exists()) return [];
 
   const raw = snapshot.val() as Record<string, any>;
-  let movimientos: MovimientoFinanciero[] = Object.entries(raw).map(([id, v]) => ({
-    id,
-    tipo: v.tipo,
-    categoria: v.categoria,
-    descripcion: v.descripcion ?? "",
-    monto: Number(v.monto ?? 0),
-    fecha: v.fecha ?? v.createdAt ?? Date.now(),
-    registradoPor: v.registradoPor ?? "",
-    registradoPorNombre: v.registradoPorNombre ?? v.registradoPor ?? "",
-    comprobantes: Array.isArray(v.comprobantes) ? v.comprobantes : [],
-    createdAt: v.createdAt ?? Date.now(),
-    updatedAt: v.updatedAt ?? v.createdAt ?? Date.now(),
-  }));
+  let movimientos: MovimientoFinanciero[] = Object.entries(raw).map(
+    ([id, v]) => ({
+      id,
+      tipo: v.tipo,
+      categoria: v.categoria,
+      descripcion: v.descripcion ?? "",
+      monto: Number(v.monto ?? 0),
+      fecha: v.fecha ?? v.createdAt ?? Date.now(),
+      registradoPor: v.registradoPor ?? "",
+      registradoPorNombre: v.registradoPorNombre ?? v.registradoPor ?? "",
+      comprobantes: Array.isArray(v.comprobantes) ? v.comprobantes : [],
+      createdAt: v.createdAt ?? Date.now(),
+      updatedAt: v.updatedAt ?? v.createdAt ?? Date.now(),
+    })
+  );
 
   if (filtros?.tipo) {
     movimientos = movimientos.filter((m) => m.tipo === filtros.tipo);
@@ -122,7 +122,9 @@ export async function obtenerMovimientos(filtros?: FiltrosLista): Promise<Movimi
     movimientos = movimientos.filter((m) => new Date(m.fecha).getTime() <= d);
   }
 
-  movimientos.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  movimientos.sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+  );
   return movimientos;
 }
 
@@ -140,11 +142,17 @@ export async function actualizarMovimiento(
   let comprobantes = movimientoActual.comprobantes || [];
 
   if (nuevosArchivos && nuevosArchivos.length > 0) {
-    const nuevos = await Promise.all(nuevosArchivos.map((a) => subirComprobante(a, id)));
+    const nuevos = await Promise.all(
+      nuevosArchivos.map((a) => subirComprobante(a, id))
+    );
     comprobantes = [...comprobantes, ...nuevos];
   }
 
-  await update(movimientoRef, { ...updates, comprobantes, updatedAt: Date.now() });
+  await update(movimientoRef, {
+    ...updates,
+    comprobantes,
+    updatedAt: Date.now(),
+  });
   await actualizarResumenCaja();
 }
 
@@ -159,17 +167,24 @@ export async function eliminarMovimiento(id: string): Promise<void> {
     });
   });
   await actualizarResumenCaja();
+
+  // (Opcional) borrar metadatos de comprobantes colgantes
+  await remove(ref(db, `finanzas/comprobantes/${id}`)).catch(() => {});
 }
-export async function deleteMovimiento(id: string) { return eliminarMovimiento(id); }
+export async function deleteMovimiento(id: string) {
+  return eliminarMovimiento(id);
+}
 
 /* ========================= Resumen de caja ========================= */
 async function calcularResumenCaja(): Promise<ResumenCaja> {
   const movimientos = await obtenerMovimientos();
 
-  const totalIngresos = movimientos.filter(m => m.tipo === "ingreso")
+  const totalIngresos = movimientos
+    .filter((m) => m.tipo === "ingreso")
     .reduce((s, m) => s + Number(m.monto || 0), 0);
 
-  const totalEgresos = movimientos.filter(m => m.tipo === "egreso")
+  const totalEgresos = movimientos
+    .filter((m) => m.tipo === "egreso")
     .reduce((s, m) => s + Number(m.monto || 0), 0);
 
   const saldoActual = totalIngresos - totalEgresos;
@@ -207,34 +222,52 @@ export async function obtenerEstadisticas(): Promise<EstadisticasFinanzas> {
   const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
   const inicioAnio = new Date(ahora.getFullYear(), 0, 1);
 
-  const movimientosMes = movimientos.filter(m => new Date(m.fecha).getTime() >= inicioMes.getTime());
-  const movimientosAnio = movimientos.filter(m => new Date(m.fecha).getTime() >= inicioAnio.getTime());
+  const movimientosMes = movimientos.filter(
+    (m) => new Date(m.fecha).getTime() >= inicioMes.getTime()
+  );
+  const movimientosAnio = movimientos.filter(
+    (m) => new Date(m.fecha).getTime() >= inicioAnio.getTime()
+  );
 
-  const ingresosDelMes = movimientosMes.filter(m => m.tipo === "ingreso")
+  const ingresosDelMes = movimientosMes
+    .filter((m) => m.tipo === "ingreso")
     .reduce((s, m) => s + Number(m.monto || 0), 0);
 
-  const egresosDelMes = movimientosMes.filter(m => m.tipo === "egreso")
+  const egresosDelMes = movimientosMes
+    .filter((m) => m.tipo === "egreso")
     .reduce((s, m) => s + Number(m.monto || 0), 0);
 
-  const ingresosDelAnio = movimientosAnio.filter(m => m.tipo === "ingreso")
+  const ingresosDelAnio = movimientosAnio
+    .filter((m) => m.tipo === "ingreso")
     .reduce((s, m) => s + Number(m.monto || 0), 0);
 
-  const egresosDelAnio = movimientosAnio.filter(m => m.tipo === "egreso")
+  const egresosDelAnio = movimientosAnio
+    .filter((m) => m.tipo === "egreso")
     .reduce((s, m) => s + Number(m.monto || 0), 0);
 
   const egresosPorCategoria = new Map<string, number>();
-  movimientosMes.filter(m => m.tipo === "egreso").forEach(m => {
-    egresosPorCategoria.set(m.categoria, (egresosPorCategoria.get(m.categoria) || 0) + Number(m.monto || 0));
-  });
+  movimientosMes
+    .filter((m) => m.tipo === "egreso")
+    .forEach((m) => {
+      egresosPorCategoria.set(
+        m.categoria,
+        (egresosPorCategoria.get(m.categoria) || 0) + Number(m.monto || 0)
+      );
+    });
   const topCategoriasEgreso = Array.from(egresosPorCategoria.entries())
     .map(([categoria, total]) => ({ categoria, total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
   const ingresosPorCategoria = new Map<string, number>();
-  movimientosMes.filter(m => m.tipo === "ingreso").forEach(m => {
-    ingresosPorCategoria.set(m.categoria, (ingresosPorCategoria.get(m.categoria) || 0) + Number(m.monto || 0));
-  });
+  movimientosMes
+    .filter((m) => m.tipo === "ingreso")
+    .forEach((m) => {
+      ingresosPorCategoria.set(
+        m.categoria,
+        (ingresosPorCategoria.get(m.categoria) || 0) + Number(m.monto || 0)
+      );
+    });
   const topCategoriasIngreso = Array.from(ingresosPorCategoria.entries())
     .map(([categoria, total]) => ({ categoria, total }))
     .sort((a, b) => b.total - a.total)
