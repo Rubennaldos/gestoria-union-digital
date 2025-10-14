@@ -1,3 +1,4 @@
+// src/services/eventos.ts
 import {
   ref,
   push,
@@ -17,11 +18,10 @@ import {
   EstadisticasEventos,
   SesionEvento,
 } from "@/types/eventos";
-import { fromZonedTime, toZonedTime, formatInTimeZone } from "date-fns-tz";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 
 const zonedTimeToUtc = fromZonedTime; // alias
-const utcToZonedTime = toZonedTime;   // alias
-
+const utcToZonedTime = toZonedTime; // alias
 
 // ========== EVENTOS ==========
 
@@ -40,14 +40,13 @@ export const crearEvento = async (
     })
   );
 
-  // Convertir fechas desde zona horaria de Perú (America/Lima) a UTC
+  // Fechas en zona horaria Perú -> UTC
   const TIMEZONE = "America/Lima";
-  
-  // Parsear las fechas como si estuvieran en hora de Perú
-  const fechaInicioPeruana = fromZonedTime(eventoData.fechaInicio, TIMEZONE);
-  const fechaFinPeruana = eventoData.fechaFin && !eventoData.fechaFinIndefinida
-    ? fromZonedTime(eventoData.fechaFin, TIMEZONE)
-    : null;
+  const fechaInicioPeruana = zonedTimeToUtc(eventoData.fechaInicio, TIMEZONE);
+  const fechaFinPeruana =
+    eventoData.fechaFin && !eventoData.fechaFinIndefinida
+      ? zonedTimeToUtc(eventoData.fechaFin, TIMEZONE)
+      : null;
 
   const evento: Evento = {
     id: nuevoEventoRef.key!,
@@ -81,29 +80,23 @@ export const crearEvento = async (
 export const obtenerEventos = async (): Promise<Evento[]> => {
   const eventosRef = ref(db, "eventos");
   const snapshot = await get(eventosRef);
-
   if (!snapshot.exists()) return [];
-
   const eventos: Evento[] = [];
-  snapshot.forEach((childSnapshot) => {
-    eventos.push(childSnapshot.val());
+  snapshot.forEach((child) => {
+    eventos.push(child.val());
   });
-
   return eventos.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
 };
 
 export const obtenerEventosActivos = async (): Promise<Evento[]> => {
   const eventos = await obtenerEventos();
   const ahora = Date.now();
-
   return eventos.filter(
-    (evento) =>
-      evento.estado === "activo" &&
-      (evento.fechaFinIndefinida ||
-        !evento.fechaFin ||
-        evento.fechaFin >= ahora) &&
-      (evento.cuposIlimitados ||
-        (evento.cuposDisponibles && evento.cuposDisponibles > 0))
+    (e) =>
+      e.estado === "activo" &&
+      (e.fechaFinIndefinida || !e.fechaFin || e.fechaFin >= ahora) &&
+      (e.cuposIlimitados ||
+        (typeof e.cuposDisponibles === "number" && e.cuposDisponibles > 0))
   );
 };
 
@@ -112,7 +105,6 @@ export const obtenerEventoPorId = async (
 ): Promise<Evento | null> => {
   const eventoRef = ref(db, `eventos/${eventoId}`);
   const snapshot = await get(eventoRef);
-
   return snapshot.exists() ? snapshot.val() : null;
 };
 
@@ -123,7 +115,7 @@ export const actualizarEvento = async (
 ): Promise<void> => {
   const eventoRef = ref(db, `eventos/${eventoId}`);
 
-  const updates: any = {
+  const updates: Record<string, any> = {
     ultimaModificacion: Date.now(),
     modificadoPor: uid,
   };
@@ -131,8 +123,7 @@ export const actualizarEvento = async (
   if (eventoData.titulo !== undefined) updates.titulo = eventoData.titulo;
   if (eventoData.descripcion !== undefined)
     updates.descripcion = eventoData.descripcion;
-  if (eventoData.categoria !== undefined)
-    updates.categoria = eventoData.categoria;
+  if (eventoData.categoria !== undefined) updates.categoria = eventoData.categoria;
   if (eventoData.instructor !== undefined)
     updates.instructor = eventoData.instructor;
   if (eventoData.precio !== undefined) updates.precio = eventoData.precio;
@@ -142,10 +133,10 @@ export const actualizarEvento = async (
     updates.materialesIncluidos = eventoData.materialesIncluidos;
   if (eventoData.imagen !== undefined) updates.imagen = eventoData.imagen;
   if (eventoData.estado !== undefined) updates.estado = eventoData.estado;
+
   if (eventoData.promocion) {
-    // Limpiar valores undefined de la promoción para Firebase
-    const promocionLimpia = JSON.parse(JSON.stringify(eventoData.promocion));
-    updates.promocion = promocionLimpia;
+    // limpiar undefined para RTDB
+    updates.promocion = JSON.parse(JSON.stringify(eventoData.promocion));
   }
 
   if (eventoData.fechaFinIndefinida !== undefined) {
@@ -164,24 +155,19 @@ export const actualizarEvento = async (
 
   if (eventoData.sesiones !== undefined) {
     const sesionesConId: SesionEvento[] = eventoData.sesiones.map(
-      (sesion, index) => ({
-        ...sesion,
-        id: `${eventoId}_sesion_${index}`,
-      })
+      (s, i) => ({ ...s, id: `${eventoId}_sesion_${i}` })
     );
     updates.sesiones = sesionesConId;
   }
 
+  const TIMEZONE = "America/Lima";
   if (eventoData.fechaInicio) {
-    const TIMEZONE = "America/Lima";
-    const fechaInicioPeruana = fromZonedTime(eventoData.fechaInicio, TIMEZONE);
-    updates.fechaInicio = fechaInicioPeruana.getTime();
+    const f = zonedTimeToUtc(eventoData.fechaInicio, TIMEZONE);
+    updates.fechaInicio = f.getTime();
   }
-
   if (eventoData.fechaFin && !eventoData.fechaFinIndefinida) {
-    const TIMEZONE = "America/Lima";
-    const fechaFinPeruana = fromZonedTime(eventoData.fechaFin, TIMEZONE);
-    updates.fechaFin = fechaFinPeruana.getTime();
+    const f = zonedTimeToUtc(eventoData.fechaFin, TIMEZONE);
+    updates.fechaFin = f.getTime();
   } else if (eventoData.fechaFinIndefinida) {
     updates.fechaFin = null;
   }
@@ -190,16 +176,14 @@ export const actualizarEvento = async (
 };
 
 export const eliminarEvento = async (eventoId: string): Promise<void> => {
-  const eventoRef = ref(db, `eventos/${eventoId}`);
-  await remove(eventoRef);
+  await remove(ref(db, `eventos/${eventoId}`));
 };
 
 export const cambiarEstadoEvento = async (
   eventoId: string,
   estado: string
 ): Promise<void> => {
-  const eventoRef = ref(db, `eventos/${eventoId}`);
-  await update(eventoRef, { estado });
+  await update(ref(db, `eventos/${eventoId}`), { estado });
 };
 
 // ========== INSCRIPCIONES ==========
@@ -211,17 +195,15 @@ export const inscribirseEvento = async (
   acompanantes: number = 0,
   observaciones?: string
 ): Promise<string> => {
-  // Verificar cupos disponibles
   const evento = await obtenerEventoPorId(eventoId);
   if (!evento) throw new Error("Evento no encontrado");
 
-  if (!evento.cuposIlimitados && evento.cuposDisponibles !== undefined) {
+  if (!evento.cuposIlimitados && typeof evento.cuposDisponibles === "number") {
     if (evento.cuposDisponibles < 1 + acompanantes) {
       throw new Error("No hay cupos suficientes disponibles");
     }
   }
 
-  // Crear inscripción
   const inscripcionesRef = ref(db, "inscripcionesEventos");
   const nuevaInscripcionRef = push(inscripcionesRef);
 
@@ -239,12 +221,9 @@ export const inscribirseEvento = async (
 
   await set(nuevaInscripcionRef, inscripcion);
 
-  // Actualizar cupos disponibles solo si no son ilimitados
-  if (!evento.cuposIlimitados && evento.cuposDisponibles !== undefined) {
+  if (!evento.cuposIlimitados && typeof evento.cuposDisponibles === "number") {
     const nuevosCupos = evento.cuposDisponibles - (1 + acompanantes);
-    await update(ref(db, `eventos/${eventoId}`), {
-      cuposDisponibles: nuevosCupos,
-    });
+    await update(ref(db, `eventos/${eventoId}`), { cuposDisponibles: nuevosCupos });
   }
 
   return nuevaInscripcionRef.key!;
@@ -255,18 +234,15 @@ export const obtenerInscripcionesPorEvento = async (
 ): Promise<InscripcionEvento[]> => {
   const inscripcionesRef = ref(db, "inscripcionesEventos");
   const snapshot = await get(inscripcionesRef);
-
   if (!snapshot.exists()) return [];
 
-  const inscripciones: InscripcionEvento[] = [];
-  snapshot.forEach((childSnapshot) => {
-    const inscripcion = childSnapshot.val();
-    if (inscripcion.eventoId === eventoId) {
-      inscripciones.push(inscripcion);
-    }
+  const list: InscripcionEvento[] = [];
+  snapshot.forEach((c) => {
+    const v = c.val();
+    if (v.eventoId === eventoId) list.push(v);
   });
 
-  return inscripciones.sort((a, b) => b.fechaInscripcion - a.fechaInscripcion);
+  return list.sort((a, b) => b.fechaInscripcion - a.fechaInscripcion);
 };
 
 export const obtenerInscripcionesPorEmpadronado = async (
@@ -274,34 +250,30 @@ export const obtenerInscripcionesPorEmpadronado = async (
 ): Promise<InscripcionEvento[]> => {
   const inscripcionesRef = ref(db, "inscripcionesEventos");
   const snapshot = await get(inscripcionesRef);
-
   if (!snapshot.exists()) return [];
 
-  const inscripciones: InscripcionEvento[] = [];
-  snapshot.forEach((childSnapshot) => {
-    const inscripcion = childSnapshot.val();
-    if (inscripcion.empadronadoId === empadronadoId) {
-      inscripciones.push(inscripcion);
-    }
+  const list: InscripcionEvento[] = [];
+  snapshot.forEach((c) => {
+    const v = c.val();
+    if (v.empadronadoId === empadronadoId) list.push(v);
   });
 
-  return inscripciones.sort((a, b) => b.fechaInscripcion - a.fechaInscripcion);
+  return list.sort((a, b) => b.fechaInscripcion - a.fechaInscripcion);
 };
 
 export const actualizarEstadoInscripcion = async (
   inscripcionId: string,
   estado: string
 ): Promise<void> => {
-  const inscripcionRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
-  await update(inscripcionRef, { estado });
+  await update(ref(db, `inscripcionesEventos/${inscripcionId}`), { estado });
 };
 
-/** ACTUALIZADA: registra pago + genera comprobante + espeja a cobranzas_v2 */
+/** Registra pago y genera comprobante (fan-out a cobranzas_v2) */
 export const registrarPagoInscripcion = async (
   inscripcionId: string,
   montoPagado: number
 ): Promise<{ receiptId: string; receiptCode: string }> => {
-  // 1) leer inscripción y evento
+  // leer inscripción y evento
   const insRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
   const insSnap = await get(insRef);
   if (!insSnap.exists()) throw new Error("Inscripción no encontrada");
@@ -310,14 +282,13 @@ export const registrarPagoInscripcion = async (
   const evento = await obtenerEventoPorId(ins.eventoId);
   if (!evento) throw new Error("Evento no encontrado");
 
-  // 2) correlativo simple/atómico
+  // correlativo
   async function getNextReceiptCode(): Promise<string> {
     const cRef = ref(db, "correlatives/receipt");
     const cSnap = await get(cRef);
     let prefix = "REC-2025";
     let next = 1;
     let pad = 6;
-
     if (cSnap.exists()) {
       const v = cSnap.val() as any;
       prefix = v.prefix ?? prefix;
@@ -325,14 +296,12 @@ export const registrarPagoInscripcion = async (
       pad = Number(v.pad ?? 6);
     }
     const code = `${prefix}-${String(next).padStart(pad, "0")}`;
-
     await set(cRef, { prefix, next: next + 1, pad, updatedAt: Date.now() });
     return code;
   }
 
   const receiptCode = await getNextReceiptCode();
 
-  // 3) payload del comprobante
   const issuedAt = Date.now();
   const items = [
     {
@@ -343,12 +312,16 @@ export const registrarPagoInscripcion = async (
     },
   ];
 
-  const receiptBase = {
+  const receiptRef = push(ref(db, "receipts"));
+  const receiptId = receiptRef.key!;
+
+  const updates: Record<string, any> = {};
+  updates[`receipts/${receiptId}`] = {
+    id: receiptId,
     code: receiptCode,
     issuedAt,
     org: {
-      name:
-        "Asociación Junta de Propietarios San Antonio de Pachacamac",
+      name: "Asociación Junta de Propietarios San Antonio de Pachacamac",
       logoPath: "/logo-san-antonio.png",
     },
     customer: {
@@ -367,27 +340,16 @@ export const registrarPagoInscripcion = async (
     currency: "PEN" as const,
     paymentMethod: "transferencia" as const,
     notes: null as string | null,
-    inscripcionId: inscripcionId,
+    inscripcionId,
   };
 
-  // 4) escribir comprobante + fan-out
-  const receiptRef = push(ref(db, "receipts"));
-  const receiptId = receiptRef.key!;
-  const updates: Record<string, any> = {};
-
-  updates[`receipts/${receiptId}`] = { id: receiptId, ...receiptBase };
-
-  // marcar pago en inscripción
   updates[`inscripcionesEventos/${inscripcionId}/pagoRealizado`] = true;
   updates[`inscripcionesEventos/${inscripcionId}/fechaPago`] = issuedAt;
   updates[`inscripcionesEventos/${inscripcionId}/montoPagado`] = montoPagado;
   updates[`inscripcionesEventos/${inscripcionId}/estado`] = "confirmado";
   updates[`inscripcionesEventos/${inscripcionId}/comprobanteId`] = receiptId;
 
-  // índice para cobranzas v2
-  updates[
-    `cobranzas_v2/comprobantes/${ins.empadronadoId}/${receiptId}`
-  ] = {
+  updates[`cobranzas_v2/comprobantes/${ins.empadronadoId}/${receiptId}`] = {
     ref: `/receipts/${receiptId}`,
     code: receiptCode,
     customerName: ins.nombreEmpadronado,
@@ -397,37 +359,29 @@ export const registrarPagoInscripcion = async (
     tipo: "evento",
   };
 
-  // índice por inscripción
   updates[`receipts_by_inscripcion/${inscripcionId}`] = receiptId;
 
   await update(ref(db), updates);
-
-  return { receiptId, receiptCode: receiptCode };
+  return { receiptId, receiptCode };
 };
 
 export const cancelarInscripcion = async (
   inscripcionId: string,
   eventoId: string
 ): Promise<void> => {
-  const inscripcionRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
-  const inscripcionSnapshot = await get(inscripcionRef);
+  const insRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
+  const insSnap = await get(insRef);
+  if (!insSnap.exists()) throw new Error("Inscripción no encontrada");
+  const ins = insSnap.val() as InscripcionEvento;
 
-  if (!inscripcionSnapshot.exists())
-    throw new Error("Inscripción no encontrada");
+  await update(insRef, { estado: "cancelado" });
 
-  const inscripcion = inscripcionSnapshot.val() as InscripcionEvento;
-
-  // Cancelar inscripción
-  await update(inscripcionRef, { estado: "cancelado" });
-
-  // Liberar cupos solo si el evento no tiene cupos ilimitados
   const eventoRef = ref(db, `eventos/${eventoId}`);
-  const eventoSnapshot = await get(eventoRef);
-
-  if (eventoSnapshot.exists()) {
-    const evento = eventoSnapshot.val() as Evento;
-    if (!evento.cuposIlimitados && evento.cuposDisponibles !== undefined) {
-      const cuposLiberados = 1 + inscripcion.acompanantes;
+  const eventoSnap = await get(eventoRef);
+  if (eventoSnap.exists()) {
+    const evento = eventoSnap.val() as Evento;
+    if (!evento.cuposIlimitados && typeof evento.cuposDisponibles === "number") {
+      const cuposLiberados = 1 + ins.acompanantes;
       await update(eventoRef, {
         cuposDisponibles: evento.cuposDisponibles + cuposLiberados,
       });
@@ -441,13 +395,10 @@ export const obtenerEstadisticasEventos = async (): Promise<EstadisticasEventos>
   const eventos = await obtenerEventos();
   const todasInscripciones: InscripcionEvento[] = [];
 
-  // Obtener todas las inscripciones
-  const inscripcionesRef = ref(db, "inscripcionesEventos");
-  const snapshot = await get(inscripcionesRef);
-
-  if (snapshot.exists()) {
-    snapshot.forEach((childSnapshot) => {
-      todasInscripciones.push(childSnapshot.val());
+  const snap = await get(ref(db, "inscripcionesEventos"));
+  if (snap.exists()) {
+    snap.forEach((c) => {
+      todasInscripciones.push(c.val());
     });
   }
 
@@ -456,7 +407,7 @@ export const obtenerEstadisticasEventos = async (): Promise<EstadisticasEventos>
     (i) => i.pagoRealizado
   );
   const ingresosTotales = inscripcionesConfirmadas.reduce(
-    (sum, i) => sum + (i.montoPagado || 0),
+    (s, i) => s + (i.montoPagado || 0),
     0
   );
 
@@ -469,15 +420,15 @@ export const obtenerEstadisticasEventos = async (): Promise<EstadisticasEventos>
     }
   });
 
-  let eventoMasPopular;
+  let eventoMasPopular: { titulo: string; inscritos: number } | undefined;
   if (Object.keys(inscripcionesPorEvento).length > 0) {
     const eventoIdMasPopular = Object.entries(inscripcionesPorEvento).sort(
       ([, a], [, b]) => b - a
     )[0][0];
-    const evento = eventos.find((e) => e.id === eventoIdMasPopular);
-    if (evento) {
+    const ev = eventos.find((e) => e.id === eventoIdMasPopular);
+    if (ev) {
       eventoMasPopular = {
-        titulo: evento.titulo,
+        titulo: ev.titulo,
         inscritos: inscripcionesPorEvento[eventoIdMasPopular],
       };
     }

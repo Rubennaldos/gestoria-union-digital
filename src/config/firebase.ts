@@ -2,7 +2,7 @@
 import { initializeApp, getApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
-import { getFirestore } from "firebase/firestore"; // 👈 Firestore
+import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
@@ -19,16 +19,16 @@ const firebaseConfig = {
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// RTDB (lo que ya usabas)
+// RTDB
 export const db = getDatabase(app);
 
-// Firestore (nuevo, para las rutas como bootstrap/ y companias/.../configuracion/)
+// Firestore
 export const fs = getFirestore(app);
 
-// Storage (para archivos)
+// Storage
 export const storage = getStorage(app);
 
-// (Opcional) App secundaria para aislar auth admin si la usas
+// (Opcional) App secundaria si la usas
 const existingAdmin = getApps().find((a) => a.name === "AdminApp");
 export const adminApp = existingAdmin ?? initializeApp(firebaseConfig, "AdminApp");
 export const adminAuth = getAuth(adminApp);
