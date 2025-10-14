@@ -125,11 +125,11 @@ export const DetalleEventoModal = ({
       setMostrarPasarelaPago(true);
     } else {
       // Inscripción gratuita directa
-      procesarInscripcion(new Date(), null);
+      procesarInscripcion(new Date(), null, "");
     }
   };
 
-  const procesarInscripcion = async (fechaPago: Date, archivoComprobante: File | null) => {
+  const procesarInscripcion = async (fechaPago: Date, archivoComprobante: File | null, nombreBanco?: string) => {
     if (!user) return;
 
     try {
@@ -143,6 +143,7 @@ export const DetalleEventoModal = ({
       // Usar empadronadoId del perfil si existe, sino usar uid
       const empadronadoId = profile?.empadronadoId || user.uid;
       const nombreEmpadronado = user.displayName || user.email || "Usuario";
+      const numeroPadron = profile?.empadronadoId || "";
 
       console.log('📝 Inscribiendo con empadronadoId:', empadronadoId);
 
@@ -226,6 +227,9 @@ export const DetalleEventoModal = ({
             observaciones: JSON.stringify({
               eventoTitulo: evento.titulo,
               eventoCategoria: getCategoriaLabel(evento.categoria),
+              nombreAsociado: nombreEmpadronado,
+              numeroPadron: numeroPadron,
+              banco: nombreBanco || "",
               persona: {
                 nombre: persona.nombre,
                 dni: persona.dni

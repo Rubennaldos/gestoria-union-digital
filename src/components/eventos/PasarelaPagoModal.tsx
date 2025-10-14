@@ -19,7 +19,7 @@ interface PasarelaPagoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   montoTotal: number;
-  onPagoConfirmado: (fechaPago: Date, archivoComprobante: File) => void;
+  onPagoConfirmado: (fechaPago: Date, archivoComprobante: File, nombreBanco: string) => void;
 }
 
 type MedioPago = {
@@ -111,7 +111,7 @@ export const PasarelaPagoModal = ({
     }
 
     setLoading(true);
-    onPagoConfirmado(fechaPago, archivoComprobante);
+    onPagoConfirmado(fechaPago, archivoComprobante, medioSeleccionado.nombre);
   };
 
   return (

@@ -18,6 +18,9 @@ interface ComprobanteFinancieroData {
   observaciones?: string;
   registradoPorNombre: string;
   createdAt: number;
+  banco?: string;
+  numeroPadron?: string;
+  nombreAsociado?: string;
   comprobantes?: Array<{
     nombre: string;
     url: string;
@@ -84,6 +87,29 @@ export async function generarComprobanteFinanciero(
 
   // Si es un evento con datos, mostrar formato de voucher
   if (eventoData) {
+    // Información del Asociado
+    const nombreAsociado = data.nombreAsociado || eventoData.nombreAsociado || "";
+    const numeroPadron = data.numeroPadron || eventoData.numeroPadron || "";
+    
+    if (nombreAsociado || numeroPadron) {
+      doc.setFillColor(...lightGray);
+      doc.roundedRect(20, yPos, pageWidth - 40, 20, 3, 3, 'F');
+      
+      doc.setFontSize(12);
+      doc.setTextColor(...primaryColor);
+      doc.text("DATOS DEL ASOCIADO", 25, yPos + 7);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(60);
+      if (nombreAsociado) {
+        doc.text(`Nombre: ${nombreAsociado}`, 25, yPos + 14);
+      }
+      if (numeroPadron) {
+        doc.text(`N° Padrón: ${numeroPadron}`, pageWidth / 2 + 10, yPos + 14);
+      }
+      yPos += 30;
+    }
+
     // Información del Evento
     doc.setFillColor(...lightGray);
     doc.roundedRect(20, yPos, pageWidth - 40, 25, 3, 3, 'F');
@@ -147,8 +173,11 @@ export async function generarComprobanteFinanciero(
 
     // Resumen de Pago
     yPos += 5;
+    const banco = data.banco || eventoData.banco || "";
+    const alturaPago = banco ? 40 : 30;
+    
     doc.setFillColor(...primaryColor);
-    doc.roundedRect(20, yPos, pageWidth - 40, 30, 3, 3, 'F');
+    doc.roundedRect(20, yPos, pageWidth - 40, alturaPago, 3, 3, 'F');
     
     doc.setFontSize(12);
     doc.setTextColor(255, 255, 255);
@@ -156,13 +185,24 @@ export async function generarComprobanteFinanciero(
     
     const fechaValida = data.fecha && !isNaN(new Date(data.fecha).getTime());
     doc.setFontSize(10);
-    doc.text(`Fecha de pago: ${fechaValida ? format(new Date(data.fecha), "dd/MM/yyyy", { locale: es }) : "N/A"}`, 25, yPos + 16);
+    
+    let lineaActual = yPos + 16;
+    if (fechaValida) {
+      const fechaPago = new Date(data.fecha);
+      doc.text(`Fecha: ${format(fechaPago, "EEEE dd 'de' MMMM 'de' yyyy", { locale: es })}`, 25, lineaActual);
+      lineaActual += 6;
+    }
+    
+    if (banco) {
+      doc.text(`Banco: ${banco}`, 25, lineaActual);
+      lineaActual += 6;
+    }
     
     doc.setFontSize(16);
     doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: S/ ${data.monto.toFixed(2)}`, 25, yPos + 25);
+    doc.text(`TOTAL: S/ ${data.monto.toFixed(2)}`, 25, lineaActual + 3);
     doc.setFont(undefined, 'normal');
-    yPos += 40;
+    yPos += alturaPago + 10;
 
     // Número de voucher
     if (eventoData.voucherCode) {

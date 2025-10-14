@@ -59,6 +59,19 @@ export const DetalleMovimientoModal = ({
         registradoPorNombre: movimiento.registradoPorNombre,
         createdAt: movimiento.createdAt,
         comprobantes: movimiento.comprobantes,
+        // Extraer información adicional de observaciones si es un evento
+        ...(movimiento.categoria === "evento" && movimiento.observaciones ? (() => {
+          try {
+            const obs = JSON.parse(movimiento.observaciones);
+            return {
+              banco: obs.banco || "",
+              numeroPadron: obs.numeroPadron || "",
+              nombreAsociado: obs.nombreAsociado || ""
+            };
+          } catch {
+            return {};
+          }
+        })() : {}),
       });
 
       // Descargar el PDF
