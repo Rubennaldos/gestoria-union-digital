@@ -466,8 +466,16 @@ export const updateEmpadronado = async (
     const oldData = await getEmpadronado(id);
     if (!oldData) return false;
 
+    // Crear copia de updates sin campos de documentos base64
+    const { 
+      documentoDniFrontal, 
+      documentoDniReverso, 
+      documentoReciboLuz, 
+      ...cleanUpdates 
+    } = updates as any;
+
     const updateData = removeUndefined({
-      ...updates,
+      ...cleanUpdates,
       updatedAt: Date.now(),
       modificadoPor: actorUid,
     });
