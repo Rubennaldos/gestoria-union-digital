@@ -54,8 +54,8 @@ export const PasarelaPagoModal = ({
   const cargarMediosPago = async () => {
     try {
       const configuracion = await obtenerMediosPago();
-      setCuentasBancarias(configuracion.cuentasBancarias.filter(c => c.activo) || []);
-      setBilleterasDigitales(configuracion.billeterasDigitales.filter(b => b.activo) || []);
+      setCuentasBancarias(configuracion?.cuentasBancarias?.filter(c => c.activo) || []);
+      setBilleterasDigitales(configuracion?.billeterasDigitales?.filter(b => b.activo) || []);
     } catch (error) {
       console.error("Error al cargar medios de pago:", error);
       toast.error("Error al cargar medios de pago");
