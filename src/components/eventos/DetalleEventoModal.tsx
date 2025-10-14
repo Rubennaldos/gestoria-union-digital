@@ -150,7 +150,7 @@ export const DetalleEventoModal = ({
           });
         }
 
-        // Generar y guardar voucher (un mismo PDF para todas las inscripciones del grupo)
+        // Generar voucher (un mismo PDF para todas las inscripciones del grupo)
         const voucherBlob = await generarVoucherEvento({
           eventoTitulo: evento.titulo,
           eventoCategoria: getCategoriaLabel(evento.categoria),
@@ -162,15 +162,8 @@ export const DetalleEventoModal = ({
           comprobanteBase64,
         });
 
-        await Promise.all(
-          inscripcionIds.map((id) =>
-            saveVoucherPdf(id, voucherBlob, `Comprobante-${id}.pdf`, {
-              numeroVoucher,
-              eventoId: evento.id,
-              empadronadoId,
-            })
-          )
-        );
+        // Nota: No guardamos en RTDB porque el PDF con imagen puede exceder el límite de 10MB
+        // El comprobante ya está guardado en el movimiento financiero
 
         // Registrar en finanzas (uno por persona)
         for (const persona of personas) {
