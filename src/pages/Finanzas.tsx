@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, TrendingUp, TrendingDown, BarChart3, Calendar, CreditCard } from "lucide-react";
+import { TrendingUp, TrendingDown, BarChart3, Calendar, CreditCard } from "lucide-react";
 import { ResumenCaja } from "@/components/finanzas/ResumenCaja";
 import { ConfiguracionMediosPago } from "@/components/finanzas/ConfiguracionMediosPago";
 import { NuevoMovimientoModal } from "@/components/finanzas/NuevoMovimientoModal";
@@ -12,8 +12,7 @@ import { DetalleMovimientoModal } from "@/components/finanzas/DetalleMovimientoM
 import { MovimientoFinanciero } from "@/types/finanzas";
 import MiBreadcrumb from "@/components/layout/MiBreadcrumb";
 import { toast } from "sonner";
-import { ref, remove } from "firebase/database";
-import { db } from "@/config/firebase";
+import { deleteMovimiento } from "@/services/finanzas";
 
 export default function Finanzas() {
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,7 +33,7 @@ export default function Finanzas() {
   };
 
   const handleSuccess = () => {
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleVerDetalle = (movimiento: MovimientoFinanciero) => {
@@ -42,15 +41,13 @@ export default function Finanzas() {
     setDetalleOpen(true);
   };
 
-  const handleEditar = (movimiento: MovimientoFinanciero) => {
+  const handleEditar = (_movimiento: MovimientoFinanciero) => {
     toast.info("Función de edición próximamente");
-    // Aquí se implementará la lógica de edición
   };
 
   const handleEliminar = async (movimientoId: string) => {
     try {
-      const movimientoRef = ref(db, `movimientos/${movimientoId}`);
-      await remove(movimientoRef);
+      await deleteMovimiento(movimientoId);
       toast.success("Movimiento eliminado exitosamente");
       handleSuccess();
     } catch (error) {

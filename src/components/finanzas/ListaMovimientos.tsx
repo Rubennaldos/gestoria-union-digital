@@ -8,7 +8,6 @@ import { obtenerMovimientos } from "@/services/finanzas";
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { toast } from "sonner";
 
 interface ListaMovimientosProps {
   onVerDetalle: (movimiento: MovimientoFinanciero) => void;
@@ -43,6 +42,7 @@ export const ListaMovimientos = ({ onVerDetalle, onEditar, onEliminar, refreshKe
 
   useEffect(() => {
     cargarMovimientos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey, filtroTipo]);
 
   const cargarMovimientos = async () => {
@@ -50,8 +50,6 @@ export const ListaMovimientos = ({ onVerDetalle, onEditar, onEliminar, refreshKe
       setCargando(true);
       const data = await obtenerMovimientos({ tipo: filtroTipo });
       setMovimientos(data);
-    } catch (error) {
-      console.error("Error al cargar movimientos:", error);
     } finally {
       setCargando(false);
     }
@@ -108,7 +106,7 @@ export const ListaMovimientos = ({ onVerDetalle, onEditar, onEliminar, refreshKe
             </TableHeader>
             <TableBody>
               {movimientos.map((movimiento) => (
-                <TableRow 
+                <TableRow
                   key={movimiento.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => onVerDetalle(movimiento)}
@@ -131,15 +129,11 @@ export const ListaMovimientos = ({ onVerDetalle, onEditar, onEliminar, refreshKe
                       {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{categoriasLabels[movimiento.categoria]}</TableCell>
+                  <TableCell>{categoriasLabels[movimiento.categoria] ?? movimiento.categoria}</TableCell>
                   <TableCell className="max-w-xs truncate">{movimiento.descripcion}</TableCell>
                   <TableCell className="text-right font-medium">
-                    <span
-                      className={
-                        movimiento.tipo === "ingreso" ? "text-green-600" : "text-red-600"
-                      }
-                    >
-                      {movimiento.tipo === "ingreso" ? "+" : "-"} S/ {movimiento.monto.toFixed(2)}
+                    <span className={movimiento.tipo === "ingreso" ? "text-green-600" : "text-red-600"}>
+                      {movimiento.tipo === "ingreso" ? "+" : "-"} S/ {Number(movimiento.monto).toFixed(2)}
                     </span>
                   </TableCell>
                   <TableCell className="text-sm">{movimiento.registradoPorNombre}</TableCell>

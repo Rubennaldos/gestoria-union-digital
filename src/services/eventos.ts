@@ -17,7 +17,11 @@ import {
   EstadisticasEventos,
   SesionEvento,
 } from "@/types/eventos";
-import { fromZonedTime } from "date-fns-tz";
+import { fromZonedTime, toZonedTime, formatInTimeZone } from "date-fns-tz";
+
+const zonedTimeToUtc = fromZonedTime; // alias
+const utcToZonedTime = toZonedTime;   // alias
+
 
 // ========== EVENTOS ==========
 
