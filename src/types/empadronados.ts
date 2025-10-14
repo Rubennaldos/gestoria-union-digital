@@ -38,20 +38,8 @@ export interface Empadronado {
   updatedAt: number;
   creadoPor: string; // uid del usuario que lo creó
   modificadoPor?: string; // uid del último usuario que lo modificó
-
-  /** NUEVO: tipo de registro para diferenciar residentes de personal */
-  tipoRegistro?: 'residente' | 'personal_seguridad';
   
-  /** Campos específicos para personal de seguridad */
-  telefonosEmergencia?: PhoneNumber[];
-  tipoSangre?: string;
-  direccionDomicilio?: string;
-  documentoDniFrontal?: string; // URL del archivo en storage
-  documentoDniReverso?: string; // URL del archivo en storage
-  documentoReciboLuz?: string; // URL del archivo en storage
-  exentoCobroMensual?: boolean; // Si no aplica cobro mensual
-  
-  /** NUEVO: vínculo con cuenta del sistema */
+  /** Vínculo con cuenta del sistema */
   authUid?: string;        // UID de Firebase Auth si tiene cuenta
   emailAcceso?: string;    // email con el que accede
 }
@@ -75,13 +63,6 @@ export interface CreateEmpadronadoForm {
   estadoVivienda: 'construida' | 'construccion' | 'terreno';
   cumpleanos: string;
   observaciones?: string;
-  tipoRegistro?: 'residente' | 'personal_seguridad';
-  
-  // Campos para personal de seguridad
-  telefonosEmergencia?: PhoneNumber[];
-  tipoSangre?: string;
-  direccionDomicilio?: string;
-  exentoCobroMensual?: boolean;
 }
 
 export interface UpdateEmpadronadoForm extends Partial<CreateEmpadronadoForm> {}

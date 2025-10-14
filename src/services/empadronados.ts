@@ -604,42 +604,6 @@ export const isNumeroPadronUnique = async (
   }
 };
 
-/**
- * Genera el siguiente número de padrón para personal de seguridad
- * Formato: PS 001, PS 002, PS 003, etc.
- */
-export const generateNextPersonalSeguridadPadron = async (): Promise<string> => {
-  try {
-    const empadronados = await getEmpadronados();
-    
-    // Filtrar solo personal de seguridad con formato PS ###
-    const personalSeguridad = empadronados.filter(e => 
-      e.tipoRegistro === 'personal_seguridad' && 
-      e.numeroPadron?.startsWith('PS ')
-    );
-    
-    if (personalSeguridad.length === 0) {
-      return 'PS 001';
-    }
-    
-    // Extraer números y encontrar el máximo
-    const numeros = personalSeguridad
-      .map(e => {
-        const match = e.numeroPadron?.match(/PS (\d+)/);
-        return match ? parseInt(match[1], 10) : 0;
-      })
-      .filter(n => !isNaN(n));
-    
-    const maxNum = Math.max(...numeros, 0);
-    const nextNum = maxNum + 1;
-    
-    // Formatear con ceros a la izquierda (3 dígitos)
-    return `PS ${String(nextNum).padStart(3, '0')}`;
-  } catch (error) {
-    console.error('Error generating personal seguridad padron:', error);
-    return 'PS 001';
-  }
-};
 
 export const obtenerEmpadronadoPorAuthUid = async (
   authUid: string

@@ -37,7 +37,7 @@ export async function createPersonalPlanilla(
       empadronadoId: data.empadronadoId,
       nombreCompleto: `${empadronado.nombre} ${empadronado.apellidos}`,
       dni: empadronado.dni,
-      tipoPersonal: empadronado.tipoRegistro || 'residente',
+      tipoPersonal: 'residente',
       funcion: data.funcion,
       areaAsignada: data.areaAsignada,
       fechaContratacion: data.fechaContratacion,
