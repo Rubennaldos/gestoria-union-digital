@@ -146,14 +146,18 @@ export const DetalleEventoModal = ({
 
       console.log('📝 Inscribiendo con empadronadoId:', empadronadoId);
 
-      // Inscribir al evento
-      const inscripcionId = await inscribirseEvento(
-        evento.id,
-        empadronadoId,
-        nombreEmpadronado,
-        personas.length - 1,
-        `${observaciones}\n\nPERSONAS INSCRITAS:\n${personas.map((p, i) => `${i + 1}. ${p.nombre} - DNI: ${p.dni}`).join('\n')}\n\nSESIONES SELECCIONADAS:\n${sesionesInfo}`
-      );
+      // Inscribir cada persona individualmente
+      const inscripcionIds: string[] = [];
+      for (const persona of personas) {
+        const inscripcionId = await inscribirseEvento(
+          evento.id,
+          empadronadoId,
+          persona.nombre,
+          0, // Sin acompañantes porque cada persona es una inscripción individual
+          `DNI: ${persona.dni}\n${observaciones}\n\nSESIONES SELECCIONADAS:\n${sesionesInfo}`
+        );
+        inscripcionIds.push(inscripcionId);
+      }
 
       // Si hay pago, generar voucher y registrar en finanzas
       if (precioTotal > 0 && archivoComprobante) {
@@ -172,23 +176,28 @@ export const DetalleEventoModal = ({
 
         const numeroVoucher = `EVT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
-        // Actualizar inscripción con información de pago
-        const inscripcionRef = ref(db, `inscripcionesEventos/${inscripcionId}`);
-        await update(inscripcionRef, {
-          pagoRealizado: true,
-          montoPagado: precioTotal,
-          fechaPago: fechaPago.getTime(),
-          estado: "confirmado",
-          observaciones: JSON.stringify({
-            observaciones: observaciones,
-            personas,
-            sesiones: sesionesData,
-            medioPago: "transferencia",
-            numeroOperacion: "Pendiente de verificación",
-            voucherCode: numeroVoucher,
-            correo: user.email
-          })
-        });
+        // Actualizar todas las inscripciones con información de pago
+        const montoPorPersona = precioTotal / personas.length;
+        for (let i = 0; i < inscripcionIds.length; i++) {
+          const inscripcionRef = ref(db, `inscripcionesEventos/${inscripcionIds[i]}`);
+          await update(inscripcionRef, {
+            pagoRealizado: true,
+            montoPagado: montoPorPersona,
+            fechaPago: fechaPago.getTime(),
+            estado: "confirmado",
+            dni: personas[i].dni,
+            observaciones: JSON.stringify({
+              observaciones: observaciones,
+              persona: personas[i],
+              sesiones: sesionesData,
+              medioPago: "transferencia",
+              numeroOperacion: "Pendiente de verificación",
+              voucherCode: numeroVoucher,
+              correo: user.email,
+              grupoInscripcion: numeroVoucher // Para vincular todas las inscripciones del mismo pago
+            })
+          });
+        }
 
         // Generar PDF del voucher
         const voucherBlob = await generarVoucherEvento({

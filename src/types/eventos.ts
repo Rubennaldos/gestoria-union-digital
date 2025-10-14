@@ -113,6 +113,7 @@ export interface InscripcionEvento {
   eventoId: string;
   empadronadoId: string;
   nombreEmpadronado: string;
+  dni?: string;
   fechaInscripcion: number;
   estado: EstadoInscripcion;
   acompanantes: number;

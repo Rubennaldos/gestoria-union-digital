@@ -126,9 +126,9 @@ export const InscripcionesEventoModal = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Empadronado</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>DNI</TableHead>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Acompañantes</TableHead>
                   <TableHead>Monto</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
@@ -140,6 +140,9 @@ export const InscripcionesEventoModal = ({
                       {inscripcion.nombreEmpadronado}
                     </TableCell>
                     <TableCell>
+                      {inscripcion.dni || 'N/A'}
+                    </TableCell>
+                    <TableCell>
                       {format(
                         new Date(inscripcion.fechaInscripcion),
                         "dd/MM/yyyy HH:mm",
@@ -148,7 +151,6 @@ export const InscripcionesEventoModal = ({
                         }
                       )}
                     </TableCell>
-                    <TableCell>{inscripcion.acompanantes}</TableCell>
                     <TableCell>
                       {inscripcion.pagoRealizado ? (
                         <Badge className="bg-success/10 text-success border-success/20">
