@@ -9,9 +9,9 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { toast } from "sonner";
-import { ref, get } from "firebase/database";
-import { db } from "@/config/firebase";
-import { generarVoucherEvento, archivoABase64 } from "@/lib/pdf/voucherEvento";
+
+// 👇 NUEVO: usamos el servicio único
+import { descargarComprobantePorInscripcion } from "@/services/recibos";
 
 interface InscripcionConEvento extends InscripcionEvento {
   evento?: Evento;
@@ -33,11 +33,8 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
   const cargarInscripciones = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Buscando inscripciones para empadronadoId:', empadronadoId);
-      
       const data = await obtenerInscripcionesPorEmpadronado(empadronadoId);
-      console.log('📋 Inscripciones encontradas:', data.length);
-      
+
       // Cargar los detalles de cada evento
       const inscripcionesConEvento = await Promise.all(
         data.map(async (inscripcion) => {
@@ -55,115 +52,14 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
     }
   };
 
+  // 👇 SIMPLIFICADO: delega en el servicio único (mismo PDF en todo el sistema)
   const descargarComprobante = async (inscripcion: InscripcionConEvento) => {
-    if (!inscripcion.evento) {
-      toast.error("No se encontró la información del evento");
-      return;
-    }
-
     try {
       setDescargando(inscripcion.id);
-
-      // Parsear las observaciones para obtener personas y sesiones
-      let personas: Array<{ nombre: string; dni: string }> = [];
-      let sesiones: Array<any> = [];
-
-      if (inscripcion.observaciones) {
-        const lines = inscripcion.observaciones.split('\n');
-        let enPersonas = false;
-        let enSesiones = false;
-
-        lines.forEach(line => {
-          const trimmedLine = line.trim();
-          
-          if (trimmedLine.includes('PERSONAS INSCRITAS:')) {
-            enPersonas = true;
-            enSesiones = false;
-          } else if (trimmedLine.includes('SESIONES SELECCIONADAS:')) {
-            enPersonas = false;
-            enSesiones = true;
-          } else if (enPersonas && trimmedLine.match(/^\d+\./)) {
-            // Formato: "1. Nombre - DNI: 12345678"
-            const match = trimmedLine.match(/\d+\.\s*(.+?)\s*-\s*DNI:\s*(\d+)/);
-            if (match) {
-              personas.push({ nombre: match[1].trim(), dni: match[2] });
-            }
-          } else if (enSesiones && trimmedLine.length > 0 && !trimmedLine.includes('PERSONAS')) {
-            // Formato: "Lugar - DD/MM/YYYY (HH:MM - HH:MM)"
-            const sesionMatch = trimmedLine.match(/^(.+?)\s*-\s*(\d{2}\/\d{2}\/\d{4})\s*\((\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\)/);
-            if (sesionMatch) {
-              const [_, lugar, fecha, horaInicio, horaFin] = sesionMatch;
-              const [dia, mes, anio] = fecha.split('/');
-              const fechaTimestamp = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia)).getTime();
-              
-              sesiones.push({ 
-                lugar: lugar.trim(), 
-                fecha: fechaTimestamp,
-                horaInicio: horaInicio,
-                horaFin: horaFin,
-                precio: 0
-              });
-            }
-          }
-        });
-      }
-
-      // Si no hay personas parseadas, usar el empadronado
-      if (personas.length === 0) {
-        personas = [{ nombre: inscripcion.nombreEmpadronado, dni: "" }];
-      }
-
-      // Si no hay sesiones, usar las sesiones del evento
-      if (sesiones.length === 0 && inscripcion.evento.sesiones) {
-        sesiones = inscripcion.evento.sesiones.map(s => ({
-          lugar: s.lugar,
-          fecha: s.fecha,
-          horaInicio: s.horaInicio,
-          horaFin: s.horaFin,
-          precio: s.precio
-        }));
-      }
-
-      // Generar número de voucher
-      let numeroVoucher = `INS-${inscripcion.id.slice(-8).toUpperCase()}`;
-      
-      // Si hay comprobanteId, intentar obtener el código del receipt
-      if (inscripcion.comprobanteId) {
-        try {
-          const receiptRef = ref(db, `receipts/${inscripcion.comprobanteId}`);
-          const receiptSnap = await get(receiptRef);
-          if (receiptSnap.exists()) {
-            const receiptData = receiptSnap.val();
-            numeroVoucher = receiptData.code || numeroVoucher;
-          }
-        } catch (error) {
-          console.log("No se pudo obtener el receipt, usando número generado");
-        }
-      }
-
-      // Generar PDF
-      const voucherData = {
-        eventoTitulo: inscripcion.evento.titulo,
-        eventoCategoria: getCategoriaLabel(inscripcion.evento.categoria),
-        personas,
-        sesiones,
-        montoTotal: inscripcion.montoPagado || inscripcion.evento.precio || 0,
-        fechaPago: new Date(inscripcion.fechaPago || inscripcion.fechaInscripcion),
-        numeroVoucher,
-      };
-
-      const pdfBlob = await generarVoucherEvento(voucherData);
-
-      // Descargar
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `comprobante-${inscripcion.evento.titulo.replace(/\s+/g, '-')}-${numeroVoucher}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
+      await descargarComprobantePorInscripcion(
+        inscripcion.id,
+        `comprobante-${inscripcion.evento?.titulo?.replace(/\s+/g, "-") || "evento"}-${(inscripcion.id || "").slice(-8).toUpperCase()}.pdf`
+      );
       toast.success("Comprobante descargado exitosamente");
     } catch (error) {
       console.error("Error al descargar comprobante:", error);
@@ -275,7 +171,6 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
                     )}
                   </div>
 
-                  {/* Siempre mostrar opción de descarga si hay comprobanteId o si el pago fue realizado */}
                   <div className="pt-3 border-t">
                     <div className="flex items-center justify-between">
                       <div>

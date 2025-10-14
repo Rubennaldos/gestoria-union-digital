@@ -18,6 +18,7 @@ import { DetalleEventoModal } from "@/components/eventos/DetalleEventoModal";
 import { HistorialInscripciones } from "@/components/eventos/HistorialInscripciones";
 import { useAuth } from "@/contexts/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { descargarComprobantePorInscripcion } from "@/services/recibos";
 
 const Eventos = () => {
   const navigate = useNavigate();

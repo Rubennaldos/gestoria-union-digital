@@ -1,5 +1,7 @@
+// src/lib/pdf/receiptEvento.ts
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { saveReceiptPdfFromBlob } from "@/lib/pdfCapture";
 
 export type EventoReceiptArgs = {
   correlativo: string;
@@ -16,10 +18,10 @@ export type EventoReceiptArgs = {
   logoBase64?: string; // opcional
 };
 
-/**
- * Genera y descarga un comprobante PDF para inscripción/pago de evento.
- */
-export default async function generarComprobanteEventoPDF(args: EventoReceiptArgs) {
+/** Genera el PDF y devuelve el Blob (NO guarda, NO descarga). */
+export async function generarComprobanteEventoPDFBlob(
+  args: EventoReceiptArgs
+): Promise<Blob> {
   const {
     correlativo,
     eventoTitulo,
@@ -42,19 +44,31 @@ export default async function generarComprobanteEventoPDF(args: EventoReceiptArg
   if (logoBase64) {
     try {
       doc.addImage(logoBase64, "PNG", 40, 36, 80, 60);
-    } catch (_) { /* ignorar si falla la imagen */ }
+    } catch {
+      /* ignorar */
+    }
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("Asociación Junta de Propietarios San Antonio de Pachacámac", pageW / 2, 52, { align: "center" });
+  doc.text(
+    "Asociación Junta de Propietarios San Antonio de Pachacámac",
+    pageW / 2,
+    52,
+    { align: "center" }
+  );
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text("Comprobante de Inscripción / Pago de Evento", pageW / 2, 72, { align: "center" });
+  doc.text("Comprobante de Inscripción / Pago de Evento", pageW / 2, 72, {
+    align: "center",
+  });
 
   // Datos principales
   const fechaStr = new Intl.DateTimeFormat("es-PE", {
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit"
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(fechaEmision);
 
   autoTable(doc, {
@@ -82,8 +96,44 @@ export default async function generarComprobanteEventoPDF(args: EventoReceiptArg
   // Pie
   const y = (doc as any).lastAutoTable?.finalY ?? 110;
   doc.setFontSize(10);
-  doc.text("Este documento es válido como constancia interna de inscripción y/o pago.", 40, y + 30);
+  doc.text(
+    "Este documento es válido como constancia interna de inscripción y/o pago.",
+    40,
+    y + 30
+  );
   doc.text("Gracias por participar.", 40, y + 48);
 
-  doc.save(`Comprobante-${correlativo}.pdf`);
+  return doc.output("blob");
+}
+
+/**
+ * Genera, guarda en RTDB y (opcional) descarga el PDF.
+ * - receiptId: id en /receipts/<receiptId>
+ * - inscripcionId/empadronadoId/movimientoId: índices (opcional)
+ */
+export default async function generarComprobanteEventoPDF(
+  args: EventoReceiptArgs,
+  ids?: { receiptId: string; inscripcionId?: string; empadronadoId?: string; movimientoId?: string },
+  descargarLocal = true
+) {
+  const blob = await generarComprobanteEventoPDFBlob(args);
+
+  if (ids?.receiptId) {
+    await saveReceiptPdfFromBlob(ids.receiptId, blob, {
+      inscripcionId: ids.inscripcionId,
+      empadronadoId: ids.empadronadoId,
+      movimientoId: ids.movimientoId,
+    });
+  }
+
+  if (descargarLocal) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Comprobante-${args.correlativo}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
 }
