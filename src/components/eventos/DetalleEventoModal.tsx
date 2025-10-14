@@ -22,8 +22,7 @@ import { generarVoucherEvento, archivoABase64 } from "@/lib/pdf/voucherEvento";
 import { crearMovimientoFinanciero } from "@/services/finanzas";
 import { ref, update } from "firebase/database";
 import { db } from "@/config/firebase";
-// ✅ guardaremos el PDF generado por inscripción
-import { saveVoucherPdf } from "@/services/recibos";
+import { compressImage, blobToBase64 } from "@/lib/imageCompression";
 
 interface PersonaInscrita {
   nombre: string;
@@ -118,7 +117,9 @@ export const DetalleEventoModal = ({
 
       // 2) si hay pago: actualizar inscripciones, generar voucher y guardar en RTDB
       if (precioTotal > 0 && archivoComprobante) {
-        const comprobanteBase64 = await archivoABase64(archivoComprobante);
+        // Comprimir imagen si es muy grande (max 500KB)
+        const comprobanteComprimido = await compressImage(archivoComprobante, 500, 1200);
+        const comprobanteBase64 = await blobToBase64(comprobanteComprimido);
 
         const sesionesData = sesionesSeleccionadas.map(sid => {
           const s = evento.sesiones.find(x => x.id === sid);
@@ -159,7 +160,7 @@ export const DetalleEventoModal = ({
           montoTotal: precioTotal,
           fechaPago,
           numeroVoucher,
-          comprobanteBase64,
+          comprobanteBase64: `data:image/jpeg;base64,${comprobanteBase64}`,
         });
 
         // Nota: No guardamos en RTDB porque el PDF con imagen puede exceder el límite de 10MB
@@ -189,7 +190,7 @@ export const DetalleEventoModal = ({
                 voucherCode: numeroVoucher,
                 fechaRegistro: fechaPago.getTime(),
                 correo: user.email,
-                comprobanteBase64,
+                comprobanteBase64: `data:image/jpeg;base64,${comprobanteBase64}`,
                 grupoInscripcion: numeroVoucher,
               }),
             },
