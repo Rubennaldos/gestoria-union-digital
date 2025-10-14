@@ -13,7 +13,6 @@ export type PdfRecord = {
 };
 
 /* -------------------- Helpers (browser) -------------------- */
-
 function ensureAtob() {
   if (typeof atob !== "function") {
     throw new Error("atob no está disponible en este entorno.");

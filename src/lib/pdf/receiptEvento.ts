@@ -73,7 +73,7 @@ export async function generarComprobanteEventoPDFBlob(
 
   autoTable(doc, {
     startY: 110,
-    head: [["Dato", "Valor"]],
+    head: [["Dato", "Valor"]], // ← AQUÍ estaba el corchete extra
     body: [
       ["Correlativo", correlativo],
       ["Fecha de emisión", fechaStr],
@@ -113,17 +113,27 @@ export async function generarComprobanteEventoPDFBlob(
  */
 export default async function generarComprobanteEventoPDF(
   args: EventoReceiptArgs,
-  ids?: { receiptId: string; inscripcionId?: string; empadronadoId?: string; movimientoId?: string },
+  ids?: {
+    receiptId: string;
+    inscripcionId?: string;
+    empadronadoId?: string;
+    movimientoId?: string;
+  },
   descargarLocal = true
 ) {
   const blob = await generarComprobanteEventoPDFBlob(args);
 
   if (ids?.receiptId) {
-    await saveReceiptPdfFromBlob(ids.receiptId, blob, {
-      inscripcionId: ids.inscripcionId,
-      empadronadoId: ids.empadronadoId,
-      movimientoId: ids.movimientoId,
-    });
+    await saveReceiptPdfFromBlob(
+      ids.receiptId,
+      blob,
+      `Comprobante-${args.correlativo}.pdf`,
+      {
+        inscripcionId: ids.inscripcionId,
+        empadronadoId: ids.empadronadoId,
+        movimientoId: ids.movimientoId,
+      }
+    );
   }
 
   if (descargarLocal) {

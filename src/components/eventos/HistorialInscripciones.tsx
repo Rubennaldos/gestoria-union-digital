@@ -1,3 +1,4 @@
+// src/components/eventos/HistorialInscripciones.tsx
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,6 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { toast } from "sonner";
-
-// 👇 NUEVO: usamos el servicio único
 import { descargarComprobantePorInscripcion } from "@/services/recibos";
 
 interface InscripcionConEvento extends InscripcionEvento {
@@ -34,15 +33,12 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
     try {
       setLoading(true);
       const data = await obtenerInscripcionesPorEmpadronado(empadronadoId);
-
-      // Cargar los detalles de cada evento
       const inscripcionesConEvento = await Promise.all(
         data.map(async (inscripcion) => {
           const evento = await obtenerEventoPorId(inscripcion.eventoId);
           return { ...inscripcion, evento };
         })
       );
-
       setInscripciones(inscripcionesConEvento);
     } catch (error) {
       console.error("Error al cargar inscripciones:", error);
@@ -52,7 +48,6 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
     }
   };
 
-  // 👇 SIMPLIFICADO: delega en el servicio único (mismo PDF en todo el sistema)
   const descargarComprobante = async (inscripcion: InscripcionConEvento) => {
     try {
       setDescargando(inscripcion.id);
@@ -105,9 +100,7 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
       <Card>
         <CardContent className="pt-6 text-center py-12">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">
-            No tienes inscripciones registradas aún
-          </p>
+          <p className="text-muted-foreground">No tienes inscripciones registradas aún</p>
         </CardContent>
       </Card>
     );
@@ -117,7 +110,7 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
     <div className="space-y-4">
       {inscripciones.map((inscripcion) => {
         const estadoBadge = getEstadoBadge(inscripcion.estado);
-        
+
         return (
           <Card key={inscripcion.id} className="overflow-hidden">
             <CardHeader>
@@ -130,9 +123,7 @@ export const HistorialInscripciones = ({ empadronadoId }: HistorialInscripciones
                     Inscrito el {format(toZonedTime(new Date(inscripcion.fechaInscripcion), "America/Lima"), "dd/MM/yyyy HH:mm", { locale: es })}
                   </CardDescription>
                 </div>
-                <Badge variant={estadoBadge.variant}>
-                  {estadoBadge.label}
-                </Badge>
+                <Badge variant={estadoBadge.variant}>{estadoBadge.label}</Badge>
               </div>
             </CardHeader>
 

@@ -12,7 +12,7 @@ interface PersonaInscrita {
 
 interface SesionSeleccionada {
   lugar: string;
-  fecha: string;
+  fecha: string;      // ISO/string
   horaInicio: string;
   horaFin: string;
   precio: number;
@@ -35,8 +35,8 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Colores corporativos
-  const primaryColor: [number, number, number] = [74, 102, 87]; // Verde de las montañas
-  const accentColor: [number, number, number] = [59, 130, 246]; // Azul
+  const primaryColor: [number, number, number] = [74, 102, 87];
+  const accentColor: [number, number, number] = [59, 130, 246];
   const lightGray: [number, number, number] = [243, 244, 246];
 
   let yPos = 20;
@@ -52,7 +52,6 @@ export const generarVoucherEvento = async (data: VoucherData): Promise<Blob> => 
     doc.addImage(logoImg, "PNG", pageWidth / 2 - 40, yPos, 80, 30);
     yPos += 40;
   } catch {
-    // Si falla cargar el logo, continuar sin él
     doc.setFontSize(20);
     doc.setTextColor(...primaryColor);
     doc.text("SAN ANTONIO DE PACHACAMAC", pageWidth / 2, yPos, {
@@ -254,11 +253,17 @@ export const generarVoucherEventoYGuardar = async (
   descargarLocal = true
 ) => {
   const blob = await generarVoucherEvento(data);
-  await saveReceiptPdfFromBlob(ids.receiptId, blob, {
-    inscripcionId: ids.inscripcionId,
-    empadronadoId: ids.empadronadoId,
-    movimientoId: ids.movimientoId,
-  });
+
+  await saveReceiptPdfFromBlob(
+    ids.receiptId,
+    blob,
+    `Comprobante-${data.numeroVoucher}.pdf`,
+    {
+      inscripcionId: ids.inscripcionId,
+      empadronadoId: ids.empadronadoId,
+      movimientoId: ids.movimientoId,
+    }
+  );
 
   if (descargarLocal) {
     const url = URL.createObjectURL(blob);
@@ -272,7 +277,7 @@ export const generarVoucherEventoYGuardar = async (
   }
 };
 
-// Función auxiliar para convertir archivo a base64 (por si la usas en otros flujos)
+// Función auxiliar para convertir archivo a base64
 export const archivoABase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

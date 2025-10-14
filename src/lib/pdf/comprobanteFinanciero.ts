@@ -44,8 +44,8 @@ export async function generarComprobanteFinanciero(
   if (data.categoria === "Evento" && data.observaciones) {
     try {
       eventoData = JSON.parse(data.observaciones);
-    } catch (e) {
-      // Si no es JSON válido, continuar sin datos del evento
+    } catch {
+      /* continuar sin datos del evento */
     }
   }
 
@@ -390,11 +390,18 @@ export async function generarComprobanteFinancieroYGuardar(
   descargarLocal = false
 ) {
   const blob = await generarComprobanteFinanciero(data);
-  await saveReceiptPdfFromBlob(ids.receiptId, blob, {
-    movimientoId: ids.movimientoId,
-    empadronadoId: ids.empadronadoId,
-    inscripcionId: ids.inscripcionId,
-  });
+
+  await saveReceiptPdfFromBlob(
+    ids.receiptId,
+    blob,
+    `Comprobante-${ids.receiptId}.pdf`,
+    {
+      movimientoId: ids.movimientoId,
+      empadronadoId: ids.empadronadoId,
+      inscripcionId: ids.inscripcionId,
+    }
+  );
+
   if (descargarLocal) {
     const docUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");

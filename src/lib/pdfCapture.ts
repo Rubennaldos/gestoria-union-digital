@@ -1,56 +1,48 @@
 // src/lib/pdfCapture.ts
 import { saveReceiptPdf } from "@/services/recibos";
 
-/** Blob -> dataURL */
-export async function blobToDataUrl(blob: Blob): Promise<string> {
-  return await new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.onerror = rej;
-    r.readAsDataURL(blob);
-  });
+/** ArrayBuffer -> Blob (PDF) */
+export function arrayBufferToPdfBlob(buf: ArrayBuffer): Blob {
+  return new Blob([buf], { type: "application/pdf" });
 }
 
-/** ArrayBuffer -> dataURL (PDF) */
-export function arrayBufferToPdfDataUrl(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-  const base64 = btoa(binary);
-  return `data:application/pdf;base64,${base64}`;
-}
-
-/** Base64 -> dataURL (PDF) */
-export function base64ToPdfDataUrl(base64: string): string {
-  return `data:application/pdf;base64,${base64}`;
+/** Base64 (sin cabecera) -> Blob (PDF) */
+export function base64ToPdfBlob(base64: string): Blob {
+  const byteChars = atob(base64);
+  const len = byteChars.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = byteChars.charCodeAt(i);
+  return new Blob([bytes], { type: "application/pdf" });
 }
 
 /** Guarda el PDF en RTDB a partir de un Blob */
 export async function saveReceiptPdfFromBlob(
-  receiptId: string,
+  movimientoId: string,
   blob: Blob,
-  opts?: { inscripcionId?: string; movimientoId?: string; empadronadoId?: string }
+  filename = `Comprobante-${movimientoId}.pdf`,
+  meta?: Record<string, any>
 ) {
-  const dataUrl = await blobToDataUrl(blob);
-  await saveReceiptPdf(receiptId, dataUrl, opts);
+  await saveReceiptPdf(movimientoId, blob, filename, meta);
 }
 
 /** Guarda el PDF en RTDB a partir de un ArrayBuffer */
 export async function saveReceiptPdfFromArrayBuffer(
-  receiptId: string,
+  movimientoId: string,
   buf: ArrayBuffer,
-  opts?: { inscripcionId?: string; movimientoId?: string; empadronadoId?: string }
+  filename = `Comprobante-${movimientoId}.pdf`,
+  meta?: Record<string, any>
 ) {
-  const dataUrl = arrayBufferToPdfDataUrl(buf);
-  await saveReceiptPdf(receiptId, dataUrl, opts);
+  const blob = arrayBufferToPdfBlob(buf);
+  await saveReceiptPdf(movimientoId, blob, filename, meta);
 }
 
-/** Guarda el PDF en RTDB a partir de un base64 (sin encabezado) */
+/** Guarda el PDF en RTDB a partir de BASE64 (sin encabezado) */
 export async function saveReceiptPdfFromBase64(
-  receiptId: string,
+  movimientoId: string,
   base64: string,
-  opts?: { inscripcionId?: string; movimientoId?: string; empadronadoId?: string }
+  filename = `Comprobante-${movimientoId}.pdf`,
+  meta?: Record<string, any>
 ) {
-  const dataUrl = base64ToPdfDataUrl(base64);
-  await saveReceiptPdf(receiptId, dataUrl, opts);
+  const blob = base64ToPdfBlob(base64);
+  await saveReceiptPdf(movimientoId, blob, filename, meta);
 }
