@@ -191,6 +191,13 @@ const Empadronados: React.FC = () => {
       );
     }
 
+    // Ordenar: los que tienen email de acceso primero
+    filtered.sort((a, b) => {
+      const aHasEmail = a.emailAcceso ? 1 : 0;
+      const bHasEmail = b.emailAcceso ? 1 : 0;
+      return bHasEmail - aHasEmail;
+    });
+
     setFilteredEmpadronados(filtered);
   };
 
