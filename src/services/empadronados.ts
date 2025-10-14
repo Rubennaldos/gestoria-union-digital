@@ -474,13 +474,22 @@ export const updateEmpadronado = async (
 
     await update(ref(db, `${EMPADRONADOS_PATH}/${id}`), updateData);
 
+    // Solo registrar los campos que cambiaron (sin documentos base64)
+    const changedFields: Record<string, any> = {};
+    Object.keys(updateData).forEach(key => {
+      // Excluir campos de documentos que pueden ser muy grandes
+      if (!key.startsWith('documento') && key !== 'updatedAt' && key !== 'modificadoPor') {
+        changedFields[key] = updateData[key];
+      }
+    });
+
     await writeAuditLog({
       actorUid,
       targetUid: id,
       accion: "actualizar_empadronado",
       moduloId: "empadronados",
-      old: oldData,
-      new: { ...oldData, ...updateData },
+      old: { id: oldData.id, numeroPadron: oldData.numeroPadron, nombre: oldData.nombre },
+      new: changedFields,
     });
 
     return true;
