@@ -1,46 +1,32 @@
 import jsPDF from "jspdf";
-import { ref as sref, getBlob, getBytes } from "firebase/storage";
+import { ref as sref, getBlob } from "firebase/storage";
 import { storage } from "@/config/firebase";
 
-/** Intenta convertir una URL de Storage a DataURL (Base64) con varias rutas. Nunca lanza: devuelve null si no puede. */
+/** Convierte una URL de Firebase Storage a DataURL (Base64) usando el SDK */
 async function storageUrlToDataURL(url: string): Promise<string | null> {
-  // 1) SDK: getBlob
-  try {
-    const r = sref(storage, url);
-    const blob = await getBlob(r);
-    return await blobToDataURL(blob);
-  } catch (e) {
-    // sigue
-  }
+  if (!url) return null;
 
-  // 2) SDK: getBytes (algunas versiones no tienen getBlob)
   try {
-    const r = sref(storage, url);
-    const bytes = await getBytes(r);
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
-    const ext = (url.split("?")[0].split(".").pop() || "jpeg").toLowerCase();
-    const mime =
-      ext === "png" ? "image/png" :
-      ext === "pdf" ? "application/pdf" :
-      "image/jpeg";
-    return `data:${mime};base64,${base64}`;
-  } catch (e) {
-    // sigue
-  }
-
-  // 3) Fallback: fetch sin credenciales (evita preflight con Authorization)
-  try {
-    const res = await fetch(url, { mode: "cors", credentials: "omit", cache: "no-cache", referrerPolicy: "no-referrer" });
-    if (res.ok) {
-      const blob = await res.blob();
-      return await blobToDataURL(blob);
+    // Extraer la ruta del archivo desde la URL de descarga de Firebase
+    let storagePath = url;
+    
+    // Si es una URL de descarga de Firebase, extraer la ruta
+    if (url.includes("firebasestorage.googleapis.com")) {
+      const match = url.match(/\/o\/(.+?)\?/);
+      if (match && match[1]) {
+        storagePath = decodeURIComponent(match[1]);
+      }
     }
-  } catch (e) {
-    // sigue
-  }
 
-  // 4) Nada funcionó: devolvemos null para NO bloquear el PDF
-  return null;
+    // Obtener referencia y descargar el blob usando el SDK
+    const storageReference = sref(storage, storagePath);
+    const blob = await getBlob(storageReference);
+    return await blobToDataURL(blob);
+    
+  } catch (error) {
+    console.warn("No se pudo cargar la imagen del comprobante:", error);
+    return null;
+  }
 }
 
 function blobToDataURL(blob: Blob): Promise<string> {
@@ -71,23 +57,11 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.text("COMPROBANTE FINANCIERO", 105, 30, { align: "center" });
 
   // ===== Información general =====
-  const numeroComprobante =
-    egreso?.numeroComprobante ??
-    egreso?.nroComprobante ??
-    egreso?.nro_comp ??
-    egreso?.nro ??
-    "";
-
-  const pagadorReceptor =
-    egreso?.pagadorReceptor ??
-    egreso?.beneficiario ??
-    egreso?.pagador ??
-    egreso?.receptor ??
-    egreso?.paidBy ??
-    egreso?.receivedBy ??
-    egreso?.proveedor ??
-    "";
-
+  const numeroComprobante = egreso?.numeroComprobante || egreso?.nroComprobante || "-";
+  
+  const pagadorReceptor = egreso?.beneficiario || egreso?.proveedor || egreso?.pagadorReceptor || "-";
+  
+  const banco = egreso?.banco || "";
   const categoria = egreso?.categoria ?? "-";
   const fechaStr = formateaFecha(egreso?.fecha);
   const monto = Number(egreso?.monto ?? 0);
@@ -95,29 +69,32 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.setFontSize(11);
   doc.text(`Categoría: ${categoria}`, 30, 60);
   doc.text(`Fecha: ${fechaStr}`, 130, 60);
-  doc.text(`N° Comprobante: ${numeroComprobante ? String(numeroComprobante) : "-"}`, 30, 68);
-  doc.text(`Pagador/Receptor: ${pagadorReceptor ? String(pagadorReceptor) : "-"}`, 130, 68);
+  doc.text(`N° Comprobante: ${numeroComprobante}`, 30, 68);
+  doc.text(`Pagador/Receptor: ${pagadorReceptor}`, 30, 76);
+  
+  if (banco) {
+    doc.text(`Banco: ${banco}`, 130, 76);
+  }
 
   // ===== Descripción y monto =====
-  doc.text("DESCRIPCIÓN:", 30, 88);
-  doc.text(String(egreso?.descripcion ?? "-"), 30, 96, { maxWidth: 150 });
+  doc.text("DESCRIPCIÓN:", 30, 96);
+  doc.text(String(egreso?.descripcion ?? "-"), 30, 104, { maxWidth: 150 });
 
   doc.setFontSize(16);
-  doc.text(`MONTO: S/ ${monto.toFixed(2)}`, 105, 125, { align: "center" });
+  doc.text(`MONTO: S/ ${monto.toFixed(2)}`, 105, 130, { align: "center" });
 
-  // ===== Imagen del comprobante (no bloquea si falla) =====
-  try {
-    const comp = egreso?.comprobantes?.[0];
-    if (comp?.url) {
-      const dataUrl = await storageUrlToDataURL(comp.url);
-      if (dataUrl) {
-        const fmt = (comp?.tipo || "").toUpperCase().includes("PNG") ? "PNG" : "JPEG";
-        doc.addImage(dataUrl, fmt as any, 20, 140, 170, 100);
+  // ===== Imagen del comprobante =====
+  const comp = egreso?.comprobantes?.[0];
+  if (comp?.url) {
+    const dataUrl = await storageUrlToDataURL(comp.url);
+    if (dataUrl) {
+      try {
+        const fmt = comp.tipo?.toUpperCase().includes("PNG") ? "PNG" : "JPEG";
+        doc.addImage(dataUrl, fmt, 20, 145, 170, 100);
+      } catch (e) {
+        console.warn("Error al agregar imagen al PDF:", e);
       }
     }
-  } catch (e) {
-    // Ignoramos imagen para no cortar descarga
-    console.warn("Imagen de comprobante omitida:", e);
   }
 
   return doc.output("blob");
