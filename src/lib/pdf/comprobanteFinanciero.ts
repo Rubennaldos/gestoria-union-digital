@@ -11,39 +11,52 @@ function blobToDataURL(blob: Blob): Promise<string> {
   });
 }
 
-/** Convierte una URL de Storage a DataURL usando el SDK de Firebase */
-async function storageUrlToDataURL(url: string): Promise<string | null> {
+/** Convierte una URL de Storage a DataURL usando el SDK de Firebase con timeout */
+async function storageUrlToDataURL(url: string, timeoutMs = 8000): Promise<string | null> {
   if (!url) return null;
   
   console.log("🔍 Descargando imagen desde URL:", url);
   
-  try {
-    // Extraer la ruta del storage desde la URL
-    let storagePath = "";
-    
-    if (url.includes("/o/")) {
-      const match = url.match(/\/o\/([^?]+)/);
-      if (match) {
-        storagePath = decodeURIComponent(match[1]);
+  return Promise.race([
+    // Intento de descarga
+    (async () => {
+      try {
+        // Extraer la ruta del storage desde la URL
+        let storagePath = "";
+        
+        if (url.includes("/o/")) {
+          const match = url.match(/\/o\/([^?]+)/);
+          if (match) {
+            storagePath = decodeURIComponent(match[1]);
+          }
+        } else {
+          storagePath = url;
+        }
+        
+        console.log("📁 Ruta de storage:", storagePath);
+        
+        // Usar el SDK de Firebase para obtener el blob
+        const storageReference = sref(storage, storagePath);
+        const blob = await getBlob(storageReference);
+        console.log("✅ Blob descargado, tamaño:", blob.size);
+        
+        const dataUrl = await blobToDataURL(blob);
+        console.log("✅ Conversión a DataURL exitosa");
+        return dataUrl;
+      } catch (error) {
+        console.error("❌ Error al descargar imagen:", error);
+        return null;
       }
-    } else {
-      storagePath = url;
-    }
+    })(),
     
-    console.log("📁 Ruta de storage:", storagePath);
-    
-    // Usar el SDK de Firebase para obtener el blob
-    const storageReference = sref(storage, storagePath);
-    const blob = await getBlob(storageReference);
-    console.log("✅ Blob descargado, tamaño:", blob.size);
-    
-    const dataUrl = await blobToDataURL(blob);
-    console.log("✅ Conversión a DataURL exitosa");
-    return dataUrl;
-  } catch (error) {
-    console.error("❌ Error al descargar imagen:", error);
-    return null;
-  }
+    // Timeout
+    new Promise<null>((resolve) => 
+      setTimeout(() => {
+        console.warn(`⏱️ Timeout de ${timeoutMs}ms alcanzado - continuando sin imagen`);
+        resolve(null);
+      }, timeoutMs)
+    )
+  ]);
 }
 
 function formateaFecha(f: number | string | undefined) {
@@ -186,8 +199,8 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   console.log("🖼️ Comprobante adjunto:", comp);
   
   if (comp?.url) {
-    console.log("⏳ Iniciando descarga de imagen...");
-    const dataUrl = await storageUrlToDataURL(comp.url);
+    console.log("⏳ Iniciando descarga de imagen (timeout: 8s)...");
+    const dataUrl = await storageUrlToDataURL(comp.url, 8000);
     
     if (dataUrl) {
       try {
@@ -209,9 +222,21 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
         yPos += maxHeight + 5;
       } catch (e) {
         console.error("❌ Error al agregar imagen al PDF:", e);
+        // Continuar sin la imagen
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(9);
+        doc.setTextColor(150, 150, 150);
+        doc.text("(La imagen del comprobante no pudo ser incluida)", 15, yPos);
+        yPos += 10;
       }
     } else {
-      console.warn("⚠️ No se pudo obtener DataURL de la imagen");
+      console.warn("⚠️ No se pudo obtener DataURL - PDF sin imagen");
+      // Indicar que hay un comprobante pero no se pudo incluir
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(150, 150, 150);
+      doc.text("(Comprobante disponible en el sistema - no incluido en PDF)", 15, yPos);
+      yPos += 10;
     }
   } else {
     console.log("ℹ️ No hay comprobante adjunto");
