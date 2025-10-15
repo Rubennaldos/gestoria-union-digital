@@ -69,13 +69,27 @@ export async function crearMovimientoFinanciero(
     comprobantes = await Promise.all(archivos.map((a) => subirComprobante(a, id)));
   }
 
-  const movimiento: MovimientoFinanciero = {
-    ...data,
+  // Crear objeto base del movimiento
+  const movimiento: any = {
     id,
+    tipo: data.tipo,
+    categoria: data.categoria,
+    monto: data.monto,
+    descripcion: data.descripcion,
+    fecha: data.fecha,
+    registradoPor: data.registradoPor,
+    registradoPorNombre: data.registradoPorNombre,
     comprobantes,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+
+  // Agregar campos opcionales solo si tienen valor (evitar undefined en Firebase)
+  if (data.numeroComprobante) movimiento.numeroComprobante = data.numeroComprobante;
+  if (data.proveedor) movimiento.proveedor = data.proveedor;
+  if (data.beneficiario) movimiento.beneficiario = data.beneficiario;
+  if (data.observaciones) movimiento.observaciones = data.observaciones;
+  if ((data as any).banco) movimiento.banco = (data as any).banco;
 
   await set(newMovimientoRef, movimiento);
   await actualizarResumenCaja();
