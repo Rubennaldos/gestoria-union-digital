@@ -38,7 +38,11 @@ function formateaFecha(f: number | string | undefined) {
   if (!f) return "-";
   try {
     const d = typeof f === "number" ? new Date(f) : new Date(f);
-    return d.toLocaleDateString();
+    return d.toLocaleDateString("es-PE", { 
+      day: "2-digit", 
+      month: "2-digit", 
+      year: "numeric" 
+    });
   } catch {
     return String(f);
   }
@@ -49,38 +53,102 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   console.log("📄 Iniciando generación de PDF para:", egreso);
   const doc = new jsPDF();
 
-  // ===== Encabezado =====
-  doc.setFontSize(18);
-  doc.text("COMPROBANTE FINANCIERO", 105, 30, { align: "center" });
+  // Colores y configuración
+  const primaryColor = [41, 128, 185] as [number, number, number]; // Azul profesional
+  const darkGray = [52, 73, 94] as [number, number, number];
+  const lightGray = [236, 240, 241] as [number, number, number];
 
-  // ===== Información general =====
-  const numeroComprobante = egreso?.numeroComprobante || egreso?.nroComprobante || "-";
+  // ===== ENCABEZADO CON FONDO =====
+  doc.setFillColor(...primaryColor);
+  doc.rect(0, 0, 210, 45, 'F');
   
-  const pagadorReceptor = egreso?.beneficiario || egreso?.proveedor || egreso?.pagadorReceptor || "-";
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(24);
+  doc.setFont('helvetica', 'bold');
+  doc.text("COMPROBANTE FINANCIERO", 105, 20, { align: "center" });
   
+  // Tipo de movimiento
+  const tipoLabel = egreso.tipo === "ingreso" ? "INGRESO" : "EGRESO";
+  doc.setFontSize(14);
+  doc.text(tipoLabel, 105, 32, { align: "center" });
+
+  // ===== INFORMACIÓN GENERAL =====
+  doc.setTextColor(...darkGray);
+  doc.setFontSize(10);
+  
+  const numeroComprobante = egreso?.numeroComprobante || egreso?.nroComprobante || "Sin número";
+  const pagadorReceptor = egreso?.beneficiario || egreso?.proveedor || egreso?.pagadorReceptor || "No especificado";
   const banco = egreso?.banco || "";
-  const categoria = egreso?.categoria ?? "-";
+  const categoria = egreso?.categoria || "Sin categoría";
   const fechaStr = formateaFecha(egreso?.fecha);
   const monto = Number(egreso?.monto ?? 0);
 
-  doc.setFontSize(11);
-  doc.text(`Categoría: ${categoria}`, 30, 60);
-  doc.text(`Fecha: ${fechaStr}`, 130, 60);
-  doc.text(`N° Comprobante: ${numeroComprobante}`, 30, 68);
-  doc.text(`Pagador/Receptor: ${pagadorReceptor}`, 30, 76);
+  let yPos = 55;
+
+  // Caja de información principal con fondo
+  doc.setFillColor(...lightGray);
+  doc.roundedRect(15, yPos, 180, 45, 3, 3, 'F');
   
-  if (banco) {
-    doc.text(`Banco: ${banco}`, 130, 76);
-  }
+  yPos += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  
+  // Columna izquierda
+  doc.text("CATEGORÍA:", 20, yPos);
+  doc.text("N° COMPROBANTE:", 20, yPos + 10);
+  doc.text("PAGADOR/RECEPTOR:", 20, yPos + 20);
+  if (banco) doc.text("BANCO:", 20, yPos + 30);
+  
+  // Valores columna izquierda
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...darkGray);
+  doc.setFontSize(10);
+  doc.text(categoria, 60, yPos);
+  doc.text(numeroComprobante, 60, yPos + 10);
+  doc.text(pagadorReceptor, 60, yPos + 20, { maxWidth: 55 });
+  if (banco) doc.text(banco, 60, yPos + 30);
+  
+  // Columna derecha
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text("FECHA:", 125, yPos);
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...darkGray);
+  doc.setFontSize(10);
+  doc.text(fechaStr, 145, yPos);
 
-  // ===== Descripción y monto =====
-  doc.text("DESCRIPCIÓN:", 30, 96);
-  doc.text(String(egreso?.descripcion ?? "-"), 30, 104, { maxWidth: 150 });
+  yPos += 55;
 
-  doc.setFontSize(16);
-  doc.text(`MONTO: S/ ${monto.toFixed(2)}`, 105, 130, { align: "center" });
+  // ===== DESCRIPCIÓN =====
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...darkGray);
+  doc.text("DESCRIPCIÓN:", 15, yPos);
+  
+  yPos += 7;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  const descripcion = String(egreso?.descripcion ?? "Sin descripción");
+  const splitDesc = doc.splitTextToSize(descripcion, 180);
+  doc.text(splitDesc, 15, yPos);
+  
+  yPos += (splitDesc.length * 5) + 10;
 
-  // ===== Imagen del comprobante =====
+  // ===== MONTO DESTACADO =====
+  doc.setFillColor(...primaryColor);
+  doc.roundedRect(15, yPos, 180, 25, 3, 3, 'F');
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text(`MONTO: S/ ${monto.toFixed(2)}`, 105, yPos + 16, { align: "center" });
+
+  yPos += 35;
+
+  // ===== IMAGEN DEL COMPROBANTE =====
   const comp = egreso?.comprobantes?.[0];
   console.log("🖼️ Comprobante adjunto:", comp);
   
@@ -90,9 +158,22 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
     
     if (dataUrl) {
       try {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(...darkGray);
+        doc.text("COMPROBANTE ADJUNTO:", 15, yPos);
+        
+        yPos += 5;
+        
         const fmt = comp.tipo?.toUpperCase().includes("PNG") ? "PNG" : "JPEG";
         console.log("✅ Agregando imagen al PDF, formato:", fmt);
-        doc.addImage(dataUrl, fmt, 20, 145, 170, 100);
+        
+        // Calcular dimensiones para ajustar la imagen
+        const maxWidth = 180;
+        const maxHeight = 100;
+        doc.addImage(dataUrl, fmt, 15, yPos, maxWidth, maxHeight);
+        
+        yPos += maxHeight + 5;
       } catch (e) {
         console.error("❌ Error al agregar imagen al PDF:", e);
       }
@@ -102,6 +183,14 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   } else {
     console.log("ℹ️ No hay comprobante adjunto");
   }
+
+  // ===== PIE DE PÁGINA =====
+  doc.setFontSize(8);
+  doc.setTextColor(150, 150, 150);
+  doc.setFont('helvetica', 'italic');
+  const fechaGeneracion = new Date().toLocaleString("es-PE");
+  doc.text(`Generado el: ${fechaGeneracion}`, 105, 285, { align: "center" });
+  doc.text(`Registrado por: ${egreso?.registradoPorNombre || "Sistema"}`, 105, 290, { align: "center" });
 
   console.log("✅ PDF generado exitosamente");
   return doc.output("blob");
