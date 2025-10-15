@@ -16,6 +16,15 @@
       ".read": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
       ".write": "auth != null"
     },
+    "cobranzas": {
+      "configuracion": {
+        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+      },
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth.uid === $uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
@@ -31,19 +40,18 @@
       },
       ".indexOn": ["authUid", "dni", "numeroPadron"]
     },
+    "cobranzas_v2": {
+      "comprobantes": {
+        ".write": "auth != null"
+      }
+    },
+    "personal-seguridad": {
+      ".write": "auth != null"
+    },
     "eventos": {
       "$eventoId": {
         ".write": "auth != null && (newData.child('creadorUid').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin')",
         ".validate": "newData.hasChildren(['creadorUid', 'nombre', 'fecha'])"
-      }
-    },
-    "cobranzas": {
-      "configuracion": {
-        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
-      },
-      "$uid": {
-        ".read": "$uid === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
-        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
       }
     },
     "finanzas": {

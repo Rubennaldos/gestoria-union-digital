@@ -1,12 +1,6 @@
 [
   {
-    "origin": [
-      "https://rubenmaldos.github.io",
-      "http://moradadelvalle.site",
-      "https://moradadelvalle.site",
-      "http://localhost:3000",
-      "http://localhost:5173"
-    ],
+    "origin": ["https://rubenmaldos.github.io"],
     "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
     "responseHeader": ["Authorization", "Content-Type", "x-goog-meta-*"],
     "maxAgeSeconds": 3600
