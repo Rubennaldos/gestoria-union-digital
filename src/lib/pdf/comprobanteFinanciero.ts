@@ -1,16 +1,20 @@
-// src/pdf/comprobanteFinanciero.ts
 import jsPDF from "jspdf";
 import { ref as sref, getBlob, getBytes } from "firebase/storage";
 import { storage } from "@/config/firebase";
 
-/** Convierte una URL de Firebase Storage (getDownloadURL) a DataURL (base64) vía SDK (evita CORS) */
-async function storageUrlToDataURL(url: string): Promise<string> {
+/** Intenta convertir una URL de Storage a DataURL (Base64) con varias rutas. Nunca lanza: devuelve null si no puede. */
+async function storageUrlToDataURL(url: string): Promise<string | null> {
+  // 1) SDK: getBlob
   try {
-    const r = sref(storage, url);           // admite https de getDownloadURL
-    const blob = await getBlob(r);          // camino preferido
+    const r = sref(storage, url);
+    const blob = await getBlob(r);
     return await blobToDataURL(blob);
-  } catch {
-    // Fallback si tu versión del SDK no tiene getBlob
+  } catch (e) {
+    // sigue
+  }
+
+  // 2) SDK: getBytes (algunas versiones no tienen getBlob)
+  try {
     const r = sref(storage, url);
     const bytes = await getBytes(r);
     const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
@@ -20,7 +24,23 @@ async function storageUrlToDataURL(url: string): Promise<string> {
       ext === "pdf" ? "application/pdf" :
       "image/jpeg";
     return `data:${mime};base64,${base64}`;
+  } catch (e) {
+    // sigue
   }
+
+  // 3) Fallback: fetch sin credenciales (evita preflight con Authorization)
+  try {
+    const res = await fetch(url, { mode: "cors", credentials: "omit", cache: "no-cache", referrerPolicy: "no-referrer" });
+    if (res.ok) {
+      const blob = await res.blob();
+      return await blobToDataURL(blob);
+    }
+  } catch (e) {
+    // sigue
+  }
+
+  // 4) Nada funcionó: devolvemos null para NO bloquear el PDF
+  return null;
 }
 
 function blobToDataURL(blob: Blob): Promise<string> {
@@ -42,10 +62,7 @@ function formateaFecha(f: number | string | undefined) {
   }
 }
 
-/**
- * Genera el PDF del comprobante (EGRESO/INGRESO).
- * Devuelve un Blob para que el caller lo descargue.
- */
+/** Genera el PDF y devuelve un Blob para descargar. */
 export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   const doc = new jsPDF();
 
@@ -78,16 +95,8 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.setFontSize(11);
   doc.text(`Categoría: ${categoria}`, 30, 60);
   doc.text(`Fecha: ${fechaStr}`, 130, 60);
-  doc.text(
-    `N° Comprobante: ${numeroComprobante ? String(numeroComprobante) : "-"}`,
-    30,
-    68
-  );
-  doc.text(
-    `Pagador/Receptor: ${pagadorReceptor ? String(pagadorReceptor) : "-"}`,
-    130,
-    68
-  );
+  doc.text(`N° Comprobante: ${numeroComprobante ? String(numeroComprobante) : "-"}`, 30, 68);
+  doc.text(`Pagador/Receptor: ${pagadorReceptor ? String(pagadorReceptor) : "-"}`, 130, 68);
 
   // ===== Descripción y monto =====
   doc.text("DESCRIPCIÓN:", 30, 88);
@@ -96,22 +105,23 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.setFontSize(16);
   doc.text(`MONTO: S/ ${monto.toFixed(2)}`, 105, 125, { align: "center" });
 
-  // ===== Imagen del comprobante (si existe) =====
-  const comp = egreso?.comprobantes?.[0];
-  if (comp?.url) {
-    try {
+  // ===== Imagen del comprobante (no bloquea si falla) =====
+  try {
+    const comp = egreso?.comprobantes?.[0];
+    if (comp?.url) {
       const dataUrl = await storageUrlToDataURL(comp.url);
-      const fmt = (comp?.tipo || "").toUpperCase().includes("PNG") ? "PNG" : "JPEG";
-      // Ajusta posición/tamaño a tu plantilla
-      doc.addImage(dataUrl, fmt as any, 20, 140, 170, 100);
-    } catch (e) {
-      console.warn("No se pudo cargar la imagen del comprobante:", e);
+      if (dataUrl) {
+        const fmt = (comp?.tipo || "").toUpperCase().includes("PNG") ? "PNG" : "JPEG";
+        doc.addImage(dataUrl, fmt as any, 20, 140, 170, 100);
+      }
     }
+  } catch (e) {
+    // Ignoramos imagen para no cortar descarga
+    console.warn("Imagen de comprobante omitida:", e);
   }
 
-  // Devuelve el PDF como Blob (para descargar desde el modal)
   return doc.output("blob");
 }
 
-// Alias para compatibilidad con código antiguo
+// Alias para compatibilidad si en algún sitio quedó el nombre viejo
 export const generarComprobanteFinanciero = generarComprobantePDF;
