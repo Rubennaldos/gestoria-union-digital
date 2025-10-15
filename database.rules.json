@@ -50,18 +50,24 @@
     },
     "eventos": {
       "$eventoId": {
-        ".write": "auth != null && (newData.child('creadorUid').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin')",
-        ".validate": "newData.hasChildren(['creadorUid', 'nombre', 'fecha'])"
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "inscripcionesEventos": {
+      "$inscripcionId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
       }
     },
     "finanzas": {
       "$movimientoId": {
-        ".write": "newData.child('usuarioId').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+        ".write": "auth != null"
       }
     },
     "acceso": {
       "visitas": {
-        ".write": "newData.child('padronId').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin' || root.child('permissions').child(auth.uid).child('role').val() === 'security'",
+        ".write": "auth != null",
         ".indexOn": ["estado", "patronId", "createdAt", "dni"]
       },
       "trabajadores": {
