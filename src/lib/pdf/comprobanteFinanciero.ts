@@ -11,41 +11,60 @@ function blobToDataURL(blob: Blob): Promise<string> {
   });
 }
 
-/** Convierte una URL de Storage a DataURL usando el SDK de Firebase con timeout */
-async function storageUrlToDataURL(url: string, timeoutMs = 8000): Promise<string | null> {
+/** Convierte una URL de Storage a DataURL con múltiples estrategias y timeout */
+async function storageUrlToDataURL(url: string, timeoutMs = 5000): Promise<string | null> {
   if (!url) return null;
   
   console.log("🔍 Descargando imagen desde URL:", url);
   
   return Promise.race([
-    // Intento de descarga
+    // Estrategia principal: fetch directo de la URL pública
     (async () => {
       try {
-        // Extraer la ruta del storage desde la URL
-        let storagePath = "";
+        console.log("⬇️ Intentando descarga directa...");
+        const response = await fetch(url, { 
+          mode: 'cors',
+          credentials: 'omit',
+          cache: 'force-cache'
+        });
         
-        if (url.includes("/o/")) {
-          const match = url.match(/\/o\/([^?]+)/);
-          if (match) {
-            storagePath = decodeURIComponent(match[1]);
-          }
-        } else {
-          storagePath = url;
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
         }
         
-        console.log("📁 Ruta de storage:", storagePath);
-        
-        // Usar el SDK de Firebase para obtener el blob
-        const storageReference = sref(storage, storagePath);
-        const blob = await getBlob(storageReference);
-        console.log("✅ Blob descargado, tamaño:", blob.size);
+        const blob = await response.blob();
+        console.log("✅ Blob descargado vía fetch, tamaño:", (blob.size / 1024).toFixed(2), "KB");
         
         const dataUrl = await blobToDataURL(blob);
         console.log("✅ Conversión a DataURL exitosa");
         return dataUrl;
       } catch (error) {
-        console.error("❌ Error al descargar imagen:", error);
-        return null;
+        console.warn("⚠️ Fetch directo falló, intentando SDK...", error);
+        
+        // Fallback: usar SDK de Firebase Storage
+        try {
+          let storagePath = "";
+          if (url.includes("/o/")) {
+            const match = url.match(/\/o\/([^?]+)/);
+            if (match) {
+              storagePath = decodeURIComponent(match[1]);
+            }
+          } else {
+            storagePath = url;
+          }
+          
+          console.log("📁 Ruta de storage:", storagePath);
+          const storageReference = sref(storage, storagePath);
+          const blob = await getBlob(storageReference);
+          console.log("✅ Blob descargado vía SDK, tamaño:", (blob.size / 1024).toFixed(2), "KB");
+          
+          const dataUrl = await blobToDataURL(blob);
+          console.log("✅ Conversión a DataURL exitosa");
+          return dataUrl;
+        } catch (sdkError) {
+          console.error("❌ Error al descargar imagen:", sdkError);
+          return null;
+        }
       }
     })(),
     
@@ -199,8 +218,8 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   console.log("🖼️ Comprobante adjunto:", comp);
   
   if (comp?.url) {
-    console.log("⏳ Iniciando descarga de imagen (timeout: 8s)...");
-    const dataUrl = await storageUrlToDataURL(comp.url, 8000);
+    console.log("⏳ Iniciando descarga de imagen (timeout: 5s)...");
+    const dataUrl = await storageUrlToDataURL(comp.url, 5000);
     
     if (dataUrl) {
       try {
