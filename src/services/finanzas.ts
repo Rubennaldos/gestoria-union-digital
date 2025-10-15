@@ -7,37 +7,32 @@ import {
   EstadisticasFinanzas,
   Comprobante,
 } from "@/types/finanzas";
+import { uploadFileAndGetURL } from "./FileStorageService";
 
 /**
- * RTDB-only:
- * - NO sube archivos.
- * - Guarda SOLO metadatos del comprobante.
- * - Si más adelante quieres adjuntar archivos reales,
- *   se puede reactivar Storage o usar otro backend.
+ * Sube un archivo a Firebase Storage y guarda los metadatos en RTDB.
+ * Devuelve los metadatos del comprobante incluyendo la URL pública.
  */
 export async function subirComprobante(
   file: File,
   movimientoId: string
 ): Promise<Comprobante> {
   const timestamp = Date.now();
-
-  // Guardamos únicamente metadatos (sin URL real)
+  // Subir archivo a Storage y obtener URL
+  const url = await uploadFileAndGetURL(file, "comprobantes");
   const meta: Comprobante = {
     nombre: file.name,
-    url: "", // sin archivo
+    url,
     tipo: file.type,
     tamano: file.size,
     fechaSubida: timestamp,
   };
-
-  // (Opcional) persistir metadatos del comprobante como hoja hija del movimiento
-  // para facilitar conteo/consulta.
+  // Guardar metadatos en RTDB
   const compRef = ref(
     db,
     `finanzas/comprobantes/${movimientoId}/${timestamp}`
   );
   await set(compRef, meta);
-
   return meta;
 }
 

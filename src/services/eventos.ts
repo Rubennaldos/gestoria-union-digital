@@ -11,6 +11,7 @@ import {
   equalTo,
 } from "firebase/database";
 import { db } from "@/config/firebase";
+import { uploadFileAndGetURL } from "./FileStorageService";
 import {
   Evento,
   InscripcionEvento,
@@ -48,6 +49,12 @@ export const crearEvento = async (
       ? zonedTimeToUtc(eventoData.fechaFin, TIMEZONE)
       : null;
 
+  // Subir imagen a Storage si es base64/dataURL
+  let imagenUrl = eventoData.imagen;
+  if (typeof eventoData.imagen === "string" && eventoData.imagen.startsWith("data:")) {
+    imagenUrl = await uploadFileAndGetURL(eventoData.imagen, "eventos");
+  }
+
   const evento: Evento = {
     id: nuevoEventoRef.key!,
     titulo: eventoData.titulo,
@@ -65,7 +72,7 @@ export const crearEvento = async (
       : eventoData.cuposMaximos,
     precio: eventoData.precio,
     ...(eventoData.promocion && { promocion: eventoData.promocion }),
-    imagen: eventoData.imagen,
+    imagen: imagenUrl,
     requisitos: eventoData.requisitos,
     materialesIncluidos: eventoData.materialesIncluidos,
     estado: eventoData.estado,
@@ -119,6 +126,12 @@ export const actualizarEvento = async (
     ultimaModificacion: Date.now(),
     modificadoPor: uid,
   };
+  // Subir imagen a Storage si es base64/dataURL
+  if (eventoData.imagen && typeof eventoData.imagen === "string" && eventoData.imagen.startsWith("data:")) {
+    updates.imagen = await uploadFileAndGetURL(eventoData.imagen, "eventos");
+  } else if (eventoData.imagen !== undefined) {
+    updates.imagen = eventoData.imagen;
+  }
 
   if (eventoData.titulo !== undefined) updates.titulo = eventoData.titulo;
   if (eventoData.descripcion !== undefined)

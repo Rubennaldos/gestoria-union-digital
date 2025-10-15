@@ -9,7 +9,7 @@ const firebaseConfig = {
   authDomain: "sis-jpusap.firebaseapp.com",
   databaseURL: "https://sis-jpusap-default-rtdb.firebaseio.com",
   projectId: "sis-jpusap",
-  storageBucket: "sis-jpusap.appspot.com", // ← no se usa, pero puede quedar
+  storageBucket: "sis-jpusap.appspot.com", // ← corregido para migración
   messagingSenderId: "784716205213",
   appId: "1:784716205213:web:de3a8dce709518cc841874",
 };
