@@ -1,0 +1,69 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": false,
+    "permissions": {
+      ".read": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "roles": {
+      ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "modules": {
+      ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+    },
+    "auditLogs": {
+      ".read": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null"
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth.uid === $uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "auth.uid === $uid",
+        ".indexOn": ["empadronadoId"]
+      }
+    },
+    "empadronados": {
+      "$empadronadoId": {
+        ".read": "data.child('authUid').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "data.child('authUid').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".validate": "newData.hasChildren(['dni', 'numeroPadron', 'authUid'])"
+      },
+      ".indexOn": ["authUid", "dni", "numeroPadron"]
+    },
+    "eventos": {
+      "$eventoId": {
+        ".write": "auth != null && (newData.child('creadorUid').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin')",
+        ".validate": "newData.hasChildren(['creadorUid', 'nombre', 'fecha'])"
+      }
+    },
+    "cobranzas": {
+      "configuracion": {
+        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+      },
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "finanzas": {
+      "$movimientoId": {
+        ".write": "newData.child('usuarioId').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "acceso": {
+      "visitas": {
+        ".write": "newData.child('padronId').val() === auth.uid || root.child('permissions').child(auth.uid).child('role').val() === 'admin' || root.child('permissions').child(auth.uid).child('role').val() === 'security'",
+        ".indexOn": ["estado", "patronId", "createdAt", "dni"]
+      },
+      "trabajadores": {
+        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".indexOn": ["estado", "dni", "padron"]
+      },
+      "proveedores": {
+        ".write": "root.child('permissions').child(auth.uid).child('role').val() === 'admin'",
+        ".indexOn": ["estado", "ruc"]
+      }
+    }
+  }
+}
