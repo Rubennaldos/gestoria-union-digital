@@ -6,7 +6,8 @@ import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download } from "luci
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { generarComprobanteFinanciero } from "@/lib/pdf/comprobanteFinanciero";
+// 👇 Ruta y nombre CORREGIDOS (el archivo vive en src/lib/pdf/)
+import { generarComprobantePDF } from "@/lib/pdf/comprobanteFinanciero";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -44,39 +45,41 @@ export const DetalleMovimientoModal = ({
   const descargarComprobante = async () => {
     try {
       setDescargando(true);
-      
-      const pdfBlob = await generarComprobanteFinanciero({
+
+      // El generador devuelve un Blob (PDF)
+      const pdfBlob = await generarComprobantePDF({
         id: movimiento.id,
         tipo: movimiento.tipo,
         categoria: categoriasLabels[movimiento.categoria] || movimiento.categoria,
         monto: movimiento.monto,
         descripcion: movimiento.descripcion,
         fecha: movimiento.fecha,
-        numeroComprobante: movimiento.numeroComprobante || '',
-        beneficiario: movimiento.beneficiario || movimiento.proveedor || '',
-        proveedor: movimiento.proveedor || '',
+        numeroComprobante: movimiento.numeroComprobante || "",
+        beneficiario: movimiento.beneficiario || movimiento.proveedor || "",
+        proveedor: movimiento.proveedor || "",
         observaciones: movimiento.observaciones,
         registradoPorNombre: movimiento.registradoPorNombre,
         createdAt: movimiento.createdAt,
         comprobantes: movimiento.comprobantes,
-        // Extraer información adicional de observaciones si es un evento
-        ...(movimiento.categoria === "evento" && movimiento.observaciones ? (() => {
-          try {
-            const obs = JSON.parse(movimiento.observaciones);
-            return {
-              banco: obs.banco || "",
-              numeroPadron: obs.numeroPadron || "",
-              nombreAsociado: obs.nombreAsociado || ""
-            };
-          } catch {
-            return {};
-          }
-        })() : {}),
+        ...(movimiento.categoria === "evento" && movimiento.observaciones
+          ? (() => {
+              try {
+                const obs = JSON.parse(movimiento.observaciones);
+                return {
+                  banco: obs.banco || "",
+                  numeroPadron: obs.numeroPadron || "",
+                  nombreAsociado: obs.nombreAsociado || "",
+                };
+              } catch {
+                return {};
+              }
+            })()
+          : {}),
       });
 
       // Descargar el PDF
       const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `comprobante-${movimiento.tipo}-${movimiento.id.slice(-8)}.pdf`;
       document.body.appendChild(link);
@@ -108,12 +111,7 @@ export const DetalleMovimientoModal = ({
                 Detalle de {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
               </DialogTitle>
             </div>
-            <Button
-              onClick={descargarComprobante}
-              disabled={descargando}
-              size="sm"
-              className="gap-2"
-            >
+            <Button onClick={descargarComprobante} disabled={descargando} size="sm" className="gap-2">
               <Download className="h-4 w-4" />
               {descargando ? "Descargando..." : "Descargar PDF"}
             </Button>
@@ -130,10 +128,7 @@ export const DetalleMovimientoModal = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Tipo</p>
-                <Badge
-                  variant={movimiento.tipo === "ingreso" ? "default" : "destructive"}
-                  className="mt-1"
-                >
+                <Badge variant={movimiento.tipo === "ingreso" ? "default" : "destructive"} className="mt-1">
                   {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
                 </Badge>
               </div>
@@ -144,11 +139,7 @@ export const DetalleMovimientoModal = ({
               <div>
                 <p className="text-sm text-muted-foreground">Monto</p>
                 <p className="text-2xl font-bold">
-                  <span
-                    className={
-                      movimiento.tipo === "ingreso" ? "text-green-600" : "text-red-600"
-                    }
-                  >
+                  <span className={movimiento.tipo === "ingreso" ? "text-green-600" : "text-red-600"}>
                     S/ {movimiento.monto.toFixed(2)}
                   </span>
                 </p>
@@ -156,9 +147,7 @@ export const DetalleMovimientoModal = ({
               <div>
                 <p className="text-sm text-muted-foreground">Fecha</p>
                 <p className="font-medium">
-                  {format(new Date(movimiento.fecha), "dd 'de' MMMM 'de' yyyy", {
-                    locale: es,
-                  })}
+                  {format(new Date(movimiento.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
                 </p>
               </div>
             </div>
@@ -204,9 +193,7 @@ export const DetalleMovimientoModal = ({
                 {movimiento.observaciones && (
                   <div className="mt-4">
                     <p className="text-sm text-muted-foreground">Observaciones</p>
-                    <p className="text-sm mt-1 whitespace-pre-wrap">
-                      {movimiento.observaciones}
-                    </p>
+                    <p className="text-sm mt-1 whitespace-pre-wrap">{movimiento.observaciones}</p>
                   </div>
                 )}
               </div>
@@ -223,25 +210,16 @@ export const DetalleMovimientoModal = ({
                 </h3>
                 <div className="space-y-2">
                   {movimiento.comprobantes.map((comprobante, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                    >
+                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{comprobante.nombre}</p>
                         <p className="text-xs text-muted-foreground">
                           {(comprobante.tamano / 1024).toFixed(2)} KB •{" "}
-                          {format(comprobante.fechaSubida, "dd/MM/yyyy HH:mm", {
-                            locale: es,
-                          })}
+                          {format(comprobante.fechaSubida, "dd/MM/yyyy HH:mm", { locale: es })}
                         </p>
                       </div>
                       <div className="flex gap-2 ml-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(comprobante.url, "_blank")}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => window.open(comprobante.url, "_blank")}>
                           <ExternalLink className="h-4 w-4" />
                         </Button>
                         <Button
