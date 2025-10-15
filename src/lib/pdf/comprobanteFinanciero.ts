@@ -227,8 +227,9 @@ export async function generarComprobanteFinanciero(
     }
   } else {
     // Formato estándar para otros tipos de movimientos
+    // INFORMACIÓN GENERAL - tabla ordenada
     doc.setFillColor(...lightGray);
-    doc.roundedRect(20, yPos, pageWidth - 40, 25, 3, 3, "F");
+    doc.roundedRect(20, yPos, pageWidth - 40, 36, 3, 3, "F");
 
     doc.setFontSize(12);
     doc.setTextColor(...primaryColor);
@@ -237,13 +238,31 @@ export async function generarComprobanteFinanciero(
     doc.setFontSize(10);
     doc.setTextColor(60);
     const fechaValida = data.fecha && !isNaN(new Date(data.fecha).getTime());
-    doc.text(`Categoría: ${data.categoria}`, 25, yPos + 14);
+    // Filas: Categoría, Fecha, N° Comprobante, Cuenta/Modo de Pago, Pagador/Receptor
+    let infoY = yPos + 14;
+    doc.text(`Categoría: ${data.categoria}`, 25, infoY);
     doc.text(
       `Fecha: ${fechaValida ? format(new Date(data.fecha), "dd/MM/yyyy", { locale: es }) : "Fecha inválida"}`,
-      25,
-      yPos + 20
+      pageWidth / 2 + 10,
+      infoY
     );
-    yPos += 35;
+    infoY += 6;
+    doc.text(`N° Comprobante: ${data.numeroComprobante || '-'}`, 25, infoY);
+    doc.text(`Cuenta/Pago: ${data.banco || '-'}`, pageWidth / 2 + 10, infoY);
+    infoY += 6;
+    // Determinar pagador/receptor según tipo
+    let pagadorReceptor = '-';
+    if (data.tipo === 'ingreso') {
+      pagadorReceptor = data.beneficiario || data.proveedor || '-';
+    } else if (data.tipo === 'egreso') {
+      pagadorReceptor = data.proveedor || data.beneficiario || '-';
+    }
+    doc.text(
+      `Pagador/Receptor: ${pagadorReceptor}`,
+      25,
+      infoY
+    );
+    yPos += 41;
 
     // Descripción
     doc.setFontSize(11);
