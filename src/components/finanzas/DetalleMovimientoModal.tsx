@@ -6,10 +6,11 @@ import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download } from "luci
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-// 👇 Ruta y nombre CORREGIDOS (el archivo vive en src/lib/pdf/)
 import { generarComprobantePDF } from "@/lib/pdf/comprobanteFinanciero";
 import { toast } from "sonner";
 import { useState } from "react";
+import { ref as sref, getDownloadURL } from "firebase/storage";
+import { storage } from "@/config/firebase";
 
 interface DetalleMovimientoModalProps {
   movimiento: MovimientoFinanciero | null;
@@ -46,7 +47,56 @@ export const DetalleMovimientoModal = ({
     try {
       setDescargando(true);
 
-      // El generador devuelve un Blob (PDF)
+      // Pre-descargar la imagen con autenticación ANTES de generar el PDF
+      let imageDataUrl: string | undefined;
+      if (movimiento.comprobantes && movimiento.comprobantes.length > 0) {
+        const comp = movimiento.comprobantes[0];
+        try {
+          console.log("🔄 Pre-descargando imagen con autenticación...");
+          
+          // Extraer ruta de storage desde la URL
+          let storagePath = "";
+          if (comp.url.includes("/o/")) {
+            const match = comp.url.match(/\/o\/([^?]+)/);
+            if (match) {
+              storagePath = decodeURIComponent(match[1]);
+            }
+          }
+          
+          console.log("📁 Ruta:", storagePath);
+          const storageRef = sref(storage, storagePath);
+          
+          // Obtener URL autenticada con token largo
+          const downloadUrl = await getDownloadURL(storageRef);
+          console.log("✅ URL autenticada obtenida");
+          
+          // Descargar con fetch y timeout largo (2 minutos)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutos
+          
+          const response = await fetch(downloadUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          
+          const blob = await response.blob();
+          console.log("✅ Imagen descargada:", (blob.size / 1024).toFixed(2), "KB");
+          
+          // Convertir a DataURL
+          imageDataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          console.log("✅ DataURL listo para PDF");
+        } catch (imgError) {
+          console.error("⚠️ Error al pre-descargar imagen:", imgError);
+          toast.warning("No se pudo incluir la imagen en el PDF");
+        }
+      }
+
+      // Generar PDF con la imagen ya descargada
       const pdfBlob = await generarComprobantePDF({
         id: movimiento.id,
         tipo: movimiento.tipo,
@@ -61,6 +111,7 @@ export const DetalleMovimientoModal = ({
         registradoPorNombre: movimiento.registradoPorNombre,
         createdAt: movimiento.createdAt,
         comprobantes: movimiento.comprobantes,
+        imageDataUrl, // 👈 Pasar la imagen pre-descargada
         ...(movimiento.categoria === "evento" && movimiento.observaciones
           ? (() => {
               try {

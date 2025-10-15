@@ -8,9 +8,11 @@ import {
   Comprobante,
 } from "@/types/finanzas";
 import { uploadFileAndGetURL } from "./FileStorageService";
+import { compressImage } from "@/lib/imageCompression";
 
 /**
  * Sube un archivo a Firebase Storage y guarda los metadatos en RTDB.
+ * Comprime la imagen antes de subirla para reducir el peso del PDF.
  * Devuelve los metadatos del comprobante incluyendo la URL pública.
  */
 export async function subirComprobante(
@@ -18,13 +20,30 @@ export async function subirComprobante(
   movimientoId: string
 ): Promise<Comprobante> {
   const timestamp = Date.now();
+  
+  // Comprimir la imagen si es un archivo de imagen
+  let fileToUpload: File = file;
+  if (file.type.startsWith('image/')) {
+    console.log(`📦 Comprimiendo imagen ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
+    try {
+      // Comprimir agresivamente para descargas rápidas en PDF (máx 80KB y 500px de ancho)
+      const compressedBlob = await compressImage(file, 80, 500);
+      console.log(`✅ Imagen comprimida a: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
+      
+      // Crear un nuevo File a partir del Blob comprimido
+      fileToUpload = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+    } catch (error) {
+      console.warn('⚠️ Error al comprimir imagen, usando original:', error);
+    }
+  }
+  
   // Subir archivo a Storage y obtener URL
-  const url = await uploadFileAndGetURL(file, "comprobantes");
+  const url = await uploadFileAndGetURL(fileToUpload, "comprobantes");
   const meta: Comprobante = {
     nombre: file.name,
     url,
-    tipo: file.type,
-    tamano: file.size,
+    tipo: fileToUpload.type,
+    tamano: fileToUpload.size,
     fechaSubida: timestamp,
   };
   // Guardar metadatos en RTDB
@@ -50,13 +69,27 @@ export async function crearMovimientoFinanciero(
     comprobantes = await Promise.all(archivos.map((a) => subirComprobante(a, id)));
   }
 
-  const movimiento: MovimientoFinanciero = {
-    ...data,
+  // Crear objeto base del movimiento
+  const movimiento: any = {
     id,
+    tipo: data.tipo,
+    categoria: data.categoria,
+    monto: data.monto,
+    descripcion: data.descripcion,
+    fecha: data.fecha,
+    registradoPor: data.registradoPor,
+    registradoPorNombre: data.registradoPorNombre,
     comprobantes,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+
+  // Agregar campos opcionales solo si tienen valor (evitar undefined en Firebase)
+  if (data.numeroComprobante) movimiento.numeroComprobante = data.numeroComprobante;
+  if (data.proveedor) movimiento.proveedor = data.proveedor;
+  if (data.beneficiario) movimiento.beneficiario = data.beneficiario;
+  if (data.observaciones) movimiento.observaciones = data.observaciones;
+  if ((data as any).banco) movimiento.banco = (data as any).banco;
 
   await set(newMovimientoRef, movimiento);
   await actualizarResumenCaja();
@@ -99,6 +132,11 @@ export async function obtenerMovimientos(
       fecha: v.fecha ?? v.createdAt ?? Date.now(),
       registradoPor: v.registradoPor ?? "",
       registradoPorNombre: v.registradoPorNombre ?? v.registradoPor ?? "",
+      numeroComprobante: v.numeroComprobante,
+      proveedor: v.proveedor,
+      beneficiario: v.beneficiario,
+      observaciones: v.observaciones,
+      banco: v.banco,
       comprobantes: Array.isArray(v.comprobantes) ? v.comprobantes : [],
       createdAt: v.createdAt ?? Date.now(),
       updatedAt: v.updatedAt ?? v.createdAt ?? Date.now(),

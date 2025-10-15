@@ -43,6 +43,7 @@ export interface MovimientoFinanciero {
   beneficiario?: string; // Para egresos
   proveedor?: string; // Para egresos
   observaciones?: string;
+  banco?: string; // Banco relacionado al movimiento
   createdAt: number;
   updatedAt: number;
 }
