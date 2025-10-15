@@ -9,7 +9,7 @@ import { es } from "date-fns/locale";
 import { generarComprobantePDF } from "@/lib/pdf/comprobanteFinanciero";
 import { toast } from "sonner";
 import { useState } from "react";
-import { ref as sref, getBlob } from "firebase/storage";
+import { ref as sref, getDownloadURL } from "firebase/storage";
 import { storage } from "@/config/firebase";
 
 interface DetalleMovimientoModalProps {
@@ -65,7 +65,21 @@ export const DetalleMovimientoModal = ({
           
           console.log("📁 Ruta:", storagePath);
           const storageRef = sref(storage, storagePath);
-          const blob = await getBlob(storageRef);
+          
+          // Obtener URL autenticada con token largo
+          const downloadUrl = await getDownloadURL(storageRef);
+          console.log("✅ URL autenticada obtenida");
+          
+          // Descargar con fetch y timeout largo (2 minutos)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutos
+          
+          const response = await fetch(downloadUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          
+          const blob = await response.blob();
           console.log("✅ Imagen descargada:", (blob.size / 1024).toFixed(2), "KB");
           
           // Convertir a DataURL
