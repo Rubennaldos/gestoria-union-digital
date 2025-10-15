@@ -26,9 +26,9 @@ export async function subirComprobante(
   if (file.type.startsWith('image/')) {
     console.log(`📦 Comprimiendo imagen ${file.name} (${(file.size / 1024).toFixed(2)} KB)...`);
     try {
-      // Comprimir a máximo 800px de ancho y 300KB
-      const compressedBlob = await compressImage(file, 300, 800);
-      console.log(`✅ Imagen comprimida: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
+      // Comprimir agresivamente para descargas rápidas en PDF (máx 80KB y 500px de ancho)
+      const compressedBlob = await compressImage(file, 80, 500);
+      console.log(`✅ Imagen comprimida a: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
       
       // Crear un nuevo File a partir del Blob comprimido
       fileToUpload = new File([compressedBlob], file.name, { type: 'image/jpeg' });
