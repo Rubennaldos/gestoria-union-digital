@@ -279,7 +279,7 @@ export async function generarComprobanteFinanciero(
   }
 
   // Comprobante de Pago (imagen) - si existe
-  if (data.comprobantes && data.comprobantes.length > 0) {
+  if (data.comprobantes && Array.isArray(data.comprobantes) && data.comprobantes.length > 0) {
     const espacioNecesario = 100;
     const espacioDisponible = doc.internal.pageSize.getHeight() - yPos - 30;
 
@@ -296,59 +296,65 @@ export async function generarComprobanteFinanciero(
     yPos += 8;
 
     try {
-      const comprobanteUrl = data.comprobantes[0].url;
+      const comprobanteUrl = data.comprobantes[0]?.url;
+      if (comprobanteUrl) {
+        // Convertir la imagen a base64
+        const response = await fetch(comprobanteUrl);
+        const blob = await response.blob();
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
 
-      // Convertir la imagen a base64
-      const response = await fetch(comprobanteUrl);
-      const blob = await response.blob();
-      const base64 = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      });
+        const img = new Image();
+        img.src = base64;
 
-      const img = new Image();
-      img.src = base64;
+        await new Promise((resolve) => {
+          img.onload = resolve as any;
+          img.onerror = resolve as any;
+        });
 
-      await new Promise((resolve) => {
-        img.onload = resolve as any;
-        img.onerror = resolve as any;
-      });
+        const maxWidth = pageWidth - 50;
+        const maxHeight = 100;
 
-      const maxWidth = pageWidth - 50;
-      const maxHeight = 100;
+        let imgWidth = img.width;
+        let imgHeight = img.height;
 
-      let imgWidth = img.width;
-      let imgHeight = img.height;
+        if (imgWidth > 0 && imgHeight > 0) {
+          const aspectRatio = imgWidth / imgHeight;
 
-      if (imgWidth > 0 && imgHeight > 0) {
-        const aspectRatio = imgWidth / imgHeight;
+          if (imgWidth > maxWidth) {
+            imgWidth = maxWidth;
+            imgHeight = imgWidth / aspectRatio;
+          }
 
-        if (imgWidth > maxWidth) {
+          if (imgHeight > maxHeight) {
+            imgHeight = maxHeight;
+            imgWidth = imgHeight * aspectRatio;
+          }
+        } else {
           imgWidth = maxWidth;
-          imgHeight = imgWidth / aspectRatio;
+          imgHeight = 80;
         }
 
-        if (imgHeight > maxHeight) {
-          imgHeight = maxHeight;
-          imgWidth = imgHeight * aspectRatio;
-        }
+        const comprobanteX = (pageWidth - imgWidth) / 2;
+
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(comprobanteX - 5, yPos - 5, imgWidth + 10, imgHeight + 10, 3, 3, "F");
+
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(comprobanteX - 5, yPos - 5, imgWidth + 10, imgHeight + 10, 3, 3, "S");
+
+        doc.addImage(base64, "JPEG", comprobanteX, yPos, imgWidth, imgHeight);
+        yPos += imgHeight + 15;
       } else {
-        imgWidth = maxWidth;
-        imgHeight = 80;
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text("(Comprobante adjunto en el registro)", 25, yPos);
+        yPos += 10;
       }
-
-      const comprobanteX = (pageWidth - imgWidth) / 2;
-
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(comprobanteX - 5, yPos - 5, imgWidth + 10, imgHeight + 10, 3, 3, "F");
-
-      doc.setDrawColor(...primaryColor);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(comprobanteX - 5, yPos - 5, imgWidth + 10, imgHeight + 10, 3, 3, "S");
-
-      doc.addImage(base64, "JPEG", comprobanteX, yPos, imgWidth, imgHeight);
-      yPos += imgHeight + 15;
     } catch {
       doc.setFontSize(9);
       doc.setTextColor(100);
