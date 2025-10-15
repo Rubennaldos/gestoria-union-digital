@@ -1,41 +1,4 @@
 import jsPDF from "jspdf";
-import { ref as sref, getBlob } from "firebase/storage";
-import { storage } from "@/config/firebase";
-
-/** Convierte una URL de Firebase Storage a DataURL (Base64) usando el SDK */
-async function storageUrlToDataURL(url: string): Promise<string | null> {
-  if (!url) return null;
-
-  console.log("🔍 Intentando convertir URL:", url);
-
-  try {
-    // Extraer la ruta del archivo desde la URL de descarga de Firebase
-    let storagePath = url;
-    
-    // Si es una URL de descarga de Firebase, extraer la ruta
-    if (url.includes("firebasestorage.googleapis.com")) {
-      const match = url.match(/\/o\/(.+?)(\?|$)/);
-      if (match && match[1]) {
-        storagePath = decodeURIComponent(match[1]);
-        console.log("📁 Ruta extraída:", storagePath);
-      }
-    }
-
-    // Obtener referencia y descargar el blob usando el SDK
-    console.log("⬇️ Descargando desde Storage...");
-    const storageReference = sref(storage, storagePath);
-    const blob = await getBlob(storageReference);
-    console.log("✅ Blob descargado, tamaño:", blob.size);
-    
-    const dataUrl = await blobToDataURL(blob);
-    console.log("✅ Conversión a DataURL exitosa");
-    return dataUrl;
-    
-  } catch (error) {
-    console.error("❌ Error al cargar imagen del comprobante:", error);
-    return null;
-  }
-}
 
 function blobToDataURL(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -44,6 +7,31 @@ function blobToDataURL(blob: Blob): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+/** Convierte una URL pública a DataURL usando fetch directo */
+async function urlToDataURL(url: string): Promise<string | null> {
+  if (!url) return null;
+  
+  console.log("🔍 Descargando imagen desde URL:", url);
+  
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error("❌ Error al descargar:", response.status);
+      return null;
+    }
+    
+    const blob = await response.blob();
+    console.log("✅ Blob descargado, tamaño:", blob.size);
+    
+    const dataUrl = await blobToDataURL(blob);
+    console.log("✅ Conversión a DataURL exitosa");
+    return dataUrl;
+  } catch (error) {
+    console.error("❌ Error al descargar imagen:", error);
+    return null;
+  }
 }
 
 function formateaFecha(f: number | string | undefined) {
@@ -98,7 +86,7 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   
   if (comp?.url) {
     console.log("⏳ Iniciando descarga de imagen...");
-    const dataUrl = await storageUrlToDataURL(comp.url);
+    const dataUrl = await urlToDataURL(comp.url);
     
     if (dataUrl) {
       try {
