@@ -1,4 +1,6 @@
 import jsPDF from "jspdf";
+import { ref as sref, getDownloadURL, getBlob } from "firebase/storage";
+import { storage } from "@/config/firebase";
 
 function blobToDataURL(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -9,20 +11,30 @@ function blobToDataURL(blob: Blob): Promise<string> {
   });
 }
 
-/** Convierte una URL pública a DataURL usando fetch directo */
-async function urlToDataURL(url: string): Promise<string | null> {
+/** Convierte una URL de Storage a DataURL usando el SDK de Firebase */
+async function storageUrlToDataURL(url: string): Promise<string | null> {
   if (!url) return null;
   
   console.log("🔍 Descargando imagen desde URL:", url);
   
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error("❌ Error al descargar:", response.status);
-      return null;
+    // Extraer la ruta del storage desde la URL
+    let storagePath = "";
+    
+    if (url.includes("/o/")) {
+      const match = url.match(/\/o\/([^?]+)/);
+      if (match) {
+        storagePath = decodeURIComponent(match[1]);
+      }
+    } else {
+      storagePath = url;
     }
     
-    const blob = await response.blob();
+    console.log("📁 Ruta de storage:", storagePath);
+    
+    // Usar el SDK de Firebase para obtener el blob
+    const storageReference = sref(storage, storagePath);
+    const blob = await getBlob(storageReference);
     console.log("✅ Blob descargado, tamaño:", blob.size);
     
     const dataUrl = await blobToDataURL(blob);
@@ -77,17 +89,20 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.setFontSize(10);
   
   const numeroComprobante = egreso?.numeroComprobante || egreso?.nroComprobante || "Sin número";
-  const pagadorReceptor = egreso?.beneficiario || egreso?.proveedor || egreso?.pagadorReceptor || "No especificado";
+  const proveedor = egreso?.proveedor || "";
+  const beneficiario = egreso?.beneficiario || "";
+  const pagadorReceptor = beneficiario || proveedor || "No especificado";
   const banco = egreso?.banco || "";
   const categoria = egreso?.categoria || "Sin categoría";
   const fechaStr = formateaFecha(egreso?.fecha);
   const monto = Number(egreso?.monto ?? 0);
+  const observaciones = egreso?.observaciones || "";
 
   let yPos = 55;
 
   // Caja de información principal con fondo
   doc.setFillColor(...lightGray);
-  doc.roundedRect(15, yPos, 180, 45, 3, 3, 'F');
+  doc.roundedRect(15, yPos, 180, 60, 3, 3, 'F');
   
   yPos += 8;
   doc.setFont('helvetica', 'bold');
@@ -97,8 +112,9 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   // Columna izquierda
   doc.text("CATEGORÍA:", 20, yPos);
   doc.text("N° COMPROBANTE:", 20, yPos + 10);
-  doc.text("PAGADOR/RECEPTOR:", 20, yPos + 20);
-  if (banco) doc.text("BANCO:", 20, yPos + 30);
+  if (proveedor) doc.text("PROVEEDOR:", 20, yPos + 20);
+  if (beneficiario) doc.text("BENEFICIARIO:", 20, yPos + (proveedor ? 30 : 20));
+  if (banco) doc.text("BANCO:", 20, yPos + (proveedor && beneficiario ? 40 : proveedor || beneficiario ? 30 : 20));
   
   // Valores columna izquierda
   doc.setFont('helvetica', 'normal');
@@ -106,8 +122,9 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.setFontSize(10);
   doc.text(categoria, 60, yPos);
   doc.text(numeroComprobante, 60, yPos + 10);
-  doc.text(pagadorReceptor, 60, yPos + 20, { maxWidth: 55 });
-  if (banco) doc.text(banco, 60, yPos + 30);
+  if (proveedor) doc.text(proveedor, 60, yPos + 20, { maxWidth: 55 });
+  if (beneficiario) doc.text(beneficiario, 60, yPos + (proveedor ? 30 : 20), { maxWidth: 55 });
+  if (banco) doc.text(banco, 60, yPos + (proveedor && beneficiario ? 40 : proveedor || beneficiario ? 30 : 20), { maxWidth: 55 });
   
   // Columna derecha
   doc.setFont('helvetica', 'bold');
@@ -120,7 +137,7 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.setFontSize(10);
   doc.text(fechaStr, 145, yPos);
 
-  yPos += 55;
+  yPos += 70;
 
   // ===== DESCRIPCIÓN =====
   doc.setFont('helvetica', 'bold');
@@ -136,6 +153,22 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   doc.text(splitDesc, 15, yPos);
   
   yPos += (splitDesc.length * 5) + 10;
+
+  // ===== OBSERVACIONES (si existen) =====
+  if (observaciones) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...darkGray);
+    doc.text("OBSERVACIONES:", 15, yPos);
+    
+    yPos += 7;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const splitObs = doc.splitTextToSize(observaciones, 180);
+    doc.text(splitObs, 15, yPos);
+    
+    yPos += (splitObs.length * 4) + 10;
+  }
 
   // ===== MONTO DESTACADO =====
   doc.setFillColor(...primaryColor);
@@ -154,7 +187,7 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   
   if (comp?.url) {
     console.log("⏳ Iniciando descarga de imagen...");
-    const dataUrl = await urlToDataURL(comp.url);
+    const dataUrl = await storageUrlToDataURL(comp.url);
     
     if (dataUrl) {
       try {
