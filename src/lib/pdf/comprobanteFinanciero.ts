@@ -218,8 +218,8 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   console.log("🖼️ Comprobante adjunto:", comp);
   
   if (comp?.url) {
-    console.log("⏳ Iniciando descarga de imagen (timeout: 5s)...");
-    const dataUrl = await storageUrlToDataURL(comp.url, 5000);
+    console.log("⏳ Iniciando descarga de imagen (timeout: 10s)...");
+    const dataUrl = await storageUrlToDataURL(comp.url, 10000);
     
     if (dataUrl) {
       try {
