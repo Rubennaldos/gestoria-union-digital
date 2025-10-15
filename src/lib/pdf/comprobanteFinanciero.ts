@@ -6,25 +6,33 @@ import { storage } from "@/config/firebase";
 async function storageUrlToDataURL(url: string): Promise<string | null> {
   if (!url) return null;
 
+  console.log("🔍 Intentando convertir URL:", url);
+
   try {
     // Extraer la ruta del archivo desde la URL de descarga de Firebase
     let storagePath = url;
     
     // Si es una URL de descarga de Firebase, extraer la ruta
     if (url.includes("firebasestorage.googleapis.com")) {
-      const match = url.match(/\/o\/(.+?)\?/);
+      const match = url.match(/\/o\/(.+?)(\?|$)/);
       if (match && match[1]) {
         storagePath = decodeURIComponent(match[1]);
+        console.log("📁 Ruta extraída:", storagePath);
       }
     }
 
     // Obtener referencia y descargar el blob usando el SDK
+    console.log("⬇️ Descargando desde Storage...");
     const storageReference = sref(storage, storagePath);
     const blob = await getBlob(storageReference);
-    return await blobToDataURL(blob);
+    console.log("✅ Blob descargado, tamaño:", blob.size);
+    
+    const dataUrl = await blobToDataURL(blob);
+    console.log("✅ Conversión a DataURL exitosa");
+    return dataUrl;
     
   } catch (error) {
-    console.warn("No se pudo cargar la imagen del comprobante:", error);
+    console.error("❌ Error al cargar imagen del comprobante:", error);
     return null;
   }
 }
@@ -50,6 +58,7 @@ function formateaFecha(f: number | string | undefined) {
 
 /** Genera el PDF y devuelve un Blob para descargar. */
 export async function generarComprobantePDF(egreso: any): Promise<Blob> {
+  console.log("📄 Iniciando generación de PDF para:", egreso);
   const doc = new jsPDF();
 
   // ===== Encabezado =====
@@ -85,18 +94,28 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
 
   // ===== Imagen del comprobante =====
   const comp = egreso?.comprobantes?.[0];
+  console.log("🖼️ Comprobante adjunto:", comp);
+  
   if (comp?.url) {
+    console.log("⏳ Iniciando descarga de imagen...");
     const dataUrl = await storageUrlToDataURL(comp.url);
+    
     if (dataUrl) {
       try {
         const fmt = comp.tipo?.toUpperCase().includes("PNG") ? "PNG" : "JPEG";
+        console.log("✅ Agregando imagen al PDF, formato:", fmt);
         doc.addImage(dataUrl, fmt, 20, 145, 170, 100);
       } catch (e) {
-        console.warn("Error al agregar imagen al PDF:", e);
+        console.error("❌ Error al agregar imagen al PDF:", e);
       }
+    } else {
+      console.warn("⚠️ No se pudo obtener DataURL de la imagen");
     }
+  } else {
+    console.log("ℹ️ No hay comprobante adjunto");
   }
 
+  console.log("✅ PDF generado exitosamente");
   return doc.output("blob");
 }
 
