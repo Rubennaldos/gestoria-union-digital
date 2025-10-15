@@ -75,7 +75,7 @@ function formateaFecha(f: number | string | undefined) {
 }
 
 /** Genera el PDF y devuelve un Blob para descargar. */
-export async function generarComprobantePDF(egreso: any): Promise<Blob> {
+export async function generarComprobantePDF(egreso: any & { imageDataUrl?: string }): Promise<Blob> {
   console.log("📄 Iniciando generación de PDF para:", egreso);
   const doc = new jsPDF();
 
@@ -199,8 +199,37 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
   const comp = egreso?.comprobantes?.[0];
   console.log("🖼️ Comprobante adjunto:", comp);
   
-  if (comp?.url) {
-    console.log("⏳ Iniciando descarga de imagen (timeout: 30s)...");
+  // Si ya tenemos el imageDataUrl pre-descargado, usarlo directamente
+  if (egreso.imageDataUrl) {
+    try {
+      console.log("✅ Usando imagen pre-descargada");
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(...darkGray);
+      doc.text("COMPROBANTE ADJUNTO:", 15, yPos);
+      
+      yPos += 5;
+      
+      const fmt = comp?.tipo?.toUpperCase().includes("PNG") ? "PNG" : "JPEG";
+      console.log("📄 Agregando imagen al PDF, formato:", fmt);
+      
+      const maxWidth = 180;
+      const maxHeight = 100;
+      doc.addImage(egreso.imageDataUrl, fmt, 15, yPos, maxWidth, maxHeight);
+      
+      yPos += maxHeight + 5;
+      console.log("✅ Imagen agregada exitosamente");
+    } catch (e) {
+      console.error("❌ Error al agregar imagen al PDF:", e);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(150, 150, 150);
+      doc.text("(La imagen del comprobante no pudo ser incluida)", 15, yPos);
+      yPos += 10;
+    }
+  } else if (comp?.url) {
+    // Fallback: intentar descargar (menos confiable)
+    console.log("⏳ Intentando descarga de imagen...");
     const dataUrl = await storageUrlToDataURL(comp.url, 30000);
     
     if (dataUrl) {
@@ -215,7 +244,6 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
         const fmt = comp.tipo?.toUpperCase().includes("PNG") ? "PNG" : "JPEG";
         console.log("✅ Agregando imagen al PDF, formato:", fmt);
         
-        // Calcular dimensiones para ajustar la imagen
         const maxWidth = 180;
         const maxHeight = 100;
         doc.addImage(dataUrl, fmt, 15, yPos, maxWidth, maxHeight);
@@ -223,7 +251,6 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
         yPos += maxHeight + 5;
       } catch (e) {
         console.error("❌ Error al agregar imagen al PDF:", e);
-        // Continuar sin la imagen
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(9);
         doc.setTextColor(150, 150, 150);
@@ -232,7 +259,6 @@ export async function generarComprobantePDF(egreso: any): Promise<Blob> {
       }
     } else {
       console.warn("⚠️ No se pudo obtener DataURL - PDF sin imagen");
-      // Indicar que hay un comprobante pero no se pudo incluir
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(9);
       doc.setTextColor(150, 150, 150);
