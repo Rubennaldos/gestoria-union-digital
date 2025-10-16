@@ -44,6 +44,11 @@ export interface MovimientoFinanciero {
   proveedor?: string; // Para egresos
   observaciones?: string;
   banco?: string; // Banco relacionado al movimiento
+  // Datos del empadronado
+  empadronadoId?: string;
+  empadronadoNumeroPadron?: string;
+  empadronadoNombres?: string;
+  empadronadoDni?: string;
   createdAt: number;
   updatedAt: number;
 }

@@ -10,6 +10,7 @@ import { crearMovimientoFinanciero } from "@/services/finanzas";
 import { TipoMovimiento, CategoriaIngreso, CategoriaEgreso } from "@/types/finanzas";
 import { useAuth } from "@/contexts/AuthContext";
 import { Upload, X } from "lucide-react";
+import { BusquedaEmpadronado } from "@/components/deportes/BusquedaEmpadronado";
 
 interface NuevoMovimientoModalProps {
   open: boolean;
@@ -48,6 +49,12 @@ export const NuevoMovimientoModal = ({
   const { user } = useAuth();
   const [guardando, setGuardando] = useState(false);
   const [archivos, setArchivos] = useState<File[]>([]);
+  const [empadronadoSeleccionado, setEmpadronadoSeleccionado] = useState<{
+    id: string;
+    numeroPadron: string;
+    nombres: string;
+    dni: string;
+  } | null>(null);
   
   const [formData, setFormData] = useState({
     tipo: tipoInicial as TipoMovimiento,
@@ -110,6 +117,10 @@ export const NuevoMovimientoModal = ({
           registradoPor: user?.uid || "",
           registradoPorNombre: user?.email || "Sistema",
           comprobantes: [],
+          empadronadoId: empadronadoSeleccionado?.id,
+          empadronadoNumeroPadron: empadronadoSeleccionado?.numeroPadron,
+          empadronadoNombres: empadronadoSeleccionado?.nombres,
+          empadronadoDni: empadronadoSeleccionado?.dni,
         },
         archivos
       );
@@ -139,6 +150,7 @@ export const NuevoMovimientoModal = ({
       observaciones: "",
     });
     setArchivos([]);
+    setEmpadronadoSeleccionado(null);
   };
 
   const categorias = formData.tipo === "ingreso" ? categoriasIngreso : categoriasEgreso;
@@ -153,6 +165,21 @@ export const NuevoMovimientoModal = ({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Buscador de Empadronado */}
+          <div>
+            <Label>Empadronado (Opcional)</Label>
+            <BusquedaEmpadronado 
+              onSeleccionar={(emp) => {
+                setEmpadronadoSeleccionado({
+                  id: emp.id,
+                  numeroPadron: emp.numeroPadron || "",
+                  nombres: `${emp.nombre} ${emp.apellidos}`,
+                  dni: emp.dni || ""
+                });
+              }}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="tipo">Tipo de Movimiento *</Label>

@@ -112,6 +112,9 @@ export const DetalleMovimientoModal = ({
         createdAt: movimiento.createdAt,
         comprobantes: movimiento.comprobantes,
         imageDataUrl, // 👈 Pasar la imagen pre-descargada
+        empadronadoNumeroPadron: movimiento.empadronadoNumeroPadron,
+        empadronadoNombres: movimiento.empadronadoNombres,
+        empadronadoDni: movimiento.empadronadoDni,
         ...(movimiento.categoria === "evento" && movimiento.observaciones
           ? (() => {
               try {
@@ -203,6 +206,30 @@ export const DetalleMovimientoModal = ({
               </div>
             </div>
           </div>
+
+          {/* Datos del Empadronado */}
+          {movimiento.empadronadoNumeroPadron && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="font-semibold text-lg mb-3">Datos del Empadronado</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">N° Padrón</p>
+                    <p className="font-medium">{movimiento.empadronadoNumeroPadron}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Nombres Completos</p>
+                    <p className="font-medium">{movimiento.empadronadoNombres}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">DNI</p>
+                    <p className="font-medium">{movimiento.empadronadoDni}</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 

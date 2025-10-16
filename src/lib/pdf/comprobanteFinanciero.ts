@@ -86,6 +86,10 @@ export interface ComprobanteFinancieroData {
   numeroPadron?: string;
   nombreAsociado?: string;
 
+  empadronadoNumeroPadron?: string;
+  empadronadoNombres?: string;
+  empadronadoDni?: string;
+
   comprobantes?: Array<{
     nombre: string;
     url: string;   // URL firmada o ruta en storage
@@ -186,6 +190,30 @@ export async function generarComprobanteFinanciero(
   doc.text(`Pagador/Receptor: ${pagadorReceptor}`, leftX, gy);
 
   yPos += blockHeight + 8;
+
+  // --- Datos del Empadronado ---
+  if (data.empadronadoNumeroPadron) {
+    doc.setFillColor(...lightGray);
+    const empBlockHeight = 26;
+    doc.roundedRect(20, yPos, pageWidth - 40, empBlockHeight, 3, 3, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...darkGray);
+    doc.text("EMPADRONADO", 25, yPos + 7);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(60);
+
+    let ey = yPos + 14;
+    doc.text(`N° Padrón: ${data.empadronadoNumeroPadron}`, leftX, ey);
+    doc.text(`DNI: ${data.empadronadoDni || "-"}`, rightX, ey);
+    ey += 6;
+    doc.text(`Nombres: ${data.empadronadoNombres || "-"}`, leftX, ey);
+
+    yPos += empBlockHeight + 8;
+  }
 
   // --- Descripción ---
   doc.setFont("helvetica", "bold");
@@ -324,6 +352,10 @@ export async function generarComprobantePDF(egreso: any & { imageDataUrl?: strin
 
     numeroPadron: egreso.numeroPadron,
     nombreAsociado: egreso.nombreAsociado,
+
+    empadronadoNumeroPadron: egreso.empadronadoNumeroPadron,
+    empadronadoNombres: egreso.empadronadoNombres,
+    empadronadoDni: egreso.empadronadoDni,
 
     comprobantes: Array.isArray(egreso.comprobantes) ? egreso.comprobantes : [],
   };

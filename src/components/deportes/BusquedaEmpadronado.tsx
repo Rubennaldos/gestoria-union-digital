@@ -12,6 +12,7 @@ interface EmpadronadoData {
   nombre: string;
   apellidos: string;
   dni: string;
+  numeroPadron?: string;
   telefono?: string;
   aporta?: boolean;
 }
@@ -44,6 +45,7 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
           nombre: emp.nombre,
           apellidos: emp.apellidos,
           dni: emp.dni,
+          numeroPadron: emp.numeroPadron,
           telefono: emp.telefonos?.[0]?.numero,
           aporta: true // Todos los empadronados son aportantes por defecto
         }));
@@ -114,7 +116,14 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{empadronado.nombre} {empadronado.apellidos}</p>
+                      {empadronado.numeroPadron && (
+                        <Badge variant="outline" className="text-xs">
+                          #{empadronado.numeroPadron}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       DNI: {empadronado.dni}
                       {empadronado.telefono && ` • Tel: ${empadronado.telefono}`}
@@ -140,7 +149,14 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
                 <div className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <div>
-                    <p className="font-medium text-green-800 dark:text-green-200">{seleccionado.nombre} {seleccionado.apellidos}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-green-800 dark:text-green-200">{seleccionado.nombre} {seleccionado.apellidos}</p>
+                      {seleccionado.numeroPadron && (
+                        <Badge variant="outline" className="text-xs">
+                          #{seleccionado.numeroPadron}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-green-600 dark:text-green-400">
                       DNI: {seleccionado.dni}
                       {seleccionado.telefono && ` • Tel: ${seleccionado.telefono}`}
