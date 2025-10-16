@@ -286,8 +286,8 @@ export async function generarComprobanteFinanciero(
             ? "PNG"
             : "JPEG";
 
-        const imgW = Math.min(170, pageWidth - 50);
-        const imgH = 100;
+        const imgW = Math.min(85, (pageWidth - 50) / 2); // 50% del ancho anterior
+        const imgH = 50; // Reducido proporcionalmente
         const x = (pageWidth - imgW) / 2;
 
         doc.addImage(dataUrl, formatGuess as any, x, yPos, imgW, imgH);
