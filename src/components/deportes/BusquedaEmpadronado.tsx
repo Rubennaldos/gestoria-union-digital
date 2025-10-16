@@ -31,6 +31,11 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
 
   useEffect(() => {
     const buscarEmpadronados = async () => {
+      // No buscar si ya hay un empadronado seleccionado
+      if (seleccionado) {
+        return;
+      }
+
       if (busqueda.length < 3) {
         setResultados([]);
         setMostrarResultados(false);
@@ -62,7 +67,7 @@ export const BusquedaEmpadronado = ({ onSeleccionar, className }: BusquedaEmpadr
 
     const timeoutId = setTimeout(buscarEmpadronados, 300);
     return () => clearTimeout(timeoutId);
-  }, [busqueda]);
+  }, [busqueda, seleccionado]);
 
   const handleSeleccionar = (empadronado: EmpadronadoData) => {
     setSeleccionado(empadronado);
