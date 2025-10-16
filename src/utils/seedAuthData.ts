@@ -150,13 +150,6 @@ export const seedModules = async () => {
       orden: 7,
       requiereAprobacion: false
     },
-    cobranzas: {
-      id: 'cobranzas',
-      nombre: 'Cobranzas',
-      icon: 'DollarSign',
-      orden: 7,
-      requiereAprobacion: true
-    },
     salud: {
       id: 'salud',
       nombre: 'Salud',

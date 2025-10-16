@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const allNavigationItems = [
   { icon: Home, label: "Inicio", href: "/inicio", module: null }, // Inicio siempre visible
   { icon: Calendar, label: "Sesiones", href: "/sesiones", module: "deportes" },
-  { icon: DollarSign, label: "Cobranzas", href: "/cobranzas", module: "cobranzas" },
+  { icon: DollarSign, label: "Cobranzas V2", href: "/cobranzas-v2", module: "cobranzas-v2" },
   { icon: Users, label: "Portal", href: "/portal-asociado", module: "portal" },
   { icon: MoreHorizontal, label: "Más", href: "/modulos", module: null }, // Módulos siempre visible
 ];
