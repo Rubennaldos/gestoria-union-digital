@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { crearMovimientoFinanciero } from "@/services/finanzas";
 import { TipoMovimiento, CategoriaIngreso, CategoriaEgreso } from "@/types/finanzas";
 import { useAuth } from "@/contexts/AuthContext";
-import { Upload, X } from "lucide-react";
+import { Upload, X, TrendingUp, TrendingDown, Calendar, DollarSign, FileText, UserCircle } from "lucide-react";
 import { BusquedaEmpadronado } from "@/components/deportes/BusquedaEmpadronado";
 
 interface NuevoMovimientoModalProps {
@@ -164,158 +165,241 @@ export const NuevoMovimientoModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            Nuevo {formData.tipo === "ingreso" ? "Ingreso" : "Egreso"}
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Buscador de Empadronado */}
-          <div>
-            <Label>Empadronado (Opcional)</Label>
-            <BusquedaEmpadronado 
-              onSeleccionar={(emp) => {
-                setEmpadronadoSeleccionado({
-                  id: emp.id,
-                  numeroPadron: emp.numeroPadron || "",
-                  nombres: `${emp.nombre} ${emp.apellidos}`,
-                  dni: emp.dni || ""
-                });
-              }}
-            />
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+        {/* Header Mejorado */}
+        <div className={`relative overflow-hidden p-6 ${
+          formData.tipo === "ingreso" 
+            ? "bg-gradient-to-br from-success/10 via-success/5 to-transparent" 
+            : "bg-gradient-to-br from-destructive/10 via-destructive/5 to-transparent"
+        }`}>
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
+            {formData.tipo === "ingreso" ? (
+              <TrendingUp className="w-full h-full" />
+            ) : (
+              <TrendingDown className="w-full h-full" />
+            )}
           </div>
+          
+          <DialogHeader className="relative">
+            <div className="flex items-center gap-4">
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                formData.tipo === "ingreso" 
+                  ? "bg-success/20" 
+                  : "bg-destructive/20"
+              }`}>
+                {formData.tipo === "ingreso" ? (
+                  <TrendingUp className="h-6 w-6 text-success" />
+                ) : (
+                  <TrendingDown className="h-6 w-6 text-destructive" />
+                )}
+              </div>
+              <DialogTitle className="text-2xl">
+                Nuevo {formData.tipo === "ingreso" ? "Ingreso" : "Egreso"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+        </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="tipo">Tipo de Movimiento *</Label>
-              <Select
-                value={formData.tipo}
-                onValueChange={(value: TipoMovimiento) => {
-                  setFormData({ ...formData, tipo: value, categoria: "" as any });
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Tipo y Categoría */}
+          <Card className="border-primary/20 shadow-sm">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold">Información del Movimiento</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tipo" className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    Tipo de Movimiento *
+                  </Label>
+                  <Select
+                    value={formData.tipo}
+                    onValueChange={(value: TipoMovimiento) => {
+                      setFormData({ ...formData, tipo: value, categoria: "" as any });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ingreso">Ingreso</SelectItem>
+                      <SelectItem value="egreso">Egreso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="categoria">Categoría *</Label>
+                  <Select
+                    value={formData.categoria}
+                    onValueChange={(value) => setFormData({ ...formData, categoria: value as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="monto" className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    Monto (S/) *
+                  </Label>
+                  <Input
+                    id="monto"
+                    type="number"
+                    step="0.01"
+                    value={formData.monto}
+                    onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
+                    placeholder="0.00"
+                    className="text-lg font-semibold"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fecha" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    Fecha *
+                  </Label>
+                  <Input
+                    id="fecha"
+                    type="date"
+                    value={formData.fecha}
+                    onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="descripcion">Descripción *</Label>
+                <Textarea
+                  id="descripcion"
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  placeholder="Detalle del movimiento"
+                  rows={3}
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Empadronado */}
+          <Card className="border-primary/20 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <UserCircle className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold">Empadronado (Opcional)</h3>
+              </div>
+              <BusquedaEmpadronado 
+                onSeleccionar={(emp) => {
+                  setEmpadronadoSeleccionado({
+                    id: emp.id,
+                    numeroPadron: emp.numeroPadron || "",
+                    nombres: `${emp.nombre} ${emp.apellidos}`,
+                    dni: emp.dni || ""
+                  });
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ingreso">Ingreso</SelectItem>
-                  <SelectItem value="egreso">Egreso</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="categoria">Categoría *</Label>
-              <Select
-                value={formData.categoria}
-                onValueChange={(value) => setFormData({ ...formData, categoria: value as any })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categorias.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="monto">Monto (S/) *</Label>
-              <Input
-                id="monto"
-                type="number"
-                step="0.01"
-                value={formData.monto}
-                onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-                placeholder="0.00"
-                required
               />
-            </div>
+              {empadronadoSeleccionado && (
+                <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+                  <p className="text-sm font-medium">{empadronadoSeleccionado.nombres}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Padrón: {empadronadoSeleccionado.numeroPadron} • DNI: {empadronadoSeleccionado.dni}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <div>
-              <Label htmlFor="fecha">Fecha *</Label>
-              <Input
-                id="fecha"
-                type="date"
-                value={formData.fecha}
-                onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                required
-              />
-            </div>
-          </div>
+          {/* Información Adicional */}
+          <Card className="border-primary/20 shadow-sm">
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold">Información Adicional</h3>
+              </div>
 
-          <div>
-            <Label htmlFor="descripcion">Descripción *</Label>
-            <Textarea
-              id="descripcion"
-              value={formData.descripcion}
-              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              placeholder="Detalle del movimiento"
-              rows={3}
-              required
-            />
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="numeroComprobante">N° Comprobante</Label>
+                  <Input
+                    id="numeroComprobante"
+                    value={formData.numeroComprobante}
+                    onChange={(e) => setFormData({ ...formData, numeroComprobante: e.target.value })}
+                    placeholder="Ej: F001-0001234"
+                  />
+                </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="numeroComprobante">N° Comprobante</Label>
-              <Input
-                id="numeroComprobante"
-                value={formData.numeroComprobante}
-                onChange={(e) => setFormData({ ...formData, numeroComprobante: e.target.value })}
-                placeholder="Ej: F001-0001234"
-              />
-            </div>
+                {formData.tipo === "egreso" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="proveedor">Proveedor</Label>
+                    <Input
+                      id="proveedor"
+                      value={formData.proveedor}
+                      onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
+                      placeholder="Nombre del proveedor"
+                    />
+                  </div>
+                )}
 
-            {formData.tipo === "egreso" && (
-              <div>
-                <Label htmlFor="proveedor">Proveedor</Label>
-                <Input
-                  id="proveedor"
-                  value={formData.proveedor}
-                  onChange={(e) => setFormData({ ...formData, proveedor: e.target.value })}
-                  placeholder="Nombre del proveedor"
+                {formData.tipo === "egreso" && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="beneficiario">Beneficiario</Label>
+                    <Input
+                      id="beneficiario"
+                      value={formData.beneficiario}
+                      onChange={(e) => setFormData({ ...formData, beneficiario: e.target.value })}
+                      placeholder="Nombre del beneficiario"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="observaciones">Observaciones</Label>
+                <Textarea
+                  id="observaciones"
+                  value={formData.observaciones}
+                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                  placeholder="Información adicional (opcional)"
+                  rows={2}
                 />
               </div>
-            )}
+            </CardContent>
+          </Card>
 
-            {formData.tipo === "egreso" && (
-              <div>
-                <Label htmlFor="beneficiario">Beneficiario</Label>
-                <Input
-                  id="beneficiario"
-                  value={formData.beneficiario}
-                  onChange={(e) => setFormData({ ...formData, beneficiario: e.target.value })}
-                  placeholder="Nombre del beneficiario"
-                />
+          {/* Comprobantes */}
+          <Card className="border-primary/20 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Upload className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold">Comprobantes</h3>
               </div>
-            )}
-          </div>
-
-          <div>
-            <Label htmlFor="observaciones">Observaciones</Label>
-            <Textarea
-              id="observaciones"
-              value={formData.observaciones}
-              onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-              placeholder="Información adicional (opcional)"
-              rows={2}
-            />
-          </div>
-
-          {/* Subir archivos */}
-          <div>
-            <Label>Comprobantes (PDF o fotos)</Label>
-            <div className="mt-2">
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+              
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 hover:border-primary/30 transition-all">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
@@ -339,13 +423,14 @@ export const NuevoMovimientoModal = ({
                   {archivos.map((archivo, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-2 bg-muted rounded"
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-muted/50 to-transparent rounded-lg border group hover:border-primary/30 transition-colors"
                     >
                       <span className="text-sm truncate flex-1">{archivo.name}</span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
+                        className="h-8 w-8 p-0"
                         onClick={() => eliminarArchivo(index)}
                       >
                         <X className="h-4 w-4" />
@@ -354,10 +439,10 @@ export const NuevoMovimientoModal = ({
                   ))}
                 </div>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button
               type="button"
               variant="outline"
@@ -366,7 +451,11 @@ export const NuevoMovimientoModal = ({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando}>
+            <Button 
+              type="submit" 
+              disabled={guardando}
+              className="gap-2"
+            >
               {guardando ? "Guardando..." : "Registrar"}
             </Button>
           </DialogFooter>

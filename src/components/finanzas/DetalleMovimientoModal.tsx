@@ -1,8 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { FileDown, ExternalLink, TrendingUp, TrendingDown, Download, Calendar, User, FileText, CreditCard, UserCircle, Clock } from "lucide-react";
 import { MovimientoFinanciero } from "@/types/finanzas";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -152,157 +152,262 @@ export const DetalleMovimientoModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {movimiento.tipo === "ingreso" ? (
-                <TrendingUp className="h-6 w-6 text-green-600" />
-              ) : (
-                <TrendingDown className="h-6 w-6 text-red-600" />
-              )}
-              <DialogTitle>
-                Detalle de {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
-              </DialogTitle>
-            </div>
-            <Button onClick={descargarComprobante} disabled={descargando} size="sm" className="gap-2">
-              <Download className="h-4 w-4" />
-              {descargando ? "Descargando..." : "Descargar PDF"}
-            </Button>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
+        {/* Header Mejorado */}
+        <div className={`relative overflow-hidden p-6 pb-8 ${
+          movimiento.tipo === "ingreso" 
+            ? "bg-gradient-to-br from-success/10 via-success/5 to-transparent" 
+            : "bg-gradient-to-br from-destructive/10 via-destructive/5 to-transparent"
+        }`}>
+          <div className="absolute top-0 right-0 w-32 h-32 opacity-10">
+            {movimiento.tipo === "ingreso" ? (
+              <TrendingUp className="w-full h-full" />
+            ) : (
+              <TrendingDown className="w-full h-full" />
+            )}
           </div>
-          <DialogDescription className="sr-only">
-            Información detallada del movimiento financiero
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Información Principal */}
-          <div>
-            <h3 className="font-semibold text-lg mb-3">Información General</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Tipo</p>
-                <Badge variant={movimiento.tipo === "ingreso" ? "default" : "destructive"} className="mt-1">
-                  {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
-                </Badge>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Categoría</p>
-                <p className="font-medium">{categoriasLabels[movimiento.categoria]}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Monto</p>
-                <p className="text-2xl font-bold">
-                  <span className={movimiento.tipo === "ingreso" ? "text-green-600" : "text-red-600"}>
-                    S/ {movimiento.monto.toFixed(2)}
-                  </span>
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Fecha</p>
-                <p className="font-medium">
-                  {format(new Date(movimiento.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Datos del Empadronado */}
-          {movimiento.empadronadoNumeroPadron && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="font-semibold text-lg mb-3">Datos del Empadronado</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">N° Padrón</p>
-                    <p className="font-medium">{movimiento.empadronadoNumeroPadron}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Nombres Completos</p>
-                    <p className="font-medium">{movimiento.empadronadoNombres}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">DNI</p>
-                    <p className="font-medium">{movimiento.empadronadoDni}</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          <Separator />
-
-          {/* Descripción */}
-          <div>
-            <h3 className="font-semibold text-lg mb-3">Descripción</h3>
-            <p className="text-sm whitespace-pre-wrap">{movimiento.descripcion}</p>
-          </div>
-
-          {/* Información Adicional */}
-          {(movimiento.numeroComprobante ||
-            movimiento.proveedor ||
-            movimiento.beneficiario ||
-            movimiento.observaciones) && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="font-semibold text-lg mb-3">Información Adicional</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {movimiento.numeroComprobante && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">N° Comprobante</p>
-                      <p className="font-medium">{movimiento.numeroComprobante}</p>
-                    </div>
-                  )}
-                  {movimiento.proveedor && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Proveedor</p>
-                      <p className="font-medium">{movimiento.proveedor}</p>
-                    </div>
-                  )}
-                  {movimiento.beneficiario && (
-                    <div>
-                      <p className="text-sm text-muted-foreground">Beneficiario</p>
-                      <p className="font-medium">{movimiento.beneficiario}</p>
-                    </div>
+          
+          <DialogHeader className="relative">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4 flex-1">
+                <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                  movimiento.tipo === "ingreso" 
+                    ? "bg-success/20" 
+                    : "bg-destructive/20"
+                }`}>
+                  {movimiento.tipo === "ingreso" ? (
+                    <TrendingUp className="h-6 w-6 text-success" />
+                  ) : (
+                    <TrendingDown className="h-6 w-6 text-destructive" />
                   )}
                 </div>
-                {movimiento.observaciones && (
-                  <div className="mt-4">
-                    <p className="text-sm text-muted-foreground">Observaciones</p>
-                    <p className="text-sm mt-1 whitespace-pre-wrap">{movimiento.observaciones}</p>
+                <div>
+                  <DialogTitle className="text-2xl mb-2">
+                    Detalle de {movimiento.tipo === "ingreso" ? "Ingreso" : "Egreso"}
+                  </DialogTitle>
+                  <Badge 
+                    variant={movimiento.tipo === "ingreso" ? "default" : "destructive"}
+                    className="text-xs"
+                  >
+                    {categoriasLabels[movimiento.categoria]}
+                  </Badge>
+                </div>
+              </div>
+              <Button 
+                onClick={descargarComprobante} 
+                disabled={descargando}
+                size="sm" 
+                className="gap-2 shrink-0"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">
+                  {descargando ? "Descargando..." : "Descargar PDF"}
+                </span>
+              </Button>
+            </div>
+            <DialogDescription className="sr-only">
+              Información detallada del movimiento financiero
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Monto Destacado */}
+          <div className="mt-4 relative">
+            <div className={`inline-flex items-baseline gap-2 px-4 py-2 rounded-lg ${
+              movimiento.tipo === "ingreso" 
+                ? "bg-success/10 border border-success/20" 
+                : "bg-destructive/10 border border-destructive/20"
+            }`}>
+              <span className="text-sm text-muted-foreground">S/</span>
+              <span className={`text-3xl font-bold ${
+                movimiento.tipo === "ingreso" ? "text-success" : "text-destructive"
+              }`}>
+                {movimiento.monto.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Información General */}
+          <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold">Información General</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Fecha</p>
+                    <p className="font-medium text-sm">
+                      {format(new Date(movimiento.fecha), "dd 'de' MMMM 'de' yyyy", { locale: es })}
+                    </p>
+                  </div>
+                </div>
+                {movimiento.numeroComprobante && (
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">N° Comprobante</p>
+                      <p className="font-medium text-sm">{movimiento.numeroComprobante}</p>
+                    </div>
                   </div>
                 )}
               </div>
-            </>
+            </CardContent>
+          </Card>
+
+          {/* Datos del Empadronado */}
+          {movimiento.empadronadoNumeroPadron && (
+            <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <UserCircle className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="font-semibold">Datos del Empadronado</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">N° Padrón</p>
+                      <p className="font-medium text-sm">{movimiento.empadronadoNumeroPadron}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Nombres Completos</p>
+                      <p className="font-medium text-sm">{movimiento.empadronadoNombres}</p>
+                    </div>
+                  </div>
+                  {movimiento.empadronadoDni && (
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">DNI</p>
+                        <p className="font-medium text-sm">{movimiento.empadronadoDni}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Descripción */}
+          <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-semibold">Descripción</h3>
+              </div>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                {movimiento.descripcion}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Información Adicional */}
+          {(movimiento.proveedor || movimiento.beneficiario || movimiento.observaciones) && (
+            <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="font-semibold">Información Adicional</h3>
+                </div>
+                <div className="space-y-3">
+                  {movimiento.proveedor && (
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Proveedor</p>
+                        <p className="font-medium text-sm">{movimiento.proveedor}</p>
+                      </div>
+                    </div>
+                  )}
+                  {movimiento.beneficiario && (
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Beneficiario</p>
+                        <p className="font-medium text-sm">{movimiento.beneficiario}</p>
+                      </div>
+                    </div>
+                  )}
+                  {movimiento.observaciones && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-2">Observaciones</p>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {movimiento.observaciones}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Comprobantes */}
           {movimiento.comprobantes && movimiento.comprobantes.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="font-semibold text-lg mb-3">
-                  Comprobantes ({movimiento.comprobantes.length})
-                </h3>
+            <Card className="border-primary/20 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-primary" />
+                  </div>
+                  <h3 className="font-semibold">
+                    Comprobantes ({movimiento.comprobantes.length})
+                  </h3>
+                </div>
                 <div className="space-y-2">
                   {movimiento.comprobantes.map((comprobante, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                    <div 
+                      key={index} 
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-muted/50 to-transparent rounded-lg border hover:border-primary/30 transition-colors group"
+                    >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{comprobante.nombre}</p>
+                        <p className="font-medium text-sm truncate">{comprobante.nombre}</p>
                         <p className="text-xs text-muted-foreground">
                           {(comprobante.tamano / 1024).toFixed(2)} KB •{" "}
                           {format(comprobante.fechaSubida, "dd/MM/yyyy HH:mm", { locale: es })}
                         </p>
                       </div>
-                      <div className="flex gap-2 ml-2">
-                        <Button variant="outline" size="sm" onClick={() => window.open(comprobante.url, "_blank")}>
+                      <div className="flex gap-2 ml-3">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => window.open(comprobante.url, "_blank")}
+                        >
                           <ExternalLink className="h-4 w-4" />
                         </Button>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
+                          className="h-8 w-8 p-0"
                           onClick={() => {
                             const link = document.createElement("a");
                             link.href = comprobante.url;
@@ -316,28 +421,43 @@ export const DetalleMovimientoModal = ({
                     </div>
                   ))}
                 </div>
-              </div>
-            </>
+              </CardContent>
+            </Card>
           )}
 
-          <Separator />
-
           {/* Información de Registro */}
-          <div>
-            <h3 className="font-semibold text-lg mb-3">Información de Registro</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Registrado por</p>
-                <p className="font-medium">{movimiento.registradoPorNombre}</p>
+          <Card className="border-muted shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-sm">Información de Registro</h3>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Fecha de Registro</p>
-                <p className="font-medium">
-                  {format(movimiento.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Registrado por</p>
+                    <p className="font-medium text-sm">{movimiento.registradoPorNombre}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Fecha de Registro</p>
+                    <p className="font-medium text-sm">
+                      {format(movimiento.createdAt, "dd/MM/yyyy HH:mm", { locale: es })}
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </DialogContent>
     </Dialog>
