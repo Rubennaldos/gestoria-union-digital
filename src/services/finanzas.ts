@@ -90,6 +90,12 @@ export async function crearMovimientoFinanciero(
   if (data.beneficiario) movimiento.beneficiario = data.beneficiario;
   if (data.observaciones) movimiento.observaciones = data.observaciones;
   if ((data as any).banco) movimiento.banco = (data as any).banco;
+  
+  // Agregar datos del empadronado si existen
+  if (data.empadronadoId) movimiento.empadronadoId = data.empadronadoId;
+  if (data.empadronadoNumeroPadron) movimiento.empadronadoNumeroPadron = data.empadronadoNumeroPadron;
+  if (data.empadronadoNombres) movimiento.empadronadoNombres = data.empadronadoNombres;
+  if (data.empadronadoDni) movimiento.empadronadoDni = data.empadronadoDni;
 
   await set(newMovimientoRef, movimiento);
   await actualizarResumenCaja();
