@@ -25,7 +25,6 @@ import UserPermissions from "./pages/admin/UserPermissions";
 import Empadronados from "./pages/Empadronados";
 import EmpadronadoForm from "./pages/EmpadronadoForm";
 import ImportacionRTDB from "./pages/ImportacionRTDB";
-import Cobranzas from "./pages/Cobranzas";
 import CobranzasV2 from "./pages/CobranzasV2";
 import Sanciones from "./pages/Sanciones";
 import Deportes from "./pages/Deportes";
@@ -162,15 +161,6 @@ const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/cobranzas"
-                element={
-                  <ProtectedRoute>
-                    <Cobranzas />
-                  </ProtectedRoute>
-                }
-              />
-
               {/* 🔧 CORREGIDO: usamos /cobranzas_v2 */}
               <Route
                 path="/cobranzas_v2"

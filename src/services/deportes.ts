@@ -12,7 +12,7 @@ import {
   FormPago,
   EstadoReserva 
 } from '@/types/deportes';
-import { crearIngreso } from './cobranzas';
+import { crearIngresoV2 } from './cobranzas-v2';
 
 const storage = getStorage();
 
@@ -252,18 +252,18 @@ export const registrarPago = async (
     
     // Crear ingreso en cobranzas
     const cancha = await obtenerCancha(reserva.canchaId);
-    const ingresoId = await crearIngreso({
+    const ingresoData = await crearIngresoV2({
       concepto: `Reserva ${cancha?.nombre} - ${reserva.nombreCliente} (${cancha?.tipo === 'futbol' ? 'Fútbol' : 'Vóley'})`,
       categoria: 'otros',
       monto: montoPago,
-      fecha: new Date().toISOString().split('T')[0],
-      metodoPago: formPago.metodoPago,
+      fecha: Date.now(),
+      metodoPago: formPago.metodoPago as 'efectivo' | 'transferencia' | 'yape' | 'plin',
       numeroOperacion: formPago.numeroOperacion,
-      archivoUrl: voucherUrl
-    }, actorUid);
+      observaciones: voucherUrl ? `Comprobante: ${voucherUrl}` : undefined
+    });
     
     // Vincular ingreso con reserva
-    await actualizarReserva(reservaId, { ingresoId });
+    await actualizarReserva(reservaId, { ingresoId: ingresoData.id });
     
   } catch (error) {
     console.error('Error al registrar pago:', error);
