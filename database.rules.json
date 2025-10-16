@@ -78,6 +78,11 @@
         ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
         ".indexOn": ["estado", "ruc"]
       }
+    },
+    "seguridad": {
+      "porticos": {
+        ".write": "auth != null"
+      }
     }
   }
 }

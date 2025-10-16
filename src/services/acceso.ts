@@ -128,9 +128,12 @@ export async function registrarVisita(data: NuevaVisitaInput) {
     ...base,
   });
 
-  const updates: Record<string, unknown> = {};
-  updates[`acceso/visitas/${id}`] = payload;
-  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] =
+  // Crear el registro de visita
+  await set(ref(db, `acceso/visitas/${id}`), payload);
+  
+  // Agregar a pendientes del pórtico
+  await set(
+    ref(db, `seguridad/porticos/${data.porticoId}/pendientes/${id}`),
     stripUndefinedDeep({
       id,
       empadronadoId: data.empadronadoId,
@@ -140,9 +143,9 @@ export async function registrarVisita(data: NuevaVisitaInput) {
       tipo: "visitante",
       solicitadoPorNombre,
       solicitadoPorPadron,
-    });
+    })
+  );
 
-  await update(ref(db), updates);
   return id;
 }
 
@@ -201,9 +204,12 @@ export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
     ...base,
   };
 
-  const updates: Record<string, unknown> = {};
-  updates[`acceso/trabajadores/${id}`] = payload;
-  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] =
+  // Crear el registro de trabajadores
+  await set(ref(db, `acceso/trabajadores/${id}`), payload);
+  
+  // Agregar a pendientes del pórtico
+  await set(
+    ref(db, `seguridad/porticos/${data.porticoId}/pendientes/${id}`),
     stripUndefinedDeep({
       id,
       empadronadoId: data.empadronadoId,
@@ -211,9 +217,9 @@ export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
       solicitadoPorPadron,
       createdAt: base.createdAt,
       tipo: "trabajador",
-    });
+    })
+  );
 
-  await update(ref(db), updates);
   return id;
 }
 
@@ -245,9 +251,12 @@ export async function registrarProveedor(data: RegistrarProveedorInput) {
     ...base,
   };
 
-  const updates: Record<string, unknown> = {};
-  updates[`acceso/proveedores/${id}`] = payload;
-  updates[`seguridad/porticos/${data.porticoId}/pendientes/${id}`] =
+  // Crear el registro de proveedor
+  await set(ref(db, `acceso/proveedores/${id}`), payload);
+  
+  // Agregar a pendientes del pórtico
+  await set(
+    ref(db, `seguridad/porticos/${data.porticoId}/pendientes/${id}`),
     stripUndefinedDeep({
       id,
       empadronadoId: data.empadronadoId,
@@ -255,9 +264,9 @@ export async function registrarProveedor(data: RegistrarProveedorInput) {
       solicitadoPorPadron,
       createdAt: base.createdAt,
       tipo: "proveedor",
-    });
+    })
+  );
 
-  await update(ref(db), updates);
   return id;
 }
 
