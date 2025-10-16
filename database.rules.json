@@ -71,12 +71,18 @@
         ".indexOn": ["estado", "patronId", "createdAt", "dni"]
       },
       "trabajadores": {
-        ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
+        ".write": "auth != null",
         ".indexOn": ["estado", "dni", "padron"]
       },
       "proveedores": {
-        ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
+        ".write": "auth != null",
         ".indexOn": ["estado", "ruc"]
+      },
+      "maestrosObra": {
+        ".write": "auth != null"
+      },
+      "favoritos": {
+        ".write": "auth != null"
       }
     },
     "seguridad": {

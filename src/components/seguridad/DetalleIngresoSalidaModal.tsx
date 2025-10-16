@@ -110,21 +110,24 @@ export const DetalleIngresoSalidaModal = ({
 
     try {
       const now = Date.now();
-      const updates: Record<string, any> = {};
 
       if (tipo === "proveedor") {
         // Para proveedores, actualizar directamente en el registro
-        updates[`acceso/proveedores/${registroId}/ingresado`] = true;
-        updates[`acceso/proveedores/${registroId}/horaIngreso`] = now;
+        await update(ref(db, `acceso/proveedores/${registroId}`), {
+          ingresado: true,
+          horaIngreso: now,
+        });
       } else if (tipo === "visitante") {
-        updates[`acceso/visitas/${registroId}/visitantes/${index}/ingresado`] = true;
-        updates[`acceso/visitas/${registroId}/visitantes/${index}/horaIngreso`] = now;
+        await update(ref(db, `acceso/visitas/${registroId}/visitantes/${index}`), {
+          ingresado: true,
+          horaIngreso: now,
+        });
       } else if (tipo === "trabajador") {
-        updates[`acceso/trabajadores/${registroId}/trabajadores/${index}/ingresado`] = true;
-        updates[`acceso/trabajadores/${registroId}/trabajadores/${index}/horaIngreso`] = now;
+        await update(ref(db, `acceso/trabajadores/${registroId}/trabajadores/${index}`), {
+          ingresado: true,
+          horaIngreso: now,
+        });
       }
-
-      await update(ref(db), updates);
 
       // Actualizar estado local
       setPersonas((prev) =>
@@ -155,17 +158,20 @@ export const DetalleIngresoSalidaModal = ({
 
     try {
       const now = Date.now();
-      const updates: Record<string, any> = {};
 
       if (tipo === "proveedor") {
-        updates[`acceso/proveedores/${registroId}/horaSalida`] = now;
+        await update(ref(db, `acceso/proveedores/${registroId}`), {
+          horaSalida: now,
+        });
       } else if (tipo === "visitante") {
-        updates[`acceso/visitas/${registroId}/visitantes/${index}/horaSalida`] = now;
+        await update(ref(db, `acceso/visitas/${registroId}/visitantes/${index}`), {
+          horaSalida: now,
+        });
       } else if (tipo === "trabajador") {
-        updates[`acceso/trabajadores/${registroId}/trabajadores/${index}/horaSalida`] = now;
+        await update(ref(db, `acceso/trabajadores/${registroId}/trabajadores/${index}`), {
+          horaSalida: now,
+        });
       }
-
-      await update(ref(db), updates);
 
       // Actualizar estado local
       setPersonas((prev) =>

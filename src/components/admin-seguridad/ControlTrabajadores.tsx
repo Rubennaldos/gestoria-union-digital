@@ -102,10 +102,10 @@ export const ControlTrabajadores = () => {
   const handleToggleHabilitado = async (trabajador: Trabajador) => {
     try {
       const [regId, index] = trabajador.id.split("-");
-      const path = `acceso/trabajadores/${regId}/trabajadores/${index}/habilitado`;
+      const path = `acceso/trabajadores/${regId}/trabajadores/${index}`;
       
-      await update(ref(db), {
-        [path]: !trabajador.habilitado,
+      await update(ref(db, path), {
+        habilitado: !trabajador.habilitado,
       });
 
       toast.success(
