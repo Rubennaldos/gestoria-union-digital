@@ -279,15 +279,16 @@ export async function cambiarEstadoAcceso(
       : "proveedores"
   }/${id}`;
 
-  const updates: Record<string, unknown> = {};
-  updates[`${registroPath}/estado`] = nuevo;
-  updates[`${registroPath}/estadoPortico`] = `${nuevo}#${porticoId}`;
-  updates[`${registroPath}/fechaAutorizacion`] = Date.now();
-  updates[`${registroPath}/autorizadoPor`] = actor;
+  // Actualizar el registro de acceso
+  await update(ref(db, registroPath), {
+    estado: nuevo,
+    estadoPortico: `${nuevo}#${porticoId}`,
+    fechaAutorizacion: Date.now(),
+    autorizadoPor: actor,
+  });
 
-  updates[`seguridad/porticos/${porticoId}/pendientes/${id}`] = null;
-
-  await update(ref(db), updates);
+  // Eliminar de pendientes del pórtico
+  await set(ref(db, `seguridad/porticos/${porticoId}/pendientes/${id}`), null);
 }
 
 /* ──────────────────────────────────────────────────────────────
