@@ -57,27 +57,45 @@ export default function Finanzas() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <MiBreadcrumb paginaActual="Finanzas" />
-          <h1 className="text-3xl font-bold mt-2">Gestión Financiera</h1>
-          <p className="text-muted-foreground">
-            Control de ingresos, egresos y caja de la asociación
+    <div className="container mx-auto p-3 md:p-6 space-y-4 md:space-y-6 pb-20 md:pb-6">
+      {/* Header Section */}
+      <div className="space-y-3">
+        <MiBreadcrumb paginaActual="Finanzas" />
+        <div className="flex flex-col gap-3">
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+            Gestión Financiera
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Control de ingresos, egresos y caja
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setEventoModalOpen(true)} variant="secondary">
+        
+        {/* Action Buttons - Mobile Optimized */}
+        <div className="grid grid-cols-2 md:flex gap-2">
+          <Button 
+            onClick={abrirModalIngreso} 
+            size="sm"
+            className="bg-gradient-to-r from-success to-success/80 hover:from-success/90 hover:to-success/70 shadow-md hover:shadow-lg transition-all"
+          >
+            <TrendingUp className="h-4 w-4 mr-1" />
+            <span className="hidden md:inline">Nuevo </span>Ingreso
+          </Button>
+          <Button 
+            onClick={abrirModalEgreso}
+            size="sm"
+            className="bg-gradient-to-r from-destructive to-destructive/80 hover:from-destructive/90 hover:to-destructive/70 shadow-md hover:shadow-lg transition-all"
+          >
+            <TrendingDown className="h-4 w-4 mr-1" />
+            <span className="hidden md:inline">Nuevo </span>Egreso
+          </Button>
+          <Button 
+            onClick={() => setEventoModalOpen(true)} 
+            variant="outline"
+            size="sm"
+            className="col-span-2 md:col-span-1"
+          >
             <Calendar className="h-4 w-4 mr-2" />
             Ingresar Eventos
-          </Button>
-          <Button onClick={abrirModalIngreso} variant="outline">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Nuevo Ingreso
-          </Button>
-          <Button onClick={abrirModalEgreso}>
-            <TrendingDown className="h-4 w-4 mr-2" />
-            Nuevo Egreso
           </Button>
         </div>
       </div>
@@ -85,27 +103,33 @@ export default function Finanzas() {
       {/* Resumen de Caja */}
       <ResumenCaja key={refreshKey} />
 
-      {/* Tabs de Movimientos y Configuración */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Gestión Financiera
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="todos" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="todos">Todos</TabsTrigger>
-              <TabsTrigger value="ingresos">Ingresos</TabsTrigger>
-              <TabsTrigger value="egresos">Egresos</TabsTrigger>
-              <TabsTrigger value="medios-pago">
-                <CreditCard className="h-4 w-4 mr-2" />
+      {/* Tabs Section */}
+      <div className="bg-card rounded-xl border shadow-sm">
+        <Tabs defaultValue="todos" className="w-full">
+          <div className="p-3 md:p-4 border-b">
+            <div className="flex items-center gap-2 mb-3">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold text-lg">Movimientos</h2>
+            </div>
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
+              <TabsTrigger value="todos" className="text-xs md:text-sm py-2">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="ingresos" className="text-xs md:text-sm py-2">
+                Ingresos
+              </TabsTrigger>
+              <TabsTrigger value="egresos" className="text-xs md:text-sm py-2">
+                Egresos
+              </TabsTrigger>
+              <TabsTrigger value="medios-pago" className="text-xs md:text-sm py-2 col-span-2 md:col-span-1">
+                <CreditCard className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                 Medios de Pago
               </TabsTrigger>
             </TabsList>
+          </div>
 
-            <TabsContent value="todos" className="mt-4">
+          <div className="p-3 md:p-4">
+            <TabsContent value="todos" className="mt-0">
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
                 onEditar={handleEditar}
@@ -114,7 +138,7 @@ export default function Finanzas() {
               />
             </TabsContent>
 
-            <TabsContent value="ingresos" className="mt-4">
+            <TabsContent value="ingresos" className="mt-0">
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
                 onEditar={handleEditar}
@@ -124,7 +148,7 @@ export default function Finanzas() {
               />
             </TabsContent>
 
-            <TabsContent value="egresos" className="mt-4">
+            <TabsContent value="egresos" className="mt-0">
               <ListaMovimientos
                 onVerDetalle={handleVerDetalle}
                 onEditar={handleEditar}
@@ -134,12 +158,12 @@ export default function Finanzas() {
               />
             </TabsContent>
 
-            <TabsContent value="medios-pago" className="mt-4">
+            <TabsContent value="medios-pago" className="mt-0">
               <ConfiguracionMediosPago />
             </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+          </div>
+        </Tabs>
+      </div>
 
       {/* Modales */}
       <NuevoMovimientoModal

@@ -51,54 +51,74 @@ export const ResumenCaja = () => {
   const hayDiferencia = Math.abs(resumen.diferencia) > 1;
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo en Caja</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+    <div className="space-y-3 md:space-y-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
+        {/* Saldo en Caja - Destacado */}
+        <Card className="col-span-2 lg:col-span-1 relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-primary/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
+            <CardTitle className="text-xs md:text-sm font-medium">Saldo en Caja</CardTitle>
+            <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Wallet className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">S/ {resumen.saldoActual.toFixed(2)}</div>
+          <CardContent className="relative">
+            <div className="text-xl md:text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              S/ {resumen.saldoActual.toFixed(2)}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Actualizado: {format(resumen.ultimaActualizacion, "dd/MM/yyyy HH:mm", { locale: es })}
+              {format(resumen.ultimaActualizacion, "dd/MM HH:mm", { locale: es })}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ingresos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
+        {/* Total Ingresos */}
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-success/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
+            <CardTitle className="text-xs md:text-sm font-medium">Ingresos</CardTitle>
+            <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-success/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-success" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+          <CardContent className="relative">
+            <div className="text-xl md:text-2xl font-bold text-success">
               S/ {resumen.totalIngresos.toFixed(2)}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">Total recibido</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Egresos</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-500" />
+        {/* Total Egresos */}
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-destructive/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-destructive/5 to-transparent" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
+            <CardTitle className="text-xs md:text-sm font-medium">Egresos</CardTitle>
+            <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-destructive/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <TrendingDown className="h-4 w-4 md:h-5 md:w-5 text-destructive" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
+          <CardContent className="relative">
+            <div className="text-xl md:text-2xl font-bold text-destructive">
               S/ {resumen.totalEgresos.toFixed(2)}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">Total gastado</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Esperado</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        {/* Saldo Esperado */}
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-muted/50 to-transparent" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
+            <CardTitle className="text-xs md:text-sm font-medium">Esperado</CardTitle>
+            <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-muted flex items-center justify-center group-hover:scale-110 transition-transform">
+              <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-foreground" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">S/ {resumen.saldoEsperado.toFixed(2)}</div>
+          <CardContent className="relative">
+            <div className="text-xl md:text-2xl font-bold">S/ {resumen.saldoEsperado.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              Ingresos - Egresos registrados
+              Balance neto
             </p>
           </CardContent>
         </Card>

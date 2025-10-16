@@ -61,19 +61,23 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 26% 14%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(213 94% 19%), hsl(213 94% 16%));
-    /* Corregido: HSL inválido -> usa RGB válido o un HSL real */
-    --gradient-card: linear-gradient(145deg, rgb(248 250 252), rgb(245 247 250));
-    --gradient-alert: linear-gradient(135deg, hsl(32 95% 44%), hsl(32 95% 40%));
+    /* Modern Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(220 91% 18%), hsl(220 91% 25%));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 45%));
+    --gradient-danger: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 72% 50%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 60% 99%));
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.7), hsl(0 0% 100% / 0.3));
+    
+    /* Modern Shadows */
+    --shadow-card: 0 2px 8px -1px hsl(220 91% 18% / 0.08), 0 4px 12px -2px hsl(220 91% 18% / 0.05);
+    --shadow-card-hover: 0 8px 24px -4px hsl(220 91% 18% / 0.15), 0 4px 16px -2px hsl(220 91% 18% / 0.08);
+    --shadow-button: 0 2px 4px -1px hsl(0 0% 0% / 0.06);
+    --shadow-glow-success: 0 0 20px hsl(142 76% 36% / 0.3);
+    --shadow-glow-danger: 0 0 20px hsl(0 84% 60% / 0.3);
 
-    /* Shadows */
-    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-card-hover: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
-    --shadow-button: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
-
-    /* Transitions */
-    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Smooth Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.75rem;
 
