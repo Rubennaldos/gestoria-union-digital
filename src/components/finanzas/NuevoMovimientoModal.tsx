@@ -103,6 +103,13 @@ export const NuevoMovimientoModal = ({
     try {
       setGuardando(true);
 
+      console.log("📝 Datos del empadronado a guardar:", {
+        empadronadoId: empadronadoSeleccionado?.id,
+        empadronadoNumeroPadron: empadronadoSeleccionado?.numeroPadron,
+        empadronadoNombres: empadronadoSeleccionado?.nombres,
+        empadronadoDni: empadronadoSeleccionado?.dni,
+      });
+
       await crearMovimientoFinanciero(
         {
           tipo: formData.tipo,

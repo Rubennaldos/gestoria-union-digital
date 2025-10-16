@@ -97,6 +97,8 @@ export async function crearMovimientoFinanciero(
   if (data.empadronadoNombres) movimiento.empadronadoNombres = data.empadronadoNombres;
   if (data.empadronadoDni) movimiento.empadronadoDni = data.empadronadoDni;
 
+  console.log("💾 Movimiento a guardar en Firebase:", movimiento);
+
   await set(newMovimientoRef, movimiento);
   await actualizarResumenCaja();
   return id;
