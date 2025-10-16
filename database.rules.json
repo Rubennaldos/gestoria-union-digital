@@ -87,6 +87,14 @@
     },
     "seguridad": {
       "porticos": {
+        "$porticoId": {
+          ".write": "auth != null",
+          "pendientes": {
+            ".write": "auth != null"
+          }
+        }
+      },
+      "registros_manuales": {
         ".write": "auth != null"
       }
     }
