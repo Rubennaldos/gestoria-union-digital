@@ -26,6 +26,8 @@ export interface UserProfile {
   fechaFinMandato?: number;    // Para directivos/delegados
   createdAt?: number;
   updatedAt?: number;
+  // map de módulos (p.ej. { eventos: true, finanzas: true })
+  modules?: { [key: string]: boolean | string };
 }
 
 export interface UsernameMapping {

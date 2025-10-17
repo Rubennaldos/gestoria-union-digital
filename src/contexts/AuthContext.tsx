@@ -57,16 +57,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               activo: true,
               fechaCreacion: new Date().toISOString().split('T')[0],
               roleId: 'usuario', // Rol básico
-              etapa: 'Etapa 1'
+              etapa: 'Etapa 1',
+              modules: {}
             };
             
             // Crear perfil en la base de datos
             await createUserProfile(fbUser.uid, basicProfile);
             setProfile(basicProfile);
-            setUser({ ...authUser, profile: basicProfile });
+            setUser({ ...authUser, profile: basicProfile, modules: basicProfile.modules });
           } else {
             setProfile(userProfile);
-            setUser({ ...authUser, profile: userProfile || undefined });
+            // Ensure user.modules reflects nested profile.modules
+            setUser({ ...authUser, profile: userProfile || undefined, modules: userProfile?.modules });
           }
           console.log('✅ AuthContext: User state updated');
         } else {
@@ -89,7 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user?.uid) return;
     const stop = onUserProfile(user.uid, (updated) => {
       setProfile(updated);
-      setUser((u) => (u ? { ...u, profile: updated || undefined } : u));
+      setUser((u) => (u ? { ...u, profile: updated || undefined, modules: updated?.modules } : u));
     });
     return () => stop && stop();
   }, [user?.uid]);
