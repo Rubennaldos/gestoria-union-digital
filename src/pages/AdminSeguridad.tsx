@@ -21,7 +21,19 @@ const AdminSeguridad = () => {
   const [activeTab, setActiveTab] = useState("autorizaciones");
   const { toast } = useToast();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const { can } = useAuthz();
+  const { can, loading } = useAuthz();
+
+  // Mostrar spinner/cargando mientras se carga el usuario
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          Cargando...
+        </div>
+      </div>
+    );
+    // Alternativamente: return null;
+  }
 
   // Verificar si el usuario tiene permisos de administración de seguridad
   const hasAdminPermission = can("admin_seguridad", "read");

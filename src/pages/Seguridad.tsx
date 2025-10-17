@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -16,6 +17,30 @@ import { BotonEmergencia } from "@/components/seguridad/BotonEmergencia";
 
 const Seguridad = () => {
   const [activeTab, setActiveTab] = useState("autorizaciones");
+  const { user, loading } = useAuth();
+
+  // Mostrar spinner/cargando mientras se carga el usuario
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          Cargando...
+        </div>
+      </div>
+    );
+    // Alternativamente: return null;
+  }
+
+  // Protección de permisos de módulo (solo después de cargar)
+  if (!user?.modules || !user.modules.seguridad) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          No tienes permiso para acceder a este módulo
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">

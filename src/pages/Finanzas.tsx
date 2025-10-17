@@ -17,7 +17,7 @@ import { deleteMovimiento } from "@/services/finanzas";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Finanzas() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [tipoModal, setTipoModal] = useState<"ingreso" | "egreso">("egreso");
   const [eventoModalOpen, setEventoModalOpen] = useState(false);
@@ -25,7 +25,19 @@ export default function Finanzas() {
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<MovimientoFinanciero | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Protección de permisos de módulo
+  // Mostrar spinner/cargando mientras se carga el usuario
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          Cargando...
+        </div>
+      </div>
+    );
+    // Alternativamente: return null;
+  }
+
+  // Protección de permisos de módulo (solo después de cargar)
   if (!user?.modules || !user.modules.finanzas) {
     return (
       <div className="min-h-screen flex items-center justify-center">

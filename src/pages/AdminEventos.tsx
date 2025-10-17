@@ -14,18 +14,30 @@ import { InscripcionesEventoModal } from "@/components/eventos/InscripcionesEven
 import { useAuth } from "@/contexts/AuthContext";
 
 const AdminEventos = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [estadisticas, setEstadisticas] = useState<EstadisticasEventos | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
   const [modalNuevoOpen, setModalNuevoOpen] = useState(false);
   const [modalEditarOpen, setModalEditarOpen] = useState(false);
   const [modalInscripcionesOpen, setModalInscripcionesOpen] = useState(false);
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
   const [tabActiva, setTabActiva] = useState("todos");
 
-  // Protección de permisos de módulo
-  if (!user?.modules || user.modules.eventos !== true) {
+  // Mostrar spinner/cargando mientras se carga el usuario
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          Cargando...
+        </div>
+      </div>
+    );
+    // Alternativamente: return null;
+  }
+
+  // Protección de permisos de módulo (solo después de cargar)
+  if (!user?.modules || !user.modules.eventos) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center text-lg text-muted-foreground font-semibold">
@@ -41,7 +53,7 @@ const AdminEventos = () => {
 
   const cargarDatos = async () => {
     try {
-      setLoading(true);
+      setIsLoadingEvents(true);
       const [eventosData, estadisticasData] = await Promise.all([
         obtenerEventos(),
         obtenerEstadisticasEventos(),
@@ -52,7 +64,7 @@ const AdminEventos = () => {
       console.error("Error al cargar datos:", error);
       toast.error("Error al cargar los eventos");
     } finally {
-      setLoading(false);
+      setIsLoadingEvents(false);
     }
   };
 
@@ -74,7 +86,7 @@ const AdminEventos = () => {
     return true;
   });
 
-  if (loading) {
+  if (isLoadingEvents) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-0">
         <TopNavigation />

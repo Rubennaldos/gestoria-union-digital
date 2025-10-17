@@ -13,6 +13,8 @@ import { DetalleAutorizacionModal } from "./DetalleAutorizacionModal";
 import { getEmpadronado, getEmpadronados } from "@/services/empadronados";
 import { Empadronado } from "@/types/empadronados";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 /* ──────────────────────────────────────────────────────────────
    Tipos y utils
    ────────────────────────────────────────────────────────────── */
@@ -65,11 +67,37 @@ export const AutorizacionesSeguridad = () => {
   const [selectedAuth, setSelectedAuth] = useState<AutorizacionPendiente | null>(null);
   const [detalleOpen, setDetalleOpen] = useState(false);
 
+  // Obtener estado de carga y usuario
+  const { user, loading } = useAuth();
+
   const { data: visitas } = useFirebaseData<Record<string, RegistroVisita>>("acceso/visitas");
   const { data: trabajadores } =
     useFirebaseData<Record<string, RegistroTrabajadores>>("acceso/trabajadores");
   const { data: proveedores } =
     useFirebaseData<Record<string, RegistroProveedor>>("acceso/proveedores");
+
+  // Mostrar spinner/cargando mientras se carga el usuario
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          Cargando...
+        </div>
+      </div>
+    );
+    // Alternativamente: return null;
+  }
+
+  // Protección de permisos de módulo (ejemplo: seguridad)
+  if (!user?.modules || !user.modules.seguridad) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          No tienes permiso para acceder a este módulo
+        </div>
+      </div>
+    );
+  }
 
   // 1) Armar lista de pendientes (independiente del snapshot guardado)
   useEffect(() => {
