@@ -33,6 +33,17 @@ const Eventos = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [tabActiva, setTabActiva] = useState<string>("eventos");
 
+  // Protección de permisos de módulo
+  if (!user?.modules || user.modules.eventos !== true) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          No tienes permiso para acceder a este módulo
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     cargarEventos();
   }, []);

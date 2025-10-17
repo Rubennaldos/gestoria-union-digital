@@ -14,13 +14,27 @@ import MiBreadcrumb from "@/components/layout/MiBreadcrumb";
 import { toast } from "sonner";
 import { deleteMovimiento } from "@/services/finanzas";
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export default function Finanzas() {
+  const { user } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [tipoModal, setTipoModal] = useState<"ingreso" | "egreso">("egreso");
   const [eventoModalOpen, setEventoModalOpen] = useState(false);
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [movimientoSeleccionado, setMovimientoSeleccionado] = useState<MovimientoFinanciero | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Protección de permisos de módulo
+  if (!user?.modules || !user.modules.finanzas) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          No tienes permiso para acceder a este módulo
+        </div>
+      </div>
+    );
+  }
 
   const abrirModalIngreso = () => {
     setTipoModal("ingreso");

@@ -24,6 +24,17 @@ const AdminEventos = () => {
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
   const [tabActiva, setTabActiva] = useState("todos");
 
+  // Protección de permisos de módulo
+  if (!user?.modules || user.modules.eventos !== true) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-lg text-muted-foreground font-semibold">
+          No tienes permiso para acceder a este módulo
+        </div>
+      </div>
+    );
+  }
+
   useEffect(() => {
     cargarDatos();
   }, []);

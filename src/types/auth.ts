@@ -88,6 +88,9 @@ export interface AuthUser {
   email: string | null;
   displayName: string | null;
   profile?: UserProfile;
+  modules?: {
+    [key: string]: boolean | string;
+  };
 }
 
 export interface CreateUserForm {

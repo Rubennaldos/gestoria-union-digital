@@ -70,10 +70,21 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
 
   const savePermissions = async () => {
     if (!empadronado?.authUid) return;
-    
     setLoading(true);
     try {
-      await savePermissionsToRTDB(empadronado.authUid, userPermissions, user?.uid || 'system');
+      // Construir el objeto modules para la RTDB
+      const modulesPayload: Record<string, any> = {};
+      Object.entries(userPermissions).forEach(([mod, level]) => {
+        if (level === 'none') {
+          modulesPayload[mod] = null; // Eliminar el nodo
+        } else {
+          modulesPayload[mod] = level; // Guardar el nivel (admin, write, read)
+        }
+      });
+      // Guardar en /users/{uid}/modules
+      const { ref, update } = await import('firebase/database');
+      const { db } = await import('@/config/firebase');
+      await update(ref(db, `/users/${empadronado.authUid}/modules`), modulesPayload);
       toast({
         title: "Éxito",
         description: "Permisos actualizados correctamente"
