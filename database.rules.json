@@ -1,23 +1,31 @@
 {
   "rules": {
-    ".read": "auth != null",
+    ".read": false,
     ".write": false,
+
+    "modules": { ".read": "auth != null" },
+    "leyenda-etapas": { ".read": "auth != null" },
+
     "permissions": {
       "$uid": {
         ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
       }
     },
+
     "roles": {
       ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
     },
-    "modules": {
+
+    "modules_config": {
       ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
     },
+
     "auditLogs": {
       ".read": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
       ".write": "auth != null"
     },
+
     "cobranzas": {
       "configuracion": {
         ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
@@ -27,78 +35,74 @@
         ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
       }
     },
+
     "users": {
       "$uid": {
         ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".indexOn": ["empadronadoId"]
+        ".indexOn": ["empadronadoId"],
+
+        "modules": {
+          ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+          "$mod": {
+            ".validate": "newData.val() in ['sin_acceso','lectura','escritura','admin']"
+          }
+        }
       }
     },
+
     "empadronados": {
       "$empadronadoId": {
         ".read": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".write": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".validate": "newData.hasChildren(['dni', 'numeroPadron', 'authUid'])"
+        ".validate": "newData.hasChildren(['dni','numeroPadron','authUid'])"
       },
-      ".indexOn": ["authUid", "dni", "numeroPadron"]
+      ".indexOn": ["authUid","dni","numeroPadron"]
     },
+
     "cobranzas_v2": {
-      "comprobantes": {
-        ".write": "auth != null"
-      }
+      "comprobantes": { ".write": "auth != null" }
     },
-    "personal-seguridad": {
-      ".write": "auth != null"
-    },
+
+    "personal-seguridad": { ".write": "auth != null" },
+
     "eventos": {
-      "$eventoId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
+      "$eventoId": { ".read": "auth != null", ".write": "auth != null" }
     },
+
     "inscripcionesEventos": {
-      "$inscripcionId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
+      "$inscripcionId": { ".read": "auth != null", ".write": "auth != null" }
     },
+
     "finanzas": {
-      "$movimientoId": {
-        ".write": "auth != null"
-      }
+      "$movimientoId": { ".write": "auth != null" }
     },
+
     "acceso": {
       "visitas": {
         ".write": "auth != null",
-        ".indexOn": ["estado", "patronId", "createdAt", "dni"]
+        ".indexOn": ["estado","patronId","createdAt","dni"]
       },
       "trabajadores": {
         ".write": "auth != null",
-        ".indexOn": ["estado", "dni", "padron"]
+        ".indexOn": ["estado","dni","padron"]
       },
       "proveedores": {
         ".write": "auth != null",
-        ".indexOn": ["estado", "ruc"]
+        ".indexOn": ["estado","ruc"]
       },
-      "maestrosObra": {
-        ".write": "auth != null"
-      },
-      "favoritos": {
-        ".write": "auth != null"
-      }
+      "maestrosObra": { ".write": "auth != null" },
+      "favoritos": { ".write": "auth != null" }
     },
+
     "seguridad": {
       "porticos": {
         "$porticoId": {
           ".write": "auth != null",
-          "pendientes": {
-            ".write": "auth != null"
-          }
+          "pendientes": { ".write": "auth != null" }
         }
       },
-      "registros_manuales": {
-        ".write": "auth != null"
-      }
+      "registros_manuales": { ".write": "auth != null" }
     }
   }
 }

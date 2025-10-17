@@ -49,6 +49,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // Carga perfil (si no existe, devolverá null)
           const userProfile = await getUserProfile(fbUser.uid);
           console.log('👤 AuthContext: User profile loaded:', userProfile);
+          // Debug: confirm modules are read from users/{uid}/modules
+          console.debug('[RTDB READ] auth.currentUser?.uid =', auth.currentUser?.uid);
+          console.debug('[RTDB READ] path =', `users/${fbUser.uid}/modules`);
+          console.debug('[RTDB READ] snapshot (modules) =', userProfile?.modules);
           
           // Si no hay perfil pero el usuario se autenticó, crear un perfil básico
           if (!userProfile && fbUser.email) {
@@ -96,6 +100,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (!user?.uid) return;
     const stop = onUserProfile(user.uid, (updated) => {
+      // Debug realtime profile updates and modules path
+      console.debug('[RTDB REALTIME] auth.currentUser?.uid =', auth.currentUser?.uid);
+      console.debug('[RTDB REALTIME] path =', `users/${user.uid}/modules`);
+      console.debug('[RTDB REALTIME] snapshot (modules) =', updated?.modules);
       setProfile(updated);
       setUser((u) => (u ? { ...u, profile: updated || undefined, modules: updated?.modules } : u));
       // Ensure we mark profileLoaded when realtime update arrives

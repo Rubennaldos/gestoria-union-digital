@@ -105,56 +105,90 @@ export const listUsers = async (filters?: { roleId?: string; activo?: boolean; s
 
 // Permission operations
 export const setPermission = async (uid: string, moduleId: string, level: PermissionLevel, actorUid: string) => {
-  const permRef = ref(db, `permissions/${uid}/${moduleId}`);
+  // Write a single module permission under users/{uid}/modules using update
+  const allowed = new Set<PermissionLevel>(["none", "read", "write", "approve", "admin"]);
+  if (!allowed.has(level)) throw new Error(`INVALID_PERMISSION_LEVEL: ${level}`);
+
+  const modulesRef = ref(db, `users/${uid}/modules`);
+  const payload: Record<string, any> = {};
+  payload[moduleId] = level === 'none' ? null : level;
+
   const oldLevel = await getPermission(uid, moduleId);
-  
-  await set(permRef, level);
-  
-  await writeAuditLog({
-    actorUid,
-    targetUid: uid,
-    accion: "PERMISO_CAMBIADO",
-    moduloId: moduleId,
-    old: oldLevel,
-    new: level
-  });
-};
 
-export const getPermission = async (uid: string, moduleId: string): Promise<PermissionLevel> => {
-  const permRef = ref(db, `permissions/${uid}/${moduleId}`);
-  const snapshot = await get(permRef);
-  return snapshot.exists() ? snapshot.val() : "none";
-};
-
-export const getUserPermissions = async (uid: string): Promise<Permission> => {
-  const permRef = ref(db, `permissions/${uid}`);
-  const snapshot = await get(permRef);
-  return snapshot.exists() ? snapshot.val() : {};
-};
-
-export const setUserPermissions = async (uid: string, permissions: Permission, actorUid?: string) => {
-  const permRef = ref(db, `permissions/${uid}`);
-  await set(permRef, permissions);
-  
-  if (actorUid) {
+  try {
+    await update(modulesRef, payload);
     await writeAuditLog({
       actorUid,
       targetUid: uid,
-      accion: "PERMISOS_ACTUALIZADOS",
-      new: permissions
+      accion: "PERMISO_CAMBIADO",
+      moduloId: moduleId,
+      old: oldLevel,
+      new: level
     });
+  } catch (err) {
+    console.error('Error setting permission:', err, { path: `users/${uid}/modules/${moduleId}`, payload });
+    throw err;
+  }
+};
+
+export const getPermission = async (uid: string, moduleId: string): Promise<PermissionLevel> => {
+  const modRef = ref(db, `users/${uid}/modules/${moduleId}`);
+  const snapshot = await get(modRef);
+  if (!snapshot.exists()) return "none";
+  const val = snapshot.val();
+  if (val === true) return 'read'; // legacy boolean flag -> treat as read
+  return (val as PermissionLevel) || 'none';
+};
+
+export const getUserPermissions = async (uid: string): Promise<Permission> => {
+  const modsRef = ref(db, `users/${uid}/modules`);
+  const snapshot = await get(modsRef);
+  if (!snapshot.exists()) return {};
+  const raw = snapshot.val() as Record<string, any>;
+  const normalized: Permission = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (v === true) normalized[k] = 'read';
+    else normalized[k] = (v as PermissionLevel) || 'none';
+  }
+  return normalized;
+};
+
+export const setUserPermissions = async (uid: string, permissions: Permission, actorUid?: string) => {
+  // Validate and write exclusively under users/{uid}/modules using update
+  const allowed = new Set<PermissionLevel>(["none", "read", "write", "approve", "admin"]);
+  const payload: Record<string, any> = {};
+
+  for (const [moduleId, level] of Object.entries(permissions || {})) {
+    if (level === null) {
+      payload[moduleId] = null;
+      continue;
+    }
+    if (!allowed.has(level)) {
+      throw new Error(`INVALID_PERMISSION_LEVEL: ${moduleId} -> ${level}`);
+    }
+    payload[moduleId] = level === 'none' ? null : level;
+  }
+
+  try {
+    await update(ref(db, `users/${uid}/modules`), payload);
+
+    if (actorUid) {
+      await writeAuditLog({
+        actorUid,
+        targetUid: uid,
+        accion: "PERMISOS_ACTUALIZADOS",
+        new: permissions
+      });
+    }
+  } catch (err) {
+    console.error('Error setting user permissions to users/{uid}/modules', err, { uid, payload, actorUid });
+    throw err;
   }
 };
 
 export const applyMirrorPermissions = async (uid: string, mirrorConfig: Permission, actorUid: string) => {
-  const updates: { [key: string]: PermissionLevel } = {};
-  
-  for (const [moduleId, level] of Object.entries(mirrorConfig)) {
-    updates[`permissions/${uid}/${moduleId}`] = level;
-  }
-  
-  await update(ref(db), updates);
-  
+  // Reuse setUserPermissions to apply mirror config under users/{uid}/modules
+  await setUserPermissions(uid, mirrorConfig, actorUid);
   await writeAuditLog({
     actorUid,
     targetUid: uid,
@@ -364,9 +398,16 @@ export const setBootstrapInitialized = async () => {
 
 // Real-time subscriptions
 export const onPermissions = (uid: string, callback: (permissions: Permission) => void) => {
-  const permRef = ref(db, `permissions/${uid}`);
-  return onValue(permRef, (snapshot) => {
-    callback(snapshot.exists() ? snapshot.val() : {});
+  const modsRef = ref(db, `users/${uid}/modules`);
+  return onValue(modsRef, (snapshot) => {
+    if (!snapshot.exists()) return callback({});
+    const raw = snapshot.val() as Record<string, any>;
+    const normalized: Permission = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (v === true) normalized[k] = 'read';
+      else normalized[k] = (v as PermissionLevel) || 'none';
+    }
+    callback(normalized);
   });
 };
 

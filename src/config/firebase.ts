@@ -19,12 +19,17 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 // Debug RTDB only in dev.
-if (import.meta.env?.DEV) {
-  import("firebase/database")
-    .then((m: any) => {
-      m?.setLogLevel?.("debug");
-    })
-    .catch(() => {});
+// Debug RTDB only in development mode. Use import.meta?.env?.MODE to avoid
+// evaluating in production bundles and wrap in try/catch for safety.
+if (import.meta?.env?.MODE === 'development') {
+  try {
+    // dynamic import keeps build stable in production and avoids type mismatches
+    import('firebase/database')
+      .then((m: any) => m?.setLogLevel?.('debug'))
+      .catch(() => {});
+  } catch {
+    // swallow any error to avoid breaking initialization
+  }
 }
 export const fs = getFirestore(app);
 export const storage = getStorage(app); // <- NUEVO

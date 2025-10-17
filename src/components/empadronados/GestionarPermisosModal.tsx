@@ -84,13 +84,28 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
       // Guardar en /users/{uid}/modules
       const { ref, update } = await import('firebase/database');
       const { db } = await import('@/config/firebase');
-      await update(ref(db, `/users/${empadronado.authUid}/modules`), modulesPayload);
+      const writerUid = user?.uid || 'anonymous';
+      const path = `/users/${empadronado.authUid}/modules`;
+      console.debug('[RTDB WRITE] writer UID =', writerUid);
+      console.debug('[RTDB WRITE] path =', path);
+      console.debug('[RTDB WRITE] payload =', modulesPayload);
+      await update(ref(db, path), modulesPayload);
+      console.debug('[RTDB WRITE] result = OK', { path, payload: modulesPayload, writerUid });
       toast({
         title: "Éxito",
         description: "Permisos actualizados correctamente"
       });
       onOpenChange(false);
     } catch (error) {
+      // If Firebase returns a permission_denied error, surface exact message and attempted path
+      console.error('[RTDB WRITE] error writing permissions:', error);
+      try {
+        const errMsg = (error as any)?.message || String(error);
+        console.error('[RTDB WRITE] attempted path =', `/users/${empadronado?.authUid}/modules`);
+        console.error('[RTDB WRITE] error message =', errMsg);
+      } catch (e) {
+        // ignore
+      }
       toast({
         title: "Error",
         description: "No se pudieron actualizar los permisos",
