@@ -4,40 +4,40 @@
     ".write": false,
     "permissions": {
       "$uid": {
-        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
-        ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'"
+        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
       }
     },
     "roles": {
-      ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'"
+      ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
     },
     "modules": {
-      ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'"
+      ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
     },
     "auditLogs": {
-      ".read": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
+      ".read": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
       ".write": "auth != null"
     },
     "cobranzas": {
       "configuracion": {
-        ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'"
+        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
       },
       "$uid": {
-        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
-        ".write": "root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'"
+        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
       }
     },
     "users": {
       "$uid": {
-        ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador' || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador' || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+        ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".indexOn": ["empadronadoId"]
       }
     },
     "empadronados": {
       "$empadronadoId": {
-        ".read": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
-        ".write": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
+        ".read": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+        ".write": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".validate": "newData.hasChildren(['dni', 'numeroPadron', 'authUid'])"
       },
       ".indexOn": ["authUid", "dni", "numeroPadron"]
