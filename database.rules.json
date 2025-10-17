@@ -30,7 +30,7 @@
     "users": {
       "$uid": {
         ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
-        ".write": "auth.uid === $uid",
+        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('roleId').val() === 'presidencia' || root.child('users').child(auth.uid).child('roleId').val() === 'administrador'",
         ".indexOn": ["empadronadoId"]
       }
     },
