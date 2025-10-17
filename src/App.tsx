@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, Navigate } from "react-router-dom"; // 👈 el Router está en main.tsx
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AuthzProvider } from "@/contexts/AuthzContext";
+import { BillingConfigProvider } from "@/contexts/BillingConfigContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AdminCreator } from "@/components/auth/AdminCreator";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
@@ -73,7 +74,9 @@ const App: React.FC = () => {
 
         {/* 👇 NINGÚN Router aquí. El Router va en main.tsx */}
         <AuthProvider>
-          <AuthzProvider>
+          {/* BillingConfigProvider depends on authenticated profile/modules, mount it inside AuthProvider */}
+          <BillingConfigProvider>
+            <AuthzProvider>
             <Routes>
               {/* Raíz → /inicio */}
               <Route path="/" element={<Navigate to="/inicio" replace />} />
@@ -309,7 +312,8 @@ const App: React.FC = () => {
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </AuthzProvider>
+            </AuthzProvider>
+          </BillingConfigProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

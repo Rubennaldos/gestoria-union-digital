@@ -18,6 +18,14 @@ const firebaseConfig = {
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
+// Debug RTDB only in dev.
+if (import.meta.env?.DEV) {
+  import("firebase/database")
+    .then((m: any) => {
+      m?.setLogLevel?.("debug");
+    })
+    .catch(() => {});
+}
 export const fs = getFirestore(app);
 export const storage = getStorage(app); // <- NUEVO
 

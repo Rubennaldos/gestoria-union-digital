@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { db } from "@/config/firebase";
 import { onValue, ref } from "firebase/database";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type BillingConfig = {
   // Normalizado para el motor de deuda:
@@ -33,8 +34,18 @@ const Ctx = createContext<BillingConfig>(DEFAULT_CFG);
 
 export function BillingConfigProvider({ children }: { children: ReactNode }) {
   const [cfg, setCfg] = useState<BillingConfig>(DEFAULT_CFG);
+  const { user, loading, profileLoaded } = useAuth();
 
   useEffect(() => {
+    // Wait until profile has been loaded (initial fetch completed)
+    if (!profileLoaded) return;
+
+    // If there's no authenticated user, don't subscribe to protected config (keep default)
+    if (!user?.uid) {
+      setCfg(DEFAULT_CFG);
+      return;
+    }
+
     const r = ref(db, "cobranzas/configuracion");
     const unsub = onValue(
       r,
@@ -67,7 +78,7 @@ export function BillingConfigProvider({ children }: { children: ReactNode }) {
       }
     );
     return () => unsub();
-  }, []);
+  }, [loading, user?.uid]);
 
   const value = useMemo(() => cfg, [cfg]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

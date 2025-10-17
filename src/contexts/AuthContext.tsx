@@ -8,6 +8,7 @@ import { getUserProfile, onUserProfile, createUserProfile } from '@/services/rtd
 interface AuthContextType {
   user: AuthUser | null;
   profile: UserProfile | null;
+  profileLoaded: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
+  profileLoaded: false,
   loading: true,
   signOut: async () => {},
 });
@@ -28,6 +30,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Escucha de sesión Firebase
@@ -35,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
       console.log('🔍 AuthContext: Firebase user changed:', fbUser?.email, fbUser?.uid);
       try {
-        if (fbUser) {
+          if (fbUser) {
           const authUser: AuthUser = {
             uid: fbUser.uid,
             email: fbUser.email,
@@ -71,10 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser({ ...authUser, profile: userProfile || undefined, modules: userProfile?.modules });
           }
           console.log('✅ AuthContext: User state updated');
+          // Mark profile as loaded (initial fetch completed)
+          setProfileLoaded(true);
         } else {
           console.log('🚪 AuthContext: User signed out');
           setUser(null);
           setProfile(null);
+          setProfileLoaded(false);
         }
       } catch (error) {
         console.error('❌ AuthContext: Error in auth state change:', error);
@@ -92,6 +98,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stop = onUserProfile(user.uid, (updated) => {
       setProfile(updated);
       setUser((u) => (u ? { ...u, profile: updated || undefined, modules: updated?.modules } : u));
+      // Ensure we mark profileLoaded when realtime update arrives
+      setProfileLoaded(true);
     });
     return () => stop && stop();
   }, [user?.uid]);
@@ -101,8 +109,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = useMemo<AuthContextType>(
-    () => ({ user, profile, loading, signOut }),
-    [user, profile, loading]
+    () => ({ user, profile, profileLoaded, loading, signOut }),
+    [user, profile, profileLoaded, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
