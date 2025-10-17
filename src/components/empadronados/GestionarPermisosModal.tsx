@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Settings, KeyRound } from 'lucide-react';
 import { Empadronado } from '@/types/empadronados';
 import { Module, Permission, PermissionLevel } from '@/types/auth';
-import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
+import { listModules, getUserPermissions } from '@/services/rtdb';
 import { useAuth } from '@/contexts/AuthContext';
-import { createUserAndProfile } from '@/services/auth';
 
 interface GestionarPermisosModalProps {
   open: boolean;
@@ -61,10 +60,10 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
     }
   };
 
-  const handlePermissionChange = (moduleId: string, level: PermissionLevel) => {
+  const handleModuleToggle = (moduleId: string, enabled: boolean) => {
     setUserPermissions(prev => ({
       ...prev,
-      [moduleId]: level
+      [moduleId]: enabled ? 'admin' : 'none'
     }));
   };
 
@@ -169,45 +168,25 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
               <div className="space-y-3">
                 {modules.map((module) => {
                   const currentLevel = userPermissions[module.id] || 'none';
+                  const isEnabled = currentLevel !== 'none';
                   const isDisabled = !empadronado.authUid && !empadronado.emailAcceso;
                   
                   return (
                     <div key={module.id} className={`border rounded-lg p-4 ${isDisabled ? 'opacity-50' : ''}`}>
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center justify-between">
                         <div>
                           <span className="font-medium">{module.nombre}</span>
                         </div>
-                        <Badge variant={
-                          currentLevel === 'none' ? 'outline' :
-                          currentLevel === 'read' ? 'secondary' :
-                          currentLevel === 'write' ? 'default' : 'destructive'
-                        }>
-                          {currentLevel === 'none' ? 'Sin acceso' :
-                           currentLevel === 'read' ? 'Lectura' :
-                           currentLevel === 'write' ? 'Escritura' : 'Admin'}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-4 gap-2">
-                        {[
-                          { value: 'none', label: 'Sin Acceso', color: 'bg-muted hover:bg-muted/80' },
-                          { value: 'read', label: 'Lectura', color: 'bg-blue-500 hover:bg-blue-600 text-white' },
-                          { value: 'write', label: 'Escritura', color: 'bg-green-500 hover:bg-green-600 text-white' },
-                          { value: 'admin', label: 'Admin', color: 'bg-purple-500 hover:bg-purple-600 text-white' }
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            onClick={() => !isDisabled && handlePermissionChange(module.id, option.value as PermissionLevel)}
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            {isEnabled ? 'Activado' : 'Desactivado'}
+                          </span>
+                          <Switch
+                            checked={isEnabled}
+                            onCheckedChange={(checked) => !isDisabled && handleModuleToggle(module.id, checked)}
                             disabled={isDisabled}
-                            className={`text-sm px-3 py-2 rounded-md border transition-all ${
-                              currentLevel === option.value && !isDisabled
-                                ? option.color
-                                : 'bg-background hover:bg-muted border-border'
-                            } ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                          />
+                        </div>
                       </div>
                     </div>
                   );
