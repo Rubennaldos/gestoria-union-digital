@@ -1,13 +1,19 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
   ],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "noImplicitAny": false,
     "noUnusedParameters": false,
@@ -15,9 +21,16 @@
     "allowJs": true,
     "noUnusedLocals": false,
     "strictNullChecks": false,
-
-    // añadidos para que Vite/TS conozcan Worker y tipos del navegador
-    "lib": ["ES2020", "DOM", "DOM.Iterable", "WebWorker", "WebWorker.Iterable"],
-    "types": ["vite/client"]
-  }
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker",
+      "WebWorker.Iterable"
+    ],
+    "types": [
+      "vite/client"
+    ]
+  },
+  "extends": "expo/tsconfig.base"
 }
