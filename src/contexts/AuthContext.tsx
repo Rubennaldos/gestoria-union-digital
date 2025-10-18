@@ -4,6 +4,7 @@ import { User as FirebaseUser, onAuthStateChanged, signOut as fbSignOut } from '
 import { auth } from '@/config/firebase';
 import { UserProfile, AuthUser } from '@/types/auth';
 import { getUserProfile, onUserProfile, createUserProfile } from '@/services/rtdb';
+import { registerForPushNotificationsAsync } from '@/services/pushNotifications';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -80,6 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('✅ AuthContext: User state updated');
           // Mark profile as loaded (initial fetch completed)
           setProfileLoaded(true);
+          // Register for push notifications (non-blocking)
+          registerForPushNotificationsAsync().catch((e) => console.warn('push registration failed', e));
         } else {
           console.log('🚪 AuthContext: User signed out');
           setUser(null);
