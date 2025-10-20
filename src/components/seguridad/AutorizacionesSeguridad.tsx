@@ -3,7 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Check, X, Clock, Users, UserCheck, Shield, Eye } from "lucide-react";
+import { Check, X, Clock, Users, UserCheck, Shield, Eye, Download } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { cambiarEstadoAcceso } from "@/services/acceso";
@@ -226,22 +229,82 @@ export const AutorizacionesSeguridad = () => {
     }
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Autorizaciones Pendientes</h3>
-          <p className="text-sm text-muted-foreground">
-            {items.length} solicitudes esperando autorización
-          </p>
-        </div>
-        <Badge variant="outline" className="flex items-center gap-1">
-          <Clock className="h-3 w-3" />
-          {items.length} pendientes
-        </Badge>
-      </div>
+  const generarPDF = (tipo: "visitante" | "trabajador" | "proveedor") => {
+    const solicitudesFiltradas = items.filter((item) => item.tipo === tipo);
 
-      {items.length === 0 ? (
+    if (solicitudesFiltradas.length === 0) {
+      toast({
+        title: "Sin solicitudes",
+        description: `No hay solicitudes de ${tipo}s pendientes para exportar.`,
+        variant: "default",
+      });
+      return;
+    }
+
+    const doc = new jsPDF();
+    const tipoTitulo = tipo === "visitante" ? "Visitas" : tipo === "trabajador" ? "Trabajadores" : "Proveedores";
+
+    doc.setFontSize(18);
+    doc.text(`Solicitudes de ${tipoTitulo}`, 14, 22);
+
+    doc.setFontSize(11);
+    doc.text(`Fecha de generación: ${new Date().toLocaleString("es-ES")}`, 14, 30);
+    doc.text(`Total de solicitudes: ${solicitudesFiltradas.length}`, 14, 36);
+
+    const tableData = solicitudesFiltradas.map((auth, index) => {
+      const emp = auth.empadronado;
+      const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
+      const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
+      const tipoAcceso = (auth.data as any).tipoAcceso || "—";
+      const placa = (auth.data as any).placa || (auth.data as any).placas?.join(", ") || "—";
+
+      let detalles = "";
+      if (tipo === "visitante") {
+        const visitantes = (auth.data as RegistroVisita).visitantes || [];
+        detalles = visitantes.map((v) => `${v.nombre} (${v.dni})`).join(", ");
+      } else if (tipo === "trabajador") {
+        const trabajadores = (auth.data as any).trabajadores || [];
+        detalles = trabajadores.map((t: any) => `${t.nombre} (${t.dni})`).join(", ");
+      } else if (tipo === "proveedor") {
+        detalles = (auth.data as RegistroProveedor).empresa || "—";
+      }
+
+      return [
+        (index + 1).toString(),
+        solicitante,
+        fecha,
+        tipoAcceso,
+        placa,
+        detalles
+      ];
+    });
+
+    autoTable(doc, {
+      head: [["#", "Solicitado por", "Fecha", "Tipo Acceso", "Placa(s)", tipo === "proveedor" ? "Empresa" : "Personas"]],
+      body: tableData,
+      startY: 42,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 },
+    });
+
+    doc.save(`Solicitudes_${tipoTitulo}_${new Date().toISOString().split("T")[0]}.pdf`);
+
+    toast({
+      title: "PDF generado",
+      description: `Se ha descargado el reporte de ${tipoTitulo}.`,
+    });
+  };
+
+  // Filtrar por tipo
+  const visitantes = items.filter((item) => item.tipo === "visitante");
+  const trabajadoresItems = items.filter((item) => item.tipo === "trabajador");
+  const proveedoresItems = items.filter((item) => item.tipo === "proveedor");
+
+  const renderSolicitudes = (solicitudes: AutorizacionPendiente[]) => {
+    if (solicitudes.length === 0) {
+      return (
         <Card>
           <CardContent className="py-8 text-center">
             <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
@@ -251,9 +314,12 @@ export const AutorizacionesSeguridad = () => {
             <p className="text-muted-foreground">Todas las solicitudes han sido procesadas</p>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4">
-          {items.map((auth) => {
+      );
+    }
+
+    return (
+      <div className="grid gap-4">
+        {solicitudes.map((auth) => {
             const Icono = getIcono(auth.tipo);
             const emp = auth.empadronado; // puede ser undefined (cargando), null (no existe) o Empadronado
 
@@ -427,7 +493,97 @@ export const AutorizacionesSeguridad = () => {
               </Card>
             );
           })}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Autorizaciones Pendientes</h3>
+          <p className="text-sm text-muted-foreground">
+            {items.length} solicitudes esperando autorización
+          </p>
         </div>
+        <Badge variant="outline" className="flex items-center gap-1">
+          <Clock className="h-3 w-3" />
+          {items.length} pendientes
+        </Badge>
+      </div>
+
+      {items.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">
+              No hay autorizaciones pendientes
+            </h3>
+            <p className="text-muted-foreground">Todas las solicitudes han sido procesadas</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Tabs defaultValue="visitantes" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="visitantes" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Visitas ({visitantes.length})
+            </TabsTrigger>
+            <TabsTrigger value="trabajadores" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              Trabajadores ({trabajadoresItems.length})
+            </TabsTrigger>
+            <TabsTrigger value="proveedores" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Proveedores ({proveedoresItems.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="visitantes" className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => generarPDF("visitante")}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </Button>
+            </div>
+            {renderSolicitudes(visitantes)}
+          </TabsContent>
+
+          <TabsContent value="trabajadores" className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => generarPDF("trabajador")}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </Button>
+            </div>
+            {renderSolicitudes(trabajadoresItems)}
+          </TabsContent>
+
+          <TabsContent value="proveedores" className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => generarPDF("proveedor")}
+                variant="outline"
+                size="sm"
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </Button>
+            </div>
+            {renderSolicitudes(proveedoresItems)}
+          </TabsContent>
+        </Tabs>
       )}
 
       {selectedAuth && (
