@@ -116,11 +116,18 @@
     "seguridad": {
       "porticos": {
         "$porticoId": {
+          ".read": "auth != null",
           ".write": "auth != null",
-          "pendientes": { ".write": "auth != null" }
+          "pendientes": { 
+            ".read": "auth != null",
+            ".write": "auth != null" 
+          }
         }
       },
-      "registros_manuales": { ".write": "auth != null" },
+      "registros_manuales": { 
+        ".read": "auth != null",
+        ".write": "auth != null" 
+      },
       "historial": {
         ".read": "auth != null",
         ".write": "auth != null",
