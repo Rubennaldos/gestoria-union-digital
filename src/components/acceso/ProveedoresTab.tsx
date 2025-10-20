@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText, Plus } from "lucide-react";
+import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText, Plus, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
@@ -62,6 +62,7 @@ export function ProveedoresTab() {
   const serviciosRapidos = [
     { id: "gas", label: "Gas", icon: Zap, color: "bg-orange-500" },
     { id: "delivery", label: "Delivery de Comida", icon: UtensilsCrossed, color: "bg-green-500" },
+    { id: "bodega", label: "Proveedor de Bodega", icon: Store, color: "bg-blue-500" },
   ] as const;
 
   const validarBase = (esRapido = false) => {
@@ -89,13 +90,13 @@ export function ProveedoresTab() {
     await procesarRegistro("otro", empresa.trim());
   };
 
-  const registrarServicioRapido = async (tipoServicio: "gas" | "delivery") => {
+  const registrarServicioRapido = async (tipoServicio: "gas" | "delivery" | "bodega") => {
     if (!validarBase(true)) return;
-    const nombreServicio = tipoServicio === "gas" ? "GAS" : "DELIVERY DE COMIDA";
+    const nombreServicio = tipoServicio === "gas" ? "GAS" : tipoServicio === "delivery" ? "DELIVERY DE COMIDA" : "PROVEEDOR DE BODEGA";
     await procesarRegistro(tipoServicio, nombreServicio);
   };
 
-  const procesarRegistro = async (tipoServicio: "gas" | "delivery" | "otro", nombreEmpresa: string) => {
+  const procesarRegistro = async (tipoServicio: "gas" | "delivery" | "bodega" | "otro", nombreEmpresa: string) => {
     try {
       const placasLimpias = placas
         .map((p) => p.placa.trim().toUpperCase())

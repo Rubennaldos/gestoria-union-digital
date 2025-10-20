@@ -88,7 +88,7 @@ export interface RegistroProveedor {
   placa?: string;
   placas?: string[]; // Múltiples placas
   empresa: string;
-  tipoServicio?: "gas" | "delivery" | "otro";
+  tipoServicio?: "gas" | "delivery" | "bodega" | "otro";
   fechaCreacion: number;
   estado: "pendiente" | "autorizado" | "denegado";
 

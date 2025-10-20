@@ -170,7 +170,7 @@ export type RegistrarProveedorInput = {
   placa?: string;
   placas?: string[]; // Múltiples placas
   empresa: string;
-  tipoServicio?: "gas" | "delivery" | "otro";
+  tipoServicio?: "gas" | "delivery" | "bodega" | "otro";
   porticoId: string;
 };
 
