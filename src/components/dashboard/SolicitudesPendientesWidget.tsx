@@ -68,17 +68,20 @@ export const SolicitudesPendientesWidget = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         Object.entries(data).forEach(([id, val]: any) => {
-          pendientes.push({
-            id,
-            tipo: val.tipo,
-            nombre: val.nombre || val.solicitadoPorNombre || "Sin nombre",
-            empadronadoId: val.empadronadoId,
-            solicitadoPorNombre: val.solicitadoPorNombre,
-            solicitadoPorPadron: val.solicitadoPorPadron,
-            createdAt: val.createdAt,
-            porticoId: "principal",
-            datos: val,
-          });
+          // Solo incluir solicitudes que están pendientes (no aprobadas ni rechazadas)
+          if (!val.estado || val.estado === "pendiente") {
+            pendientes.push({
+              id,
+              tipo: val.tipo,
+              nombre: val.nombre || val.solicitadoPorNombre || "Sin nombre",
+              empadronadoId: val.empadronadoId,
+              solicitadoPorNombre: val.solicitadoPorNombre,
+              solicitadoPorPadron: val.solicitadoPorPadron,
+              createdAt: val.createdAt,
+              porticoId: "principal",
+              datos: val,
+            });
+          }
         });
       }
       actualizarSolicitudes(pendientes, "accesos");
