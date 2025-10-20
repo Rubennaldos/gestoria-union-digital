@@ -27,14 +27,8 @@
     },
 
     "configuracion": {
-      "reglamento_acceso": {
-        ".read": "auth != null",
-        ".write": "root.child('users').child(auth.uid).child('modules').child('admin_seguridad').val() === 'admin'"
-      },
-      "whatsapp_accesos": {
-        ".read": "auth != null",
-        ".write": "root.child('users').child(auth.uid).child('modules').child('admin_seguridad').val() === 'admin'"
-      }
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
 
     "cobranzas": {
