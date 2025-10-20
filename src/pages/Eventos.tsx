@@ -22,18 +22,31 @@ import { descargarComprobantePorInscripcion } from "@/services/recibos";
 
 const Eventos = () => {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [eventosFiltrados, setEventosFiltrados] = useState<Evento[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [eventosLoading, setEventosLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState<string>("todas");
   const [eventoSeleccionado, setEventoSeleccionado] = useState<Evento | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [tabActiva, setTabActiva] = useState<string>("eventos");
 
-  // Protección de permisos de módulo
+  // If auth state still loading, show a spinner/message to avoid race conditions
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-0">
+        <TopNavigation />
+        <main className="container mx-auto px-4 py-6">
+          <div className="text-center">Cargando...</div>
+        </main>
+        <BottomNavigation />
+      </div>
+    );
+  }
+
+  // Protección de permisos de módulo (solo cuando authLoading === false)
   if (!user?.modules || user.modules.eventos !== true) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -54,7 +67,7 @@ const Eventos = () => {
 
   const cargarEventos = async () => {
     try {
-      setLoading(true);
+      setEventosLoading(true);
       const data = await obtenerEventosActivos();
       setEventos(data);
       setEventosFiltrados(data);
@@ -62,7 +75,7 @@ const Eventos = () => {
       console.error("Error al cargar eventos:", error);
       toast.error("Error al cargar los eventos");
     } finally {
-      setLoading(false);
+      setEventosLoading(false);
     }
   };
 
@@ -138,7 +151,7 @@ const Eventos = () => {
     setModalOpen(true);
   };
 
-  if (loading) {
+  if (eventosLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-0">
         <TopNavigation />
