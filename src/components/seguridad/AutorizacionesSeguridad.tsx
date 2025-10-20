@@ -251,43 +251,138 @@ export const AutorizacionesSeguridad = () => {
     doc.text(`Fecha de generación: ${new Date().toLocaleString("es-ES")}`, 14, 30);
     doc.text(`Total de solicitudes: ${solicitudesFiltradas.length}`, 14, 36);
 
-    const tableData = solicitudesFiltradas.map((auth, index) => {
-      const emp = auth.empadronado;
-      const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
-      const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
-      const tipoAcceso = (auth.data as any).tipoAcceso || "—";
-      const placa = (auth.data as any).placa || (auth.data as any).placas?.join(", ") || "—";
-
-      let detalles = "";
-      if (tipo === "visitante") {
-        const visitantes = (auth.data as RegistroVisita).visitantes || [];
-        detalles = visitantes.map((v) => `${v.nombre} (${v.dni})`).join(", ");
-      } else if (tipo === "trabajador") {
+    // PDF especial para trabajadores con maestros como subtítulos
+    if (tipo === "trabajador") {
+      let startY = 42;
+      
+      solicitudesFiltradas.forEach((auth, solicitudIndex) => {
+        const emp = auth.empadronado;
+        const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
+        const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
+        const tipoAcceso = (auth.data as any).tipoAcceso || "—";
+        const placa = (auth.data as any).placa || (auth.data as any).placas?.join(", ") || "—";
         const trabajadores = (auth.data as any).trabajadores || [];
-        detalles = trabajadores.map((t: any) => `${t.nombre} (${t.dni})`).join(", ");
-      } else if (tipo === "proveedor") {
-        detalles = (auth.data as RegistroProveedor).empresa || "—";
-      }
+        
+        // Buscar maestro(s)
+        const maestros = trabajadores.filter((t: any) => t.esMaestroObra);
+        const obreros = trabajadores.filter((t: any) => !t.esMaestroObra);
+        
+        // Encabezado de la solicitud
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text(`Solicitud #${solicitudIndex + 1}`, 14, startY);
+        startY += 6;
+        
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Solicitado por: ${solicitante}`, 14, startY);
+        startY += 5;
+        doc.text(`Fecha: ${fecha} | Tipo Acceso: ${tipoAcceso} | Placa(s): ${placa}`, 14, startY);
+        startY += 8;
+        
+        // Maestro(s) como subtítulo
+        if (maestros.length > 0) {
+          maestros.forEach((maestro: any) => {
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Maestro Encargado: ${maestro.nombre} (${maestro.dni})`, 14, startY);
+            startY += 8;
+            
+            // Lista de obreros bajo este maestro
+            if (obreros.length > 0) {
+              const obrerosData = obreros.map((obrero: any, idx: number) => [
+                (idx + 1).toString(),
+                obrero.nombre,
+                obrero.dni
+              ]);
+              
+              autoTable(doc, {
+                head: [["#", "Nombre", "DNI"]],
+                body: obrerosData,
+                startY: startY,
+                styles: { fontSize: 9, cellPadding: 2 },
+                headStyles: { fillColor: [34, 197, 94], textColor: 255 },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                margin: { left: 14, right: 14 },
+              });
+              
+              startY = (doc as any).lastAutoTable.finalY + 10;
+            } else {
+              doc.setFontSize(9);
+              doc.setFont(undefined, 'italic');
+              doc.text("Sin obreros asociados", 20, startY);
+              startY += 10;
+            }
+          });
+        } else {
+          // Si no hay maestro, mostrar todos como trabajadores
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'bold');
+          doc.text("Trabajadores:", 14, startY);
+          startY += 6;
+          
+          const trabajadoresData = trabajadores.map((t: any, idx: number) => [
+            (idx + 1).toString(),
+            t.nombre,
+            t.dni
+          ]);
+          
+          autoTable(doc, {
+            head: [["#", "Nombre", "DNI"]],
+            body: trabajadoresData,
+            startY: startY,
+            styles: { fontSize: 9, cellPadding: 2 },
+            headStyles: { fillColor: [34, 197, 94], textColor: 255 },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+            margin: { left: 14, right: 14 },
+          });
+          
+          startY = (doc as any).lastAutoTable.finalY + 10;
+        }
+        
+        // Agregar nueva página si es necesario
+        if (startY > 250 && solicitudIndex < solicitudesFiltradas.length - 1) {
+          doc.addPage();
+          startY = 20;
+        }
+      });
+    } else {
+      // PDF normal para visitas y proveedores
+      const tableData = solicitudesFiltradas.map((auth, index) => {
+        const emp = auth.empadronado;
+        const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
+        const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
+        const tipoAcceso = (auth.data as any).tipoAcceso || "—";
+        const placa = (auth.data as any).placa || (auth.data as any).placas?.join(", ") || "—";
 
-      return [
-        (index + 1).toString(),
-        solicitante,
-        fecha,
-        tipoAcceso,
-        placa,
-        detalles
-      ];
-    });
+        let detalles = "";
+        if (tipo === "visitante") {
+          const visitantes = (auth.data as RegistroVisita).visitantes || [];
+          detalles = visitantes.map((v) => `${v.nombre} (${v.dni})`).join(", ");
+        } else if (tipo === "proveedor") {
+          detalles = (auth.data as RegistroProveedor).empresa || "—";
+        }
 
-    autoTable(doc, {
-      head: [["#", "Solicitado por", "Fecha", "Tipo Acceso", "Placa(s)", tipo === "proveedor" ? "Empresa" : "Personas"]],
-      body: tableData,
-      startY: 42,
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [59, 130, 246], textColor: 255 },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      margin: { left: 14, right: 14 },
-    });
+        return [
+          (index + 1).toString(),
+          solicitante,
+          fecha,
+          tipoAcceso,
+          placa,
+          detalles
+        ];
+      });
+
+      autoTable(doc, {
+        head: [["#", "Solicitado por", "Fecha", "Tipo Acceso", "Placa(s)", tipo === "proveedor" ? "Empresa" : "Personas"]],
+        body: tableData,
+        startY: 42,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 },
+      });
+    }
 
     doc.save(`Solicitudes_${tipoTitulo}_${new Date().toISOString().split("T")[0]}.pdf`);
 
