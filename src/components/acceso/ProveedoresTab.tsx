@@ -21,6 +21,7 @@ export function ProveedoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placas, setPlacas] = useState<{ id: string; placa: string }[]>([{ id: "1", placa: "" }]);
   const [empresa, setEmpresa] = useState("");
+  const [servicioRapidoSeleccionado, setServicioRapidoSeleccionado] = useState<"gas" | "delivery" | "bodega" | null>(null);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [aceptaReglamento, setAceptaReglamento] = useState(false);
   const [textoReglamento, setTextoReglamento] = useState("");
@@ -91,10 +92,10 @@ export function ProveedoresTab() {
     await procesarRegistro("otro", empresa.trim());
   };
 
-  const registrarServicioRapido = async (tipoServicio: "gas" | "delivery" | "bodega") => {
-    if (!validarBase(true)) return;
+  const seleccionarServicioRapido = (tipoServicio: "gas" | "delivery" | "bodega") => {
     const nombreServicio = tipoServicio === "gas" ? "GAS" : tipoServicio === "delivery" ? "DELIVERY DE COMIDA" : "PROVEEDOR DE BODEGA";
-    await procesarRegistro(tipoServicio, nombreServicio);
+    setServicioRapidoSeleccionado(tipoServicio);
+    setEmpresa(nombreServicio);
   };
 
   const procesarRegistro = async (tipoServicio: "gas" | "delivery" | "bodega" | "otro", nombreEmpresa: string) => {
@@ -115,62 +116,37 @@ export function ProveedoresTab() {
 
       const id = await registrarProveedor(payload);
 
-      enviarMensajeWhatsApp({ telefono: "", mensaje: `Autorizo a ${nombreEmpresa}. Código: ${id}` });
+      // Enviar WhatsApp automáticamente
+      try {
+        const config = await getConfigWhatsApp();
+        if (config?.numero) {
+          const detalles = generarDetallesSolicitud({
+            tipo: "proveedor",
+            tipoAcceso,
+            placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
+            empresa: nombreEmpresa,
+            tipoServicio,
+          });
+          const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
+          abrirWhatsApp(config.numero, mensaje);
+        }
+      } catch (whatsappError) {
+        console.error("Error al enviar WhatsApp:", whatsappError);
+      }
 
       setMostrarConfirmacion(true);
-      if (tipoServicio === "otro") setEmpresa("");
+      setEmpresa("");
+      setServicioRapidoSeleccionado(null);
       if (tipoAcceso === "vehicular") setPlacas([{ id: "1", placa: "" }]);
       setAceptaReglamento(false);
 
-      toast({ title: "Registro exitoso", description: "Se envió la solicitud a vigilancia" });
+      toast({ title: "Registro exitoso", description: "Solicitud enviada a vigilancia y WhatsApp" });
     } catch (error: any) {
       console.error("registrarProveedor error:", error);
       toast({ title: "Error", description: error?.message || "No se pudo registrar al proveedor", variant: "destructive" });
     }
   };
 
-  const enviarWhatsApp = async () => {
-    if (!validarBase()) return;
-
-    try {
-      const config = await getConfigWhatsApp();
-      if (!config || !config.numero) {
-        toast({
-          title: "Configuración no disponible",
-          description: "No se ha configurado un número de WhatsApp para solicitudes",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const placasLimpias = placas
-        .map((p) => p.placa.trim().toUpperCase())
-        .filter((p) => p);
-
-      const detalles = generarDetallesSolicitud({
-        tipo: "proveedor",
-        tipoAcceso,
-        placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
-        empresa: empresa.trim(),
-        tipoServicio: "otro",
-      });
-
-      const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
-      abrirWhatsApp(config.numero, mensaje);
-
-      toast({
-        title: "WhatsApp abierto",
-        description: "Se ha abierto WhatsApp con el mensaje prellenado",
-      });
-    } catch (error) {
-      console.error("Error al abrir WhatsApp:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo abrir WhatsApp",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -180,8 +156,15 @@ export function ProveedoresTab() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {serviciosRapidos.map((s) => {
               const Icon = s.icon;
+              const isSelected = servicioRapidoSeleccionado === s.id;
               return (
-                <Button key={s.id} onClick={() => registrarServicioRapido(s.id)} className={`h-20 flex-col gap-2 ${s.color} hover:opacity-90 text-white`} size="lg">
+                <Button 
+                  key={s.id} 
+                  onClick={() => seleccionarServicioRapido(s.id)} 
+                  variant={isSelected ? "default" : "outline"}
+                  className={`h-20 flex-col gap-2 transition-all ${isSelected ? `${s.color} text-white ring-4 ring-offset-2 ring-primary/50` : `border-2 hover:border-primary`}`} 
+                  size="lg"
+                >
                   <Icon className="h-8 w-8" />
                   <span className="font-medium">{s.label}</span>
                 </Button>
@@ -241,10 +224,12 @@ export function ProveedoresTab() {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="empresa">Empresa o Servicio *</Label>
-            <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nombre de la empresa o servicio" className="text-lg" />
-          </div>
+          {!servicioRapidoSeleccionado && (
+            <div className="space-y-2">
+              <Label htmlFor="empresa">Empresa o Servicio *</Label>
+              <Input id="empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} placeholder="Nombre de la empresa o servicio" className="text-lg" />
+            </div>
+          )}
 
           <Separator />
 
@@ -271,22 +256,10 @@ export function ProveedoresTab() {
             </div>
           )}
 
-          <div className="flex flex-col gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full h-12 flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
-              onClick={enviarWhatsApp}
-            >
-              <MessageCircle className="h-5 w-5" />
-              Enviar Solicitud por WhatsApp
-            </Button>
-
-            <Button onClick={registrarProveedorGeneral} className="w-full h-12 flex items-center gap-2" size="lg">
-              <Send className="h-5 w-5" />
-              Registrar Proveedor
-            </Button>
-          </div>
+          <Button onClick={registrarProveedorGeneral} className="w-full h-12 flex items-center gap-2" size="lg">
+            <Send className="h-5 w-5" />
+            Registrar y Enviar Solicitud
+          </Button>
         </CardContent>
       </Card>
 

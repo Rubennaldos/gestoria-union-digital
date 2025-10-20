@@ -118,7 +118,7 @@ export function VisitaTab() {
         .filter((p) => p);
 
       const registro = {
-        empadronadoId, // dueño real
+        empadronadoId,
         tipoAcceso,
         placa: tipoAcceso === "vehicular" && placasLimpias.length > 0 ? placasLimpias[0] : undefined,
         placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
@@ -129,15 +129,25 @@ export function VisitaTab() {
 
       const id = await registrarVisita(registro);
 
-      // (Opcional) WhatsApp
-      const listaVisitantes = registro.visitantes.map((v) => `• ${v.nombre} (DNI: ${v.dni})`).join("\n");
-      const mensajeMenores = registro.menores > 0 ? `\n- ${registro.menores} menor(es) de edad` : "";
-      const mensaje = `Yo ${user?.displayName || ""} autorizo el ingreso a:\n\n${listaVisitantes}${mensajeMenores}\n\nCódigo de solicitud: ${id}`;
-
-      enviarMensajeWhatsApp({ telefono: "", mensaje });
+      // Enviar WhatsApp automáticamente
+      try {
+        const config = await getConfigWhatsApp();
+        if (config?.numero) {
+          const detalles = generarDetallesSolicitud({
+            tipo: "visita",
+            tipoAcceso,
+            placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
+            personas: visitantesLimpios.map(v => ({ nombre: v.nombre, dni: v.dni })),
+          });
+          const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
+          abrirWhatsApp(config.numero, mensaje);
+        }
+      } catch (whatsappError) {
+        console.error("Error al enviar WhatsApp:", whatsappError);
+      }
 
       setMostrarConfirmacion(true);
-      toast({ title: "Registro exitoso", description: "Se ha enviado la solicitud de autorización a vigilancia" });
+      toast({ title: "Registro exitoso", description: "Solicitud enviada a vigilancia y WhatsApp" });
 
       setPlacas([{ id: "1", placa: "" }]);
       setVisitantes([{ id: "1", nombre: "", dni: "" }]);
@@ -155,51 +165,6 @@ export function VisitaTab() {
 
   const deshabilitarSubmit = useMemo(() => cargandoEmp || !empadronadoId, [cargandoEmp, empadronadoId]);
 
-  const enviarWhatsApp = async () => {
-    if (!validarFormulario()) return;
-
-    try {
-      const config = await getConfigWhatsApp();
-      if (!config || !config.numero) {
-        toast({
-          title: "Configuración no disponible",
-          description: "No se ha configurado un número de WhatsApp para solicitudes",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const visitantesLimpios = visitantes
-        .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
-        .filter((v) => v.nombre && v.dni);
-
-      const placasLimpias = placas
-        .map((p) => p.placa.trim().toUpperCase())
-        .filter((p) => p);
-
-      const detalles = generarDetallesSolicitud({
-        tipo: "visita",
-        tipoAcceso,
-        placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
-        personas: visitantesLimpios.map(v => ({ nombre: v.nombre, dni: v.dni })),
-      });
-
-      const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
-      abrirWhatsApp(config.numero, mensaje);
-
-      toast({
-        title: "WhatsApp abierto",
-        description: "Se ha abierto WhatsApp con el mensaje prellenado",
-      });
-    } catch (error) {
-      console.error("Error al abrir WhatsApp:", error);
-      toast({
-        title: "Error",
-        description: "No se pudo abrir WhatsApp",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -380,28 +345,15 @@ export function VisitaTab() {
           )}
 
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex items-center gap-2 h-12"
-                onClick={() => toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" })}
-              >
-                <Star className="h-4 w-4" />
-                Guardar Favorito
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="flex items-center gap-2 h-12 flex-1 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
-                onClick={enviarWhatsApp}
-                disabled={deshabilitarSubmit}
-              >
-                <MessageCircle className="h-4 w-4" />
-                Enviar Solicitud por WhatsApp
-              </Button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex items-center gap-2 h-12"
+              onClick={() => toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" })}
+            >
+              <Star className="h-4 w-4" />
+              Guardar Favorito
+            </Button>
 
             <Button
               onClick={guardarYRegistrar}
@@ -410,7 +362,7 @@ export function VisitaTab() {
               title={deshabilitarSubmit ? "Esperando tu empadronado…" : ""}
             >
               <Send className="h-4 w-4" />
-              Guardar y Registrar Visita
+              Registrar y Enviar Solicitud
             </Button>
           </div>
         </CardContent>
