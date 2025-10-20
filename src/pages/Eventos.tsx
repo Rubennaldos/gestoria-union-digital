@@ -47,7 +47,7 @@ const Eventos = () => {
   }
 
   // Protección de permisos de módulo (solo cuando authLoading === false)
-  if (!user?.modules || user.modules.eventos !== true) {
+  if (!profile?.modules || profile.modules.eventos !== true) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center text-lg text-muted-foreground font-semibold">
