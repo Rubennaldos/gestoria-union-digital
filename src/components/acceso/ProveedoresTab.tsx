@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText, Plus, Store } from "lucide-react";
+import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText, Plus, Store, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
@@ -15,6 +15,7 @@ import { registrarProveedor, enviarMensajeWhatsApp } from "@/services/acceso";
 import { useAuth } from "@/contexts/AuthContext";
 import { ref, get } from "firebase/database";
 import { db } from "@/config/firebase";
+import { getConfigWhatsApp, generarDetallesSolicitud, abrirWhatsApp } from "@/lib/whatsappAcceso";
 
 export function ProveedoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
@@ -128,6 +129,49 @@ export function ProveedoresTab() {
     }
   };
 
+  const enviarWhatsApp = async () => {
+    if (!validarBase()) return;
+
+    try {
+      const config = await getConfigWhatsApp();
+      if (!config || !config.numero) {
+        toast({
+          title: "Configuración no disponible",
+          description: "No se ha configurado un número de WhatsApp para solicitudes",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const placasLimpias = placas
+        .map((p) => p.placa.trim().toUpperCase())
+        .filter((p) => p);
+
+      const detalles = generarDetallesSolicitud({
+        tipo: "proveedor",
+        tipoAcceso,
+        placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
+        empresa: empresa.trim(),
+        tipoServicio: "otro",
+      });
+
+      const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
+      abrirWhatsApp(config.numero, mensaje);
+
+      toast({
+        title: "WhatsApp abierto",
+        description: "Se ha abierto WhatsApp con el mensaje prellenado",
+      });
+    } catch (error) {
+      console.error("Error al abrir WhatsApp:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo abrir WhatsApp",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -227,10 +271,22 @@ export function ProveedoresTab() {
             </div>
           )}
 
-          <Button onClick={registrarProveedorGeneral} className="w-full h-12 flex items-center gap-2" size="lg">
-            <Send className="h-5 w-5" />
-            Registrar Proveedor
-          </Button>
+          <div className="flex flex-col gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12 flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+              onClick={enviarWhatsApp}
+            >
+              <MessageCircle className="h-5 w-5" />
+              Enviar Solicitud por WhatsApp
+            </Button>
+
+            <Button onClick={registrarProveedorGeneral} className="w-full h-12 flex items-center gap-2" size="lg">
+              <Send className="h-5 w-5" />
+              Registrar Proveedor
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

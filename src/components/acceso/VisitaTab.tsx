@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Car, User, Star, Send, Clock, FileText } from "lucide-react";
+import { Plus, Car, User, Star, Send, Clock, FileText, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
@@ -16,6 +16,7 @@ import { registrarVisita, enviarMensajeWhatsApp } from "@/services/acceso";
 import { Visitante, FavoritoUsuario } from "@/types/acceso";
 import { ref, get } from "firebase/database";
 import { db } from "@/config/firebase";
+import { getConfigWhatsApp, generarDetallesSolicitud, abrirWhatsApp } from "@/lib/whatsappAcceso";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -153,6 +154,52 @@ export function VisitaTab() {
   };
 
   const deshabilitarSubmit = useMemo(() => cargandoEmp || !empadronadoId, [cargandoEmp, empadronadoId]);
+
+  const enviarWhatsApp = async () => {
+    if (!validarFormulario()) return;
+
+    try {
+      const config = await getConfigWhatsApp();
+      if (!config || !config.numero) {
+        toast({
+          title: "Configuración no disponible",
+          description: "No se ha configurado un número de WhatsApp para solicitudes",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const visitantesLimpios = visitantes
+        .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
+        .filter((v) => v.nombre && v.dni);
+
+      const placasLimpias = placas
+        .map((p) => p.placa.trim().toUpperCase())
+        .filter((p) => p);
+
+      const detalles = generarDetallesSolicitud({
+        tipo: "visita",
+        tipoAcceso,
+        placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
+        personas: visitantesLimpios.map(v => ({ nombre: v.nombre, dni: v.dni })),
+      });
+
+      const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
+      abrirWhatsApp(config.numero, mensaje);
+
+      toast({
+        title: "WhatsApp abierto",
+        description: "Se ha abierto WhatsApp con el mensaje prellenado",
+      });
+    } catch (error) {
+      console.error("Error al abrir WhatsApp:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo abrir WhatsApp",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -332,20 +379,33 @@ export function VisitaTab() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex items-center gap-2 h-12"
-              onClick={() => toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" })}
-            >
-              <Star className="h-4 w-4" />
-              Guardar Favorito
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex items-center gap-2 h-12"
+                onClick={() => toast({ title: "Favorito guardado", description: "Los datos se han guardado en favoritos" })}
+              >
+                <Star className="h-4 w-4" />
+                Guardar Favorito
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="flex items-center gap-2 h-12 flex-1 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                onClick={enviarWhatsApp}
+                disabled={deshabilitarSubmit}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Enviar Solicitud por WhatsApp
+              </Button>
+            </div>
 
             <Button
               onClick={guardarYRegistrar}
-              className="flex items-center gap-2 h-12 flex-1"
+              className="flex items-center gap-2 h-12 w-full"
               disabled={deshabilitarSubmit}
               title={deshabilitarSubmit ? "Esperando tu empadronado…" : ""}
             >

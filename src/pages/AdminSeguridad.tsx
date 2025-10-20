@@ -11,7 +11,7 @@ import { GestionMaestrosObra } from "@/components/admin-seguridad/GestionMaestro
 import { SolicitudesMaestros } from "@/components/admin-seguridad/SolicitudesMaestros";
 import { ControlTrabajadores } from "@/components/admin-seguridad/ControlTrabajadores";
 import { SancionesSeguridad } from "@/components/admin-seguridad/SancionesSeguridad";
-import { ReglamentoInterno } from "@/components/admin-seguridad/ReglamentoInterno";
+import { ConfiguracionSeguridad } from "@/components/admin-seguridad/ConfiguracionSeguridad";
 import { Can } from "@/components/auth/Can";
 import { useAuthz } from "@/contexts/AuthzContext";
 
@@ -189,9 +189,9 @@ const AdminSeguridad = () => {
                   <Ban className="h-4 w-4" />
                   <span className="hidden sm:inline">Sanciones</span>
                 </TabsTrigger>
-                <TabsTrigger value="reglamento" className="flex items-center gap-1">
+                <TabsTrigger value="configuracion" className="flex items-center gap-1">
                   <ScrollText className="h-4 w-4" />
-                  <span className="hidden sm:inline">Reglamento</span>
+                  <span className="hidden sm:inline">Configuración</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -219,8 +219,8 @@ const AdminSeguridad = () => {
                 <SancionesSeguridad />
               </TabsContent>
 
-              <TabsContent value="reglamento" className="mt-6">
-                <ReglamentoInterno />
+              <TabsContent value="configuracion" className="mt-6">
+                <ConfiguracionSeguridad />
               </TabsContent>
             </Tabs>
           </CardContent>

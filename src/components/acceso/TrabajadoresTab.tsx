@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Car, User, Star, Send, Clock, Zap, FileText } from "lucide-react";
+import { Plus, Car, User, Star, Send, Clock, Zap, FileText, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
@@ -25,6 +25,7 @@ import { Trabajador, MaestroObra } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
 import { ref, get } from "firebase/database";
 import { db } from "@/config/firebase";
+import { getConfigWhatsApp, generarDetallesSolicitud, abrirWhatsApp } from "@/lib/whatsappAcceso";
 
 export function TrabajadoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
@@ -160,6 +161,56 @@ export function TrabajadoresTab() {
   };
 
   const deshabilitarSubmit = useMemo(() => cargandoEmp || !empadronadoId, [cargandoEmp, empadronadoId]);
+
+  const enviarWhatsApp = async () => {
+    if (!validarFormulario()) return;
+
+    try {
+      const config = await getConfigWhatsApp();
+      if (!config || !config.numero) {
+        toast({
+          title: "Configuración no disponible",
+          description: "No se ha configurado un número de WhatsApp para solicitudes",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const trabajadoresLimpios = trabajadores
+        .map((t) => ({ nombre: (t.nombre || "").trim(), dni: (t.dni || "").trim(), esMaestroObra: !!t.esMaestroObra }))
+        .filter((t) => t.nombre && t.dni);
+
+      const placasLimpias = placas
+        .map((p) => p.placa.trim().toUpperCase())
+        .filter((p) => p);
+
+      const maestro = trabajadoresLimpios.find(t => t.esMaestroObra);
+      const obreros = trabajadoresLimpios.filter(t => !t.esMaestroObra);
+
+      const detalles = generarDetallesSolicitud({
+        tipo: "trabajador",
+        tipoAcceso,
+        placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
+        maestro: maestro ? { nombre: maestro.nombre, dni: maestro.dni } : undefined,
+        personas: obreros.length > 0 ? obreros : undefined,
+      });
+
+      const mensaje = config.mensajePredeterminado.replace("{detalles}", detalles);
+      abrirWhatsApp(config.numero, mensaje);
+
+      toast({
+        title: "WhatsApp abierto",
+        description: "Se ha abierto WhatsApp con el mensaje prellenado",
+      });
+    } catch (error) {
+      console.error("Error al abrir WhatsApp:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo abrir WhatsApp",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -319,13 +370,26 @@ export function TrabajadoresTab() {
             </div>
           )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button type="button" variant="outline" className="flex items-center gap-2 h-12">
-              <Star className="h-4 w-4" />
-              Guardar Favorito
-            </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button type="button" variant="outline" className="flex items-center gap-2 h-12">
+                <Star className="h-4 w-4" />
+                Guardar Favorito
+              </Button>
 
-            <Button onClick={guardarYRegistrar} className="flex items-center gap-2 h-12 flex-1" disabled={deshabilitarSubmit}>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex items-center gap-2 h-12 flex-1 bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+                onClick={enviarWhatsApp}
+                disabled={deshabilitarSubmit}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Enviar Solicitud por WhatsApp
+              </Button>
+            </div>
+
+            <Button onClick={guardarYRegistrar} className="flex items-center gap-2 h-12 w-full" disabled={deshabilitarSubmit}>
               <Send className="h-4 w-4" />
               Guardar y Registrar
             </Button>
