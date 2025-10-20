@@ -89,19 +89,28 @@
 
     "acceso": {
       "visitas": {
+        ".read": "auth != null",
         ".write": "auth != null",
         ".indexOn": ["estado","patronId","createdAt","dni"]
       },
       "trabajadores": {
+        ".read": "auth != null",
         ".write": "auth != null",
         ".indexOn": ["estado","dni","padron"]
       },
       "proveedores": {
+        ".read": "auth != null",
         ".write": "auth != null",
         ".indexOn": ["estado","ruc"]
       },
-      "maestrosObra": { ".write": "auth != null" },
-      "favoritos": { ".write": "auth != null" }
+      "maestrosObra": { 
+        ".read": "auth != null",
+        ".write": "auth != null" 
+      },
+      "favoritos": { 
+        ".read": "auth != null",
+        ".write": "auth != null" 
+      }
     },
 
     "seguridad": {
