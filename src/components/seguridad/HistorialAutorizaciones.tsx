@@ -78,18 +78,16 @@ export const HistorialAutorizaciones = () => {
         const vAny = v as any;
         // Solo mostrar si está autorizado Y NO ha salido definitivamente
         if (vAny?.estado === "autorizado" && !vAny?.salidaDefinitiva) {
-          // Verificar si algún visitante está dentro
-          const visitantes = vAny.visitantes || [];
-          const algunoDentro = visitantes.some((vis: any) => vis.ingresado && !vis.horaSalida);
-          const algunoIngresado = visitantes.some((vis: any) => vis.ingresado);
+          // Usar campos del nivel raíz
+          const dentroActualmente = vAny.ingresado && !vAny.horaSalida;
           
           autorizadas.push({
             id,
             tipo: "visitante",
             data: v,
             fechaCreacion: tsFrom(v),
-            dentroActualmente: algunoDentro,
-            ingresado: algunoIngresado,
+            dentroActualmente: dentroActualmente,
+            ingresado: vAny.ingresado || false,
           });
         }
       }
@@ -100,18 +98,16 @@ export const HistorialAutorizaciones = () => {
         const tAny = t as any;
         // Solo mostrar si está autorizado Y NO ha salido definitivamente
         if (tAny?.estado === "autorizado" && !tAny?.salidaDefinitiva) {
-          // Verificar si algún trabajador está dentro
-          const trab = tAny.trabajadores || [];
-          const algunoDentro = trab.some((tr: any) => tr.ingresado && !tr.horaSalida);
-          const algunoIngresado = trab.some((tr: any) => tr.ingresado);
+          // Usar campos del nivel raíz
+          const dentroActualmente = tAny.ingresado && !tAny.horaSalida;
           
           autorizadas.push({
             id,
             tipo: "trabajador",
             data: t,
             fechaCreacion: tsFrom(t),
-            dentroActualmente: algunoDentro,
-            ingresado: algunoIngresado,
+            dentroActualmente: dentroActualmente,
+            ingresado: tAny.ingresado || false,
           });
         }
       }
@@ -122,14 +118,14 @@ export const HistorialAutorizaciones = () => {
         const pAny = p as any;
         // Solo mostrar si está autorizado Y NO ha salido definitivamente
         if (pAny?.estado === "autorizado" && !pAny?.salidaDefinitiva) {
-          const dentro = pAny.ingresado && !pAny.horaSalida;
+          const dentroActualmente = pAny.ingresado && !pAny.horaSalida;
           
           autorizadas.push({
             id,
             tipo: "proveedor",
             data: p,
             fechaCreacion: tsFrom(p),
-            dentroActualmente: dentro,
+            dentroActualmente: dentroActualmente,
             ingresado: pAny.ingresado || false,
           });
         }
@@ -254,6 +250,7 @@ export const HistorialAutorizaciones = () => {
         ingresado: true,
         horaIngreso: now,
         ultimoIngreso: now,
+        horaSalida: null, // Limpiar campo de salida al reingresar
       });
 
       // Registrar en historial de seguridad
@@ -292,6 +289,7 @@ export const HistorialAutorizaciones = () => {
         : "acceso/proveedores";
 
       await update(ref(db, `${basePath}/${auth.id}`), {
+        horaSalida: now, // Marca que salió temporalmente
         horaSalidaRapida: now,
         ultimaSalidaRapida: now,
       });
