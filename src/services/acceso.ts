@@ -158,6 +158,7 @@ export type RegistrarTrabajadoresInput = {
   empadronadoId: string;
   tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
+  placas?: string[]; // Múltiples placas
   maestroObraId: string;
   trabajadores: { nombre: string; dni: string; esMaestroObra?: boolean }[];
   porticoId: string;
@@ -167,6 +168,7 @@ export type RegistrarProveedorInput = {
   empadronadoId: string;
   tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
+  placas?: string[]; // Múltiples placas
   empresa: string;
   tipoServicio?: "gas" | "delivery" | "otro";
   porticoId: string;

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText } from "lucide-react";
+import { Car, User, Send, Clock, Zap, UtensilsCrossed, Truck, FileText, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
@@ -18,7 +18,7 @@ import { db } from "@/config/firebase";
 
 export function ProveedoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
-  const [placa, setPlaca] = useState("");
+  const [placas, setPlacas] = useState<{ id: string; placa: string }[]>([{ id: "1", placa: "" }]);
   const [empresa, setEmpresa] = useState("");
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
   const [aceptaReglamento, setAceptaReglamento] = useState(false);
@@ -47,6 +47,16 @@ export function ProveedoresTab() {
     } catch (error) {
       console.error("Error al cargar reglamento:", error);
     }
+  };
+
+  const agregarPlaca = () => {
+    setPlacas((prev) => [...prev, { id: Date.now().toString(), placa: "" }]);
+  };
+  const actualizarPlaca = (id: string, valor: string) => {
+    setPlacas((prev) => prev.map((p) => (p.id === id ? { ...p, placa: valor.toUpperCase() } : p)));
+  };
+  const eliminarPlaca = (id: string) => {
+    setPlacas((prev) => (prev.length > 1 ? prev.filter((p) => p.id !== id) : prev));
   };
 
   const serviciosRapidos = [
@@ -87,10 +97,15 @@ export function ProveedoresTab() {
 
   const procesarRegistro = async (tipoServicio: "gas" | "delivery" | "otro", nombreEmpresa: string) => {
     try {
+      const placasLimpias = placas
+        .map((p) => p.placa.trim().toUpperCase())
+        .filter((p) => p);
+
       const payload: Parameters<typeof registrarProveedor>[0] = {
         empadronadoId,
         tipoAcceso,
-        placa: tipoAcceso === "vehicular" ? placa.toUpperCase() : undefined,
+        placa: tipoAcceso === "vehicular" && placasLimpias.length > 0 ? placasLimpias[0] : undefined,
+        placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
         empresa: nombreEmpresa,
         tipoServicio,
         porticoId: "principal",
@@ -102,7 +117,7 @@ export function ProveedoresTab() {
 
       setMostrarConfirmacion(true);
       if (tipoServicio === "otro") setEmpresa("");
-      if (tipoAcceso === "vehicular") setPlaca("");
+      if (tipoAcceso === "vehicular") setPlacas([{ id: "1", placa: "" }]);
       setAceptaReglamento(false);
 
       toast({ title: "Registro exitoso", description: "Se envió la solicitud a vigilancia" });
@@ -143,9 +158,41 @@ export function ProveedoresTab() {
           </div>
 
           {tipoAcceso === "vehicular" && (
-            <div className="space-y-2">
-              <Label htmlFor="placa-prov">Placa del Vehículo (opcional)</Label>
-              <Input id="placa-prov" value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="ABC-123" className="text-lg font-mono" />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">Placas de Vehículos (opcional)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={agregarPlaca} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Agregar Placa
+                </Button>
+              </div>
+              
+              {placas.map((item, index) => (
+                <Card key={item.id} className="p-4">
+                  <div className="flex gap-4 items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor={`placa-prov-${item.id}`}>Placa {index + 1}</Label>
+                      <Input
+                        id={`placa-prov-${item.id}`}
+                        value={item.placa}
+                        onChange={(e) => actualizarPlaca(item.id, e.target.value)}
+                        placeholder="ABC-123"
+                        className="text-lg font-mono"
+                      />
+                    </div>
+                    {placas.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => eliminarPlaca(item.id)}
+                      >
+                        Eliminar
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              ))}
             </div>
           )}
 

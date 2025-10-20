@@ -12,6 +12,7 @@ export interface RegistroVisita {
   empadronadoId: string;
   tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
+  placas?: string[]; // Múltiples placas
   visitantes: Visitante[];
   menores: number;
   fechaCreacion: number;
@@ -62,6 +63,7 @@ export interface RegistroTrabajadores {
   empadronadoId: string;
   tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
+  placas?: string[]; // Múltiples placas
   maestroObraId: string;
   trabajadores: Trabajador[];
   fechaCreacion: number;
@@ -84,6 +86,7 @@ export interface RegistroProveedor {
   empadronadoId: string;
   tipoAcceso: "vehicular" | "peatonal";
   placa?: string;
+  placas?: string[]; // Múltiples placas
   empresa: string;
   tipoServicio?: "gas" | "delivery" | "otro";
   fechaCreacion: number;
