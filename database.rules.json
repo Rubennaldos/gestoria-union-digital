@@ -13,6 +13,13 @@
       }
     },
 
+    "delegations": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+      }
+    },
+
     "roles": {
       ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
     },
