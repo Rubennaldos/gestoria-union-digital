@@ -8,6 +8,7 @@ import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation"
 import { ModuleCard } from "@/components/ui/module-card";
 import { ModuleCircle } from "@/components/ui/module-circle";
 import { QuickAccessSection } from "@/components/dashboard/QuickAccessSection";
+import { SolicitudesPendientesWidget } from "@/components/dashboard/SolicitudesPendientesWidget";
 import { useAuthz } from "@/contexts/AuthzContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -195,6 +196,9 @@ const Index = () => {
             Sistema de Gestión - Junta Directiva
           </p>
         </div>
+
+        {/* Solicitudes Pendientes Widget */}
+        <SolicitudesPendientesWidget />
 
         {/* Quick Access Section - Only Mobile */}
         {isMobile && (
