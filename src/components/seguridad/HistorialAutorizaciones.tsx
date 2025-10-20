@@ -3,12 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Clock, Users, UserCheck, Shield, Eye, Check, Search } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, Users, UserCheck, Shield, LogIn, LogOut, Clock3, ArrowLeft, Check, Search } from "lucide-react";
 import { useFirebaseData } from "@/hooks/useFirebase";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { getEmpadronado, getEmpadronados } from "@/services/empadronados";
 import { Empadronado } from "@/types/empadronados";
-import { DetalleIngresoSalidaModal } from "./DetalleIngresoSalidaModal";
+import { ref, update } from "firebase/database";
+import { db } from "@/config/firebase";
+import { useToast } from "@/hooks/use-toast";
 
 interface AutorizacionAprobada {
   id: string;
@@ -16,6 +19,10 @@ interface AutorizacionAprobada {
   data: RegistroVisita | RegistroTrabajadores | RegistroProveedor;
   fechaCreacion: number;
   empadronado?: Empadronado | null;
+  ingresado?: boolean;
+  horaIngreso?: number;
+  horaSalidaRapida?: number;
+  dentroActualmente?: boolean;
 }
 
 function tsFrom(obj: any): number {
@@ -50,11 +57,11 @@ const getColorBadge = (tipo: string) => {
 };
 
 export const HistorialAutorizaciones = () => {
+  const { toast } = useToast();
   const [autorizaciones, setAutorizaciones] = useState<AutorizacionAprobada[]>([]);
   const [empMap, setEmpMap] = useState<Record<string, Empadronado | null>>({});
-  const [selectedAuth, setSelectedAuth] = useState<AutorizacionAprobada | null>(null);
-  const [detalleOpen, setDetalleOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
 
   const { data: visitas } = useFirebaseData<Record<string, RegistroVisita>>("acceso/visitas");
   const { data: trabajadores } =
@@ -62,18 +69,27 @@ export const HistorialAutorizaciones = () => {
   const { data: proveedores } =
     useFirebaseData<Record<string, RegistroProveedor>>("acceso/proveedores");
 
-  // Obtener solo las autorizadas
+  // Obtener solo las autorizadas que NO han salido definitivamente
   useEffect(() => {
     const autorizadas: AutorizacionAprobada[] = [];
 
     if (visitas) {
       for (const [id, v] of Object.entries(visitas)) {
-        if ((v as any)?.estado === "autorizado") {
+        const vAny = v as any;
+        // Solo mostrar si está autorizado Y NO ha salido definitivamente
+        if (vAny?.estado === "autorizado" && !vAny?.salidaDefinitiva) {
+          // Verificar si algún visitante está dentro
+          const visitantes = vAny.visitantes || [];
+          const algunoDentro = visitantes.some((vis: any) => vis.ingresado && !vis.horaSalida);
+          const algunoIngresado = visitantes.some((vis: any) => vis.ingresado);
+          
           autorizadas.push({
             id,
             tipo: "visitante",
             data: v,
             fechaCreacion: tsFrom(v),
+            dentroActualmente: algunoDentro,
+            ingresado: algunoIngresado,
           });
         }
       }
@@ -81,12 +97,21 @@ export const HistorialAutorizaciones = () => {
 
     if (trabajadores) {
       for (const [id, t] of Object.entries(trabajadores)) {
-        if ((t as any)?.estado === "autorizado") {
+        const tAny = t as any;
+        // Solo mostrar si está autorizado Y NO ha salido definitivamente
+        if (tAny?.estado === "autorizado" && !tAny?.salidaDefinitiva) {
+          // Verificar si algún trabajador está dentro
+          const trab = tAny.trabajadores || [];
+          const algunoDentro = trab.some((tr: any) => tr.ingresado && !tr.horaSalida);
+          const algunoIngresado = trab.some((tr: any) => tr.ingresado);
+          
           autorizadas.push({
             id,
             tipo: "trabajador",
             data: t,
             fechaCreacion: tsFrom(t),
+            dentroActualmente: algunoDentro,
+            ingresado: algunoIngresado,
           });
         }
       }
@@ -94,12 +119,18 @@ export const HistorialAutorizaciones = () => {
 
     if (proveedores) {
       for (const [id, p] of Object.entries(proveedores)) {
-        if ((p as any)?.estado === "autorizado") {
+        const pAny = p as any;
+        // Solo mostrar si está autorizado Y NO ha salido definitivamente
+        if (pAny?.estado === "autorizado" && !pAny?.salidaDefinitiva) {
+          const dentro = pAny.ingresado && !pAny.horaSalida;
+          
           autorizadas.push({
             id,
             tipo: "proveedor",
             data: p,
             fechaCreacion: tsFrom(p),
+            dentroActualmente: dentro,
+            ingresado: pAny.ingresado || false,
           });
         }
       }
@@ -203,6 +234,283 @@ export const HistorialAutorizaciones = () => {
     });
   }, [autorizaciones, empMap, busqueda]);
 
+  // Agrupar por tipo
+  const visitantesItems = items.filter(i => i.tipo === "visitante");
+  const trabajadoresItems = items.filter(i => i.tipo === "trabajador");
+  const proveedoresItems = items.filter(i => i.tipo === "proveedor");
+
+  // Funciones de control de acceso
+  const handleIngreso = async (auth: AutorizacionAprobada) => {
+    const loadingKey = `ingreso-${auth.id}`;
+    setLoading(prev => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      const now = Date.now();
+      const basePath = auth.tipo === "visitante" ? "acceso/visitas" 
+        : auth.tipo === "trabajador" ? "acceso/trabajadores" 
+        : "acceso/proveedores";
+
+      await update(ref(db, `${basePath}/${auth.id}`), {
+        ingresado: true,
+        horaIngreso: now,
+        ultimoIngreso: now,
+      });
+
+      // Registrar en historial de seguridad
+      await update(ref(db, `seguridad/historial/${auth.id}_ingreso_${now}`), {
+        tipo: auth.tipo,
+        registroId: auth.id,
+        accion: "ingreso",
+        timestamp: now,
+        empadronadoId: (auth.data as any).empadronadoId,
+      });
+
+      toast({
+        title: "Ingreso Registrado",
+        description: "Se ha registrado el ingreso correctamente",
+      });
+    } catch (error) {
+      console.error("Error al registrar ingreso:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar el ingreso",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, [loadingKey]: false }));
+    }
+  };
+
+  const handleSalidaRapida = async (auth: AutorizacionAprobada) => {
+    const loadingKey = `salida-rapida-${auth.id}`;
+    setLoading(prev => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      const now = Date.now();
+      const basePath = auth.tipo === "visitante" ? "acceso/visitas" 
+        : auth.tipo === "trabajador" ? "acceso/trabajadores" 
+        : "acceso/proveedores";
+
+      await update(ref(db, `${basePath}/${auth.id}`), {
+        horaSalidaRapida: now,
+        ultimaSalidaRapida: now,
+      });
+
+      // Registrar en historial
+      await update(ref(db, `seguridad/historial/${auth.id}_salida_rapida_${now}`), {
+        tipo: auth.tipo,
+        registroId: auth.id,
+        accion: "salida_rapida",
+        timestamp: now,
+        empadronadoId: (auth.data as any).empadronadoId,
+      });
+
+      toast({
+        title: "Salida Rápida Registrada",
+        description: "Salida temporal registrada. Puede reingresar.",
+      });
+    } catch (error) {
+      console.error("Error al registrar salida rápida:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la salida rápida",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, [loadingKey]: false }));
+    }
+  };
+
+  const handleSalidaDefinitiva = async (auth: AutorizacionAprobada) => {
+    const loadingKey = `salida-definitiva-${auth.id}`;
+    setLoading(prev => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      const now = Date.now();
+      const basePath = auth.tipo === "visitante" ? "acceso/visitas" 
+        : auth.tipo === "trabajador" ? "acceso/trabajadores" 
+        : "acceso/proveedores";
+
+      await update(ref(db, `${basePath}/${auth.id}`), {
+        horaSalida: now,
+        salidaDefinitiva: true,
+        horaSalidaDefinitiva: now,
+      });
+
+      // Registrar en historial
+      await update(ref(db, `seguridad/historial/${auth.id}_salida_definitiva_${now}`), {
+        tipo: auth.tipo,
+        registroId: auth.id,
+        accion: "salida_definitiva",
+        timestamp: now,
+        empadronadoId: (auth.data as any).empadronadoId,
+      });
+
+      toast({
+        title: "Salida Definitiva Registrada",
+        description: "El registro se ha completado y archivado",
+      });
+    } catch (error) {
+      console.error("Error al registrar salida definitiva:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la salida definitiva",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, [loadingKey]: false }));
+    }
+  };
+
+  const renderAutorizaciones = (items: AutorizacionAprobada[], tipoLabel: string) => {
+    if (items.length === 0) {
+      return (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              No hay {tipoLabel.toLowerCase()} activos
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <div className="grid gap-4">
+        {items.map((auth) => {
+          const Icono = getIcono(auth.tipo);
+          const emp = auth.empadronado;
+
+          return (
+            <Card key={auth.id} className={`border-l-4 ${auth.dentroActualmente ? 'border-l-green-500' : 'border-l-yellow-500'}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Icono className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <CardTitle className="text-lg capitalize">{auth.tipo}</CardTitle>
+                      <CardDescription>
+                        Autorizado el {auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString() : "—"}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Badge className={getColorBadge(auth.tipo)}>
+                    {auth.dentroActualmente ? "ADENTRO" : auth.ingresado ? "AFUERA" : "PENDIENTE"}
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Información del vecino solicitante */}
+                  <div className="bg-muted/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-sm">Solicitado por:</span>
+                    </div>
+                    {emp === undefined ? (
+                      <p className="text-sm text-muted-foreground">Cargando…</p>
+                    ) : emp ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="font-medium">Vecino:</span>
+                          <p className="text-muted-foreground">{emp.nombre} {emp.apellidos}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Padrón:</span>
+                          <p className="text-muted-foreground">{emp.numeroPadron}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Información no disponible</p>
+                    )}
+                  </div>
+
+                  {/* Vista rápida de datos */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {auth.tipo === "visitante" && (
+                      <div>
+                        <span className="font-medium">Visitantes:</span>
+                        <p className="text-muted-foreground">
+                          {(auth.data as RegistroVisita).visitantes?.length || 0} persona(s)
+                        </p>
+                      </div>
+                    )}
+                    {auth.tipo === "trabajador" && (
+                      <div>
+                        <span className="font-medium">Trabajadores:</span>
+                        <p className="text-muted-foreground">
+                          {(auth.data as any).trabajadores?.length || 0} persona(s)
+                        </p>
+                      </div>
+                    )}
+                    {auth.tipo === "proveedor" && (
+                      <div>
+                        <span className="font-medium">Empresa:</span>
+                        <p className="text-muted-foreground">
+                          {(auth.data as RegistroProveedor).empresa}
+                        </p>
+                      </div>
+                    )}
+                    {(auth.data as any).placa && (
+                      <div>
+                        <span className="font-medium">Placa:</span>
+                        <p className="text-muted-foreground">{(auth.data as any).placa}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botones de control */}
+                  <div className="flex flex-wrap gap-2 pt-3 border-t">
+                    {!auth.ingresado ? (
+                      <Button
+                        onClick={() => handleIngreso(auth)}
+                        className="flex-1 min-w-[140px] bg-green-600 hover:bg-green-700"
+                        disabled={loading[`ingreso-${auth.id}`]}
+                      >
+                        <LogIn className="h-4 w-4 mr-2" />
+                        {loading[`ingreso-${auth.id}`] ? "Registrando..." : "Registrar Ingreso"}
+                      </Button>
+                    ) : auth.dentroActualmente ? (
+                      <>
+                        <Button
+                          onClick={() => handleSalidaRapida(auth)}
+                          className="flex-1 min-w-[140px] bg-orange-600 hover:bg-orange-700"
+                          disabled={loading[`salida-rapida-${auth.id}`]}
+                        >
+                          <Clock3 className="h-4 w-4 mr-2" />
+                          {loading[`salida-rapida-${auth.id}`] ? "Registrando..." : "Salida Rápida"}
+                        </Button>
+                        <Button
+                          onClick={() => handleSalidaDefinitiva(auth)}
+                          className="flex-1 min-w-[140px] bg-red-600 hover:bg-red-700"
+                          disabled={loading[`salida-definitiva-${auth.id}`]}
+                        >
+                          <LogOut className="h-4 w-4 mr-2" />
+                          {loading[`salida-definitiva-${auth.id}`] ? "Registrando..." : "Salida Definitiva"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        onClick={() => handleIngreso(auth)}
+                        className="flex-1 min-w-[140px] bg-blue-600 hover:bg-blue-700"
+                        disabled={loading[`ingreso-${auth.id}`]}
+                      >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        {loading[`ingreso-${auth.id}`] ? "Registrando..." : "Reingresar"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Buscador */}
@@ -220,158 +528,102 @@ export const HistorialAutorizaciones = () => {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Historial de Autorizaciones</h3>
-          <p className="text-sm text-muted-foreground">
-            {items.length} {busqueda.trim() ? "resultados encontrados" : "autorizaciones aprobadas"}
-          </p>
-        </div>
-        <Badge variant="outline" className="flex items-center gap-1">
-          <Check className="h-3 w-4" />
-          {items.length} {busqueda.trim() ? "resultados" : "autorizadas"}
-        </Badge>
-      </div>
-
-      {items.length === 0 ? (
+      {/* Resumen */}
+      <div className="grid grid-cols-3 gap-4">
         <Card>
-          <CardContent className="py-8 text-center">
-            <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No hay autorizaciones
-            </h3>
-            <p className="text-muted-foreground">
-              Las autorizaciones aprobadas aparecerán aquí
-            </p>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <Users className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+              <div className="text-2xl font-bold">{visitantesItems.length}</div>
+              <div className="text-sm text-muted-foreground">Visitantes</div>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4">
-          {items.map((auth) => {
-            const Icono = getIcono(auth.tipo);
-            const emp = auth.empadronado;
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <UserCheck className="h-8 w-8 mx-auto mb-2 text-green-600" />
+              <div className="text-2xl font-bold">{trabajadoresItems.length}</div>
+              <div className="text-sm text-muted-foreground">Trabajadores</div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <Shield className="h-8 w-8 mx-auto mb-2 text-orange-600" />
+              <div className="text-2xl font-bold">{proveedoresItems.length}</div>
+              <div className="text-sm text-muted-foreground">Proveedores</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            return (
-              <Card key={auth.id} className="border-l-4 border-l-green-500">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Icono className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <CardTitle className="text-lg capitalize">{auth.tipo}</CardTitle>
-                        <CardDescription>
-                          Autorizado el{" "}
-                          {auth.fechaCreacion
-                            ? new Date(auth.fechaCreacion).toLocaleString()
-                            : "—"}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <Badge className={getColorBadge(auth.tipo)}>{auth.tipo.toUpperCase()}</Badge>
-                  </div>
-                </CardHeader>
+      {/* Tabs por tipo */}
+      <Tabs defaultValue="todos" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="todos">Todos ({items.length})</TabsTrigger>
+          <TabsTrigger value="visitantes">Visitantes ({visitantesItems.length})</TabsTrigger>
+          <TabsTrigger value="trabajadores">Trabajadores ({trabajadoresItems.length})</TabsTrigger>
+          <TabsTrigger value="proveedores">Proveedores ({proveedoresItems.length})</TabsTrigger>
+        </TabsList>
 
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Información del vecino solicitante */}
-                    <div className="bg-muted/50 p-4 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-sm">Solicitado por:</span>
-                      </div>
+        <TabsContent value="todos" className="mt-4">
+          {items.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No hay autorizaciones activas</h3>
+                <p className="text-muted-foreground">
+                  Las autorizaciones autorizadas aparecerán aquí
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {visitantesItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Visitantes
+                  </h3>
+                  {renderAutorizaciones(visitantesItems, "Visitantes")}
+                </div>
+              )}
+              {trabajadoresItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <UserCheck className="h-5 w-5" />
+                    Trabajadores
+                  </h3>
+                  {renderAutorizaciones(trabajadoresItems, "Trabajadores")}
+                </div>
+              )}
+              {proveedoresItems.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Proveedores
+                  </h3>
+                  {renderAutorizaciones(proveedoresItems, "Proveedores")}
+                </div>
+              )}
+            </div>
+          )}
+        </TabsContent>
 
-                      {emp === undefined ? (
-                        <p className="text-sm text-muted-foreground">
-                          Cargando información del vecino…
-                        </p>
-                      ) : emp ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="font-medium">Vecino:</span>
-                            <p className="text-muted-foreground">
-                              {emp.nombre} {emp.apellidos}
-                            </p>
-                          </div>
-                          <div>
-                            <span className="font-medium">Padrón:</span>
-                            <p className="text-muted-foreground">{emp.numeroPadron}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Información del vecino no disponible
-                        </p>
-                      )}
-                    </div>
+        <TabsContent value="visitantes" className="mt-4">
+          {renderAutorizaciones(visitantesItems, "Visitantes")}
+        </TabsContent>
 
-                    {/* Vista rápida de datos */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      {auth.tipo === "visitante" && (
-                        <div>
-                          <span className="font-medium">Visitantes:</span>
-                          <p className="text-muted-foreground">
-                            {(auth.data as RegistroVisita).visitantes?.length || 0} persona(s)
-                          </p>
-                        </div>
-                      )}
+        <TabsContent value="trabajadores" className="mt-4">
+          {renderAutorizaciones(trabajadoresItems, "Trabajadores")}
+        </TabsContent>
 
-                      {auth.tipo === "trabajador" && (
-                        <div>
-                          <span className="font-medium">Trabajadores:</span>
-                          <p className="text-muted-foreground">
-                            {(auth.data as any).trabajadores?.length || 0} persona(s)
-                          </p>
-                        </div>
-                      )}
-
-                      {auth.tipo === "proveedor" && (
-                        <div>
-                          <span className="font-medium">Empresa:</span>
-                          <p className="text-muted-foreground">
-                            {(auth.data as RegistroProveedor).empresa}
-                          </p>
-                        </div>
-                      )}
-
-                      {(auth.data as any).placa && (
-                        <div>
-                          <span className="font-medium">Placa:</span>
-                          <p className="text-muted-foreground">{(auth.data as any).placa}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2 pt-3 border-t">
-                      <Button
-                        onClick={() => {
-                          setSelectedAuth(auth);
-                          setDetalleOpen(true);
-                        }}
-                        className="flex-1"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver Detalle y Control de Ingreso/Salida
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {selectedAuth && (
-        <DetalleIngresoSalidaModal
-          open={detalleOpen}
-          onOpenChange={setDetalleOpen}
-          tipo={selectedAuth.tipo}
-          data={selectedAuth.data}
-          empadronado={selectedAuth.empadronado}
-          fechaCreacion={selectedAuth.fechaCreacion}
-          registroId={selectedAuth.id}
-        />
-      )}
+        <TabsContent value="proveedores" className="mt-4">
+          {renderAutorizaciones(proveedoresItems, "Proveedores")}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
