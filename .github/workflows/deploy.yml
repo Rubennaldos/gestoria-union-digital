@@ -33,6 +33,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Generate version.json during build
+      - name: Generate version.json
+        run: |
+          cat > dist/version.json << EOF
+          {
+            "version": "1.0.0",
+            "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}"
+          }
+          EOF
+
       # 404 para SPA (evita pantallas blancas al recargar rutas)
       - name: Add 404 for SPA
         run: cp dist/index.html dist/404.html
