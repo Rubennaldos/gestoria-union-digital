@@ -43,10 +43,7 @@
         ".indexOn": ["empadronadoId"],
 
         "modules": {
-          ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-          "$mod": {
-            ".validate": "newData.val() in ['sin_acceso','lectura','escritura','admin']"
-          }
+          ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
         }
       }
     },
