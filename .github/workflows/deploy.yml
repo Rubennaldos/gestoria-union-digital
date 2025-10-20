@@ -25,12 +25,11 @@ jobs:
           node-version: 20
           cache: npm
 
+      # --- ¡CORRECCIÓN CLAVE AQUÍ! ---
       - name: Install
-        run: npm ci
+        # Añadimos --legacy-peer-deps para que el instalador sea flexible
+        run: npm ci --legacy-peer-deps
 
-      # ⚠️ IMPORTANTe: NO forzamos VITE_BASE aquí.
-      # Vite tomará la base desde tu vite.config.ts (./), así los assets serán relativos
-      # y funcionará perfecto en /gestoria-union-digital/.
       - name: Build
         run: npm run build
 
