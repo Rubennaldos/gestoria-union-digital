@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { User as FirebaseUser, onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { UserProfile, AuthUser } from '@/types/auth';
-import { getUserProfile, onUserProfile, createUserProfile } from '@/services/rtdb';
+import { getUserProfile, onUserProfile, createUserProfile, getUserPermissions } from '@/services/rtdb';
 import { registerForPushNotificationsAsync } from '@/services/pushNotifications';
 
 interface AuthContextType {
@@ -48,8 +48,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           console.log('📋 AuthContext: Loading user profile for UID:', fbUser.uid);
           // Carga perfil (si no existe, devolverá null)
-          const userProfile = await getUserProfile(fbUser.uid);
-          console.log('👤 AuthContext: User profile loaded:', userProfile);
+          let userProfile = await getUserProfile(fbUser.uid);
+          console.log('👤 AuthContext: User profile loaded (raw):', userProfile);
+
+          // If modules are missing in the profile node, try to read modules under users/{uid}/modules
+          try {
+            if (!userProfile?.modules) {
+              const perms = await getUserPermissions(fbUser.uid);
+              if (perms && Object.keys(perms).length > 0) {
+                userProfile = { ...(userProfile || {}), modules: perms } as any;
+                console.debug('[RTDB READ] Fallback loaded modules from users/{uid}/modules:', perms);
+              }
+            }
+          } catch (e) {
+            console.warn('AuthContext: Failed to load fallback modules:', e);
+          }
+
           // Debug: confirm modules are read from users/{uid}/modules
           console.debug('[RTDB READ] auth.currentUser?.uid =', auth.currentUser?.uid);
           console.debug('[RTDB READ] path =', `users/${fbUser.uid}/modules`);
@@ -102,13 +116,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Suscripción en tiempo real al perfil
   useEffect(() => {
     if (!user?.uid) return;
-    const stop = onUserProfile(user.uid, (updated) => {
+    const stop = onUserProfile(user.uid, async (updated) => {
       // Debug realtime profile updates and modules path
       console.debug('[RTDB REALTIME] auth.currentUser?.uid =', auth.currentUser?.uid);
       console.debug('[RTDB REALTIME] path =', `users/${user.uid}/modules`);
-      console.debug('[RTDB REALTIME] snapshot (modules) =', updated?.modules);
-      setProfile(updated);
-      setUser((u) => (u ? { ...u, profile: updated || undefined, modules: updated?.modules } : u));
+
+      let finalProfile = updated;
+      // If modules missing from realtime payload, fetch them explicitly
+      if (!updated?.modules) {
+        try {
+          const perms = await getUserPermissions(user.uid);
+          if (perms && Object.keys(perms).length > 0) {
+            finalProfile = { ...(updated || {}), modules: perms } as any;
+            console.debug('[RTDB REALTIME] Fallback loaded modules for realtime update:', perms);
+          }
+        } catch (e) {
+          console.warn('AuthContext: Failed to load realtime fallback modules:', e);
+        }
+      }
+
+      console.debug('[RTDB REALTIME] snapshot (modules) =', finalProfile?.modules);
+      setProfile(finalProfile);
+      setUser((u) => (u ? { ...u, profile: finalProfile || undefined, modules: finalProfile?.modules } : u));
       // Ensure we mark profileLoaded when realtime update arrives
       setProfileLoaded(true);
     });
