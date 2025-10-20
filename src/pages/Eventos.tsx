@@ -33,6 +33,16 @@ const Eventos = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [tabActiva, setTabActiva] = useState<string>("eventos");
 
+  useEffect(() => {
+    if (!authLoading && profile?.modules?.eventos) {
+      cargarEventos();
+    }
+  }, [authLoading, profile]);
+
+  useEffect(() => {
+    filtrarEventos();
+  }, [busqueda, categoriaFiltro, eventos]);
+
   // If auth state still loading, show a spinner/message to avoid race conditions
   if (authLoading) {
     return (
@@ -56,14 +66,6 @@ const Eventos = () => {
       </div>
     );
   }
-
-  useEffect(() => {
-    cargarEventos();
-  }, []);
-
-  useEffect(() => {
-    filtrarEventos();
-  }, [busqueda, categoriaFiltro, eventos]);
 
   const cargarEventos = async () => {
     try {
