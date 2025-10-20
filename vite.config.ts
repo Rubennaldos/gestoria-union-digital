@@ -9,8 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  // ⚠️ Forzamos rutas relativas para GitHub Pages
-  base: "./",
+  // Base para GitHub Pages: debe coincidir con el nombre del repo
+  base: '/gestoria-union-digital/',
   server: { host: "::", port: 8080 },
   build: { outDir: "dist", emptyOutDir: true, sourcemap: true },
   plugins: [react(), mode === "development" ? componentTagger() : null].filter(
