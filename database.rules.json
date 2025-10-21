@@ -95,7 +95,12 @@
     },
 
     "finanzas": {
-      "$movimientoId": { ".write": "auth != null" }
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$movimientoId": { 
+        ".read": "auth != null",
+        ".write": "auth != null" 
+      }
     },
 
     "acceso": {
