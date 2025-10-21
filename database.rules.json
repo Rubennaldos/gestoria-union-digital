@@ -62,11 +62,28 @@
     },
 
     "empadronados": {
-      ".read": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin' || root.child('users').child(auth.uid).child('modules').child('seguridad').val() != null",
+      ".read": "auth != null",
       "$empadronadoId": {
-        ".read": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin' || root.child('users').child(auth.uid).child('modules').child('seguridad').val() != null",
+        ".read": "auth != null",
         ".write": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".validate": "newData.hasChildren(['dni','numeroPadron','authUid'])"
+        "dni": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+        },
+        "numeroPadron": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+        },
+        "nombre": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+        },
+        "apellidos": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+        },
+        "manzana": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+        },
+        "lote": {
+          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+        }
       },
       ".indexOn": ["authUid","dni","numeroPadron"]
     },

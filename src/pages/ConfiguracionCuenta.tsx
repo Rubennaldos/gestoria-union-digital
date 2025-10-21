@@ -502,7 +502,7 @@ const ConfiguracionCuenta: React.FC = () => {
                       Nombres
                     </Label>
                     <Input
-                      value={empadronado?.nombre || profile?.displayName || ""}
+                      value={empadronado?.nombre || ""}
                       disabled
                       className="bg-muted"
                     />
@@ -515,6 +515,22 @@ const ConfiguracionCuenta: React.FC = () => {
                     </Label>
                     <Input
                       value={empadronado?.apellidos || ""}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Lock className="h-3 w-3" />
+                      Dirección
+                    </Label>
+                    <Input
+                      value={
+                        empadronado?.manzana && empadronado?.lote
+                          ? `Mz ${empadronado.manzana} Lt ${empadronado.lote}`
+                          : "No registrada"
+                      }
                       disabled
                       className="bg-muted"
                     />
