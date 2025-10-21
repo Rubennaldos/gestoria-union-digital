@@ -40,6 +40,7 @@
 
     "cobranzas": {
       "configuracion": {
+        ".read": "auth != null",
         ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
       },
       "$uid": {
@@ -101,6 +102,11 @@
         ".read": "auth != null",
         ".write": "auth != null" 
       }
+    },
+
+    "planilla": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
 
     "acceso": {
