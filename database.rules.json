@@ -172,6 +172,13 @@
         ".write": "auth != null",
         ".indexOn": ["tipo", "estado", "createdAt", "autorizacionId"]
       }
+    },
+
+    "security_questions": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
     }
   }
 }
