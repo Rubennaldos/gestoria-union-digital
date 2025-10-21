@@ -4,20 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { MensajeMasivo } from '@/types/comunicaciones';
 import { obtenerMensajesActivos } from '@/services/comunicaciones';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface MensajeMasivoOverlayProps {
-  empadronadoId: string;
-}
-
-export const MensajeMasivoOverlay: React.FC<MensajeMasivoOverlayProps> = ({ empadronadoId }) => {
+export const MensajeMasivoOverlay: React.FC = () => {
+  const { user } = useAuth();
   const [mensajes, setMensajes] = useState<MensajeMasivo[]>([]);
   const [mensajeActual, setMensajeActual] = useState<MensajeMasivo | null>(null);
   const [indiceActual, setIndiceActual] = useState(0);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    cargarMensajes();
-  }, []);
+    if (user) {
+      cargarMensajes();
+    }
+  }, [user]);
 
   const cargarMensajes = async () => {
     try {

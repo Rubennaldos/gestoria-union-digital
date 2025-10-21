@@ -14,6 +14,7 @@ import { useVersionCheck } from "@/hooks/useVersionCheck";
 // 🔔 NUEVO: botón e init de notificaciones
 import { NotificationsButton } from "@/components/NotificationsButton";
 import { ensureMessagingReady } from "@/messaging";
+import { MensajeMasivoOverlay } from "@/components/comunicaciones/MensajeMasivoOverlay";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -77,6 +78,9 @@ const App: React.FC = () => {
 
         {/* 👇 NINGÚN Router aquí. El Router va en main.tsx */}
         <AuthProvider>
+          {/* Overlay de mensajes masivos - aparece globalmente para todos los usuarios autenticados */}
+          <MensajeMasivoOverlay />
+          
           {/* BillingConfigProvider depends on authenticated profile/modules, mount it inside AuthProvider */}
           <BillingConfigProvider>
             <AuthzProvider>
