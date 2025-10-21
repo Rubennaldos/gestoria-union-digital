@@ -56,10 +56,11 @@
 
     "users": {
       ".read": true,
+      ".indexOn": ["email"],
       "$uid": {
         ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".indexOn": ["empadronadoId", "email"],
+        ".indexOn": ["empadronadoId"],
 
         "modules": {
           ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
