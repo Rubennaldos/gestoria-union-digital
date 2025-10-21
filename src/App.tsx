@@ -41,6 +41,7 @@ import Eventos from "./pages/Eventos";
 import AdminEventos from "./pages/AdminEventos";
 import Modulos from "./pages/Modulos";
 import RecuperarContrasena from "./pages/RecuperarContrasena";
+import Comunicaciones from "./pages/Comunicaciones";
 
 const queryClient = new QueryClient();
 
@@ -298,6 +299,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <AdminEventos />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Comunicaciones */}
+              <Route
+                path="/comunicaciones"
+                element={
+                  <ProtectedRoute>
+                    <Comunicaciones />
                   </ProtectedRoute>
                 }
               />

@@ -28,6 +28,7 @@ import {
 import { obtenerEmpadronadoPorAuthUid } from '@/services/empadronados';
 import { SeguimientoPago, ResumenDeuda, Evento, EstadisticasPortal } from '@/types/portal-asociado';
 import { Empadronado } from '@/types/empadronados';
+import { MensajeMasivoOverlay } from '@/components/comunicaciones/MensajeMasivoOverlay';
 
 export default function PortalAsociado() {
   const { user } = useAuth();
@@ -125,6 +126,8 @@ export default function PortalAsociado() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Overlay de mensajes masivos */}
+      {empadronado && <MensajeMasivoOverlay empadronadoId={empadronado.id} />}
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-2">

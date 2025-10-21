@@ -181,6 +181,56 @@
       }
     },
 
+    "comunicaciones": {
+      "mensajes-masivos": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('comunicaciones').val() === 'admin'",
+        "$mensajeId": {
+          ".read": "auth != null",
+          ".write": "root.child('users').child(auth.uid).child('modules').child('comunicaciones').val() === 'admin'"
+        }
+      }
+    },
+
+    "portal": {
+      "visitas": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "preguntas-frecuentes": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('portal').val() === 'admin'"
+      },
+      "categorias-pregunta": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('portal').val() === 'admin'"
+      },
+      "productos": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('portal').val() === 'admin'"
+      },
+      "categorias-producto": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('portal').val() === 'admin'"
+      },
+      "pedidos": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "sugerencias": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "eventos": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('portal').val() === 'admin'"
+      },
+      "inscripciones-eventos": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
     "security_questions": {
       ".read": true,
       "$uid": {
