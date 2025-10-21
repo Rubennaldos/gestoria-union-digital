@@ -77,11 +77,21 @@
     "personal-seguridad": { ".write": "auth != null" },
 
     "eventos": {
-      "$eventoId": { ".read": "auth != null", ".write": "auth != null" }
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$eventoId": { 
+        ".read": "auth != null", 
+        ".write": "auth != null" 
+      }
     },
 
     "inscripcionesEventos": {
-      "$inscripcionId": { ".read": "auth != null", ".write": "auth != null" }
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$inscripcionId": { 
+        ".read": "auth != null", 
+        ".write": "auth != null" 
+      }
     },
 
     "finanzas": {
