@@ -49,11 +49,17 @@
       }
     },
 
+    "usernames": {
+      ".read": true,
+      ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+    },
+
     "users": {
+      ".read": true,
       "$uid": {
         ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
         ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".indexOn": ["empadronadoId"],
+        ".indexOn": ["empadronadoId", "email"],
 
         "modules": {
           ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
@@ -175,8 +181,9 @@
     },
 
     "security_questions": {
+      ".read": true,
       "$uid": {
-        ".read": "$uid === auth.uid",
+        ".read": true,
         ".write": "$uid === auth.uid"
       }
     },
