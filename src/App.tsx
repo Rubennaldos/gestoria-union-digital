@@ -39,6 +39,7 @@ import ConfiguracionCuenta from "./pages/ConfiguracionCuenta";
 import Planilla from "./pages/Planilla";
 import Eventos from "./pages/Eventos";
 import AdminEventos from "./pages/AdminEventos";
+import Modulos from "./pages/Modulos";
 
 const queryClient = new QueryClient();
 
@@ -305,6 +306,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute requireRole="presidencia">
                     <Users />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Más - Opciones adicionales */}
+              <Route
+                path="/modulos"
+                element={
+                  <ProtectedRoute>
+                    <Modulos />
                   </ProtectedRoute>
                 }
               />

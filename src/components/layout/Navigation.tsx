@@ -118,15 +118,6 @@ export const TopNavigation = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate("/configuracion-cuenta")}
-            className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3"
-          >
-            <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
-            <span className="hidden sm:inline text-xs sm:text-sm">Configuración</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
             onClick={handleLogout}
             className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3"
           >
