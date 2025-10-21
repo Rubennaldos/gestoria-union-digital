@@ -91,7 +91,7 @@ const Seguridad = () => {
           </CardHeader>
           <CardContent className="p-3 md:p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
+              <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
                 <TabsTrigger 
                   value="autorizaciones" 
                   className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
@@ -99,14 +99,6 @@ const Seguridad = () => {
                   <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
                   <span className="hidden sm:inline">Historial Autorizaciones</span>
                   <span className="sm:hidden">Historial</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="ingreso-salida" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Ingreso/Salida</span>
-                  <span className="sm:hidden">I/S</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="manual-visitas" 
@@ -144,10 +136,6 @@ const Seguridad = () => {
 
               <TabsContent value="autorizaciones" className="mt-3 md:mt-6">
                 <HistorialAutorizaciones />
-              </TabsContent>
-
-              <TabsContent value="ingreso-salida" className="mt-3 md:mt-6">
-                <ControlIngresoSalida />
               </TabsContent>
 
               <TabsContent value="manual-visitas" className="mt-3 md:mt-6">
