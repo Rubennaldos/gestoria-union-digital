@@ -40,43 +40,63 @@ export default function RecuperarContrasena() {
       let foundEmail: string | null = null;
       const usersRef = ref(db, 'users');
       
+      console.log('🔍 Buscando usuario:', identifier);
+      
       // Si tiene @, buscar por email
       if (identifier.includes('@')) {
         const emailNormalized = identifier.trim().toLowerCase();
+        console.log('📧 Buscando por email:', emailNormalized);
+        
         const emailQuery = query(usersRef, orderByChild('email'), equalTo(emailNormalized));
         const snapshot = await get(emailQuery);
+        
+        console.log('📊 Resultado búsqueda email:', snapshot.exists());
         
         if (snapshot.exists()) {
           const userData = Object.entries(snapshot.val())[0];
           foundUid = userData[0];
           foundEmail = emailNormalized;
+          console.log('✅ Usuario encontrado:', foundUid);
         }
       } else {
         // Buscar por username
         const usernameNormalized = identifier.trim().toLowerCase();
+        console.log('👤 Buscando por username:', usernameNormalized);
+        
         const usernameRef = ref(db, `usernames/${usernameNormalized}`);
         const usernameSnapshot = await get(usernameRef);
         
+        console.log('📊 Username existe:', usernameSnapshot.exists());
+        
         if (usernameSnapshot.exists()) {
           foundEmail = usernameSnapshot.val().email;
+          console.log('📧 Email del username:', foundEmail);
+          
           // Ahora buscar el uid por email
           const emailQuery = query(usersRef, orderByChild('email'), equalTo(foundEmail));
           const snapshot = await get(emailQuery);
+          
           if (snapshot.exists()) {
             const userData = Object.entries(snapshot.val())[0];
             foundUid = userData[0];
+            console.log('✅ UID encontrado:', foundUid);
           }
         }
       }
 
       if (!foundUid || !foundEmail) {
+        console.log('❌ Usuario no encontrado');
         setError('No se encontró ningún usuario con ese identificador');
         setLoading(false);
         return;
       }
 
+      console.log('🔐 Verificando preguntas de seguridad para UID:', foundUid);
+      
       // Verificar que tenga preguntas de seguridad configuradas
       const userQuestions = await getSecurityQuestionsForRecovery(foundUid);
+      
+      console.log('📝 Preguntas encontradas:', userQuestions.length);
 
       if (userQuestions.length === 0) {
         setError('Este usuario no tiene preguntas de seguridad configuradas. Por favor contacta al administrador.');
@@ -88,9 +108,11 @@ export default function RecuperarContrasena() {
       setEmail(foundEmail);
       setQuestions(userQuestions);
       setStep('questions');
-    } catch (err) {
-      console.error('Error buscando usuario:', err);
-      setError('Error al buscar el usuario. Intenta nuevamente.');
+      console.log('✅ Pasando a preguntas de seguridad');
+    } catch (err: any) {
+      console.error('❌ Error buscando usuario:', err);
+      console.error('❌ Detalles del error:', err.message, err.code);
+      setError(`Error al buscar el usuario: ${err.message || 'Intenta nuevamente'}`);
     } finally {
       setLoading(false);
     }
