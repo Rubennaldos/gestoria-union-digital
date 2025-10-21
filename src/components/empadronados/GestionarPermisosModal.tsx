@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Settings, KeyRound } from 'lucide-react';
 import { Empadronado } from '@/types/empadronados';
 import { Module, Permission, PermissionLevel } from '@/types/auth';
-import { listModules, getUserPermissions } from '@/services/rtdb';
+import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface GestionarPermisosModalProps {
