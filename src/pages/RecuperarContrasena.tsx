@@ -5,53 +5,78 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Shield, Mail, Loader2, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
+import { User, Loader2, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ref, get, query, orderByChild, equalTo } from 'firebase/database';
-import { db, auth } from '@/config/firebase';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { db } from '@/config/firebase';
 import {
   getSecurityQuestionsForRecovery,
   verifySecurityAnswers,
   SecurityQuestion,
 } from '@/services/security-questions';
+import { changePasswordAfterVerification } from '@/services/password-reset';
 
 export default function RecuperarContrasena() {
-  const [step, setStep] = useState<'email' | 'questions' | 'success'>('email');
+  const [step, setStep] = useState<'identifier' | 'questions' | 'newPassword' | 'success'>('identifier');
   const [loading, setLoading] = useState(false);
+  const [identifier, setIdentifier] = useState('');
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [questions, setQuestions] = useState<string[]>([]);
   const [answers, setAnswers] = useState<string[]>(['', '', '']);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleEmailSubmit = async (e: React.FormEvent) => {
+  const handleIdentifierSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
     try {
-      const emailNormalized = email.trim().toLowerCase();
-      
-      // Buscar usuario por email en /users
+      let foundUid: string | null = null;
+      let foundEmail: string | null = null;
       const usersRef = ref(db, 'users');
-      const emailQuery = query(usersRef, orderByChild('email'), equalTo(emailNormalized));
-      const snapshot = await get(emailQuery);
+      
+      // Si tiene @, buscar por email
+      if (identifier.includes('@')) {
+        const emailNormalized = identifier.trim().toLowerCase();
+        const emailQuery = query(usersRef, orderByChild('email'), equalTo(emailNormalized));
+        const snapshot = await get(emailQuery);
+        
+        if (snapshot.exists()) {
+          const userData = Object.entries(snapshot.val())[0];
+          foundUid = userData[0];
+          foundEmail = emailNormalized;
+        }
+      } else {
+        // Buscar por username
+        const usernameNormalized = identifier.trim().toLowerCase();
+        const usernameRef = ref(db, `usernames/${usernameNormalized}`);
+        const usernameSnapshot = await get(usernameRef);
+        
+        if (usernameSnapshot.exists()) {
+          foundEmail = usernameSnapshot.val().email;
+          // Ahora buscar el uid por email
+          const emailQuery = query(usersRef, orderByChild('email'), equalTo(foundEmail));
+          const snapshot = await get(emailQuery);
+          if (snapshot.exists()) {
+            const userData = Object.entries(snapshot.val())[0];
+            foundUid = userData[0];
+          }
+        }
+      }
 
-      if (!snapshot.exists()) {
-        setError('No se encontró ningún usuario con ese email');
+      if (!foundUid || !foundEmail) {
+        setError('No se encontró ningún usuario con ese identificador');
         setLoading(false);
         return;
       }
 
-      // Obtener el primer usuario que coincida
-      const userData = Object.entries(snapshot.val())[0];
-      const uid = userData[0];
-
       // Verificar que tenga preguntas de seguridad configuradas
-      const userQuestions = await getSecurityQuestionsForRecovery(uid);
+      const userQuestions = await getSecurityQuestionsForRecovery(foundUid);
 
       if (userQuestions.length === 0) {
         setError('Este usuario no tiene preguntas de seguridad configuradas. Por favor contacta al administrador.');
@@ -59,7 +84,8 @@ export default function RecuperarContrasena() {
         return;
       }
 
-      setUserId(uid);
+      setUserId(foundUid);
+      setEmail(foundEmail);
       setQuestions(userQuestions);
       setStep('questions');
     } catch (err) {
@@ -97,18 +123,51 @@ export default function RecuperarContrasena() {
         return;
       }
 
-      // Si las respuestas son correctas, enviar email de recuperación
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-
-      toast({
-        title: 'Verificación exitosa',
-        description: 'Revisa tu correo para restablecer tu contraseña.',
-      });
-
-      setStep('success');
+      // Si las respuestas son correctas, pasar al paso de nueva contraseña
+      setStep('newPassword');
     } catch (err) {
       console.error('Error verificando respuestas:', err);
       setError('Error al verificar las respuestas. Intenta nuevamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Validar contraseñas
+      if (newPassword.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        setLoading(false);
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        setLoading(false);
+        return;
+      }
+
+      // Cambiar la contraseña usando el servicio
+      const result = await changePasswordAfterVerification(email, newPassword);
+      
+      if (result.success) {
+        toast({
+          title: 'Contraseña actualizada',
+          description: 'Tu contraseña ha sido cambiada exitosamente. Ya puedes iniciar sesión.',
+        });
+        
+        setStep('success');
+      } else {
+        setError(result.message);
+      }
+    } catch (err) {
+      console.error('Error cambiando contraseña:', err);
+      setError('Error al cambiar la contraseña. Intenta nuevamente.');
     } finally {
       setLoading(false);
     }
@@ -129,24 +188,24 @@ export default function RecuperarContrasena() {
             {step === 'success' ? '¡Listo!' : 'Recuperar Contraseña'}
           </CardTitle>
           <CardDescription>
-            {step === 'email' && 'Ingresa tu email para comenzar'}
+            {step === 'identifier' && 'Ingresa tu usuario o email'}
             {step === 'questions' && 'Responde las preguntas de seguridad'}
-            {step === 'success' && 'Revisa tu correo electrónico'}
+            {step === 'newPassword' && 'Ingresa tu nueva contraseña'}
+            {step === 'success' && 'Contraseña actualizada exitosamente'}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {step === 'email' && (
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
+          {step === 'identifier' && (
+            <form onSubmit={handleIdentifierSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>Usuario o Email</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
-                    type="email"
                     className="pl-10"
-                    placeholder="tu-email@ejemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="usuario o email@ejemplo.com"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     required
                   />
                 </div>
@@ -211,8 +270,66 @@ export default function RecuperarContrasena() {
                   variant="ghost"
                   className="w-full"
                   onClick={() => {
-                    setStep('email');
+                    setStep('identifier');
                     setAnswers(['', '', '']);
+                    setError(null);
+                  }}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {step === 'newPassword' && (
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nueva Contraseña</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mínimo 6 caracteres
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Confirmar Contraseña</Label>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="space-y-2">
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Cambiar Contraseña
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setStep('questions');
+                    setNewPassword('');
+                    setConfirmPassword('');
                     setError(null);
                   }}
                 >
@@ -226,23 +343,17 @@ export default function RecuperarContrasena() {
           {step === 'success' && (
             <div className="space-y-4">
               <Alert className="border-primary/50 bg-primary/5">
-                <Mail className="h-4 w-4 text-primary" />
+                <CheckCircle2 className="h-4 w-4 text-primary" />
                 <AlertDescription className="ml-2">
-                  Hemos enviado un correo electrónico a <strong>{email}</strong> con las instrucciones para restablecer tu contraseña.
+                  Tu contraseña ha sido actualizada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.
                 </AlertDescription>
               </Alert>
-
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>• Revisa tu bandeja de entrada y la carpeta de spam</p>
-                <p>• El enlace expirará en 1 hora por seguridad</p>
-                <p>• Si no recibes el correo, intenta nuevamente</p>
-              </div>
 
               <Button
                 className="w-full"
                 onClick={() => navigate('/login')}
               >
-                Volver al inicio de sesión
+                Ir al inicio de sesión
               </Button>
             </div>
           )}

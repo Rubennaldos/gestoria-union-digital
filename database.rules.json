@@ -179,6 +179,11 @@
         ".read": "$uid === auth.uid",
         ".write": "$uid === auth.uid"
       }
+    },
+
+    "password_reset_requests": {
+      ".read": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
+      ".write": "auth != null"
     }
   }
 }
