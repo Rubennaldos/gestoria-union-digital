@@ -40,6 +40,7 @@ import Planilla from "./pages/Planilla";
 import Eventos from "./pages/Eventos";
 import AdminEventos from "./pages/AdminEventos";
 import Modulos from "./pages/Modulos";
+import RecuperarContrasena from "./pages/RecuperarContrasena";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App: React.FC = () => {
 
               {/* Público */}
               <Route path="/login" element={<Login />} />
+              <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
               <Route path="/bootstrap" element={<AdminCreator />} />
 
               {/* Inicio protegido */}

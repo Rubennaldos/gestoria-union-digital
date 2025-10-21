@@ -240,6 +240,15 @@ export default function Login() {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Iniciar Sesión
               </Button>
+
+              <Button
+                type="button"
+                variant="link"
+                className="w-full text-sm text-muted-foreground hover:text-primary"
+                onClick={() => navigate('/recuperar-contrasena')}
+              >
+                ¿Olvidaste tu contraseña?
+              </Button>
             </form>
           </Form>
         </CardContent>
