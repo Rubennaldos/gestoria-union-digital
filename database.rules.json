@@ -156,6 +156,11 @@
       "favoritos": { 
         ".read": "auth != null",
         ".write": "auth != null" 
+      },
+      "listas_trabajadores": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["empadronadoId","fechaInicio","fechaFin","activa"]
       }
     },
 

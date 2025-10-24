@@ -111,3 +111,23 @@ export interface FavoritoUsuario {
   datos: any;
   fechaCreacion: number;
 }
+
+export interface ListaTrabajadoresRecurrente {
+  id: string;
+  empadronadoId: string;
+  nombreLista: string;
+  maestroObraId: string;
+  tipoAcceso: "vehicular" | "peatonal";
+  placa?: string;
+  placas?: string[];
+  trabajadores: Trabajador[];
+  fechaInicio: number; // timestamp
+  fechaFin: number; // timestamp (máximo 30 días desde inicio)
+  activa?: boolean;
+  createdAt: number;
+  updatedAt?: number;
+  
+  // Snapshot para mostrar en Seguridad
+  solicitadoPorNombre?: string;
+  solicitadoPorPadron?: string;
+}

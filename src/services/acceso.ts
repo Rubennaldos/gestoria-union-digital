@@ -590,3 +590,112 @@ export async function migrarMisPendientesDesdeUser123(
   }
   return { cambiados };
 }
+
+/* ──────────────────────────────────────────────────────────────
+   LISTAS RECURRENTES DE TRABAJADORES
+   ────────────────────────────────────────────────────────────── */
+
+export type CrearListaTrabajadoresInput = {
+  empadronadoId: string;
+  nombreLista: string;
+  maestroObraId: string;
+  tipoAcceso: "vehicular" | "peatonal";
+  placa?: string;
+  placas?: string[];
+  trabajadores: { nombre: string; dni: string; esMaestroObra?: boolean }[];
+  fechaInicio: number;
+  fechaFin: number;
+};
+
+export async function crearListaTrabajadores(data: CrearListaTrabajadoresInput): Promise<string> {
+  if (!data.empadronadoId) throw new Error("Falta empadronadoId");
+  if (!data.nombreLista?.trim()) throw new Error("Falta nombre de la lista");
+  if (!data.maestroObraId) throw new Error("Falta maestroObraId");
+  if (!data.fechaInicio || !data.fechaFin) throw new Error("Faltan fechas");
+  
+  // Validar que el período no exceda 30 días
+  const diffDays = (data.fechaFin - data.fechaInicio) / (1000 * 60 * 60 * 24);
+  if (diffDays > 30) throw new Error("El período máximo es de 30 días");
+  if (diffDays < 0) throw new Error("La fecha de fin debe ser posterior a la fecha de inicio");
+
+  const { solicitadoPorNombre, solicitadoPorPadron } = await readEmpadronadoSnapshot(data.empadronadoId);
+
+  const id = push(child(ref(db), "acceso/listas_trabajadores")).key as string;
+
+  const payload = stripUndefinedDeep({
+    id,
+    empadronadoId: data.empadronadoId,
+    nombreLista: data.nombreLista.trim(),
+    maestroObraId: data.maestroObraId,
+    tipoAcceso: data.tipoAcceso,
+    placa: data.tipoAcceso === "vehicular" ? data.placa?.toUpperCase() : undefined,
+    placas: data.tipoAcceso === "vehicular" ? data.placas?.map(p => p.toUpperCase()) : undefined,
+    trabajadores: (data.trabajadores || []).map((t) => ({
+      id: push(child(ref(db), "temp")).key,
+      nombre: t.nombre.trim(),
+      dni: t.dni.trim(),
+      esMaestroObra: !!t.esMaestroObra,
+    })),
+    fechaInicio: data.fechaInicio,
+    fechaFin: data.fechaFin,
+    activa: true,
+    solicitadoPorNombre,
+    solicitadoPorPadron,
+    createdAt: Date.now(),
+  });
+
+  await set(ref(db, `acceso/listas_trabajadores/${id}`), payload);
+  return id;
+}
+
+export async function obtenerListasTrabajadores(empadronadoId: string): Promise<any[]> {
+  const snap = await get(ref(db, "acceso/listas_trabajadores"));
+  if (!snap.exists()) return [];
+  
+  const arr: any[] = Object.values(snap.val());
+  return arr
+    .filter((lista) => lista.empadronadoId === empadronadoId)
+    .sort((a, b) => tsFrom(b) - tsFrom(a));
+}
+
+export async function obtenerListaTrabajadoresPorId(id: string): Promise<any | null> {
+  const snap = await get(ref(db, `acceso/listas_trabajadores/${id}`));
+  return snap.exists() ? snap.val() : null;
+}
+
+export async function actualizarListaTrabajadores(
+  id: string,
+  updates: Partial<CrearListaTrabajadoresInput> & { activa?: boolean }
+): Promise<void> {
+  // Si se actualizan fechas, validar el período
+  if (updates.fechaInicio && updates.fechaFin) {
+    const diffDays = (updates.fechaFin - updates.fechaInicio) / (1000 * 60 * 60 * 24);
+    if (diffDays > 30) throw new Error("El período máximo es de 30 días");
+    if (diffDays < 0) throw new Error("La fecha de fin debe ser posterior a la fecha de inicio");
+  }
+
+  const cleanUpdates = stripUndefinedDeep({
+    ...updates,
+    updatedAt: Date.now(),
+  });
+
+  await update(ref(db, `acceso/listas_trabajadores/${id}`), cleanUpdates);
+}
+
+export async function eliminarListaTrabajadores(id: string): Promise<void> {
+  await set(ref(db, `acceso/listas_trabajadores/${id}`), null);
+}
+
+export async function obtenerListasActivasParaSeguridad(): Promise<any[]> {
+  const snap = await get(ref(db, "acceso/listas_trabajadores"));
+  if (!snap.exists()) return [];
+  
+  const ahora = Date.now();
+  const arr: any[] = Object.values(snap.val());
+  
+  return arr.filter((lista) => 
+    lista.activa && 
+    lista.fechaInicio <= ahora && 
+    lista.fechaFin >= ahora
+  );
+}

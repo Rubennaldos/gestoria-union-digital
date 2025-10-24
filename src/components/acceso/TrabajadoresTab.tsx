@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmacionDialog } from "@/components/acceso/ConfirmacionDialog";
 import { ReglamentoDialog } from "@/components/acceso/ReglamentoDialog";
 import { MaestroObraRapidoModal } from "@/components/acceso/MaestroObraRapidoModal";
+import { GestionListasTrabajadores } from "@/components/acceso/GestionListasTrabajadores";
 import { registrarTrabajadores, enviarMensajeWhatsApp, obtenerMaestrosObra } from "@/services/acceso";
 import { Trabajador, MaestroObra } from "@/types/acceso";
 import { useAuth } from "@/contexts/AuthContext";
@@ -183,6 +184,13 @@ export function TrabajadoresTab() {
 
   return (
     <div className="space-y-6">
+      {/* Gestión de Listas Recurrentes */}
+      {empadronadoId && (
+        <GestionListasTrabajadores empadronadoId={empadronadoId} />
+      )}
+
+      <Separator />
+
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><User className="h-5 w-5" />Registro de Trabajadores</CardTitle></CardHeader>
         <CardContent className="space-y-6">

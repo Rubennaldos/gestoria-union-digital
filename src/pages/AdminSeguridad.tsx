@@ -16,6 +16,7 @@ import { Can } from "@/components/auth/Can";
 import { useAuthz } from "@/contexts/AuthzContext";
 
 import { AutorizacionesSeguridad as AutorizacionesAdmin } from "@/components/seguridad/AutorizacionesSeguridad";
+import { ListasTrabajadoresActivas } from "@/components/admin-seguridad/ListasTrabajadoresActivas";
 
 const AdminSeguridad = () => {
   const [activeTab, setActiveTab] = useState("autorizaciones");
@@ -212,7 +213,10 @@ const AdminSeguridad = () => {
               </TabsContent>
 
               <TabsContent value="trabajadores" className="mt-6">
-                <ControlTrabajadores />
+                <div className="space-y-6">
+                  <ListasTrabajadoresActivas />
+                  <ControlTrabajadores />
+                </div>
               </TabsContent>
 
               <TabsContent value="sanciones" className="mt-6">
