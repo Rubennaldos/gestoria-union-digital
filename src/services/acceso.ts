@@ -10,6 +10,7 @@ import {
   query,
   orderByChild,
   equalTo,
+  runTransaction,
 } from "firebase/database";
 import { db } from "@/config/firebase";
 import { FavoritoUsuario } from "@/types/acceso";
@@ -211,6 +212,21 @@ export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
     solicitadoPorPadron,
     ...base,
   };
+
+  // Generar correlativo único para la solicitud de trabajador usando una transacción
+  try {
+    const counterRef = ref(db, `contadores/solicitudesTrabajador`);
+    const tr = await runTransaction(counterRef, (current) => {
+      if (current === null || current === undefined) return 1;
+      const n = typeof current === "number" ? current : Number(current) || 0;
+      return n + 1;
+    });
+    const correl = tr.snapshot?.val();
+    if (correl) payload.correlativo = correl;
+  } catch (e) {
+    // Si la transacción falla, continuamos sin correlativo pero registramos el error
+    console.error("No se pudo obtener correlativo para solicitud de trabajador:", e);
+  }
 
   // Crear el registro de trabajadores
   await set(ref(db, `acceso/trabajadores/${id}`), payload);

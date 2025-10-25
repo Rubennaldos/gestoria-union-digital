@@ -269,7 +269,13 @@ export const AutorizacionesSeguridad = () => {
 
       doc.setFontSize(18);
       doc.setFont(undefined, "bold");
-      doc.text(`Solicitud ${auth.tipo.toUpperCase()} — ID: ${auth.id}`, margin, y);
+      // Mostrar correlativo si existe (especialmente para trabajadores)
+      const correl = (auth.data as any)?.correlativo;
+      if (correl) {
+        doc.text(`Solicitud ${auth.tipo.toUpperCase()} — N°: ${correl}`, margin, y);
+      } else {
+        doc.text(`Solicitud ${auth.tipo.toUpperCase()} — ID: ${auth.id}`, margin, y);
+      }
       y += 18;
 
       doc.setFontSize(10);
