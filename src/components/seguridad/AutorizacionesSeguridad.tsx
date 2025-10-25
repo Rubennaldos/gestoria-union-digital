@@ -241,6 +241,152 @@ export const AutorizacionesSeguridad = () => {
     }
   };
 
+  // Generar PDF unitario para una autorización (trabajador/visitante/proveedor)
+  const generarPDFUnitario = async (authParam: AutorizacionPendiente) => {
+    try {
+      // Asegurar registro completo si el snapshot es parcial
+      const needsFetch = (a: AutorizacionPendiente) => {
+        const record = a.data as any;
+        if (a.tipo === "trabajador") return !record || !record.trabajadores;
+        if (a.tipo === "visitante") return !record || !record.visitantes;
+        if (a.tipo === "proveedor") return !record || !record.empresa;
+        return false;
+      };
+
+      let auth = authParam;
+      if (needsFetch(authParam)) {
+        const path = `acceso/${authParam.tipo === "visitante" ? "visitas" : authParam.tipo === "trabajador" ? "trabajadores" : "proveedores"}/${authParam.id}`;
+        const snap = await get(dbRef(db, path));
+        if (snap.exists()) {
+          auth = { ...authParam, data: snap.val(), fechaCreacion: snap.val().createdAt || snap.val().fechaCreacion || authParam.fechaCreacion } as AutorizacionPendiente;
+        }
+      }
+
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageWidth = (doc.internal.pageSize as any).getWidth();
+      const margin = 36;
+      let y = 48;
+
+      doc.setFontSize(18);
+      doc.setFont(undefined, "bold");
+      doc.text(`Solicitud ${auth.tipo.toUpperCase()} — ID: ${auth.id}`, margin, y);
+      y += 18;
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, "normal");
+      doc.text(`Generado: ${new Date().toLocaleString("es-ES")}`, margin, y);
+      const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
+      doc.text(`Fecha Solicitud: ${fecha}`, pageWidth - margin - 180, y);
+      y += 14;
+
+      // Solicitante (empadronado)
+      const emp = auth.empadronado;
+      const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : ((auth.data as any)?.solicitadoPorNombre || "No disponible");
+      doc.setFontSize(11);
+      doc.setFont(undefined, "bold");
+      doc.text("Solicitado por:", margin, y);
+      doc.setFont(undefined, "normal");
+      doc.text(solicitante, margin + 110, y);
+      y += 16;
+
+      // Datos comunes
+      doc.setFontSize(10);
+      const tipoAcceso = (auth.data as any)?.tipoAcceso || "—";
+      const placa = (auth.data as any)?.placa || (auth.data as any)?.placas?.join(", ") || "—";
+      doc.text(`Tipo Acceso: ${tipoAcceso}`, margin, y);
+      doc.text(`Placa(s): ${placa}`, margin + 250, y);
+      y += 14;
+
+      // Contenido por tipo
+      if (auth.tipo === "trabajador") {
+        const trabajadorData = auth.data as RegistroTrabajadores;
+
+        // Maestro de obra (temporal o por id)
+        let maestroInfo: { nombre?: string; dni?: string; telefono?: string; temporal?: boolean } | null = null;
+        if (trabajadorData?.maestroObraTemporal) {
+          maestroInfo = { nombre: trabajadorData.maestroObraTemporal.nombre, dni: trabajadorData.maestroObraTemporal.dni, temporal: true };
+        } else if (trabajadorData?.maestroObraId && trabajadorData.maestroObraId !== "temporal") {
+          try {
+            const { obtenerMaestroObraPorId } = await import("@/services/acceso");
+            const maestro = await obtenerMaestroObraPorId(trabajadorData.maestroObraId);
+            if (maestro) maestroInfo = { nombre: maestro.nombre, dni: maestro.dni || "Sin DNI", telefono: maestro.telefono, temporal: false };
+          } catch (e) {
+            console.error("Error obteniendo maestro de obra para PDF unitario:", e);
+          }
+        }
+
+        if (maestroInfo) {
+          doc.setFontSize(11);
+          doc.setFont(undefined, "bold");
+          doc.text("Encargado de Obra:", margin, y);
+          doc.setFont(undefined, "normal");
+          const temporalText = maestroInfo.temporal ? " (Temporal)" : "";
+          doc.text(`${maestroInfo.nombre || "—"}${temporalText}`, margin + 120, y);
+          y += 14;
+          doc.text(`DNI: ${maestroInfo.dni || "—"}${maestroInfo.telefono ? ` — Tel: ${maestroInfo.telefono}` : ""}`, margin + 120, y);
+          y += 14;
+        }
+
+        const trabajadores = trabajadorData?.trabajadores || [];
+        if (trabajadores.length > 0) {
+          const body = trabajadores.map((t: any, i: number) => [(i + 1).toString(), t.nombre, t.dni]);
+          autoTable(doc, {
+            head: [["#", "Nombre", "DNI"]],
+            body,
+            startY: y,
+            styles: { fontSize: 10, cellPadding: 4 },
+            headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+            margin: { left: margin, right: margin },
+          });
+          y = (doc as any).lastAutoTable.finalY + 12;
+        } else {
+          doc.setFontSize(10);
+          doc.setFont(undefined, "italic");
+          doc.text("Sin trabajadores asociados", margin, y);
+          y += 14;
+        }
+      } else if (auth.tipo === "visitante") {
+        const visita = auth.data as RegistroVisita;
+        const visitantes = visita?.visitantes || [];
+        if (visitantes.length > 0) {
+          const body = visitantes.map((v: any, i: number) => [(i + 1).toString(), v.nombre, v.dni, v.esMenor ? "Menor" : "Adulto"]);
+          autoTable(doc, {
+            head: [["#", "Nombre", "DNI", "Edad"]],
+            body,
+            startY: y,
+            styles: { fontSize: 10, cellPadding: 4 },
+            headStyles: { fillColor: [59, 130, 246], textColor: 255 },
+            margin: { left: margin, right: margin },
+          });
+          y = (doc as any).lastAutoTable.finalY + 12;
+        }
+        if (visita?.menores) {
+          doc.setFontSize(10);
+          doc.setFont(undefined, "italic");
+          doc.text(`Menores adicionales: ${visita.menores}`, margin, y);
+          y += 12;
+        }
+      } else if (auth.tipo === "proveedor") {
+        const prov = auth.data as RegistroProveedor;
+        doc.setFontSize(11);
+        doc.setFont(undefined, "bold");
+        doc.text("Empresa:", margin, y);
+        doc.setFont(undefined, "normal");
+        doc.text(prov?.empresa || "—", margin + 80, y);
+        y += 14;
+      }
+
+      // Footer / guardar
+      const filename = `Solicitud_${auth.tipo}_${auth.id}_${new Date().toISOString().split("T")[0]}.pdf`;
+      doc.save(filename);
+
+      toast({ title: "PDF descargado", description: `Se descargó ${filename}` });
+    } catch (e) {
+      console.error("Error generando PDF unitario:", e);
+      toast({ title: "Error", description: "No se pudo generar el PDF unitario", variant: "destructive" });
+    }
+  };
+
   const generarPDF = async (tipo: "visitante" | "trabajador" | "proveedor") => {
     const solicitudesFiltradas = items.filter((item) => item.tipo === tipo);
 
@@ -603,6 +749,16 @@ export const AutorizacionesSeguridad = () => {
                         size="icon"
                       >
                         <Eye className="h-4 w-4" />
+                      </Button>
+                      {/* Botón para descargar PDF unitario de esta solicitud (trabajador) */}
+                      <Button
+                        onClick={() => generarPDFUnitario(auth)}
+                        variant="outline"
+                        size="icon"
+                        title="Descargar PDF Unitario"
+                        className="ml-2"
+                      >
+                        <Download className="h-4 w-4" />
                       </Button>
                       <Button
                         onClick={() => manejarAutorizacion(auth.id, auth.tipo, true)}
