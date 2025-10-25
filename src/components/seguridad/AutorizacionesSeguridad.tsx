@@ -202,7 +202,7 @@ export const AutorizacionesSeguridad = () => {
     }
   };
 
-  const generarPDF = (tipo: "visitante" | "trabajador" | "proveedor") => {
+  const generarPDF = async (tipo: "visitante" | "trabajador" | "proveedor") => {
     const solicitudesFiltradas = items.filter((item) => item.tipo === tipo);
 
     if (solicitudesFiltradas.length === 0) {
@@ -228,17 +228,38 @@ export const AutorizacionesSeguridad = () => {
     if (tipo === "trabajador") {
       let startY = 42;
       
-      solicitudesFiltradas.forEach((auth, solicitudIndex) => {
+      for (const [solicitudIndex, auth] of solicitudesFiltradas.entries()) {
         const emp = auth.empadronado;
         const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
         const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
         const tipoAcceso = (auth.data as any).tipoAcceso || "—";
         const placa = (auth.data as any).placa || (auth.data as any).placas?.join(", ") || "—";
-        const trabajadores = (auth.data as any).trabajadores || [];
+        const trabajadorData = auth.data as RegistroTrabajadores;
+        const trabajadores = trabajadorData.trabajadores || [];
         
-        // Buscar maestro(s)
-        const maestros = trabajadores.filter((t: any) => t.esMaestroObra);
-        const obreros = trabajadores.filter((t: any) => !t.esMaestroObra);
+        // Obtener información del maestro de obra
+        let maestroInfo = null;
+        if (trabajadorData.maestroObraTemporal) {
+          maestroInfo = {
+            nombre: trabajadorData.maestroObraTemporal.nombre,
+            dni: trabajadorData.maestroObraTemporal.dni,
+            temporal: true
+          };
+        } else if (trabajadorData.maestroObraId && trabajadorData.maestroObraId !== "temporal") {
+          try {
+            const { obtenerMaestroObraPorId } = await import("@/services/acceso");
+            const maestro = await obtenerMaestroObraPorId(trabajadorData.maestroObraId);
+            if (maestro) {
+              maestroInfo = {
+                nombre: maestro.nombre,
+                dni: maestro.dni || "Sin DNI",
+                temporal: false
+              };
+            }
+          } catch (error) {
+            console.error("Error al obtener maestro:", error);
+          }
+        }
         
         // Encabezado de la solicitud
         doc.setFontSize(12);
@@ -253,45 +274,20 @@ export const AutorizacionesSeguridad = () => {
         doc.text(`Fecha: ${fecha} | Tipo Acceso: ${tipoAcceso} | Placa(s): ${placa}`, 14, startY);
         startY += 8;
         
-        // Maestro(s) como subtítulo
-        if (maestros.length > 0) {
-          maestros.forEach((maestro: any) => {
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'bold');
-            doc.text(`Maestro Encargado: ${maestro.nombre} (${maestro.dni})`, 14, startY);
-            startY += 8;
-            
-            // Lista de obreros bajo este maestro
-            if (obreros.length > 0) {
-              const obrerosData = obreros.map((obrero: any, idx: number) => [
-                (idx + 1).toString(),
-                obrero.nombre,
-                obrero.dni
-              ]);
-              
-              autoTable(doc, {
-                head: [["#", "Nombre", "DNI"]],
-                body: obrerosData,
-                startY: startY,
-                styles: { fontSize: 9, cellPadding: 2 },
-                headStyles: { fillColor: [34, 197, 94], textColor: 255 },
-                alternateRowStyles: { fillColor: [245, 245, 245] },
-                margin: { left: 14, right: 14 },
-              });
-              
-              startY = (doc as any).lastAutoTable.finalY + 10;
-            } else {
-              doc.setFontSize(9);
-              doc.setFont(undefined, 'italic');
-              doc.text("Sin obreros asociados", 20, startY);
-              startY += 10;
-            }
-          });
-        } else {
-          // Si no hay maestro, mostrar todos como trabajadores
+        // Maestro como subtítulo
+        if (maestroInfo) {
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          const temporalText = maestroInfo.temporal ? " (Temporal)" : "";
+          doc.text(`Encargado de Obra: ${maestroInfo.nombre} - DNI: ${maestroInfo.dni}${temporalText}`, 14, startY);
+          startY += 8;
+        }
+        
+        // Lista de trabajadores
+        if (trabajadores.length > 0) {
           doc.setFontSize(10);
           doc.setFont(undefined, 'bold');
-          doc.text("Trabajadores:", 14, startY);
+          doc.text(`Trabajadores (${trabajadores.length}):`, 14, startY);
           startY += 6;
           
           const trabajadoresData = trabajadores.map((t: any, idx: number) => [
@@ -311,6 +307,11 @@ export const AutorizacionesSeguridad = () => {
           });
           
           startY = (doc as any).lastAutoTable.finalY + 10;
+        } else {
+          doc.setFontSize(9);
+          doc.setFont(undefined, 'italic');
+          doc.text("Sin trabajadores asociados", 20, startY);
+          startY += 10;
         }
         
         // Agregar nueva página si es necesario
@@ -318,7 +319,7 @@ export const AutorizacionesSeguridad = () => {
           doc.addPage();
           startY = 20;
         }
-      });
+      }
     } else {
       // PDF normal para visitas y proveedores
       const tableData = solicitudesFiltradas.map((auth, index) => {

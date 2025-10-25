@@ -29,13 +29,23 @@ export const DetalleAutorizacionModal = ({
 
   useEffect(() => {
     if (tipo === "trabajador" && open) {
-      const maestroId = (data as RegistroTrabajadores).maestroObraId;
-      if (maestroId) {
+      const trabajadorData = data as RegistroTrabajadores;
+      
+      // Si hay maestro temporal, usarlo directamente
+      if (trabajadorData.maestroObraTemporal) {
+        setMaestroObra(trabajadorData.maestroObraTemporal);
+        setLoadingMaestro(false);
+      } 
+      // Si hay maestroObraId, buscar en la base de datos
+      else if (trabajadorData.maestroObraId && trabajadorData.maestroObraId !== "temporal") {
         setLoadingMaestro(true);
-        obtenerMaestroObraPorId(maestroId)
+        obtenerMaestroObraPorId(trabajadorData.maestroObraId)
           .then(setMaestroObra)
           .catch(console.error)
           .finally(() => setLoadingMaestro(false));
+      } else {
+        setMaestroObra(null);
+        setLoadingMaestro(false);
       }
     }
   }, [tipo, data, open]);
@@ -204,6 +214,9 @@ export const DetalleAutorizacionModal = ({
                         <span className="text-sm text-muted-foreground">Empresa:</span>
                         <p className="font-medium">{maestroObra.empresa}</p>
                       </div>
+                    )}
+                    {(data as RegistroTrabajadores).maestroObraTemporal && (
+                      <Badge variant="secondary" className="mt-2">Registro Temporal</Badge>
                     )}
                   </div>
                 ) : (
