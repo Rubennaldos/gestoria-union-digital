@@ -383,7 +383,8 @@ export const AutorizacionesSeguridad = () => {
       }
 
       // Footer / guardar
-      const filename = `Solicitud_${auth.tipo}_${auth.id}_${new Date().toISOString().split("T")[0]}.pdf`;
+      const correlativoText = (auth.data as any)?.correlativo ? `N${(auth.data as any).correlativo}` : auth.id;
+      const filename = `Solicitud_${auth.tipo}_${correlativoText}_${new Date().toISOString().split("T")[0]}.pdf`;
       doc.save(filename);
 
       toast({ title: "PDF descargado", description: `Se descargó ${filename}` });
