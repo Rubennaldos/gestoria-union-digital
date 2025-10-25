@@ -38,6 +38,11 @@
       ".write": "auth != null"
     },
 
+    "contadores": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
     "cobranzas": {
       "configuracion": {
         ".read": "auth != null",
