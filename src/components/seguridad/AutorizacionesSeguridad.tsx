@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { get, ref as dbRef } from "firebase/database";
+import { db } from "@/config/firebase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -202,6 +204,43 @@ export const AutorizacionesSeguridad = () => {
     }
   };
 
+  // Open detalle: ensure we have the full registro from acceso/{tipo}/{id}
+  const openDetalle = async (auth: AutorizacionPendiente) => {
+    try {
+      const record = auth.data as any;
+      let needsFetch = false;
+
+      if (auth.tipo === 'trabajador') {
+        // expect trabajadores array
+        if (!record || !record.trabajadores) needsFetch = true;
+      } else if (auth.tipo === 'visitante') {
+        if (!record || !record.visitantes) needsFetch = true;
+      } else if (auth.tipo === 'proveedor') {
+        if (!record || !record.empresa) needsFetch = true;
+      }
+
+      if (needsFetch) {
+        // fetch full registro from RTDB
+        const path = `acceso/${auth.tipo === 'visitante' ? 'visitas' : auth.tipo === 'trabajador' ? 'trabajadores' : 'proveedores'}/${auth.id}`;
+        const snap = await get(dbRef(db, path));
+        if (snap.exists()) {
+          const full = snap.val();
+          setSelectedAuth({ ...auth, data: full, fechaCreacion: full.createdAt || full.fechaCreacion || auth.fechaCreacion });
+        } else {
+          // still set what we have
+          setSelectedAuth(auth);
+        }
+      } else {
+        setSelectedAuth(auth);
+      }
+    } catch (e) {
+      console.error('Error fetching full registro for detalle:', e);
+      setSelectedAuth(auth);
+    } finally {
+      setDetalleOpen(true);
+    }
+  };
+
   const generarPDF = async (tipo: "visitante" | "trabajador" | "proveedor") => {
     const solicitudesFiltradas = items.filter((item) => item.tipo === tipo);
 
@@ -214,115 +253,142 @@ export const AutorizacionesSeguridad = () => {
       return;
     }
 
-    const doc = new jsPDF();
+    // Crear documento A4 en puntos para un layout más predecible
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = (doc.internal.pageSize as any).getWidth();
+    const margin = 36; // pts
+    const usableWidth = pageWidth - margin * 2;
     const tipoTitulo = tipo === "visitante" ? "Visitas" : tipo === "trabajador" ? "Trabajadores" : "Proveedores";
 
+    // Cabecera
+    let y = 48;
     doc.setFontSize(18);
-    doc.text(`Solicitudes de ${tipoTitulo}`, 14, 22);
+    doc.setFont(undefined, "bold");
+    doc.text(`Solicitudes de ${tipoTitulo}`, margin, y);
 
-    doc.setFontSize(11);
-    doc.text(`Fecha de generación: ${new Date().toLocaleString("es-ES")}`, 14, 30);
-    doc.text(`Total de solicitudes: ${solicitudesFiltradas.length}`, 14, 36);
+    doc.setFontSize(10);
+    doc.setFont(undefined, "normal");
+    y += 18;
+    doc.text(`Fecha de generación: ${new Date().toLocaleString("es-ES")}`, margin, y);
+    doc.text(`Total de solicitudes: ${solicitudesFiltradas.length}`, pageWidth - margin - 160, y);
+    y += 12;
 
-    // PDF especial para trabajadores con maestros como subtítulos
+    // Helper: ensure we have the full registro para cada auth (RTDB snapshot puede ser parcial)
+    const ensureFullRegistro = async (auth: AutorizacionPendiente) => {
+      const record = auth.data as any;
+      let needsFetch = false;
+
+      if (auth.tipo === "trabajador") {
+        if (!record || !record.trabajadores) needsFetch = true;
+      } else if (auth.tipo === "visitante") {
+        if (!record || !record.visitantes) needsFetch = true;
+      } else if (auth.tipo === "proveedor") {
+        if (!record || !record.empresa) needsFetch = true;
+      }
+
+      if (!needsFetch) return auth;
+
+      try {
+        const path = `acceso/${auth.tipo === "visitante" ? "visitas" : auth.tipo === "trabajador" ? "trabajadores" : "proveedores"}/${auth.id}`;
+        const snap = await get(dbRef(db, path));
+        if (snap.exists()) return { ...auth, data: snap.val(), fechaCreacion: snap.val().createdAt || snap.val().fechaCreacion || auth.fechaCreacion } as AutorizacionPendiente;
+        return auth;
+      } catch (e) {
+        console.error("Error cargando registro completo para PDF:", e);
+        return auth;
+      }
+    };
+
     if (tipo === "trabajador") {
-      let startY = 42;
-      
-      for (const [solicitudIndex, auth] of solicitudesFiltradas.entries()) {
+      // Para trabajadores: mostrar maestro y tabla de trabajadores por solicitud
+      let startY = y;
+
+      for (const [solicitudIndex, rawAuth] of solicitudesFiltradas.entries()) {
+        const auth = await ensureFullRegistro(rawAuth);
         const emp = auth.empadronado;
         const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
         const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
         const tipoAcceso = (auth.data as any).tipoAcceso || "—";
         const placa = (auth.data as any).placa || (auth.data as any).placas?.join(", ") || "—";
         const trabajadorData = auth.data as RegistroTrabajadores;
-        const trabajadores = trabajadorData.trabajadores || [];
-        
-        // Obtener información del maestro de obra
-        let maestroInfo = null;
-        if (trabajadorData.maestroObraTemporal) {
-          maestroInfo = {
-            nombre: trabajadorData.maestroObraTemporal.nombre,
-            dni: trabajadorData.maestroObraTemporal.dni,
-            temporal: true
-          };
-        } else if (trabajadorData.maestroObraId && trabajadorData.maestroObraId !== "temporal") {
+        const trabajadores = (trabajadorData && trabajadorData.trabajadores) || [];
+
+        // Maestro de obra
+        let maestroInfo: { nombre?: string; dni?: string; telefono?: string; temporal?: boolean } | null = null;
+        if (trabajadorData?.maestroObraTemporal) {
+          maestroInfo = { nombre: trabajadorData.maestroObraTemporal.nombre, dni: trabajadorData.maestroObraTemporal.dni, temporal: true };
+        } else if (trabajadorData?.maestroObraId && trabajadorData.maestroObraId !== "temporal") {
           try {
             const { obtenerMaestroObraPorId } = await import("@/services/acceso");
             const maestro = await obtenerMaestroObraPorId(trabajadorData.maestroObraId);
-            if (maestro) {
-              maestroInfo = {
-                nombre: maestro.nombre,
-                dni: maestro.dni || "Sin DNI",
-                temporal: false
-              };
-            }
-          } catch (error) {
-            console.error("Error al obtener maestro:", error);
+            if (maestro) maestroInfo = { nombre: maestro.nombre, dni: maestro.dni || "Sin DNI", telefono: maestro.telefono, temporal: false };
+          } catch (e) {
+            console.error("Error obteniendo maestro de obra para PDF:", e);
           }
         }
-        
-        // Encabezado de la solicitud
+
+        // Bloque de solicitud
+        doc.setFillColor(245, 245, 245);
+        doc.rect(margin, startY - 6, usableWidth, 6, "F");
+
         doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text(`Solicitud #${solicitudIndex + 1}`, 14, startY);
-        startY += 6;
-        
-        doc.setFontSize(9);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Solicitado por: ${solicitante}`, 14, startY);
-        startY += 5;
-        doc.text(`Fecha: ${fecha} | Tipo Acceso: ${tipoAcceso} | Placa(s): ${placa}`, 14, startY);
-        startY += 8;
-        
-        // Maestro como subtítulo
+        doc.setFont(undefined, "bold");
+        doc.text(`Solicitud #${solicitudIndex + 1}`, margin, startY);
+        startY += 16;
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, "normal");
+        doc.text(`Solicitado por: ${solicitante}`, margin, startY);
+        doc.text(`Fecha: ${fecha}`, pageWidth - margin - 200, startY);
+        startY += 14;
+        doc.text(`Tipo Acceso: ${tipoAcceso} | Placa(s): ${placa}`, margin, startY);
+        startY += 12;
+
         if (maestroInfo) {
           doc.setFontSize(11);
-          doc.setFont(undefined, 'bold');
+          doc.setFont(undefined, "bold");
           const temporalText = maestroInfo.temporal ? " (Temporal)" : "";
-          doc.text(`Encargado de Obra: ${maestroInfo.nombre} - DNI: ${maestroInfo.dni}${temporalText}`, 14, startY);
-          startY += 8;
-        }
-        
-        // Lista de trabajadores
-        if (trabajadores.length > 0) {
+          doc.text(`Encargado de Obra:${temporalText}`, margin, startY);
+          doc.setFont(undefined, "normal");
           doc.setFontSize(10);
-          doc.setFont(undefined, 'bold');
-          doc.text(`Trabajadores (${trabajadores.length}):`, 14, startY);
-          startY += 6;
-          
-          const trabajadoresData = trabajadores.map((t: any, idx: number) => [
-            (idx + 1).toString(),
-            t.nombre,
-            t.dni
-          ]);
-          
+          doc.text(`${maestroInfo.nombre || "—"} — DNI: ${maestroInfo.dni || "—"}${maestroInfo.telefono ? ` — Tel: ${maestroInfo.telefono}` : ""}`, margin + 120, startY);
+          startY += 14;
+        }
+
+        if (trabajadores.length > 0) {
+          const trabajadoresData = trabajadores.map((t: any, idx: number) => [ (idx + 1).toString(), t.nombre, t.dni ]);
+
           autoTable(doc, {
             head: [["#", "Nombre", "DNI"]],
             body: trabajadoresData,
             startY: startY,
-            styles: { fontSize: 9, cellPadding: 2 },
-            headStyles: { fillColor: [34, 197, 94], textColor: 255 },
-            alternateRowStyles: { fillColor: [245, 245, 245] },
-            margin: { left: 14, right: 14 },
+            styles: { fontSize: 9, cellPadding: 4 },
+            headStyles: { fillColor: [37, 99, 235], textColor: 255 },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            margin: { left: margin, right: margin },
+            tableWidth: usableWidth,
           });
-          
-          startY = (doc as any).lastAutoTable.finalY + 10;
+
+          startY = (doc as any).lastAutoTable.finalY + 12;
         } else {
-          doc.setFontSize(9);
-          doc.setFont(undefined, 'italic');
-          doc.text("Sin trabajadores asociados", 20, startY);
-          startY += 10;
+          doc.setFontSize(10);
+          doc.setFont(undefined, "italic");
+          doc.text("Sin trabajadores asociados", margin + 6, startY);
+          startY += 14;
         }
-        
-        // Agregar nueva página si es necesario
-        if (startY > 250 && solicitudIndex < solicitudesFiltradas.length - 1) {
+
+        startY += 6;
+        const pageHeight = (doc.internal.pageSize as any).getHeight();
+        if (startY > pageHeight - margin - 80 && solicitudIndex < solicitudesFiltradas.length - 1) {
           doc.addPage();
-          startY = 20;
+          startY = margin;
         }
       }
     } else {
-      // PDF normal para visitas y proveedores
-      const tableData = solicitudesFiltradas.map((auth, index) => {
+      // Visitas y proveedores: tabla compacta
+      const tableData: any[] = [];
+      for (const rawAuth of solicitudesFiltradas) {
+        const auth = await ensureFullRegistro(rawAuth);
         const emp = auth.empadronado;
         const solicitante = emp ? `${emp.nombre} ${emp.apellidos} (Padrón: ${emp.numeroPadron})` : "No disponible";
         const fecha = auth.fechaCreacion ? new Date(auth.fechaCreacion).toLocaleString("es-ES") : "—";
@@ -337,24 +403,24 @@ export const AutorizacionesSeguridad = () => {
           detalles = (auth.data as RegistroProveedor).empresa || "—";
         }
 
-        return [
-          (index + 1).toString(),
+        tableData.push([
           solicitante,
           fecha,
           tipoAcceso,
           placa,
           detalles
-        ];
-      });
+        ]);
+      }
 
       autoTable(doc, {
-        head: [["#", "Solicitado por", "Fecha", "Tipo Acceso", "Placa(s)", tipo === "proveedor" ? "Empresa" : "Personas"]],
+        head: [["Solicitado por", "Fecha", "Tipo Acceso", "Placa(s)", tipo === "proveedor" ? "Empresa" : "Personas"]],
         body: tableData,
-        startY: 42,
-        styles: { fontSize: 9, cellPadding: 3 },
+        startY: y,
+        styles: { fontSize: 9, cellPadding: 4 },
         headStyles: { fillColor: [59, 130, 246], textColor: 255 },
         alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { left: 14, right: 14 },
+        margin: { left: margin, right: margin },
+        tableWidth: usableWidth,
       });
     }
 
@@ -530,12 +596,9 @@ export const AutorizacionesSeguridad = () => {
                       )}
                     </div>
 
-                    <div className="flex gap-2 pt-3 border-t">
+                      <div className="flex gap-2 pt-3 border-t">
                       <Button
-                        onClick={() => {
-                          setSelectedAuth(auth);
-                          setDetalleOpen(true);
-                        }}
+                        onClick={() => openDetalle(auth)}
                         variant="outline"
                         size="icon"
                       >
