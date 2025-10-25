@@ -32,6 +32,7 @@ export function TrabajadoresTab() {
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placas, setPlacas] = useState<{ id: string; placa: string }[]>([{ id: "1", placa: "" }]);
   const [maestroObraId, setMaestroObraId] = useState("");
+  const [maestroTemporal, setMaestroTemporal] = useState<{ nombre: string; dni: string } | null>(null);
   const [trabajadores, setTrabajadores] = useState<Trabajador[]>([]);
   const [maestrosObra, setMaestrosObra] = useState<MaestroObra[]>([]);
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
@@ -69,11 +70,11 @@ export function TrabajadoresTab() {
     try { setMaestrosObra(await obtenerMaestrosObra()); } catch (e) { console.error(e); }
   };
 
-  const handleMaestroCreado = async (maestroId: string) => {
-    await cargarMaestrosObra();
-    setMaestroObraId(maestroId);
+  const handleMaestroCreado = (datos: { nombre: string; dni: string }) => {
+    setMaestroTemporal(datos);
+    setMaestroObraId(""); // Limpiar selección de maestro permanente
     toast({
-      title: "Maestro de obra seleccionado",
+      title: "Encargado agregado",
       description: "Puede continuar con el registro de trabajadores",
     });
   };
@@ -109,8 +110,8 @@ export function TrabajadoresTab() {
         return false;
       }
     }
-    if (!maestroObraId) {
-      toast({ title: "Error", description: "Debe seleccionar un maestro de obra", variant: "destructive" });
+    if (!maestroObraId && !maestroTemporal) {
+      toast({ title: "Error", description: "Debe seleccionar un maestro de obra o agregar uno temporal", variant: "destructive" });
       return false;
     }
     if (!aceptaReglamento) {
@@ -140,7 +141,8 @@ export function TrabajadoresTab() {
         tipoAcceso,
         placa: tipoAcceso === "vehicular" && placasLimpias.length > 0 ? placasLimpias[0] : undefined,
         placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
-        maestroObraId,
+        maestroObraId: maestroObraId || "temporal",
+        maestroObraTemporal: maestroTemporal || undefined,
         trabajadores: trabajadoresLimpios,
         porticoId: "principal",
       } as Parameters<typeof registrarTrabajadores>[0];
@@ -170,6 +172,7 @@ export function TrabajadoresTab() {
       setMostrarConfirmacion(true);
       setPlacas([{ id: "1", placa: "" }]);
       setMaestroObraId("");
+      setMaestroTemporal(null);
       setTrabajadores([]);
       setAceptaReglamento(false);
       toast({ title: "Registro exitoso", description: "Solicitud enviada a vigilancia y WhatsApp" });
@@ -245,7 +248,7 @@ export function TrabajadoresTab() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-base font-medium">Maestro de Obra *</Label>
+              <Label className="text-base font-medium">Encargado de Obra *</Label>
               <Button
                 type="button"
                 variant="outline"
@@ -254,50 +257,71 @@ export function TrabajadoresTab() {
                 className="flex items-center gap-2 hover:scale-105 transition-transform"
               >
                 <Zap className="h-4 w-4" />
-                Acceso Rápido
+                Registro Rápido de Encargado de Obra
               </Button>
             </div>
-            
-            <Select value={maestroObraId} onValueChange={setMaestroObraId}>
-              <SelectTrigger className="w-full h-11 bg-background">
-                <SelectValue placeholder="Buscar el nombre del maestro de obra" />
-              </SelectTrigger>
-              <SelectContent className="bg-background z-50">
-                {maestrosObra.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground text-center">
-                    No hay maestros de obra registrados
-                  </div>
-                ) : (
-                  maestrosObra.map((maestro) => (
-                    <SelectItem key={maestro.id} value={maestro.id}>
-                      <div className="flex items-center justify-between w-full gap-3">
-                        <span className="font-medium">{maestro.nombre}</span>
-                        {maestro.dni && (
-                          <span className="text-xs text-muted-foreground">DNI: {maestro.dni}</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
 
-            {maestroObraId && maestrosObra.find((m) => m.id === maestroObraId) && (
-              <div className="p-3 border rounded-lg bg-muted/30 space-y-2">
+            {maestroTemporal ? (
+              <div className="p-4 border rounded-lg bg-amber-500/10 border-amber-500/30 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {maestrosObra.find((m) => m.id === maestroObraId)?.nombre}
-                  </span>
-                  <Badge variant={maestrosObra.find((m) => m.id === maestroObraId)?.activo ? "default" : "destructive"}>
-                    {maestrosObra.find((m) => m.id === maestroObraId)?.activo ? "Activo" : "Inactivo"}
-                  </Badge>
+                  <span className="text-sm font-semibold">{maestroTemporal.nombre}</span>
+                  <Badge variant="secondary" className="bg-amber-500/20">Temporal</Badge>
                 </div>
-                {maestrosObra.find((m) => m.id === maestroObraId)?.dni && (
-                  <p className="text-xs text-muted-foreground">
-                    DNI: {maestrosObra.find((m) => m.id === maestroObraId)?.dni}
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">DNI: {maestroTemporal.dni}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMaestroTemporal(null)}
+                  className="w-full mt-2"
+                >
+                  Cambiar encargado
+                </Button>
               </div>
+            ) : (
+              <>
+                <Select value={maestroObraId} onValueChange={(val) => { setMaestroObraId(val); setMaestroTemporal(null); }}>
+                  <SelectTrigger className="w-full h-11 bg-background">
+                    <SelectValue placeholder="Buscar el nombre del encargado de obra" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background z-50">
+                    {maestrosObra.length === 0 ? (
+                      <div className="p-4 text-sm text-muted-foreground text-center">
+                        No hay encargados de obra registrados
+                      </div>
+                    ) : (
+                      maestrosObra.map((maestro) => (
+                        <SelectItem key={maestro.id} value={maestro.id}>
+                          <div className="flex items-center justify-between w-full gap-3">
+                            <span className="font-medium">{maestro.nombre}</span>
+                            {maestro.dni && (
+                              <span className="text-xs text-muted-foreground">DNI: {maestro.dni}</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {maestroObraId && maestrosObra.find((m) => m.id === maestroObraId) && (
+                  <div className="p-3 border rounded-lg bg-muted/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">
+                        {maestrosObra.find((m) => m.id === maestroObraId)?.nombre}
+                      </span>
+                      <Badge variant={maestrosObra.find((m) => m.id === maestroObraId)?.activo ? "default" : "destructive"}>
+                        {maestrosObra.find((m) => m.id === maestroObraId)?.activo ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </div>
+                    {maestrosObra.find((m) => m.id === maestroObraId)?.dni && (
+                      <p className="text-xs text-muted-foreground">
+                        DNI: {maestrosObra.find((m) => m.id === maestroObraId)?.dni}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 

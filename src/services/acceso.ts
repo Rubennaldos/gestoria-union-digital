@@ -160,6 +160,7 @@ export type RegistrarTrabajadoresInput = {
   placa?: string;
   placas?: string[]; // Múltiples placas
   maestroObraId: string;
+  maestroObraTemporal?: { nombre: string; dni: string }; // Datos temporales del encargado
   trabajadores: { nombre: string; dni: string; esMaestroObra?: boolean }[];
   porticoId: string;
 };
@@ -191,7 +192,12 @@ export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
       data.tipoAcceso === "vehicular"
         ? (data.placa || "").toUpperCase()
         : undefined,
+    placas:
+      data.tipoAcceso === "vehicular" && data.placas
+        ? data.placas.map((p) => p.toUpperCase())
+        : undefined,
     maestroObraId: data.maestroObraId,
+    maestroObraTemporal: data.maestroObraTemporal || undefined,
     trabajadores: (data.trabajadores || []).map((t) => ({
       nombre: (t?.nombre || "").trim(),
       dni: (t?.dni || "").trim(),

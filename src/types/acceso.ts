@@ -65,6 +65,7 @@ export interface RegistroTrabajadores {
   placa?: string;
   placas?: string[]; // Múltiples placas
   maestroObraId: string;
+  maestroObraTemporal?: { nombre: string; dni: string }; // Datos temporales del encargado
   trabajadores: Trabajador[];
   fechaCreacion: number;
   estado: "pendiente" | "autorizado" | "denegado";
