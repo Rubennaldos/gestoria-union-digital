@@ -655,13 +655,16 @@ export async function crearListaTrabajadores(data: CrearListaTrabajadoresInput):
 }
 
 export async function obtenerListasTrabajadores(empadronadoId: string): Promise<any[]> {
-  const snap = await get(ref(db, "acceso/listas_trabajadores"));
+  if (!empadronadoId) return [];
+  
+  const listasRef = ref(db, "acceso/listas_trabajadores");
+  const q = query(listasRef, orderByChild("empadronadoId"), equalTo(empadronadoId));
+  
+  const snap = await get(q);
   if (!snap.exists()) return [];
   
   const arr: any[] = Object.values(snap.val());
-  return arr
-    .filter((lista) => lista.empadronadoId === empadronadoId)
-    .sort((a, b) => tsFrom(b) - tsFrom(a));
+  return arr.sort((a, b) => tsFrom(b) - tsFrom(a));
 }
 
 export async function obtenerListaTrabajadoresPorId(id: string): Promise<any | null> {

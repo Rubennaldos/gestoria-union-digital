@@ -61,6 +61,8 @@ export function GestionListasTrabajadores({ empadronadoId }: GestionListasTrabaj
   }, [empadronadoId]);
 
   const cargarDatos = async () => {
+    if (!empadronadoId) return;
+    
     try {
       const [listasData, maestrosData] = await Promise.all([
         obtenerListasTrabajadores(empadronadoId),
@@ -70,6 +72,11 @@ export function GestionListasTrabajadores({ empadronadoId }: GestionListasTrabaj
       setMaestrosObra(maestrosData);
     } catch (error) {
       console.error("Error al cargar datos:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar las listas de trabajadores",
+        variant: "destructive",
+      });
     }
   };
 

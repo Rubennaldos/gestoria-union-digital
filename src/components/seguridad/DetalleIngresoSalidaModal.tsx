@@ -11,11 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Users, UserCheck, Shield, Car, User, LogIn, LogOut, Clock, CheckCircle2 } from "lucide-react";
+import { Users, UserCheck, Shield, Car, User, LogIn, LogOut, Clock, CheckCircle2, Building2 } from "lucide-react";
 import { RegistroVisita, RegistroTrabajadores, RegistroProveedor } from "@/types/acceso";
 import { Empadronado } from "@/types/empadronados";
 import { ref, update } from "firebase/database";
 import { db } from "@/config/firebase";
+import { obtenerMaestroObraPorId } from "@/services/acceso";
 
 interface DetalleIngresoSalidaModalProps {
   open: boolean;
@@ -47,6 +48,32 @@ export const DetalleIngresoSalidaModal = ({
   const { toast } = useToast();
   const [personas, setPersonas] = useState<PersonaEstado[]>([]);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [maestroObra, setMaestroObra] = useState<any>(null);
+  const [loadingMaestro, setLoadingMaestro] = useState(false);
+
+  // Cargar información del maestro de obra si es trabajador
+  useEffect(() => {
+    if (tipo === "trabajador" && open) {
+      const trabajadorData = data as RegistroTrabajadores;
+      
+      // Si hay maestro temporal, usarlo directamente
+      if (trabajadorData.maestroObraTemporal) {
+        setMaestroObra(trabajadorData.maestroObraTemporal);
+        setLoadingMaestro(false);
+      } 
+      // Si hay maestroObraId, buscar en la base de datos
+      else if (trabajadorData.maestroObraId && trabajadorData.maestroObraId !== "temporal") {
+        setLoadingMaestro(true);
+        obtenerMaestroObraPorId(trabajadorData.maestroObraId)
+          .then(setMaestroObra)
+          .catch(console.error)
+          .finally(() => setLoadingMaestro(false));
+      } else {
+        setMaestroObra(null);
+        setLoadingMaestro(false);
+      }
+    }
+  }, [tipo, data, open]);
 
   // Inicializar el estado de las personas
   useEffect(() => {
@@ -200,10 +227,10 @@ export const DetalleIngresoSalidaModal = ({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Icon className="h-5 w-5" />
-            <DialogTitle>Control de Ingreso/Salida - {tipo.charAt(0).toUpperCase() + tipo.slice(1)}</DialogTitle>
+            <DialogTitle>Detalle De {tipo === "trabajador" ? "Trabajador" : tipo === "visitante" ? "Visitante" : "Proveedor"}</DialogTitle>
           </div>
           <DialogDescription>
-            Autorizado el {new Date(fechaCreacion).toLocaleString()}
+            Información completa de la solicitud
           </DialogDescription>
         </DialogHeader>
 
@@ -214,11 +241,11 @@ export const DetalleIngresoSalidaModal = ({
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-semibold">Solicitado por:</span>
+                  <span className="font-semibold">Solicitado por</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Vecino:</span>
+                    <span className="text-muted-foreground">Nombre:</span>
                     <p className="font-medium">
                       {empadronado.nombre} {empadronado.apellidos}
                     </p>
@@ -228,6 +255,10 @@ export const DetalleIngresoSalidaModal = ({
                     <p className="font-medium">{empadronado.numeroPadron}</p>
                   </div>
                 </div>
+                <div className="mt-2">
+                  <span className="text-muted-foreground">Fecha de Solicitud:</span>
+                  <p className="font-medium">{new Date(fechaCreacion).toLocaleString()}</p>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -235,16 +266,19 @@ export const DetalleIngresoSalidaModal = ({
           {/* Información general */}
           <Card>
             <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Car className="h-4 w-4 text-muted-foreground" />
+                <span className="font-semibold">Tipo de Acceso</span>
+              </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Tipo de Acceso:</span>
+                  <span className="text-muted-foreground">Acceso:</span>
                   <p className="font-medium capitalize">{(data as any).tipoAcceso}</p>
                 </div>
                 {(data as any).placa && (
                   <div>
                     <span className="text-muted-foreground">Placa:</span>
                     <div className="flex items-center gap-2">
-                      <Car className="h-4 w-4" />
                       <p className="font-medium">{(data as any).placa}</p>
                     </div>
                   </div>
@@ -252,6 +286,55 @@ export const DetalleIngresoSalidaModal = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Información del Maestro de Obra (solo para trabajadores) */}
+          {tipo === "trabajador" && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-semibold">Maestro de Obra</span>
+                </div>
+                {loadingMaestro ? (
+                  <p className="text-sm text-muted-foreground">Cargando información...</p>
+                ) : maestroObra ? (
+                  <div className="bg-primary/10 p-4 rounded-lg space-y-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-sm text-muted-foreground">Nombre:</span>
+                        <p className="font-medium">{maestroObra.nombre}</p>
+                      </div>
+                      {maestroObra.dni && (
+                        <div>
+                          <span className="text-sm text-muted-foreground">DNI:</span>
+                          <p className="font-medium">{maestroObra.dni}</p>
+                        </div>
+                      )}
+                    </div>
+                    {maestroObra.telefono && (
+                      <div>
+                        <span className="text-sm text-muted-foreground">Teléfono:</span>
+                        <p className="font-medium">{maestroObra.telefono}</p>
+                      </div>
+                    )}
+                    {maestroObra.empresa && (
+                      <div>
+                        <span className="text-sm text-muted-foreground">Empresa:</span>
+                        <p className="font-medium">{maestroObra.empresa}</p>
+                      </div>
+                    )}
+                    {(data as RegistroTrabajadores).maestroObraTemporal && (
+                      <Badge variant="secondary" className="mt-2">Temporal</Badge>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Información del maestro de obra no disponible
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Separator />
 
@@ -263,7 +346,7 @@ export const DetalleIngresoSalidaModal = ({
                 ? "Control de Proveedor"
                 : tipo === "visitante"
                 ? "Control de Visitantes"
-                : "Control de Trabajadores"}
+                : `Trabajadores Acompañantes (${personas.length})`}
             </h3>
 
             {personas.map((persona, index) => (
