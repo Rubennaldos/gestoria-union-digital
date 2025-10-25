@@ -269,7 +269,7 @@ export const AutorizacionesSeguridad = () => {
 
       doc.setFontSize(18);
       doc.setFont(undefined, "bold");
-      // Mostrar correlativo si existe (especialmente para trabajadores)
+      // Mostrar correlativo único en lugar del ID de Firebase
       const correl = (auth.data as any)?.correlativo;
       if (correl) {
         doc.text(`Solicitud ${auth.tipo.toUpperCase()} — N°: ${correl}`, margin, y);
