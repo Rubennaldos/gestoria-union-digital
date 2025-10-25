@@ -10,7 +10,6 @@ import {
   query,
   orderByChild,
   equalTo,
-  runTransaction,
 } from "firebase/database";
 import { db } from "@/config/firebase";
 import { FavoritoUsuario } from "@/types/acceso";
@@ -126,22 +125,9 @@ export async function registrarVisita(data: NuevaVisitaInput) {
     menores: Number(data.menores || 0),
     solicitadoPorNombre,
     solicitadoPorPadron,
+    correlativo: Date.now(), // Correlativo único basado en timestamp
     ...base,
   });
-
-  // Generar correlativo único para la solicitud de visita
-  try {
-    const counterRef = ref(db, `contadores/solicitudesVisita`);
-    const tr = await runTransaction(counterRef, (current) => {
-      if (current === null || current === undefined) return 1;
-      const n = typeof current === "number" ? current : Number(current) || 0;
-      return n + 1;
-    });
-    const correl = tr.snapshot?.val();
-    if (correl) payload.correlativo = correl;
-  } catch (e) {
-    console.error("No se pudo obtener correlativo para solicitud de visita:", e);
-  }
 
   // Crear el registro de visita
   await set(ref(db, `acceso/visitas/${id}`), payload);
@@ -224,23 +210,9 @@ export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
     ...cleanedData,
     solicitadoPorNombre,
     solicitadoPorPadron,
+    correlativo: Date.now(), // Correlativo único basado en timestamp
     ...base,
   };
-
-  // Generar correlativo único para la solicitud de trabajador usando una transacción
-  try {
-    const counterRef = ref(db, `contadores/solicitudesTrabajador`);
-    const tr = await runTransaction(counterRef, (current) => {
-      if (current === null || current === undefined) return 1;
-      const n = typeof current === "number" ? current : Number(current) || 0;
-      return n + 1;
-    });
-    const correl = tr.snapshot?.val();
-    if (correl) payload.correlativo = correl;
-  } catch (e) {
-    // Si la transacción falla, continuamos sin correlativo pero registramos el error
-    console.error("No se pudo obtener correlativo para solicitud de trabajador:", e);
-  }
 
   // Crear el registro de trabajadores
   await set(ref(db, `acceso/trabajadores/${id}`), payload);
@@ -286,22 +258,9 @@ export async function registrarProveedor(data: RegistrarProveedorInput) {
     ...cleanedData,
     solicitadoPorNombre,
     solicitadoPorPadron,
+    correlativo: Date.now(), // Correlativo único basado en timestamp
     ...base,
   };
-
-  // Generar correlativo único para la solicitud de proveedor
-  try {
-    const counterRef = ref(db, `contadores/solicitudesProveedor`);
-    const tr = await runTransaction(counterRef, (current) => {
-      if (current === null || current === undefined) return 1;
-      const n = typeof current === "number" ? current : Number(current) || 0;
-      return n + 1;
-    });
-    const correl = tr.snapshot?.val();
-    if (correl) payload.correlativo = correl;
-  } catch (e) {
-    console.error("No se pudo obtener correlativo para solicitud de proveedor:", e);
-  }
 
   // Crear el registro de proveedor
   await set(ref(db, `acceso/proveedores/${id}`), payload);
