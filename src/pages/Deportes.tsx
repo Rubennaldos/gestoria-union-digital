@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Calendar, Clock, MapPin, Users, TrendingUp, Search, Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CalendarioReservas } from "@/components/deportes/CalendarioReservas";
 import { NuevaReservaModal } from "@/components/deportes/NuevaReservaModal";
 import { PagoReservaModal } from "@/components/deportes/PagoReservaModal";
@@ -21,7 +22,7 @@ export default function Deportes() {
   const [canchas, setCanchas] = useState<Cancha[]>([]);
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [estadisticas, setEstadisticas] = useState<EstadisticasDeportes | null>(null);
-  const [canchaActiva, setCanchaActiva] = useState<string>("");
+  const [canchaSeleccionada, setCanchaSeleccionada] = useState<string>("all");
   const [busquedaTexto, setBusquedaTexto] = useState("");
   const [loading, setLoading] = useState(true);
   
@@ -48,11 +49,6 @@ export default function Deportes() {
       setCanchas(canchasData);
       setReservas(reservasData);
       setEstadisticas(estadisticasData);
-      
-      // Establecer primera cancha como activa por defecto
-      if (canchasData.length > 0 && !canchaActiva) {
-        setCanchaActiva(canchasData[0].id);
-      }
     } catch (error) {
       console.error('Error al cargar datos:', error);
       toast({
@@ -87,34 +83,15 @@ export default function Deportes() {
     }
   };
 
-  const canchasFiltradas = canchas.filter(cancha => 
-    cancha.nombre.toLowerCase().includes(busquedaTexto.toLowerCase()) ||
-    cancha.ubicacion.toLowerCase().includes(busquedaTexto.toLowerCase())
-  );
-
-  // Agrupar canchas por ubicación y tipo para las tabs
-  const tabs = [
-    {
-      id: 'boulevard-futbol',
-      label: 'Boulevard - Fútbol',
-      canchas: canchas.filter(c => c.ubicacion === 'boulevard' && c.tipo === 'futbol')
-    },
-    {
-      id: 'boulevard-voley', 
-      label: 'Boulevard - Vóley',
-      canchas: canchas.filter(c => c.ubicacion === 'boulevard' && c.tipo === 'voley')
-    },
-    {
-      id: 'quinta-futbol',
-      label: 'Quinta Llana - Fútbol', 
-      canchas: canchas.filter(c => c.ubicacion === 'quinta_llana' && c.tipo === 'futbol')
-    },
-    {
-      id: 'quinta-voley',
-      label: 'Quinta Llana - Vóley',
-      canchas: canchas.filter(c => c.ubicacion === 'quinta_llana' && c.tipo === 'voley')
-    }
-  ].filter(tab => tab.canchas.length > 0);
+  // Filtrar canchas según selección
+  const canchasFiltradas = canchaSeleccionada === "all" 
+    ? canchas 
+    : canchas.filter(c => c.id === canchaSeleccionada);
+  
+  // Filtrar reservas según cancha seleccionada
+  const reservasFiltradas = canchaSeleccionada === "all"
+    ? reservas
+    : reservas.filter(r => r.canchaId === canchaSeleccionada);
 
   if (loading) {
     return (
@@ -255,38 +232,42 @@ export default function Deportes() {
         {/* Calendario por recursos */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Calendario de Reservas
-            </CardTitle>
-            <CardDescription>
-              Arrastra para crear, mover y redimensionar reservas
-            </CardDescription>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Calendario de Reservas
+                </CardTitle>
+                <CardDescription>
+                  Arrastra para crear, mover y redimensionar reservas
+                </CardDescription>
+              </div>
+              
+              <div className="w-full sm:w-[300px]">
+                <Select value={canchaSeleccionada} onValueChange={setCanchaSeleccionada}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una loza deportiva" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las canchas</SelectItem>
+                    {canchas.map(cancha => (
+                      <SelectItem key={cancha.id} value={cancha.id}>
+                        {cancha.nombre} - {cancha.ubicacion === 'boulevard' ? 'Boulevard' : 'Quinta Llana'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <Tabs value={tabs[0]?.id} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
-                {tabs.map(tab => (
-                  <TabsTrigger key={tab.id} value={tab.id} className="text-xs">
-                    {tab.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-              
-              {tabs.map(tab => (
-                <TabsContent key={tab.id} value={tab.id} className="mt-6">
-                  <CalendarioReservas
-                    canchas={tab.canchas}
-                    reservas={reservas.filter(r => 
-                      tab.canchas.some(c => c.id === r.canchaId)
-                    )}
-                    onReservaClick={handleReservaClick}
-                    onNuevaReserva={handleNuevaReserva}
-                    onReservaUpdate={cargarDatos}
-                  />
-                </TabsContent>
-              ))}
-            </Tabs>
+            <CalendarioReservas
+              canchas={canchasFiltradas}
+              reservas={reservasFiltradas}
+              onReservaClick={handleReservaClick}
+              onNuevaReserva={handleNuevaReserva}
+              onReservaUpdate={cargarDatos}
+            />
           </CardContent>
         </Card>
 
