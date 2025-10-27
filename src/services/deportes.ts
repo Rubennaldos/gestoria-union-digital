@@ -234,16 +234,24 @@ export const registrarPago = async (
     const montoPago = formPago.esPrepago ? formPago.montoPrepago! : reserva.precio.total;
     const saldoPendiente = formPago.esPrepago ? (reserva.precio.total - formPago.montoPrepago!) : 0;
     
-    // Actualizar reserva
-    const pagoData = {
+    // Actualizar reserva - limpiar undefined
+    const pagoData: any = {
       metodoPago: formPago.metodoPago,
-      numeroOperacion: formPago.numeroOperacion,
-      voucherUrl,
       fechaPago: new Date().toISOString(),
       esPrepago: formPago.esPrepago || false,
-      montoPrepago: formPago.montoPrepago,
       saldoPendiente
     };
+
+    // Solo agregar propiedades si tienen valor
+    if (formPago.numeroOperacion) {
+      pagoData.numeroOperacion = formPago.numeroOperacion;
+    }
+    if (voucherUrl) {
+      pagoData.voucherUrl = voucherUrl;
+    }
+    if (formPago.esPrepago && formPago.montoPrepago) {
+      pagoData.montoPrepago = formPago.montoPrepago;
+    }
     
     await actualizarReserva(reservaId, {
       estado: saldoPendiente > 0 ? 'pendiente' : 'pagado',
