@@ -140,9 +140,13 @@
     "finanzas": {
       ".read": "auth != null",
       ".write": "auth != null",
-      "$movimientoId": { 
+      "movimientos": {
         ".read": "auth != null",
-        ".write": "auth != null" 
+        ".write": "auth != null"
+      },
+      "comprobantes": {
+        ".read": "auth != null",
+        ".write": "auth != null"
       }
     },
 
