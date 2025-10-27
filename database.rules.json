@@ -95,8 +95,26 @@
       ".indexOn": ["authUid","dni","numeroPadron"]
     },
 
+    "correlativos": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
     "cobranzas_v2": {
-      "comprobantes": { ".write": "auth != null" }
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "comprobantes": { 
+        ".read": "auth != null",
+        ".write": "auth != null" 
+      },
+      "ingresos": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "egresos": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
     },
 
     "personal-seguridad": { ".write": "auth != null" },
