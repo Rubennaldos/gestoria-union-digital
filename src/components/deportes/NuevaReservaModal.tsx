@@ -13,6 +13,7 @@ import { Cancha, FormReserva } from "@/types/deportes";
 import { crearReserva, calcularPrecio, validarDisponibilidad, validarLimitesReserva } from "@/services/deportes";
 import { toast } from "@/hooks/use-toast";
 import { BusquedaEmpadronado } from "./BusquedaEmpadronado";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NuevaReservaModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ export const NuevaReservaModal = ({
   fechaInicioPredeterminada,
   fechaFinPredeterminada
 }: NuevaReservaModalProps) => {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<FormReserva & { direccion?: string }>({
     canchaId: '',
@@ -43,7 +45,6 @@ export const NuevaReservaModal = ({
     observaciones: '',
     direccion: ''
   });
-  const [esEmpadronado, setEsEmpadronado] = useState(true);
   const [mostrarRecurrente, setMostrarRecurrente] = useState(false);
   const [precioCalculado, setPrecioCalculado] = useState<{
     base: number;
@@ -53,14 +54,14 @@ export const NuevaReservaModal = ({
   } | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && profile) {
       console.log('Modal abierto, canchas disponibles:', canchas);
-      // Resetear formulario
+      // Cargar datos del usuario logueado automáticamente
       setForm({
         canchaId: canchas.length > 0 ? canchas[0].id : '',
-        nombreCliente: '',
+        nombreCliente: profile.displayName || profile.email || '',
         dni: '',
-        telefono: '',
+        telefono: profile.phone || '',
         fechaInicio: fechaInicioPredeterminada ? 
           fechaInicioPredeterminada.toISOString().slice(0, 16) : '',
         fechaFin: fechaFinPredeterminada ? 
@@ -69,11 +70,10 @@ export const NuevaReservaModal = ({
         observaciones: '',
         direccion: ''
       });
-      setEsEmpadronado(true);
       setMostrarRecurrente(false);
       setPrecioCalculado(null);
     }
-  }, [open, canchas, fechaInicioPredeterminada, fechaFinPredeterminada]);
+  }, [open, canchas, fechaInicioPredeterminada, fechaFinPredeterminada, profile]);
 
   useEffect(() => {
     calcularPrecioReserva();
@@ -213,18 +213,6 @@ export const NuevaReservaModal = ({
     }));
   };
 
-  const toggleTipoCliente = () => {
-    setEsEmpadronado(!esEmpadronado);
-    // Limpiar formulario al cambiar tipo
-    setForm(prev => ({
-      ...prev,
-      nombreCliente: '',
-      dni: '',
-      telefono: '',
-      direccion: '',
-      esAportante: false
-    }));
-  };
 
   const canchaSeleccionada = canchas.find(c => c.id === form.canchaId);
 
@@ -252,85 +240,59 @@ export const NuevaReservaModal = ({
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Toggle entre empadronado y no empadronado */}
-                <div className="flex items-center space-x-4 p-3 bg-muted rounded-lg">
-                  <Button
-                    type="button"
-                    variant={esEmpadronado ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => !esEmpadronado && toggleTipoCliente()}
-                  >
-                    Empadronado
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={!esEmpadronado ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => esEmpadronado && toggleTipoCliente()}
-                  >
-                    No Empadronado
-                  </Button>
-                </div>
-
-                {esEmpadronado ? (
-                  <BusquedaEmpadronado onSeleccionar={handleEmpadronadoSelect} />
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="nombreCliente">Nombre Completo *</Label>
-                      <Input
-                        id="nombreCliente"
-                        value={form.nombreCliente}
-                        onChange={(e) => setForm(prev => ({ ...prev, nombreCliente: e.target.value }))}
-                        placeholder="Nombre del cliente"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="dni">DNI</Label>
-                      <Input
-                        id="dni"
-                        value={form.dni}
-                        onChange={(e) => setForm(prev => ({ ...prev, dni: e.target.value }))}
-                        placeholder="12345678"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="telefono">Teléfono *</Label>
-                      <Input
-                        id="telefono"
-                        value={form.telefono}
-                        onChange={(e) => setForm(prev => ({ ...prev, telefono: e.target.value }))}
-                        placeholder="987654321"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="direccion">Dirección</Label>
-                      <Input
-                        id="direccion"
-                        value={form.direccion || ''}
-                        onChange={(e) => setForm(prev => ({ ...prev, direccion: e.target.value }))}
-                        placeholder="Dirección del cliente"
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="esAportante"
-                        checked={form.esAportante}
-                        onCheckedChange={(checked) => setForm(prev => ({ ...prev, esAportante: checked }))}
-                      />
-                      <Label htmlFor="esAportante">Es aportante</Label>
-                      {form.esAportante && (
-                        <Badge variant="secondary">Descuento aplicado</Badge>
-                      )}
-                    </div>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="nombreCliente">Nombre Completo *</Label>
+                    <Input
+                      id="nombreCliente"
+                      value={form.nombreCliente}
+                      onChange={(e) => setForm(prev => ({ ...prev, nombreCliente: e.target.value }))}
+                      placeholder="Nombre del cliente"
+                      required
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Reserva a nombre de: {profile?.displayName || profile?.email}
+                    </p>
                   </div>
-                )}
+
+                  <div>
+                    <Label htmlFor="dni">DNI</Label>
+                    <Input
+                      id="dni"
+                      value={form.dni}
+                      onChange={(e) => setForm(prev => ({ ...prev, dni: e.target.value }))}
+                      placeholder="12345678"
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="telefono">Teléfono *</Label>
+                    <Input
+                      id="telefono"
+                      value={form.telefono}
+                      onChange={(e) => setForm(prev => ({ ...prev, telefono: e.target.value }))}
+                      placeholder="987654321"
+                      required
+                    />
+                  </div>
+
+                  {form.esAportante && (
+                    <Badge variant="secondary" className="w-fit">
+                      ✓ Descuento de aportante aplicado
+                    </Badge>
+                  )}
+
+                  <div className="pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      ¿Desea crear la reserva para otro empadronado?
+                    </p>
+                    <BusquedaEmpadronado onSeleccionar={handleEmpadronadoSelect} />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
