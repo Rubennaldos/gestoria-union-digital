@@ -12,7 +12,7 @@ import {
   FormPago,
   EstadoReserva 
 } from '@/types/deportes';
-import { crearIngresoV2 } from './cobranzas-v2';
+import { crearMovimientoFinanciero } from './finanzas';
 
 const storage = getStorage();
 
@@ -264,20 +264,24 @@ export const registrarPago = async (
       pago: pagoData
     });
     
-    // Crear ingreso en cobranzas
+    // Crear ingreso en finanzas
     const cancha = await obtenerCancha(reserva.canchaId);
-    const ingresoData = await crearIngresoV2({
-      concepto: `Reserva ${cancha?.nombre} - ${reserva.nombreCliente} (${cancha?.tipo === 'futbol' ? 'Fútbol' : 'Vóley'})`,
-      categoria: 'otros',
+    const movimientoId = await crearMovimientoFinanciero({
+      tipo: 'ingreso',
+      categoria: 'alquiler',
       monto: montoPago,
-      fecha: Date.now(),
-      metodoPago: formPago.metodoPago as 'efectivo' | 'transferencia' | 'yape' | 'plin',
-      numeroOperacion: formPago.numeroOperacion,
-      observaciones: voucherUrl ? `Comprobante: ${voucherUrl}` : undefined
+      descripcion: `Reserva ${cancha?.nombre} - ${reserva.nombreCliente} (${cancha?.tipo === 'futbol' ? 'Fútbol' : 'Vóley'})`,
+      fecha: new Date().toISOString(),
+      comprobantes: [],
+      registradoPor: actorUid,
+      registradoPorNombre: 'Sistema Deportes',
+      numeroComprobante: formPago.numeroOperacion,
+      observaciones: voucherUrl ? `Comprobante: ${voucherUrl}` : undefined,
+      banco: pagoData.metodoPago === 'transferencia' ? 'Transferencia Bancaria' : pagoData.metodoPago === 'yape' ? 'Yape' : 'Plin',
     });
     
     // Vincular ingreso con reserva
-    await actualizarReserva(reservaId, { ingresoId: ingresoData.id });
+    await actualizarReserva(reservaId, { ingresoId: movimientoId });
     
   } catch (error) {
     console.error('Error al registrar pago:', error);
