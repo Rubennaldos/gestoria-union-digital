@@ -302,13 +302,6 @@ export const NuevaReservaModal = ({
                       ✓ Descuento de aportante aplicado
                     </Badge>
                   )}
-
-                  <div className="pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      ¿Desea crear la reserva para otro empadronado?
-                    </p>
-                    <BusquedaEmpadronado onSeleccionar={handleEmpadronadoSelect} />
-                  </div>
                 </div>
               </CardContent>
             </Card>
