@@ -128,38 +128,69 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
     try {
       setLoading(true);
 
+      // Subir comprobante primero
+      const voucherUrl = await uploadFileAndGetURL(archivoComprobante, "comprobantes-reservas");
+
       // Calcular fechas
       const [hora, minuto] = horaInicio.split(":").map(Number);
       const fechaInicioISO = new Date(fecha);
       fechaInicioISO.setHours(hora, minuto, 0, 0);
       const fechaFinISO = addHours(fechaInicioISO, duracion);
 
-      // Crear reserva directamente sin validación previa (ya se hace en crearReserva)
-      const formReserva = {
+      // Crear reserva directamente con estado "pagado"
+      const reservaId = `reserva_${Date.now()}`;
+      const reservaData = {
+        id: reservaId,
         canchaId: canchaSeleccionada.id,
+        empadronadoId: empadronado?.id,
         nombreCliente,
         dni: dni || undefined,
         telefono,
         fechaInicio: fechaInicioISO.toISOString(),
         fechaFin: fechaFinISO.toISOString(),
+        duracionHoras: duracion,
+        estado: "pagado",
         esAportante: !!empadronado,
+        precio: precioCalculado,
+        pago: {
+          metodoPago: nombreBanco.includes("Yape") || nombreBanco.includes("Plin") ? "yape" : "transferencia",
+          numeroOperacion,
+          voucherUrl,
+          fechaPago: fechaPago.toISOString(),
+        },
         observaciones: conLuz ? "Con iluminación" : "Sin iluminación",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: user.uid,
       };
 
-      console.log("Creando reserva con datos:", formReserva);
-      const reservaId = await crearReserva(formReserva, user.uid);
-      console.log("Reserva creada con ID:", reservaId);
+      await set(ref(db, `deportes/reservas/${reservaId}`), reservaData);
 
-      // Registrar el pago
-      const formPago = {
-        metodoPago: nombreBanco.includes("Yape") || nombreBanco.includes("Plin") ? "yape" as const : "transferencia" as const,
-        numeroOperacion,
-        voucher: archivoComprobante,
+      // Crear movimiento en finanzas
+      const movimientoId = `mov_${Date.now()}`;
+      const movimientoData = {
+        id: movimientoId,
+        tipo: 'ingreso',
+        categoria: 'alquiler',
+        monto: precioCalculado.total,
+        descripcion: `Reserva ${canchaSeleccionada.nombre} - ${nombreCliente} (${canchaSeleccionada.tipo === 'futbol' ? 'Fútbol' : 'Vóley'})`,
+        fecha: new Date().toISOString(),
+        comprobantes: [],
+        registradoPor: user.uid,
+        registradoPorNombre: nombreCliente,
+        numeroComprobante: numeroOperacion,
+        observaciones: `Comprobante: ${voucherUrl}`,
+        banco: nombreBanco,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
-      await registrarPago(reservaId, formPago, user.uid);
+      await set(ref(db, `finanzas/movimientos/${movimientoId}`), movimientoData);
 
-      // Generar correlativo para el comprobante
+      // Vincular
+      await set(ref(db, `deportes/reservas/${reservaId}/ingresoId`), movimientoId);
+
+      // Generar correlativo
       const correlativoRef = ref(db, "correlativos/reservas");
       const correlativoSnap = await get(correlativoRef);
       const ultimoCorrelativo = correlativoSnap.exists() ? correlativoSnap.val() : 0;
