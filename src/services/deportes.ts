@@ -138,14 +138,20 @@ export const crearReserva = async (
   createdBy: string
 ): Promise<string> => {
   try {
+    console.log('Iniciando creación de reserva:', reservaData);
+    
     // Validar disponibilidad
+    console.log('Validando disponibilidad...');
     const disponible = await validarDisponibilidad(
       reservaData.canchaId,
       reservaData.fechaInicio,
       reservaData.fechaFin
     );
     
+    console.log('Resultado de validación de disponibilidad:', disponible);
+    
     if (!disponible) {
+      console.error('Horario no disponible para reserva');
       throw new Error('El horario seleccionado no está disponible');
     }
     
@@ -290,7 +296,12 @@ export const validarDisponibilidad = async (
   excludeReservaId?: string
 ): Promise<boolean> => {
   try {
+    console.log('Validando disponibilidad para cancha:', canchaId);
+    console.log('Fechas:', { fechaInicio, fechaFin });
+    
     const reservas = await obtenerReservas({ canchaId });
+    console.log('Reservas existentes para esta cancha:', reservas.length);
+    
     const inicio = new Date(fechaInicio);
     const fin = new Date(fechaFin);
     
@@ -302,13 +313,28 @@ export const validarDisponibilidad = async (
       const reservaInicio = new Date(reserva.fechaInicio);
       const reservaFin = new Date(reserva.fechaFin);
       
-      return !(fin <= reservaInicio || inicio >= reservaFin);
+      const hayConflicto = !(fin <= reservaInicio || inicio >= reservaFin);
+      
+      if (hayConflicto) {
+        console.log('Conflicto encontrado con reserva:', {
+          id: reserva.id,
+          inicio: reserva.fechaInicio,
+          fin: reserva.fechaFin
+        });
+      }
+      
+      return hayConflicto;
     });
     
-    return conflictos.length === 0;
+    console.log('Conflictos encontrados:', conflictos.length);
+    const disponible = conflictos.length === 0;
+    console.log('¿Disponible?:', disponible);
+    
+    return disponible;
   } catch (error) {
     console.error('Error al validar disponibilidad:', error);
     // Si hay error al obtener reservas (ej: base de datos vacía), consideramos disponible
+    console.log('Error en validación, asumiendo disponible');
     return true;
   }
 };
