@@ -11,7 +11,7 @@ import { format, addHours } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { calcularPrecio } from "@/services/deportes";
+import { calcularPrecio, crearReserva, registrarPago } from "@/services/deportes";
 import { Cancha } from "@/types/deportes";
 import { useAuth } from "@/contexts/AuthContext";
 import { PasarelaPagoReservaModal } from "./PasarelaPagoReservaModal";
@@ -128,42 +128,34 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
     try {
       setLoading(true);
 
-      // Subir comprobante
-      const voucherUrl = await uploadFileAndGetURL(archivoComprobante, "comprobantes-reservas");
-
       // Calcular fechas
       const [hora, minuto] = horaInicio.split(":").map(Number);
       const fechaInicioISO = new Date(fecha);
       fechaInicioISO.setHours(hora, minuto, 0, 0);
       const fechaFinISO = addHours(fechaInicioISO, duracion);
 
-      // Crear reserva en Firebase
-      const reservaId = `reserva_${Date.now()}`;
-      const reservaData = {
-        id: reservaId,
+      // Crear reserva usando el servicio existente
+      const formReserva = {
         canchaId: canchaSeleccionada.id,
-        empadronadoId: empadronado?.id,
         nombreCliente,
         dni: dni || undefined,
         telefono,
         fechaInicio: fechaInicioISO.toISOString(),
         fechaFin: fechaFinISO.toISOString(),
-        duracionHoras: duracion,
-        estado: "pagado",
         esAportante: !!empadronado,
-        precio: precioCalculado,
-        pago: {
-          metodoPago: nombreBanco.includes("Yape") || nombreBanco.includes("Plin") ? "yape" : "transferencia",
-          numeroOperacion,
-          voucherUrl,
-          fechaPago: fechaPago.toISOString(),
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        createdBy: user.uid,
+        observaciones: conLuz ? "Con iluminación" : "Sin iluminación",
       };
 
-      await set(ref(db, `deportes/reservas/${reservaId}`), reservaData);
+      const reservaId = await crearReserva(formReserva, user.uid);
+
+      // Registrar el pago
+      const formPago = {
+        metodoPago: nombreBanco.includes("Yape") || nombreBanco.includes("Plin") ? "yape" as const : "transferencia" as const,
+        numeroOperacion,
+        voucher: archivoComprobante,
+      };
+
+      await registrarPago(reservaId, formPago, user.uid);
 
       // Generar correlativo para el comprobante
       const correlativoRef = ref(db, "correlativos/reservas");
