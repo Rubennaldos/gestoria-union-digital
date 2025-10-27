@@ -34,6 +34,7 @@ export const NuevaReservaModal = ({
 }: NuevaReservaModalProps) => {
   const { profile, empadronado } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [tipoDeporte, setTipoDeporte] = useState<'futbol' | 'voley' | null>(null);
   const [form, setForm] = useState<FormReserva & { direccion?: string }>({
     canchaId: '',
     nombreCliente: '',
@@ -58,6 +59,9 @@ export const NuevaReservaModal = ({
       console.log('Modal abierto, canchas disponibles:', canchas);
       console.log('Empadronado data:', empadronado);
       
+      // Resetear tipo de deporte
+      setTipoDeporte(null);
+      
       // Cargar datos del empadronado si está vinculado, sino del perfil
       const nombreCompleto = empadronado 
         ? `${empadronado.nombre} ${empadronado.apellidos}`
@@ -66,7 +70,7 @@ export const NuevaReservaModal = ({
       const telefono = empadronado?.telefonos?.[0]?.numero || profile?.phone || '';
       
       setForm({
-        canchaId: canchas.length > 0 ? canchas[0].id : '',
+        canchaId: '',
         nombreCliente: nombreCompleto,
         dni: empadronado?.dni || '',
         telefono: telefono,
@@ -221,8 +225,12 @@ export const NuevaReservaModal = ({
     }));
   };
 
-
   const canchaSeleccionada = canchas.find(c => c.id === form.canchaId);
+  
+  // Filtrar canchas según el tipo de deporte seleccionado
+  const canchasFiltradas = tipoDeporte 
+    ? canchas.filter(c => c.activa && c.tipo === tipoDeporte)
+    : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -236,6 +244,72 @@ export const NuevaReservaModal = ({
             Complete los datos para crear una nueva reserva
           </DialogDescription>
         </DialogHeader>
+
+        {/* Selección del tipo de deporte */}
+        {!tipoDeporte && (
+          <div className="space-y-4 py-8">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-semibold mb-2">¿Qué quieres jugar?</h3>
+              <p className="text-sm text-muted-foreground">Selecciona el deporte para continuar</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-32 text-lg flex flex-col gap-3 hover:bg-primary hover:text-primary-foreground transition-all"
+                onClick={() => {
+                  setTipoDeporte('voley');
+                  // Seleccionar automáticamente la primera cancha de voley
+                  const primeraVoley = canchas.find(c => c.activa && c.tipo === 'voley');
+                  if (primeraVoley) {
+                    setForm(prev => ({ ...prev, canchaId: primeraVoley.id }));
+                  }
+                }}
+              >
+                <span className="text-4xl">🏐</span>
+                <span>Voleibol</span>
+              </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                className="h-32 text-lg flex flex-col gap-3 hover:bg-primary hover:text-primary-foreground transition-all"
+                onClick={() => {
+                  setTipoDeporte('futbol');
+                  // Seleccionar automáticamente la primera cancha de fútbol
+                  const primeraFutbol = canchas.find(c => c.activa && c.tipo === 'futbol');
+                  if (primeraFutbol) {
+                    setForm(prev => ({ ...prev, canchaId: primeraFutbol.id }));
+                  }
+                }}
+              >
+                <span className="text-4xl">⚽</span>
+                <span>Fútbol</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Formulario de reserva */}
+        {tipoDeporte && (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setTipoDeporte(null);
+                  setForm(prev => ({ ...prev, canchaId: '' }));
+                }}
+              >
+                ← Cambiar deporte
+              </Button>
+              <Badge variant="secondary">
+                {tipoDeporte === 'futbol' ? '⚽ Fútbol' : '🏐 Voleibol'}
+              </Badge>
+            </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -322,10 +396,9 @@ export const NuevaReservaModal = ({
                       <SelectValue placeholder="Seleccionar cancha" />
                     </SelectTrigger>
                     <SelectContent className="bg-background border shadow-lg z-50">
-                      {canchas.filter(cancha => cancha.activa).map(cancha => (
+                      {canchasFiltradas.map(cancha => (
                         <SelectItem key={cancha.id} value={cancha.id}>
-                          {cancha.nombre} - {cancha.ubicacion === 'boulevard' ? 'Boulevard' : 'Quinta Llana'}
-                          {cancha.tipo === 'futbol' ? ' ⚽' : ' 🏐'}
+                          {cancha.tipo === 'futbol' ? 'Cancha Deportiva' : 'Cancha de Voleibol'} - {cancha.ubicacion === 'boulevard' ? 'Boulevard' : 'Quinta Llana'}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -476,14 +549,18 @@ export const NuevaReservaModal = ({
             </Card>
           )}
         </form>
+          </>
+        )}
 
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={loading || !precioCalculado}>
-            {loading ? "Creando..." : "Crear Reserva"}
-          </Button>
+          {tipoDeporte && (
+            <Button type="submit" onClick={handleSubmit} disabled={loading || !precioCalculado}>
+              {loading ? "Creando..." : "Crear Reserva"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
