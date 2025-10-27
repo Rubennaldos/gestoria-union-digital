@@ -134,7 +134,7 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
       fechaInicioISO.setHours(hora, minuto, 0, 0);
       const fechaFinISO = addHours(fechaInicioISO, duracion);
 
-      // Crear reserva usando el servicio existente
+      // Crear reserva directamente sin validación previa (ya se hace en crearReserva)
       const formReserva = {
         canchaId: canchaSeleccionada.id,
         nombreCliente,
@@ -146,7 +146,9 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
         observaciones: conLuz ? "Con iluminación" : "Sin iluminación",
       };
 
+      console.log("Creando reserva con datos:", formReserva);
       const reservaId = await crearReserva(formReserva, user.uid);
+      console.log("Reserva creada con ID:", reservaId);
 
       // Registrar el pago
       const formPago = {

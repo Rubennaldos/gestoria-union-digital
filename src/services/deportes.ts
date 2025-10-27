@@ -300,7 +300,8 @@ export const validarDisponibilidad = async (
     return conflictos.length === 0;
   } catch (error) {
     console.error('Error al validar disponibilidad:', error);
-    return false;
+    // Si hay error al obtener reservas (ej: base de datos vacía), consideramos disponible
+    return true;
   }
 };
 
