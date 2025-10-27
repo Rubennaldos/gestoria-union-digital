@@ -122,10 +122,10 @@ export const CalendarioReservas = ({
   };
 
   return (
-    <div className="h-[600px] w-full">
+    <div className="w-full space-y-4">
       {/* Controles del calendario */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-3 md:gap-0 md:flex-row md:justify-between md:items-center">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             size="sm"
@@ -150,7 +150,7 @@ export const CalendarioReservas = ({
             <ChevronRight className="h-4 w-4" />
           </Button>
           
-          <span className="font-medium">
+          <span className="font-medium text-sm md:text-base ml-2">
             {moment(fecha).format(vista === Views.DAY ? 'dddd, D [de] MMMM' : 'MMMM YYYY')}
           </span>
         </div>
@@ -177,7 +177,7 @@ export const CalendarioReservas = ({
       </div>
 
       {/* Calendario */}
-      <div className="border rounded-lg overflow-hidden bg-white">
+      <div className="border rounded-lg overflow-auto bg-white" style={{ height: '600px' }}>
         <Calendar
           localizer={localizer}
           events={eventos}
@@ -203,7 +203,7 @@ export const CalendarioReservas = ({
           max={new Date(2023, 0, 1, 22, 0)} // 10:00 PM
           step={30}
           timeslots={2}
-          className="h-full"
+          style={{ height: '100%', minHeight: '500px' }}
           formats={{
             timeGutterFormat: 'HH:mm',
             eventTimeRangeFormat: ({ start, end }) => 
@@ -213,7 +213,7 @@ export const CalendarioReservas = ({
       </div>
 
       {/* Ayuda */}
-      <div className="mt-4 text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground space-y-1">
         <p>💡 <strong>Tip:</strong> Haz clic en un espacio libre para crear una nueva reserva, o haz clic en una reserva existente para editarla.</p>
         <p>📋 <strong>Leyenda:</strong> (A) = Aportante</p>
       </div>
