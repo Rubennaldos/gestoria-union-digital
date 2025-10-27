@@ -38,11 +38,6 @@
       ".write": "auth != null"
     },
 
-    "contadores": {
-      ".read": "auth != null",
-      ".write": "auth != null"
-    },
-
     "cobranzas": {
       "configuracion": {
         ".read": "auth != null",
@@ -136,6 +131,22 @@
     "planilla": {
       ".read": "auth != null",
       ".write": "auth != null"
+    },
+
+    "deportes": {
+      "canchas": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "reservas": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["canchaId", "estado", "fechaInicio", "dni"]
+      },
+      "configuracion": {
+        ".read": "auth != null",
+        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
+      }
     },
 
     "acceso": {
@@ -252,30 +263,6 @@
     "password_reset_requests": {
       ".read": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
       ".write": "auth != null"
-    },
-
-    "deportes": {
-      "canchas": {
-        ".read": "auth != null",
-        ".write": "auth != null",
-        "$canchaId": {
-          ".read": "auth != null",
-          ".write": "auth != null"
-        }
-      },
-      "reservas": {
-        ".read": "auth != null",
-        ".write": "auth != null",
-        ".indexOn": ["canchaId", "estado", "fechaInicio", "dni"],
-        "$reservaId": {
-          ".read": "auth != null",
-          ".write": "auth != null"
-        }
-      },
-      "configuracion": {
-        ".read": "auth != null",
-        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-      }
     }
   }
 }
