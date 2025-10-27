@@ -102,7 +102,7 @@ const moduleRoutes: Record<string, string> = {
 
 const Index = () => {
   const { can, loading: authLoading } = useAuthz();
-  const { user, profile } = useAuth();
+  const { user, profile, empadronado } = useAuth();
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const isMobile = useIsMobile();
@@ -190,9 +190,15 @@ const Index = () => {
         {/* Welcome Message */}
         <div className="bg-card border rounded-lg p-6 text-center">
           <h2 className="text-xl font-semibold text-foreground mb-2">
-            Bienvenido: {profile?.displayName || user?.displayName || user?.email || 'Usuario'}
+            Bienvenido: {empadronado ? `${empadronado.nombre} ${empadronado.apellidos}` : (profile?.displayName || user?.displayName || user?.email || 'Usuario')}
           </h2>
-          <p className="text-muted-foreground">
+          {empadronado && (
+            <div className="text-sm text-muted-foreground space-y-1 mt-2">
+              <p>Padrón N°: {empadronado.numeroPadron}</p>
+              {empadronado.dni && <p>DNI: {empadronado.dni}</p>}
+            </div>
+          )}
+          <p className="text-muted-foreground mt-2">
             Sistema de Gestión - Junta Directiva
           </p>
         </div>

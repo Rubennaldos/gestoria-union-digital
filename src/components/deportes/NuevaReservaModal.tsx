@@ -32,7 +32,7 @@ export const NuevaReservaModal = ({
   fechaInicioPredeterminada,
   fechaFinPredeterminada
 }: NuevaReservaModalProps) => {
-  const { profile } = useAuth();
+  const { profile, empadronado } = useAuth();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<FormReserva & { direccion?: string }>({
     canchaId: '',
@@ -54,14 +54,22 @@ export const NuevaReservaModal = ({
   } | null>(null);
 
   useEffect(() => {
-    if (open && profile) {
+    if (open) {
       console.log('Modal abierto, canchas disponibles:', canchas);
-      // Cargar datos del usuario logueado automáticamente
+      console.log('Empadronado data:', empadronado);
+      
+      // Cargar datos del empadronado si está vinculado, sino del perfil
+      const nombreCompleto = empadronado 
+        ? `${empadronado.nombre} ${empadronado.apellidos}`
+        : (profile?.displayName || profile?.email || '');
+      
+      const telefono = empadronado?.telefonos?.[0]?.numero || profile?.phone || '';
+      
       setForm({
         canchaId: canchas.length > 0 ? canchas[0].id : '',
-        nombreCliente: profile.displayName || profile.email || '',
-        dni: '',
-        telefono: profile.phone || '',
+        nombreCliente: nombreCompleto,
+        dni: empadronado?.dni || '',
+        telefono: telefono,
         fechaInicio: fechaInicioPredeterminada ? 
           fechaInicioPredeterminada.toISOString().slice(0, 16) : '',
         fechaFin: fechaFinPredeterminada ? 
@@ -73,7 +81,7 @@ export const NuevaReservaModal = ({
       setMostrarRecurrente(false);
       setPrecioCalculado(null);
     }
-  }, [open, canchas, fechaInicioPredeterminada, fechaFinPredeterminada, profile]);
+  }, [open, canchas, fechaInicioPredeterminada, fechaFinPredeterminada, profile, empadronado]);
 
   useEffect(() => {
     calcularPrecioReserva();
@@ -241,6 +249,13 @@ export const NuevaReservaModal = ({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-4">
+                  {empadronado && (
+                    <div className="bg-primary/10 border border-primary/20 rounded-md p-3 mb-2">
+                      <p className="text-sm font-medium">Datos del Padrón</p>
+                      <p className="text-xs text-muted-foreground">Padrón N°: {empadronado.numeroPadron}</p>
+                    </div>
+                  )}
+                  
                   <div>
                     <Label htmlFor="nombreCliente">Nombre Completo *</Label>
                     <Input
@@ -253,7 +268,9 @@ export const NuevaReservaModal = ({
                       className="bg-muted"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Reserva a nombre de: {profile?.displayName || profile?.email}
+                      {empadronado 
+                        ? `Reserva a nombre de: ${empadronado.nombre} ${empadronado.apellidos}` 
+                        : `Reserva a nombre de: ${profile?.displayName || profile?.email}`}
                     </p>
                   </div>
 

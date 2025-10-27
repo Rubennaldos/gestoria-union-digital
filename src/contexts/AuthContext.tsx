@@ -3,12 +3,15 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { User as FirebaseUser, onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 import { UserProfile, AuthUser } from '@/types/auth';
+import { Empadronado } from '@/types/empadronados';
 import { getUserProfile, onUserProfile, createUserProfile, getUserPermissions } from '@/services/rtdb';
+import { obtenerEmpadronadoPorAuthUid } from '@/services/empadronados';
 import { registerForPushNotificationsAsync } from '@/services/pushNotifications';
 
 interface AuthContextType {
   user: AuthUser | null;
   profile: UserProfile | null;
+  empadronado: Empadronado | null;
   profileLoaded: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -17,6 +20,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
+  empadronado: null,
   profileLoaded: false,
   loading: true,
   signOut: async () => {},
@@ -31,6 +35,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [empadronado, setEmpadronado] = useState<Empadronado | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -92,6 +97,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Ensure user.modules reflects nested profile.modules
             setUser({ ...authUser, profile: userProfile || undefined, modules: userProfile?.modules });
           }
+          
+          // Cargar información del empadronado vinculado
+          try {
+            const empadronadoData = await obtenerEmpadronadoPorAuthUid(fbUser.uid);
+            if (empadronadoData) {
+              console.log('✅ AuthContext: Empadronado data loaded:', empadronadoData);
+              setEmpadronado(empadronadoData);
+            } else {
+              setEmpadronado(null);
+            }
+          } catch (error) {
+            console.warn('⚠️ AuthContext: Could not load empadronado data:', error);
+            setEmpadronado(null);
+          }
+          
           console.log('✅ AuthContext: User state updated');
           // Mark profile as loaded (initial fetch completed)
           setProfileLoaded(true);
@@ -101,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.log('🚪 AuthContext: User signed out');
           setUser(null);
           setProfile(null);
+          setEmpadronado(null);
           setProfileLoaded(false);
         }
       } catch (error) {
@@ -149,8 +170,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = useMemo<AuthContextType>(
-    () => ({ user, profile, profileLoaded, loading, signOut }),
-    [user, profile, profileLoaded, loading]
+    () => ({ user, profile, empadronado, profileLoaded, loading, signOut }),
+    [user, profile, empadronado, profileLoaded, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
