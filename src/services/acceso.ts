@@ -129,23 +129,8 @@ export async function registrarVisita(data: NuevaVisitaInput) {
     ...base,
   });
 
-  // Crear el registro de visita
+  // Crear el registro de visita (NO se duplica en seguridad/porticos hasta ser aprobado)
   await set(ref(db, `acceso/visitas/${id}`), payload);
-  
-  // Agregar a pendientes del pórtico
-  await set(
-    ref(db, `seguridad/porticos/${data.porticoId}/pendientes/${id}`),
-    stripUndefinedDeep({
-      id,
-      empadronadoId: data.empadronadoId,
-      nombre: visitantes[0]?.nombre || "",
-      dni: visitantes[0]?.dni || "",
-      createdAt: base.createdAt,
-      tipo: "visitante",
-      solicitadoPorNombre,
-      solicitadoPorPadron,
-    })
-  );
 
   return id;
 }
@@ -214,21 +199,8 @@ export async function registrarTrabajadores(data: RegistrarTrabajadoresInput) {
     ...base,
   };
 
-  // Crear el registro de trabajadores
+  // Crear el registro de trabajadores (NO se duplica en seguridad/porticos hasta ser aprobado)
   await set(ref(db, `acceso/trabajadores/${id}`), payload);
-  
-  // Agregar a pendientes del pórtico
-  await set(
-    ref(db, `seguridad/porticos/${data.porticoId}/pendientes/${id}`),
-    stripUndefinedDeep({
-      id,
-      empadronadoId: data.empadronadoId,
-      solicitadoPorNombre,
-      solicitadoPorPadron,
-      createdAt: base.createdAt,
-      tipo: "trabajador",
-    })
-  );
 
   return id;
 }
@@ -262,21 +234,8 @@ export async function registrarProveedor(data: RegistrarProveedorInput) {
     ...base,
   };
 
-  // Crear el registro de proveedor
+  // Crear el registro de proveedor (NO se duplica en seguridad/porticos hasta ser aprobado)
   await set(ref(db, `acceso/proveedores/${id}`), payload);
-  
-  // Agregar a pendientes del pórtico
-  await set(
-    ref(db, `seguridad/porticos/${data.porticoId}/pendientes/${id}`),
-    stripUndefinedDeep({
-      id,
-      empadronadoId: data.empadronadoId,
-      solicitadoPorNombre,
-      solicitadoPorPadron,
-      createdAt: base.createdAt,
-      tipo: "proveedor",
-    })
-  );
 
   return id;
 }
@@ -307,8 +266,8 @@ export async function cambiarEstadoAcceso(
     autorizadoPor: actor,
   });
 
-  // Eliminar de pendientes del pórtico
-  await set(ref(db, `seguridad/porticos/${porticoId}/pendientes/${id}`), null);
+  // Si fue autorizado, NO hacer nada más (ya está visible en HistorialAutorizaciones)
+  // Si fue denegado, solo actualiza el estado
 }
 
 /* ──────────────────────────────────────────────────────────────

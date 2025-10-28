@@ -75,8 +75,10 @@ export const AutorizacionesSeguridad = () => {
   // Obtener estado de carga y usuario
   const { user, loading } = useAuth();
 
-  // Leer de la misma ruta que el widget del dashboard
-  const { data: pendientesPortico } = useFirebaseData<Record<string, any>>("seguridad/porticos/principal/pendientes");
+  // Leer directamente de las colecciones de acceso (donde están las solicitudes pendientes)
+  const { data: visitas } = useFirebaseData<Record<string, RegistroVisita>>("acceso/visitas");
+  const { data: trabajadores } = useFirebaseData<Record<string, RegistroTrabajadores>>("acceso/trabajadores");
+  const { data: proveedores } = useFirebaseData<Record<string, RegistroProveedor>>("acceso/proveedores");
 
   // Mostrar spinner/cargando mientras se carga el usuario
   if (loading) {
@@ -101,20 +103,47 @@ export const AutorizacionesSeguridad = () => {
     );
   }
 
-  // 1) Armar lista de pendientes desde la misma ruta que el widget
+  // 1) Armar lista de pendientes desde las colecciones de acceso
   useEffect(() => {
     const pendientes: AutorizacionPendiente[] = [];
 
-    if (pendientesPortico) {
-      for (const [id, val] of Object.entries(pendientesPortico)) {
-        // Solo incluir solicitudes que están pendientes (no aprobadas ni rechazadas)
-        if (!val.estado || val.estado === "pendiente") {
-          const tipo = val.tipo as "visitante" | "trabajador" | "proveedor";
+    // Visitas pendientes
+    if (visitas) {
+      for (const [id, v] of Object.entries(visitas)) {
+        if (!v.estado || v.estado === "pendiente") {
           pendientes.push({
             id,
-            tipo,
-            data: val,
-            fechaCreacion: val.createdAt || val.fechaCreacion || 0,
+            tipo: "visitante",
+            data: v,
+            fechaCreacion: tsFrom(v),
+          });
+        }
+      }
+    }
+
+    // Trabajadores pendientes
+    if (trabajadores) {
+      for (const [id, t] of Object.entries(trabajadores)) {
+        if (!t.estado || t.estado === "pendiente") {
+          pendientes.push({
+            id,
+            tipo: "trabajador",
+            data: t,
+            fechaCreacion: tsFrom(t),
+          });
+        }
+      }
+    }
+
+    // Proveedores pendientes
+    if (proveedores) {
+      for (const [id, p] of Object.entries(proveedores)) {
+        if (!p.estado || p.estado === "pendiente") {
+          pendientes.push({
+            id,
+            tipo: "proveedor",
+            data: p,
+            fechaCreacion: tsFrom(p),
           });
         }
       }
@@ -122,7 +151,7 @@ export const AutorizacionesSeguridad = () => {
 
     pendientes.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
     setAutorizaciones(pendientes);
-  }, [pendientesPortico]);
+  }, [visitas, trabajadores, proveedores]);
 
   // 2) Resolver empadronados EN BLOQUE para todos los pendientes visibles
   useEffect(() => {

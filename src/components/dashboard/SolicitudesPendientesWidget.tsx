@@ -29,6 +29,13 @@ export const SolicitudesPendientesWidget = () => {
   const navigate = useNavigate();
   const [solicitudes, setSolicitudes] = useState<SolicitudPendiente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [maestrosSolicitudes, setMaestrosSolicitudes] = useState<SolicitudPendiente[]>([]);
+  const [accesosSolicitudes, setAccesosSolicitudes] = useState<SolicitudPendiente[]>([]);
+  
+  // Estados para almacenar solicitudes por tipo de acceso
+  const [visitasPendientes, setVisitasPendientes] = useState<SolicitudPendiente[]>([]);
+  const [trabajadoresPendientes, setTrabajadoresPendientes] = useState<SolicitudPendiente[]>([]);
+  const [proveedoresPendientes, setProveedoresPendientes] = useState<SolicitudPendiente[]>([]);
 
   // Verificar si el usuario tiene acceso al módulo
   const tieneAcceso = can("admin_seguridad", "read");
@@ -61,41 +68,101 @@ export const SolicitudesPendientesWidget = () => {
       actualizarSolicitudes(maestros, "maestros");
     });
 
-    // Escuchar pendientes del pórtico principal
-    const pendientesRef = ref(db, "seguridad/porticos/principal/pendientes");
-    const unsubPendientes = onValue(pendientesRef, (snapshot) => {
+    // Escuchar visitas
+    const visitasRef = ref(db, "acceso/visitas");
+    const unsubVisitas = onValue(visitasRef, (snapshot) => {
       const pendientes: SolicitudPendiente[] = [];
       if (snapshot.exists()) {
         const data = snapshot.val();
         Object.entries(data).forEach(([id, val]: any) => {
-          // Solo incluir solicitudes que están pendientes (no aprobadas ni rechazadas)
           if (!val.estado || val.estado === "pendiente") {
+            const visitantes = val.visitantes || [];
             pendientes.push({
               id,
-              tipo: val.tipo,
-              nombre: val.nombre || val.solicitadoPorNombre || "Sin nombre",
+              tipo: "visitante",
+              nombre: visitantes[0]?.nombre || val.solicitadoPorNombre || "Sin nombre",
               empadronadoId: val.empadronadoId,
               solicitadoPorNombre: val.solicitadoPorNombre,
               solicitadoPorPadron: val.solicitadoPorPadron,
-              createdAt: val.createdAt,
-              porticoId: "principal",
+              createdAt: val.createdAt || val.fechaCreacion || 0,
+              porticoId: val.porticoId || "principal",
               datos: val,
             });
           }
         });
       }
-      actualizarSolicitudes(pendientes, "accesos");
+      setVisitasPendientes(pendientes);
+    });
+
+    // Escuchar trabajadores
+    const trabajadoresRef = ref(db, "acceso/trabajadores");
+    const unsubTrabajadores = onValue(trabajadoresRef, (snapshot) => {
+      const pendientes: SolicitudPendiente[] = [];
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.entries(data).forEach(([id, val]: any) => {
+          if (!val.estado || val.estado === "pendiente") {
+            const trabajadores = val.trabajadores || [];
+            pendientes.push({
+              id,
+              tipo: "trabajador",
+              nombre: trabajadores[0]?.nombre || val.solicitadoPorNombre || "Sin nombre",
+              empadronadoId: val.empadronadoId,
+              solicitadoPorNombre: val.solicitadoPorNombre,
+              solicitadoPorPadron: val.solicitadoPorPadron,
+              createdAt: val.createdAt || val.fechaCreacion || 0,
+              porticoId: val.porticoId || "principal",
+              datos: val,
+            });
+          }
+        });
+      }
+      setTrabajadoresPendientes(pendientes);
+    });
+
+    // Escuchar proveedores
+    const proveedoresRef = ref(db, "acceso/proveedores");
+    const unsubProveedores = onValue(proveedoresRef, (snapshot) => {
+      const pendientes: SolicitudPendiente[] = [];
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        Object.entries(data).forEach(([id, val]: any) => {
+          if (!val.estado || val.estado === "pendiente") {
+            pendientes.push({
+              id,
+              tipo: "proveedor",
+              nombre: val.empresa || val.solicitadoPorNombre || "Sin nombre",
+              empadronadoId: val.empadronadoId,
+              solicitadoPorNombre: val.solicitadoPorNombre,
+              solicitadoPorPadron: val.solicitadoPorPadron,
+              createdAt: val.createdAt || val.fechaCreacion || 0,
+              porticoId: val.porticoId || "principal",
+              datos: val,
+            });
+          }
+        });
+      }
+      setProveedoresPendientes(pendientes);
       setLoading(false);
     });
 
     return () => {
       unsubMaestros();
-      unsubPendientes();
+      unsubVisitas();
+      unsubTrabajadores();
+      unsubProveedores();
     };
   }, [tieneAcceso]);
 
-  const [maestrosSolicitudes, setMaestrosSolicitudes] = useState<SolicitudPendiente[]>([]);
-  const [accesosSolicitudes, setAccesosSolicitudes] = useState<SolicitudPendiente[]>([]);
+  // Combinar todas las solicitudes de acceso cuando cambie alguna
+  useEffect(() => {
+    const pendientesAcceso = [
+      ...visitasPendientes,
+      ...trabajadoresPendientes,
+      ...proveedoresPendientes,
+    ];
+    actualizarSolicitudes(pendientesAcceso, "accesos");
+  }, [visitasPendientes, trabajadoresPendientes, proveedoresPendientes]);
 
   const actualizarSolicitudes = (nuevas: SolicitudPendiente[], tipo: "maestros" | "accesos") => {
     if (tipo === "maestros") {
