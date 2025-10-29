@@ -254,6 +254,27 @@ export const seedModules = async () => {
       icon: 'Briefcase',
       orden: 22,
       requiereAprobacion: false
+    },
+    eventos: {
+      id: 'eventos',
+      nombre: 'Eventos',
+      icon: 'PartyPopper',
+      orden: 23,
+      requiereAprobacion: false
+    },
+    admin_eventos: {
+      id: 'admin_eventos',
+      nombre: 'Administración Eventos',
+      icon: 'Calendar',
+      orden: 24,
+      requiereAprobacion: false
+    },
+    admin_deportes: {
+      id: 'admin_deportes',
+      nombre: 'Administración Deportes',
+      icon: 'Building',
+      orden: 25,
+      requiereAprobacion: false
     }
   };
 

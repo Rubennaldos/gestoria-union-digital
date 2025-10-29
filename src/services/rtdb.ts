@@ -324,6 +324,19 @@ export const listModules = async (): Promise<Module[]> => {
     needsUpdate = true;
   }
   
+  // Auto-agregar módulo ADMIN_DEPORTES si no existe
+  const hasAdminDeportes = modules.some(m => m.id === 'admin_deportes');
+  if (!hasAdminDeportes && snapshot.exists()) {
+    allModules.admin_deportes = {
+      id: 'admin_deportes',
+      nombre: 'Administración Deportes',
+      icon: 'Building',
+      orden: 25,
+      requiereAprobacion: false
+    };
+    needsUpdate = true;
+  }
+  
   if (needsUpdate) {
     await set(modulesRef, allModules);
     modules = Object.values(allModules);
