@@ -71,30 +71,37 @@ export default function Deportes() {
 
   const descargarComprobante = async (reserva: Reserva) => {
     try {
-      if (!reserva.ingresoId) {
+      // Intentar con ingresoId primero, luego con el ID de la reserva
+      const posiblesIds = [
+        reserva.ingresoId,
+        `receipt_${reserva.id}`,
+        `mov_${reserva.id.replace('reserva_', '')}`
+      ].filter(Boolean);
+
+      let receiptData = null;
+      let foundId = null;
+
+      // Intentar encontrar el comprobante con cualquiera de los IDs posibles
+      for (const id of posiblesIds) {
+        const receiptRef = ref(db, `recibos/${id}`);
+        const snapshot = await get(receiptRef);
+        
+        if (snapshot.exists()) {
+          receiptData = snapshot.val();
+          foundId = id;
+          break;
+        }
+      }
+
+      if (!receiptData) {
         toast({
-          title: "Sin comprobante",
-          description: "Esta reserva no tiene comprobante disponible",
+          title: "Comprobante no disponible",
+          description: "Esta reserva fue creada antes de que se implementara el sistema de comprobantes digitales",
           variant: "destructive"
         });
         return;
       }
 
-      // Obtener el PDF del recibo desde Firebase
-      const receiptRef = ref(db, `recibos/${reserva.ingresoId}`);
-      const snapshot = await get(receiptRef);
-      
-      if (!snapshot.exists()) {
-        toast({
-          title: "No encontrado",
-          description: "No se encontró el comprobante",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const receiptData = snapshot.val();
-      
       if (receiptData.pdfDataUrl) {
         // Crear un enlace temporal y descargar
         const link = document.createElement('a');
@@ -105,13 +112,13 @@ export default function Deportes() {
         document.body.removeChild(link);
         
         toast({
-          title: "Descargando",
-          description: "El comprobante se está descargando"
+          title: "¡Listo!",
+          description: "El comprobante se ha descargado correctamente"
         });
       } else {
         toast({
-          title: "No disponible",
-          description: "El PDF del comprobante no está disponible",
+          title: "PDF no disponible",
+          description: "El comprobante existe pero el PDF no está disponible",
           variant: "destructive"
         });
       }
@@ -119,7 +126,7 @@ export default function Deportes() {
       console.error('Error al descargar comprobante:', error);
       toast({
         title: "Error",
-        description: "No se pudo descargar el comprobante",
+        description: "No se pudo descargar el comprobante. Por favor, intenta nuevamente",
         variant: "destructive"
       });
     }
@@ -292,8 +299,8 @@ export default function Deportes() {
                         </>
                       )}
 
-                      {/* Botón de descarga de comprobante */}
-                      {reserva.estado === 'pagado' && reserva.ingresoId && (
+      {/* Botón de descarga de comprobante */}
+                      {reserva.estado === 'pagado' && (
                         <>
                           <Separator className="opacity-50" />
                           <Button
