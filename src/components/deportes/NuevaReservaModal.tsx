@@ -137,7 +137,10 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
       fechaInicioISO.setHours(hora, minuto, 0, 0);
       const fechaFinISO = addHours(fechaInicioISO, duracion);
 
-      // Crear reserva directamente con estado "pagado"
+      // Crear movimiento en finanzas PRIMERO para obtener el ID
+      const movimientoId = `mov_${Date.now()}`;
+
+      // Crear reserva directamente con estado "pagado" y el ingresoId
       const reservaId = `reserva_${Date.now()}`;
       const reservaData = {
         id: reservaId,
@@ -159,15 +162,13 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
           fechaPago: fechaPago.toISOString(),
         },
         observaciones: conLuz ? "Con iluminación" : "Sin iluminación",
+        ingresoId: movimientoId, // ✅ Guardamos el ID del movimiento financiero
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         createdBy: user.uid,
       };
 
       await set(ref(db, `deportes/reservas/${reservaId}`), reservaData);
-
-      // Crear movimiento en finanzas
-      const movimientoId = `mov_${Date.now()}`;
       const movimientoData = {
         id: movimientoId,
         tipo: 'ingreso',
@@ -199,7 +200,7 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
 
       const correlativoStr = `RES-${String(nuevoCorrelativo).padStart(6, "0")}`;
 
-      // Generar PDF
+      // Generar PDF usando el movimientoId como receiptId
       await generarComprobanteReservaPDF(
         {
           correlativo: correlativoStr,
@@ -219,9 +220,10 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
           fechaEmision: new Date(),
         },
         {
-          receiptId: `receipt_${reservaId}`,
+          receiptId: movimientoId, // ✅ Usar el mismo ID del movimiento
           reservaId,
           empadronadoId: empadronado?.id,
+          movimientoId,
         }
       );
 
