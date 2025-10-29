@@ -40,6 +40,7 @@ import ConfiguracionCuenta from "./pages/ConfiguracionCuenta";
 import Planilla from "./pages/Planilla";
 import Eventos from "./pages/Eventos";
 import AdminEventos from "./pages/AdminEventos";
+import AdminDeportes from "./pages/AdminDeportes";
 import Modulos from "./pages/Modulos";
 import RecuperarContrasena from "./pages/RecuperarContrasena";
 import Comunicaciones from "./pages/Comunicaciones";
@@ -313,6 +314,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Comunicaciones />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Administración de Deportes */}
+              <Route
+                path="/admin-deportes"
+                element={
+                  <ProtectedRoute>
+                    <AdminDeportes />
                   </ProtectedRoute>
                 }
               />

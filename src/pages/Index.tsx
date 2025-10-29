@@ -43,7 +43,8 @@ const moduleIcons: Record<string, any> = {
   finanzas: BarChart3,
   planilla: Briefcase,
   eventos: PartyPopper,
-  admin_eventos: Calendar
+  admin_eventos: Calendar,
+  admin_deportes: Building
 };
 
 // Mapa de colores para los módulos
@@ -70,7 +71,8 @@ const moduleColors: Record<string, "primary" | "warning" | "success" | "secondar
   finanzas: "success",
   planilla: "primary",
   eventos: "success",
-  admin_eventos: "warning"
+  admin_eventos: "warning",
+  admin_deportes: "success"
 };
 
 // Mapa de rutas para los módulos
@@ -97,7 +99,8 @@ const moduleRoutes: Record<string, string> = {
   finanzas: "/finanzas",
   planilla: "/planilla",
   eventos: "/eventos",
-  admin_eventos: "/admin-eventos"
+  admin_eventos: "/admin-eventos",
+  admin_deportes: "/admin-deportes"
 };
 
 const Index = () => {
