@@ -280,7 +280,27 @@ export const listRoles = async (): Promise<Role[]> => {
 export const listModules = async (): Promise<Module[]> => {
   const modulesRef = ref(db, 'modules');
   const snapshot = await get(modulesRef);
-  const modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
+  let modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
+  
+  // Auto-agregar módulo admin_deportes si no existe
+  const hasAdminDeportes = modules.some(m => m.id === 'admin_deportes');
+  if (!hasAdminDeportes && snapshot.exists()) {
+    try {
+      const allModules = snapshot.val();
+      allModules.admin_deportes = {
+        id: 'admin_deportes',
+        nombre: 'Administración Deportes',
+        icon: 'Building',
+        orden: 25,
+        requiereAprobacion: false
+      };
+      await set(modulesRef, allModules);
+      modules = Object.values(allModules);
+      console.log('✅ Módulo admin_deportes agregado automáticamente');
+    } catch (error) {
+      console.error('❌ Error agregando módulo admin_deportes:', error);
+    }
+  }
   
   return modules.sort((a, b) => a.orden - b.orden);
 };
