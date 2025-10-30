@@ -280,7 +280,20 @@ export const listRoles = async (): Promise<Role[]> => {
 export const listModules = async (): Promise<Module[]> => {
   const modulesRef = ref(db, 'modules');
   const snapshot = await get(modulesRef);
-  const modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
+  if (!snapshot.exists()) return [];
+
+  // Support two shapes in RTDB:
+  // 1) modules: { id1: { nombre, orden, ... }, id2: { ... } }
+  // 2) modules: { 0: { id, nombre, orden }, ... }
+  const raw = snapshot.val() as Record<string, any>;
+  const modules: Module[] = Object.entries(raw).map(([key, val]) => {
+    // If the entry already contains an id field, respect it; otherwise inject the key as id
+    const id = (val && val.id) ? val.id : key;
+    return { id, ...(val || {}) } as Module;
+  });
+
+  // Normalize orden and sort safely
+  modules.forEach(m => { if (typeof m.orden !== 'number') m.orden = Number(m.orden) || 9999; });
   return modules.sort((a, b) => a.orden - b.orden);
 };
 
