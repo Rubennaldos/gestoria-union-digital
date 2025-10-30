@@ -39,8 +39,10 @@ export const GestionarPermisosModal: React.FC<GestionarPermisosModalProps> = ({
   const loadData = async () => {
     setLoading(true);
     try {
-      const modulesData = await listModules();
-      setModules(modulesData);
+  const modulesData = await listModules();
+  setModules(modulesData);
+  // Debug: mostrar los módulos recibidos desde RTDB para verificar que el nuevo módulo existe
+  console.log('[GestionarPermisosModal] listModules ->', modulesData);
       
       if (empadronado?.authUid) {
         const permissions = await getUserPermissions(empadronado.authUid);
