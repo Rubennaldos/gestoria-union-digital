@@ -3,10 +3,7 @@
     ".read": false,
     ".write": false,
 
-    "modules": { 
-      ".read": "auth != null",
-      ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-    },
+    "modules": { ".read": "auth != null" },
     "leyenda-etapas": { ".read": "auth != null" },
 
     "permissions": {
