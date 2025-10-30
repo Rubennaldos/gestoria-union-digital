@@ -280,67 +280,7 @@ export const listRoles = async (): Promise<Role[]> => {
 export const listModules = async (): Promise<Module[]> => {
   const modulesRef = ref(db, 'modules');
   const snapshot = await get(modulesRef);
-  let modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
-  
-  let needsUpdate = false;
-  let allModules = snapshot.exists() ? snapshot.val() : {};
-  
-  // Auto-agregar módulo PLANILLA si no existe
-  const hasPlanilla = modules.some(m => m.id === 'planilla');
-  if (!hasPlanilla && snapshot.exists()) {
-    allModules.planilla = {
-      id: 'planilla',
-      nombre: 'Planilla',
-      icon: 'Briefcase',
-      orden: 22,
-      requiereAprobacion: false
-    };
-    needsUpdate = true;
-  }
-  
-  // Auto-agregar módulo EVENTOS si no existe
-  const hasEventos = modules.some(m => m.id === 'eventos');
-  if (!hasEventos && snapshot.exists()) {
-    allModules.eventos = {
-      id: 'eventos',
-      nombre: 'Eventos',
-      icon: 'PartyPopper',
-      orden: 23,
-      requiereAprobacion: false
-    };
-    needsUpdate = true;
-  }
-  
-  // Auto-agregar módulo ADMIN_EVENTOS si no existe
-  const hasAdminEventos = modules.some(m => m.id === 'admin_eventos');
-  if (!hasAdminEventos && snapshot.exists()) {
-    allModules.admin_eventos = {
-      id: 'admin_eventos',
-      nombre: 'Administración Eventos',
-      icon: 'Calendar',
-      orden: 24,
-      requiereAprobacion: false
-    };
-    needsUpdate = true;
-  }
-  
-  // Auto-agregar módulo ADMIN_DEPORTES si no existe
-  const hasAdminDeportes = modules.some(m => m.id === 'admin_deportes');
-  if (!hasAdminDeportes && snapshot.exists()) {
-    allModules.admin_deportes = {
-      id: 'admin_deportes',
-      nombre: 'Administración Deportes',
-      icon: 'Building',
-      orden: 25,
-      requiereAprobacion: false
-    };
-    needsUpdate = true;
-  }
-  
-  if (needsUpdate) {
-    await set(modulesRef, allModules);
-    modules = Object.values(allModules);
-  }
+  const modules: Module[] = snapshot.exists() ? Object.values(snapshot.val()) : [];
   
   return modules.sort((a, b) => a.orden - b.orden);
 };
