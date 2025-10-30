@@ -12,6 +12,7 @@ import { useAuthz } from '@/contexts/AuthzContext';
 import { listUsers, listRoles, toggleUserActive } from '@/services/rtdb';
 import { resetPassword } from '@/services/auth';
 import { UserProfile, Role } from '@/types/auth';
+import { SeedDataButton } from '@/components/ui/seedDataButton';
 import { 
   Users, 
   Plus, 
@@ -164,14 +165,17 @@ export default function UsersAdmin() {
               </div>
             </div>
             
-            <Can module="usuarios" level="write">
-              <Button asChild>
-                <Link to="/admin/users/new" className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Nuevo Usuario
-                </Link>
-              </Button>
-            </Can>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <Can module="usuarios" level="write">
+                <Button asChild>
+                  <Link to="/admin/users/new" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Nuevo Usuario
+                  </Link>
+                </Button>
+              </Can>
+              <SeedDataButton />
+            </div>
           </div>
         </div>
       </div>
