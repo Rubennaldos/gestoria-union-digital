@@ -292,6 +292,18 @@ export const listModules = async (): Promise<Module[]> => {
     return { id, ...(val || {}) } as Module;
   });
 
+  // Agregar módulo admin_deportes si no existe en la BD
+  const hasAdminDeportes = modules.some(m => m.id === 'admin_deportes');
+  if (!hasAdminDeportes) {
+    modules.push({
+      id: 'admin_deportes',
+      nombre: 'Administración Deportes',
+      icon: 'Building',
+      orden: 25,
+      requiereAprobacion: false
+    });
+  }
+
   // Normalize orden and sort safely
   modules.forEach(m => { if (typeof m.orden !== 'number') m.orden = Number(m.orden) || 9999; });
   return modules.sort((a, b) => a.orden - b.orden);
