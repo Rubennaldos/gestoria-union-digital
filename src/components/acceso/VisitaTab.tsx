@@ -17,6 +17,7 @@ import { Visitante, FavoritoUsuario } from "@/types/acceso";
 import { ref, get } from "firebase/database";
 import { db } from "@/config/firebase";
 import { getConfigWhatsApp, generarDetallesSolicitud, abrirWhatsApp } from "@/lib/whatsappAcceso";
+import { generarYDescargarQRVisita } from "@/lib/qrCodeGenerator";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -129,6 +130,31 @@ export function VisitaTab() {
 
       const id = await registrarVisita(registro);
 
+      // Generar y descargar QR automáticamente
+      try {
+        await generarYDescargarQRVisita({
+          id,
+          tipoAcceso,
+          visitantes: visitantesLimpios,
+          placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
+          menores: Number(menores || 0),
+          fechaCreacion: new Date().toLocaleString('es-PE', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        });
+      } catch (qrError) {
+        console.error("Error al generar QR:", qrError);
+        toast({
+          title: "Advertencia",
+          description: "El registro fue exitoso pero no se pudo generar el QR",
+          variant: "default"
+        });
+      }
+
       // Enviar WhatsApp automáticamente
       try {
         const config = await getConfigWhatsApp();
@@ -147,7 +173,7 @@ export function VisitaTab() {
       }
 
       setMostrarConfirmacion(true);
-      toast({ title: "Registro exitoso", description: "Solicitud enviada a vigilancia y WhatsApp" });
+      toast({ title: "Registro exitoso", description: "Solicitud enviada y QR generado. Revisa tus descargas." });
 
       setPlacas([{ id: "1", placa: "" }]);
       setVisitantes([{ id: "1", nombre: "", dni: "" }]);
