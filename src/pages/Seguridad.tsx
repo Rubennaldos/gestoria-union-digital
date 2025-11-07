@@ -12,6 +12,7 @@ import { RegistroManualProveedores } from "@/components/seguridad/RegistroManual
 import { HistorialAutorizaciones } from "@/components/seguridad/HistorialAutorizaciones";
 import { ControlIngresoSalida } from "@/components/seguridad/ControlIngresoSalida";
 import { HistorialSeguridad } from "@/components/seguridad/HistorialSeguridad";
+import { HistorialCompleto } from "@/components/seguridad/HistorialCompleto";
 import { BuscadorInteligente } from "@/components/seguridad/BuscadorInteligente";
 import { BotonEmergencia } from "@/components/seguridad/BotonEmergencia";
 
@@ -91,14 +92,14 @@ const Seguridad = () => {
           </CardHeader>
           <CardContent className="p-3 md:p-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
+              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
                 <TabsTrigger 
                   value="autorizaciones" 
                   className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
                 >
                   <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Historial Autorizaciones</span>
-                  <span className="sm:hidden">Historial</span>
+                  <span className="hidden sm:inline">Activos</span>
+                  <span className="sm:hidden">Activos</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="manual-visitas" 
@@ -125,12 +126,20 @@ const Seguridad = () => {
                   <span className="sm:hidden">Proveed.</span>
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="historial-completo" 
+                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+                >
+                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                  <span className="hidden sm:inline">Historial Completo</span>
+                  <span className="sm:hidden">Historial</span>
+                </TabsTrigger>
+                <TabsTrigger 
                   value="historial" 
                   className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
                 >
                   <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Historial</span>
-                  <span className="sm:hidden">Historial</span>
+                  <span className="hidden sm:inline">Movimientos</span>
+                  <span className="sm:hidden">Mov.</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -148,6 +157,10 @@ const Seguridad = () => {
 
               <TabsContent value="manual-proveedores" className="mt-3 md:mt-6">
                 <RegistroManualProveedores />
+              </TabsContent>
+
+              <TabsContent value="historial-completo" className="mt-3 md:mt-6">
+                <HistorialCompleto />
               </TabsContent>
 
               <TabsContent value="historial" className="mt-3 md:mt-6">
