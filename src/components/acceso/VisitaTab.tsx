@@ -160,7 +160,8 @@ export function VisitaTab() {
             day: '2-digit',
             hour: '2-digit',
             minute: '2-digit'
-          })
+          }),
+          tipoRegistro,
         });
       } catch (qrError) {
         console.error("Error al generar QR:", qrError);

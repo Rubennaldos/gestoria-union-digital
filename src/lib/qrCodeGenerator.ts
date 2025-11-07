@@ -7,6 +7,7 @@ export interface DatosVisitaQR {
   placas?: string[];
   menores: number;
   fechaCreacion: string;
+  tipoRegistro?: "visita" | "alquiler";
 }
 
 /**

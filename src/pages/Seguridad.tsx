@@ -6,18 +6,11 @@ import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation"
 import { Badge } from "@/components/ui/badge";
 import BackButton from "@/components/layout/BackButton";
 import { AlertTriangle, Shield, Users, Clock, UserCheck, FileText, Camera, Search, Plus } from "lucide-react";
-import { RegistroManualVisitas } from "@/components/seguridad/RegistroManualVisitas";
-import { RegistroManualTrabajadores } from "@/components/seguridad/RegistroManualTrabajadores";
-import { RegistroManualProveedores } from "@/components/seguridad/RegistroManualProveedores";
-import { HistorialAutorizaciones } from "@/components/seguridad/HistorialAutorizaciones";
-import { ControlIngresoSalida } from "@/components/seguridad/ControlIngresoSalida";
-import { HistorialSeguridad } from "@/components/seguridad/HistorialSeguridad";
-import { HistorialCompleto } from "@/components/seguridad/HistorialCompleto";
-import { BuscadorInteligente } from "@/components/seguridad/BuscadorInteligente";
+import { EscanearQRPortico } from "@/components/seguridad/EscanearQRPortico";
+import { HistorialAsociado } from "@/components/seguridad/HistorialAsociado";
 import { BotonEmergencia } from "@/components/seguridad/BotonEmergencia";
 
 const Seguridad = () => {
-  const [activeTab, setActiveTab] = useState("autorizaciones");
   const { user, loading } = useAuth();
 
   // Mostrar spinner/cargando mientras se carga el usuario
@@ -69,101 +62,31 @@ const Seguridad = () => {
           </div>
         </div>
 
-        {/* Control de Acceso - Mobile Optimized */}
-        <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-          <CardHeader className="p-3 md:p-6 bg-gradient-to-r from-primary/5 to-primary/10">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-              <div className="p-1.5 md:p-2 rounded-lg bg-primary/10">
-                <UserCheck className="h-3.5 w-3.5 md:h-5 md:w-5 text-primary" />
+        {/* Opciones principales - Mobile Optimized */}
+        <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+          {/* Escanear QR */}
+          <EscanearQRPortico />
+
+          {/* Historial */}
+          <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group">
+            <CardContent className="p-8 md:p-12">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 group-hover:scale-110 transition-transform duration-300">
+                  <Clock className="h-16 w-16 md:h-24 md:w-24 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-2">Historial de Visitas</h3>
+                  <p className="text-muted-foreground">
+                    Consulta tus visitas y horarios de entrada/salida
+                  </p>
+                </div>
               </div>
-              Control de Acceso
-            </CardTitle>
-            <CardDescription className="text-xs md:text-sm hidden md:block">
-              Gestión de autorizaciones, registro manual y control de ingreso/salida
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-3 md:p-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
-                <TabsTrigger 
-                  value="autorizaciones" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Activos</span>
-                  <span className="sm:hidden">Activos</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="manual-visitas" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <Users className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Reg. Visitas</span>
-                  <span className="sm:hidden">Visitas</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="manual-trabajadores" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <UserCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Reg. Trabajadores</span>
-                  <span className="sm:hidden">Trabaj.</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="manual-proveedores" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <Shield className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Reg. Proveedores</span>
-                  <span className="sm:hidden">Proveed.</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="historial-completo" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Historial Completo</span>
-                  <span className="sm:hidden">Historial</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="historial" 
-                  className="flex flex-col md:flex-row items-center gap-0.5 md:gap-1 text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
-                >
-                  <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Movimientos</span>
-                  <span className="sm:hidden">Mov.</span>
-                </TabsTrigger>
-              </TabsList>
+            </CardContent>
+          </Card>
+        </div>
 
-              <TabsContent value="autorizaciones" className="mt-3 md:mt-6">
-                <HistorialAutorizaciones />
-              </TabsContent>
-
-              <TabsContent value="manual-visitas" className="mt-3 md:mt-6">
-                <RegistroManualVisitas />
-              </TabsContent>
-
-              <TabsContent value="manual-trabajadores" className="mt-3 md:mt-6">
-                <RegistroManualTrabajadores />
-              </TabsContent>
-
-              <TabsContent value="manual-proveedores" className="mt-3 md:mt-6">
-                <RegistroManualProveedores />
-              </TabsContent>
-
-              <TabsContent value="historial-completo" className="mt-3 md:mt-6">
-                <HistorialCompleto />
-              </TabsContent>
-
-              <TabsContent value="historial" className="mt-3 md:mt-6">
-                <HistorialSeguridad />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        {/* Buscador Inteligente */}
-        <BuscadorInteligente />
+        {/* Historial detallado */}
+        <HistorialAsociado />
       </main>
 
       <BottomNavigation />
