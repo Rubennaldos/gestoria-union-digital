@@ -22,6 +22,7 @@ import { generarYDescargarQRVisita } from "@/lib/qrCodeGenerator";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function VisitaTab() {
+  const [tipoRegistro, setTipoRegistro] = useState<"visita" | "alquiler">("visita");
   const [tipoAcceso, setTipoAcceso] = useState<"vehicular" | "peatonal">("peatonal");
   const [placas, setPlacas] = useState<{ id: string; placa: string }[]>([{ id: "1", placa: "" }]);
   const [visitantes, setVisitantes] = useState<Visitante[]>([{ id: "1", nombre: "", dni: "" }]);
@@ -82,11 +83,23 @@ export function VisitaTab() {
         return false;
       }
     }
-    const validos = visitantes.filter((v) => v.nombre.trim() && v.dni.trim());
+    
+    // Para alquiler, el DNI es obligatorio. Para visita, es opcional
+    const validos = tipoRegistro === "alquiler" 
+      ? visitantes.filter((v) => v.nombre.trim() && v.dni.trim())
+      : visitantes.filter((v) => v.nombre.trim());
+      
     if (validos.length === 0) {
-      toast({ title: "Error", description: "Debe agregar al menos un visitante", variant: "destructive" });
+      toast({ 
+        title: "Error", 
+        description: tipoRegistro === "alquiler" 
+          ? "Debe agregar al menos un visitante con nombre y DNI" 
+          : "Debe agregar al menos un visitante con nombre",
+        variant: "destructive" 
+      });
       return false;
     }
+    
     if (!empadronadoId) {
       toast({
         title: "No se pudo identificar al vecino",
@@ -110,9 +123,11 @@ export function VisitaTab() {
     if (!validarFormulario()) return;
 
     try {
-      const visitantesLimpios = visitantes
-        .map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() }))
-        .filter((v) => v.nombre && v.dni);
+      // Para alquiler, filtrar solo los que tienen nombre y DNI
+      // Para visita, filtrar solo los que tienen nombre (DNI opcional)
+      const visitantesLimpios = tipoRegistro === "alquiler"
+        ? visitantes.map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() })).filter((v) => v.nombre && v.dni)
+        : visitantes.map((v) => ({ nombre: v.nombre.trim(), dni: v.dni.trim() })).filter((v) => v.nombre);
 
       const placasLimpias = placas
         .map((p) => p.placa.trim().toUpperCase())
@@ -120,6 +135,7 @@ export function VisitaTab() {
 
       const registro = {
         empadronadoId,
+        tipoRegistro,
         tipoAcceso,
         placa: tipoAcceso === "vehicular" && placasLimpias.length > 0 ? placasLimpias[0] : undefined,
         placas: tipoAcceso === "vehicular" ? placasLimpias : undefined,
@@ -175,6 +191,7 @@ export function VisitaTab() {
       setMostrarConfirmacion(true);
       toast({ title: "Registro exitoso", description: "Solicitud enviada y QR generado. Revisa tus descargas." });
 
+      setTipoRegistro("visita");
       setPlacas([{ id: "1", placa: "" }]);
       setVisitantes([{ id: "1", nombre: "", dni: "" }]);
       setMenores(0);
@@ -208,6 +225,30 @@ export function VisitaTab() {
           ) : !empadronadoId ? (
             <p className="text-sm text-destructive">Tu usuario no está vinculado a un empadronado.</p>
           ) : null}
+
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Tipo de Registro</Label>
+            <RadioGroup
+              value={tipoRegistro}
+              onValueChange={(value) => setTipoRegistro(value as "visita" | "alquiler")}
+              className="flex gap-6"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="visita" id="visita" />
+                <Label htmlFor="visita" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Visita
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="alquiler" id="alquiler" />
+                <Label htmlFor="alquiler" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Alquiler
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
 
           <div className="space-y-3">
             <Label className="text-base font-medium">Tipo de Acceso</Label>
@@ -307,7 +348,7 @@ export function VisitaTab() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>DNI o Documento *</Label>
+                    <Label>DNI o Documento {tipoRegistro === "alquiler" ? "*" : "(Opcional)"}</Label>
                     <Input
                       value={visitante.dni}
                       onChange={(e) => actualizarVisitante(visitante.id, "dni", e.target.value)}
