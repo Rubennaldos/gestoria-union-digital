@@ -4,8 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle, Shield, Users, Clock, UserCheck, FileText, Camera, Search, Plus, Home } from "lucide-react";
+import BackButton from "@/components/layout/BackButton";
+import { AlertTriangle, Shield, Users, Clock, UserCheck, FileText, Camera, Search, Plus } from "lucide-react";
 import { RegistroManualVisitas } from "@/components/seguridad/RegistroManualVisitas";
 import { RegistroManualTrabajadores } from "@/components/seguridad/RegistroManualTrabajadores";
 import { RegistroManualProveedores } from "@/components/seguridad/RegistroManualProveedores";
@@ -52,15 +52,7 @@ const Seguridad = () => {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 md:gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => (window.location.href = "/")}
-                className="gap-1.5 h-8 md:h-9 px-2 md:px-3"
-              >
-                <Home className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                <span className="text-xs md:text-sm">Inicio</span>
-              </Button>
+              <BackButton fallbackTo="/" label="Inicio" />
               <div className="h-6 w-px bg-border" />
               <div>
                 <h1 className="text-lg md:text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent flex items-center gap-1.5 md:gap-2">
