@@ -400,41 +400,45 @@ export function EscanearQRPortico() {
     }
   };
 
-  const handleClick = () => {
-    if (isMobile) {
-      setEscaneando(true);
-    } else {
-      setMostrarBusqueda(true);
-    }
-  };
-
   return (
     <>
+      {/* Escanear QR - Siempre visible */}
       <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
-            onClick={handleClick}>
+            onClick={() => setEscaneando(true)}>
         <CardContent className="p-8 md:p-12">
           <div className="flex flex-col items-center text-center space-y-6">
             <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 group-hover:scale-110 transition-transform duration-300">
-              {isMobile ? (
-                <QrCode className="h-16 w-16 md:h-24 md:w-24 text-primary" />
-              ) : (
-                <Search className="h-16 w-16 md:h-24 md:w-24 text-primary" />
-              )}
+              <QrCode className="h-16 w-16 md:h-24 md:w-24 text-primary" />
             </div>
             <div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">
-                {isMobile ? "Escanear Código QR" : "Buscar Persona"}
-              </h3>
+              <h3 className="text-2xl md:text-3xl font-bold mb-2">Escanear Código QR</h3>
               <p className="text-muted-foreground">
-                {isMobile 
-                  ? "Escanea el código QR de la visita para registrar entrada"
-                  : "Busca visitantes o trabajadores registrados por DNI o nombre"
-                }
+                Escanea el código QR de la visita para registrar entrada
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Búsqueda Manual - Solo en PC */}
+      {!isMobile && (
+        <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
+              onClick={() => setMostrarBusqueda(true)}>
+          <CardContent className="p-8 md:p-12">
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 group-hover:scale-110 transition-transform duration-300">
+                <Search className="h-16 w-16 md:h-24 md:w-24 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-2xl md:text-3xl font-bold mb-2">Buscar Persona</h3>
+                <p className="text-muted-foreground">
+                  Busca visitantes o trabajadores por DNI o nombre
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal de Búsqueda Manual (PC) */}
       <Dialog open={mostrarBusqueda} onOpenChange={setMostrarBusqueda}>
