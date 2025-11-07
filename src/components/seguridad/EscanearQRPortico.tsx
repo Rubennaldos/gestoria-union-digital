@@ -146,7 +146,10 @@ export function EscanearQRPortico() {
 
   const procesarQR = async (texto: string) => {
     try {
+      console.log("Texto QR recibido:", texto);
       const datos = JSON.parse(texto) as DatosQR;
+      console.log("Datos QR parseados:", datos);
+      console.log("Visitantes en QR:", datos.visitantes);
       
       // Verificar que el registro existe y está autorizado
       const registroSnap = await get(ref(db, `acceso/visitas/${datos.id}`));
@@ -160,6 +163,9 @@ export function EscanearQRPortico() {
       }
 
       const registro = registroSnap.val();
+      console.log("Registro de Firebase:", registro);
+      console.log("Visitantes en registro:", registro.visitantes);
+      
       if (registro.estado !== "autorizado") {
         toast({
           title: "Acceso Denegado",
@@ -169,9 +175,16 @@ export function EscanearQRPortico() {
         return;
       }
 
-      setDatosQR(datos);
+      // Usar los visitantes del registro de Firebase si existen, sino los del QR
+      const datosConVisitantes = {
+        ...datos,
+        visitantes: registro.visitantes || datos.visitantes || []
+      };
+      
+      console.log("Datos finales a mostrar:", datosConVisitantes);
+      setDatosQR(datosConVisitantes);
       // Seleccionar todos por defecto
-      setVisitantesSeleccionados(new Set(datos.visitantes.map((_, i) => i)));
+      setVisitantesSeleccionados(new Set(datosConVisitantes.visitantes.map((_, i) => i)));
     } catch (error) {
       console.error("Error al procesar QR:", error);
       toast({
