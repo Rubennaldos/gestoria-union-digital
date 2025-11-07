@@ -633,7 +633,13 @@ export function EscanearQRPortico() {
       </Dialog>
 
       {/* Modal de Visitantes */}
-      <Dialog open={!!datosQR} onOpenChange={() => setDatosQR(null)}>
+      <Dialog open={!!datosQR} onOpenChange={(open) => {
+        console.log("Modal visitantes onChange:", open);
+        if (!open) {
+          setDatosQR(null);
+          setVisitantesSeleccionados(new Set());
+        }
+      }}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Registrar Entrada de Visitantes</DialogTitle>
@@ -679,30 +685,34 @@ export function EscanearQRPortico() {
               {/* Lista de visitantes */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Visitantes ({datosQR.visitantes.length})</h4>
+                  <h4 className="font-medium">Visitantes ({datosQR.visitantes?.length || 0})</h4>
                   <Button variant="outline" size="sm" onClick={seleccionarTodos}>
                     Seleccionar Todos
                   </Button>
                 </div>
 
-                {datosQR.visitantes.map((visitante, index) => (
-                  <Card key={index} className={visitantesSeleccionados.has(index) ? "border-primary" : ""}>
-                    <CardContent className="py-3">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={visitantesSeleccionados.has(index)}
-                          onCheckedChange={() => toggleVisitante(index)}
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium">{visitante.nombre}</p>
-                          {visitante.dni && (
-                            <p className="text-sm text-muted-foreground">DNI: {visitante.dni}</p>
-                          )}
+                {datosQR.visitantes && datosQR.visitantes.length > 0 ? (
+                  datosQR.visitantes.map((visitante, index) => (
+                    <Card key={index} className={visitantesSeleccionados.has(index) ? "border-primary" : ""}>
+                      <CardContent className="py-3">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={visitantesSeleccionados.has(index)}
+                            onCheckedChange={() => toggleVisitante(index)}
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium">{visitante.nombre}</p>
+                            {visitante.dni && (
+                              <p className="text-sm text-muted-foreground">DNI: {visitante.dni}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <p className="text-center text-muted-foreground py-4">No hay visitantes registrados</p>
+                )}
               </div>
 
               {/* Botones de acción */}
@@ -710,7 +720,11 @@ export function EscanearQRPortico() {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => setDatosQR(null)}
+                  onClick={() => {
+                    console.log("Cancelar clickeado");
+                    setDatosQR(null);
+                    setVisitantesSeleccionados(new Set());
+                  }}
                   disabled={procesando}
                 >
                   Cancelar
