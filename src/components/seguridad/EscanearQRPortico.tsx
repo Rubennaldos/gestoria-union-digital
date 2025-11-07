@@ -400,11 +400,18 @@ export function EscanearQRPortico() {
     }
   };
 
+  const handleEscanearClick = () => {
+    console.log("Botón de escanear QR clickeado");
+    setEscaneando(true);
+  };
+
   return (
     <>
       {/* Escanear QR - Siempre visible */}
-      <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
-            onClick={() => setEscaneando(true)}>
+      <Card 
+        className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
+        onClick={handleEscanearClick}
+      >
         <CardContent className="p-8 md:p-12">
           <div className="flex flex-col items-center text-center space-y-6">
             <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 group-hover:scale-110 transition-transform duration-300">
@@ -551,8 +558,14 @@ export function EscanearQRPortico() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Escaneo (Mobile) */}
-      <Dialog open={escaneando} onOpenChange={setEscaneando}>
+      {/* Modal de Escaneo */}
+      <Dialog open={escaneando} onOpenChange={(open) => {
+        console.log("Dialog onChange:", open);
+        if (!open) {
+          detenerEscaneo();
+        }
+        setEscaneando(open);
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -568,12 +581,18 @@ export function EscanearQRPortico() {
               ref={videoRef}
               className="w-full rounded-lg bg-black"
               style={{ maxHeight: "400px" }}
+              playsInline
+              autoPlay
+              muted
             />
             <Button
               variant="destructive"
               size="icon"
               className="absolute top-2 right-2"
-              onClick={detenerEscaneo}
+              onClick={() => {
+                console.log("Cerrando escáner");
+                detenerEscaneo();
+              }}
             >
               <X className="h-4 w-4" />
             </Button>
