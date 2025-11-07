@@ -59,16 +59,27 @@ export function EscanearQRPortico() {
 
   useEffect(() => {
     console.log("useEffect escaneando cambió a:", escaneando);
-    console.log("videoRef.current existe:", !!videoRef.current);
-    if (escaneando && videoRef.current) {
-      console.log("Iniciando escaneo...");
-      iniciarEscaneo();
-    }
-    return () => {
-      if (escaneando) {
-        console.log("Limpiando escaneo");
-        detenerEscaneo();
+    if (!escaneando) return;
+
+    // Esperar a que el video element esté disponible en el DOM
+    const intentarIniciarEscaneo = () => {
+      console.log("Intentando iniciar escaneo, videoRef.current existe:", !!videoRef.current);
+      if (videoRef.current) {
+        console.log("Video ref disponible, iniciando escaneo...");
+        iniciarEscaneo();
+      } else {
+        console.log("Video ref no disponible todavía, reintentando en 100ms...");
+        setTimeout(intentarIniciarEscaneo, 100);
       }
+    };
+
+    // Dar un pequeño delay para que el Dialog se monte
+    const timeoutId = setTimeout(intentarIniciarEscaneo, 50);
+
+    return () => {
+      clearTimeout(timeoutId);
+      console.log("Limpiando escaneo");
+      detenerEscaneo();
     };
   }, [escaneando]);
 
