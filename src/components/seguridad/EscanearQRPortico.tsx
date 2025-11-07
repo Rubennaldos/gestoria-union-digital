@@ -427,27 +427,25 @@ export function EscanearQRPortico() {
         </CardContent>
       </Card>
 
-      {/* Búsqueda Manual - Solo en PC */}
-      {!isMobile && (
-        <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
-              onClick={() => setMostrarBusqueda(true)}>
-          <CardContent className="p-8 md:p-12">
-            <div className="flex flex-col items-center text-center space-y-6">
-              <div className="p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 group-hover:scale-110 transition-transform duration-300">
-                <Search className="h-16 w-16 md:h-24 md:w-24 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="text-2xl md:text-3xl font-bold mb-2">Buscar Persona</h3>
-                <p className="text-muted-foreground">
-                  Busca visitantes o trabajadores por DNI o nombre
-                </p>
-              </div>
+      {/* Búsqueda Manual - Disponible en todos los dispositivos */}
+      <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
+            onClick={() => setMostrarBusqueda(true)}>
+        <CardContent className="p-8 md:p-12">
+          <div className="flex flex-col items-center text-center space-y-6">
+            <div className="p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 group-hover:scale-110 transition-transform duration-300">
+              <Search className="h-16 w-16 md:h-24 md:w-24 text-blue-600" />
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div>
+              <h3 className="text-2xl md:text-3xl font-bold mb-2">Buscar Persona</h3>
+              <p className="text-muted-foreground">
+                Busca visitantes o trabajadores por DNI o nombre
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Modal de Búsqueda Manual (PC) */}
+      {/* Modal de Búsqueda Manual */}
       <Dialog open={mostrarBusqueda} onOpenChange={setMostrarBusqueda}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -462,7 +460,7 @@ export function EscanearQRPortico() {
 
           <div className="space-y-4">
             {/* Formulario de búsqueda */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="dni">DNI</Label>
                 <Input
