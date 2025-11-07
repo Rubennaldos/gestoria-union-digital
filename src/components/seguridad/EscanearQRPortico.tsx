@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { QrCode, Camera, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { QrCode, Camera, X, Search, LogIn, LogOut } from "lucide-react";
 import { BrowserQRCodeReader } from "@zxing/browser";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { ref, update, get } from "firebase/database";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ref, update, get, query, orderByChild, equalTo } from "firebase/database";
 import { db } from "@/config/firebase";
 
 interface Visitante {
@@ -25,7 +28,19 @@ interface DatosQR {
   tipoRegistro?: "visita" | "alquiler";
 }
 
+interface PersonaEncontrada {
+  id: string;
+  nombre: string;
+  dni: string;
+  tipo: "visitante" | "trabajador";
+  registroId: string;
+  ingresado?: boolean;
+  horaIngreso?: number;
+  horaSalida?: number;
+}
+
 export function EscanearQRPortico() {
+  const isMobile = useIsMobile();
   const [escaneando, setEscaneando] = useState(false);
   const [datosQR, setDatosQR] = useState<DatosQR | null>(null);
   const [visitantesSeleccionados, setVisitantesSeleccionados] = useState<Set<number>>(new Set());
@@ -33,6 +48,14 @@ export function EscanearQRPortico() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserQRCodeReader | null>(null);
   const { toast } = useToast();
+
+  // Estados para búsqueda manual (PC)
+  const [mostrarBusqueda, setMostrarBusqueda] = useState(false);
+  const [dniBusqueda, setDniBusqueda] = useState("");
+  const [nombreBusqueda, setNombreBusqueda] = useState("");
+  const [apellidoBusqueda, setApellidoBusqueda] = useState("");
+  const [resultadosBusqueda, setResultadosBusqueda] = useState<PersonaEncontrada[]>([]);
+  const [buscando, setBuscando] = useState(false);
 
   useEffect(() => {
     if (escaneando && videoRef.current) {
@@ -203,26 +226,328 @@ export function EscanearQRPortico() {
     }
   };
 
+  // Búsqueda manual de personas registradas
+  const buscarPersona = async () => {
+    if (!dniBusqueda && !nombreBusqueda && !apellidoBusqueda) {
+      toast({
+        title: "Datos requeridos",
+        description: "Ingresa al menos un criterio de búsqueda",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setBuscando(true);
+    setResultadosBusqueda([]);
+
+    try {
+      const resultados: PersonaEncontrada[] = [];
+
+      // Buscar en visitas autorizadas
+      const visitasSnap = await get(ref(db, "acceso/visitas"));
+      if (visitasSnap.exists()) {
+        const visitas = visitasSnap.val();
+        Object.entries(visitas).forEach(([id, visita]: [string, any]) => {
+          if (visita.estado === "autorizado" && visita.visitantes) {
+            visita.visitantes.forEach((v: Visitante) => {
+              const coincideDNI = dniBusqueda && v.dni?.toLowerCase().includes(dniBusqueda.toLowerCase());
+              const coincideNombre = nombreBusqueda && v.nombre?.toLowerCase().includes(nombreBusqueda.toLowerCase());
+              const coincideApellido = apellidoBusqueda && v.nombre?.toLowerCase().includes(apellidoBusqueda.toLowerCase());
+
+              if (coincideDNI || coincideNombre || coincideApellido) {
+                resultados.push({
+                  id: v.dni || v.nombre,
+                  nombre: v.nombre,
+                  dni: v.dni,
+                  tipo: "visitante",
+                  registroId: id,
+                  ingresado: visita.ingresado,
+                  horaIngreso: visita.horaIngreso,
+                  horaSalida: visita.horaSalida,
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Buscar en trabajadores autorizados
+      const trabajadoresSnap = await get(ref(db, "acceso/trabajadores"));
+      if (trabajadoresSnap.exists()) {
+        const trabajadores = trabajadoresSnap.val();
+        Object.entries(trabajadores).forEach(([id, trabajo]: [string, any]) => {
+          if (trabajo.estado === "autorizado" && trabajo.trabajadores) {
+            trabajo.trabajadores.forEach((t: any) => {
+              const coincideDNI = dniBusqueda && t.dni?.toLowerCase().includes(dniBusqueda.toLowerCase());
+              const coincideNombre = nombreBusqueda && t.nombre?.toLowerCase().includes(nombreBusqueda.toLowerCase());
+              const coincideApellido = apellidoBusqueda && t.nombre?.toLowerCase().includes(apellidoBusqueda.toLowerCase());
+
+              if (coincideDNI || coincideNombre || coincideApellido) {
+                resultados.push({
+                  id: t.dni || t.nombre,
+                  nombre: t.nombre,
+                  dni: t.dni,
+                  tipo: "trabajador",
+                  registroId: id,
+                  ingresado: trabajo.ingresado,
+                  horaIngreso: trabajo.horaIngreso,
+                  horaSalida: trabajo.horaSalida,
+                });
+              }
+            });
+          }
+        });
+      }
+
+      setResultadosBusqueda(resultados);
+
+      if (resultados.length === 0) {
+        toast({
+          title: "Sin resultados",
+          description: "No se encontraron personas registradas con esos datos",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error al buscar persona:", error);
+      toast({
+        title: "Error",
+        description: "Error al buscar en la base de datos",
+        variant: "destructive",
+      });
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  // Registrar entrada de una persona
+  const registrarEntradaPersona = async (persona: PersonaEncontrada) => {
+    setProcesando(true);
+    try {
+      const now = Date.now();
+      const ruta = persona.tipo === "visitante" ? "acceso/visitas" : "acceso/trabajadores";
+
+      await update(ref(db, `${ruta}/${persona.registroId}`), {
+        ingresado: true,
+        horaIngreso: now,
+        ultimoIngreso: now,
+        horaSalida: null,
+      });
+
+      await update(ref(db, `seguridad/historial/${persona.registroId}_ingreso_${now}`), {
+        tipo: persona.tipo,
+        registroId: persona.registroId,
+        accion: "ingreso",
+        timestamp: now,
+        persona: persona.nombre,
+      });
+
+      toast({
+        title: "Entrada Registrada",
+        description: `${persona.nombre} ingresó correctamente`,
+      });
+
+      // Actualizar resultados
+      buscarPersona();
+    } catch (error) {
+      console.error("Error al registrar entrada:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la entrada",
+        variant: "destructive",
+      });
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  // Registrar salida de una persona
+  const registrarSalidaPersona = async (persona: PersonaEncontrada) => {
+    setProcesando(true);
+    try {
+      const now = Date.now();
+      const ruta = persona.tipo === "visitante" ? "acceso/visitas" : "acceso/trabajadores";
+
+      await update(ref(db, `${ruta}/${persona.registroId}`), {
+        ingresado: false,
+        horaSalida: now,
+      });
+
+      await update(ref(db, `seguridad/historial/${persona.registroId}_salida_${now}`), {
+        tipo: persona.tipo,
+        registroId: persona.registroId,
+        accion: "salida",
+        timestamp: now,
+        persona: persona.nombre,
+      });
+
+      toast({
+        title: "Salida Registrada",
+        description: `${persona.nombre} salió correctamente`,
+      });
+
+      // Actualizar resultados
+      buscarPersona();
+    } catch (error) {
+      console.error("Error al registrar salida:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la salida",
+        variant: "destructive",
+      });
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  const handleClick = () => {
+    if (isMobile) {
+      setEscaneando(true);
+    } else {
+      setMostrarBusqueda(true);
+    }
+  };
+
   return (
     <>
       <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group" 
-            onClick={() => setEscaneando(true)}>
+            onClick={handleClick}>
         <CardContent className="p-8 md:p-12">
           <div className="flex flex-col items-center text-center space-y-6">
             <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 group-hover:scale-110 transition-transform duration-300">
-              <QrCode className="h-16 w-16 md:h-24 md:w-24 text-primary" />
+              {isMobile ? (
+                <QrCode className="h-16 w-16 md:h-24 md:w-24 text-primary" />
+              ) : (
+                <Search className="h-16 w-16 md:h-24 md:w-24 text-primary" />
+              )}
             </div>
             <div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">Escanear Código QR</h3>
+              <h3 className="text-2xl md:text-3xl font-bold mb-2">
+                {isMobile ? "Escanear Código QR" : "Buscar Persona"}
+              </h3>
               <p className="text-muted-foreground">
-                Escanea el código QR de la visita para registrar entrada
+                {isMobile 
+                  ? "Escanea el código QR de la visita para registrar entrada"
+                  : "Busca visitantes o trabajadores registrados por DNI o nombre"
+                }
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Modal de Escaneo */}
+      {/* Modal de Búsqueda Manual (PC) */}
+      <Dialog open={mostrarBusqueda} onOpenChange={setMostrarBusqueda}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5" />
+              Buscar Persona Registrada
+            </DialogTitle>
+            <DialogDescription>
+              Ingresa DNI, nombre o apellido para buscar visitantes o trabajadores autorizados
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Formulario de búsqueda */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dni">DNI</Label>
+                <Input
+                  id="dni"
+                  placeholder="12345678"
+                  value={dniBusqueda}
+                  onChange={(e) => setDniBusqueda(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && buscarPersona()}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre</Label>
+                <Input
+                  id="nombre"
+                  placeholder="Juan"
+                  value={nombreBusqueda}
+                  onChange={(e) => setNombreBusqueda(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && buscarPersona()}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="apellido">Apellido</Label>
+                <Input
+                  id="apellido"
+                  placeholder="Pérez"
+                  value={apellidoBusqueda}
+                  onChange={(e) => setApellidoBusqueda(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && buscarPersona()}
+                />
+              </div>
+            </div>
+
+            <Button onClick={buscarPersona} disabled={buscando} className="w-full">
+              {buscando ? "Buscando..." : "Buscar"}
+            </Button>
+
+            {/* Resultados */}
+            {resultadosBusqueda.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="font-medium">Resultados ({resultadosBusqueda.length})</h4>
+                {resultadosBusqueda.map((persona) => (
+                  <Card key={persona.id + persona.registroId}>
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{persona.nombre}</p>
+                            <Badge variant={persona.tipo === "visitante" ? "default" : "secondary"}>
+                              {persona.tipo === "visitante" ? "Visitante" : "Trabajador"}
+                            </Badge>
+                            {persona.ingresado && (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-300">
+                                ADENTRO
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">DNI: {persona.dni}</p>
+                          {persona.horaIngreso && (
+                            <p className="text-xs text-muted-foreground">
+                              Último ingreso: {new Date(persona.horaIngreso).toLocaleString("es-PE")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          {!persona.ingresado ? (
+                            <Button
+                              size="sm"
+                              onClick={() => registrarEntradaPersona(persona)}
+                              disabled={procesando}
+                            >
+                              <LogIn className="h-4 w-4 mr-1" />
+                              Entrada
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => registrarSalidaPersona(persona)}
+                              disabled={procesando}
+                            >
+                              <LogOut className="h-4 w-4 mr-1" />
+                              Salida
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Escaneo (Mobile) */}
       <Dialog open={escaneando} onOpenChange={setEscaneando}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

@@ -12,6 +12,7 @@ import { BotonEmergencia } from "@/components/seguridad/BotonEmergencia";
 
 const Seguridad = () => {
   const { user, loading } = useAuth();
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
   // Mostrar spinner/cargando mientras se carga el usuario
   if (loading) {
@@ -68,7 +69,10 @@ const Seguridad = () => {
           <EscanearQRPortico />
 
           {/* Historial */}
-          <Card className="hover:shadow-xl transition-all duration-300 cursor-pointer group">
+          <Card 
+            className="hover:shadow-xl transition-all duration-300 cursor-pointer group"
+            onClick={() => setMostrarHistorial(!mostrarHistorial)}
+          >
             <CardContent className="p-8 md:p-12">
               <div className="flex flex-col items-center text-center space-y-6">
                 <div className="p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-blue-500/5 group-hover:scale-110 transition-transform duration-300">
@@ -85,8 +89,8 @@ const Seguridad = () => {
           </Card>
         </div>
 
-        {/* Historial detallado */}
-        <HistorialAsociado />
+        {/* Historial detallado - solo visible cuando se hace clic */}
+        {mostrarHistorial && <HistorialAsociado />}
       </main>
 
       <BottomNavigation />
