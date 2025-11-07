@@ -58,11 +58,17 @@ export function EscanearQRPortico() {
   const [buscando, setBuscando] = useState(false);
 
   useEffect(() => {
+    console.log("useEffect escaneando cambió a:", escaneando);
+    console.log("videoRef.current existe:", !!videoRef.current);
     if (escaneando && videoRef.current) {
+      console.log("Iniciando escaneo...");
       iniciarEscaneo();
     }
     return () => {
-      detenerEscaneo();
+      if (escaneando) {
+        console.log("Limpiando escaneo");
+        detenerEscaneo();
+      }
     };
   }, [escaneando]);
 
@@ -402,7 +408,9 @@ export function EscanearQRPortico() {
 
   const handleEscanearClick = () => {
     console.log("Botón de escanear QR clickeado");
+    console.log("Estado actual de escaneando:", escaneando);
     setEscaneando(true);
+    console.log("Estado después de setEscaneando(true)");
   };
 
   return (
@@ -557,12 +565,14 @@ export function EscanearQRPortico() {
       </Dialog>
 
       {/* Modal de Escaneo */}
+      {console.log("Renderizando modal, escaneando =", escaneando)}
       <Dialog open={escaneando} onOpenChange={(open) => {
         console.log("Dialog onChange:", open);
         if (!open) {
           detenerEscaneo();
+        } else {
+          setEscaneando(true);
         }
-        setEscaneando(open);
       }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
