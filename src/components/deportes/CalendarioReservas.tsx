@@ -194,7 +194,6 @@ export const CalendarioReservas = ({
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           selectable
-          resizable
           components={{
             event: EventComponent
           }}
