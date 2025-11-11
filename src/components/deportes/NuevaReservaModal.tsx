@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
 import { CalendarIcon, Lightbulb, LightbulbOff, ArrowLeft } from "lucide-react";
-import { format, addHours } from "date-fns";
+import { format, addHours, differenceInMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,9 +25,13 @@ interface NuevaReservaModalProps {
   onOpenChange: (open: boolean) => void;
   canchas: Cancha[];
   onSuccess: () => void;
+  prefilledData?: {
+    start?: string | Date;
+    end?: string | Date;
+  };
 }
 
-export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: NuevaReservaModalProps) => {
+export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess, prefilledData }: NuevaReservaModalProps) => {
   const { user, empadronado } = useAuth();
   
   // Estados para el flujo por pasos
@@ -62,6 +66,39 @@ export const NuevaReservaModal = ({ open, onOpenChange, canchas, onSuccess }: Nu
       setTelefono(telefonoEmpadronado);
     }
   }, [open, empadronado]);
+
+  // Aplicar prefilledData si se proporciona (fecha/hora/duración)
+  useEffect(() => {
+    if (!open || !prefilledData?.start) return;
+
+    try {
+      const start = new Date(prefilledData.start);
+      const end = prefilledData?.end ? new Date(prefilledData.end) : undefined;
+
+      // Fecha (solo la parte de fecha)
+      const dateOnly = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      setFecha(dateOnly);
+
+      // Hora de inicio en formato HH:mm
+      const hh = String(start.getHours()).padStart(2, '0');
+      const mm = String(start.getMinutes()).padStart(2, '0');
+      setHoraInicio(`${hh}:${mm}`);
+
+      // Duración en horas (redondear hacia arriba, mínimo 1)
+      if (end) {
+        const mins = differenceInMinutes(end, start);
+        const hours = Math.max(1, Math.ceil(mins / 60));
+        setDuracion(hours);
+      } else {
+        setDuracion(1);
+      }
+
+      // Ir al paso de completar la reserva
+      setPaso(3);
+    } catch (err) {
+      console.error('Error aplicando prefilledData en NuevaReservaModal', err);
+    }
+  }, [open, prefilledData]);
 
   // Resetear estados al cerrar
   useEffect(() => {

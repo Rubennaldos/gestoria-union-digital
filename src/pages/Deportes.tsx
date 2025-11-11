@@ -15,6 +15,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ref, get } from "firebase/database";
 import { db } from "@/config/firebase";
+import CalendarioDeportes from '@/components/deportes/CalendarioDeportes';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Deportes() {
   const { empadronado } = useAuth();
@@ -142,6 +144,14 @@ export default function Deportes() {
     return cancha ? (cancha.ubicacion === 'boulevard' ? 'Boulevard' : 'Quinta Llana') : '';
   };
 
+  const calendarEvents = reservas.map(r => ({
+    id: r.id,
+    title: `${getNombreCancha(r.canchaId)} (${r.estado})`,
+    start: new Date(r.fechaInicio),
+    end: new Date(r.fechaFin),
+    resource: r
+  }));
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
@@ -188,7 +198,39 @@ export default function Deportes() {
               Nueva Reserva
             </Button>
           </div>
+
+          {/* Botón para ver horario en modal */}
+          <div className="mt-4 md:mt-0 md:ml-4">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full md:w-auto">
+                  Ver Horario Disponible
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Horario de Reservas</DialogTitle>
+                </DialogHeader>
+                <CalendarioDeportes
+                  events={calendarEvents}
+                  canchas={canchas}
+                  onSelectEvent={(ev) => {
+                    console.debug('Calendario: evento seleccionado', ev);
+                  }}
+                  onSuccess={() => cargarDatos()}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+        {/* Calendario */}
+        <CalendarioDeportes
+          events={calendarEvents}
+          onSelectEvent={(ev) => {
+            // seleccionar evento -> navegar o abrir detalle (por ahora solo log)
+            console.debug('Calendario: evento seleccionado', ev);
+          }}
+        />
 
         {/* Historial de Reservas */}
         <div className="space-y-4">
