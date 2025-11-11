@@ -226,10 +226,12 @@ export default function Deportes() {
         {/* Calendario */}
         <CalendarioDeportes
           events={calendarEvents}
+          canchas={canchas}
           onSelectEvent={(ev) => {
             // seleccionar evento -> navegar o abrir detalle (por ahora solo log)
             console.debug('Calendario: evento seleccionado', ev);
           }}
+          onSuccess={() => cargarDatos()}
         />
 
         {/* Historial de Reservas */}

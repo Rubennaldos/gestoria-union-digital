@@ -34,6 +34,16 @@ export const QuickAccessSection = ({
   moduleRoutes,
 }: QuickAccessSectionProps) => {
   const [open, setOpen] = useState(false);
+
+  // Guard: modules puede ser undefined si aún no cargó en el padre
+  if (!modules || !Array.isArray(modules)) {
+    return (
+      <div className="bg-card border rounded-lg p-4">
+        <div className="text-center">Cargando módulos...</div>
+      </div>
+    );
+  }
+
   const favoriteModules = modules.filter((m) => favorites.includes(m.id));
 
   const handleDragEnd = (event: DragEndEvent) => {

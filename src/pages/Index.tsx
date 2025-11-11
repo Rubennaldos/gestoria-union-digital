@@ -127,10 +127,18 @@ const Index = () => {
     const loadModules = async () => {
       try {
         const allModules = await listModules();
+        // Seguridad: asegurar que allModules sea un array antes de filtrar
+        if (!allModules || !Array.isArray(allModules)) {
+          console.warn('listModules returned non-array:', allModules);
+          setModules([]);
+          return;
+        }
+
         // Filtrar módulos según permisos del usuario
-        const accessibleModules = allModules.filter(module => 
+        const accessibleModules = allModules.filter((module) =>
           can(module.id, "read") // Solo mostrar módulos con al menos permiso de lectura
         );
+
         setModules(accessibleModules);
       } catch (error) {
         console.error("Error loading modules:", error);
