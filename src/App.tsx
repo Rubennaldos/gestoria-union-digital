@@ -41,6 +41,8 @@ import Planilla from "./pages/Planilla";
 import Eventos from "./pages/Eventos";
 import AdminEventos from "./pages/AdminEventos";
 import AdminDeportes from "./pages/AdminDeportes";
+import Balances from "./pages/Balances";
+import AdminBalances from "./pages/AdminBalances";
 import Modulos from "./pages/Modulos";
 import RecuperarContrasena from "./pages/RecuperarContrasena";
 import Comunicaciones from "./pages/Comunicaciones";
@@ -324,6 +326,26 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <AdminDeportes />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Balances */}
+              <Route
+                path="/balances"
+                element={
+                  <ProtectedRoute>
+                    <Balances />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Administrador de Balances */}
+              <Route
+                path="/admin-balances"
+                element={
+                  <ProtectedRoute>
+                    <AdminBalances />
                   </ProtectedRoute>
                 }
               />

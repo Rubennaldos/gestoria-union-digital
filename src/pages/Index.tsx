@@ -2,7 +2,7 @@ import {
   Users, FileText, Calendar, DollarSign, Shield, MessageSquare,
   Trophy, Heart, GraduationCap, Vote, Package, BarChart3,
   UserCheck, Search, Gavel, Building, UserCircle, CreditCard, Settings,
-  Briefcase, PartyPopper
+  Briefcase, PartyPopper, FileBarChart
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import { ModuleCard } from "@/components/ui/module-card";
@@ -44,7 +44,9 @@ const moduleIcons: Record<string, any> = {
   planilla: Briefcase,
   eventos: PartyPopper,
   admin_eventos: Calendar,
-  admin_deportes: Building
+  admin_deportes: Building,
+  balances: FileBarChart,
+  admin_balances: Settings
 };
 
 // Mapa de colores para los módulos
@@ -72,7 +74,9 @@ const moduleColors: Record<string, "primary" | "warning" | "success" | "secondar
   planilla: "primary",
   eventos: "success",
   admin_eventos: "warning",
-  admin_deportes: "success"
+  admin_deportes: "success",
+  balances: "primary",
+  admin_balances: "warning"
 };
 
 // Mapa de rutas para los módulos
@@ -100,7 +104,9 @@ const moduleRoutes: Record<string, string> = {
   planilla: "/planilla",
   eventos: "/eventos",
   admin_eventos: "/admin-eventos",
-  admin_deportes: "/admin-deportes"
+  admin_deportes: "/admin-deportes",
+  balances: "/balances",
+  admin_balances: "/admin-balances"
 };
 
 const Index = () => {

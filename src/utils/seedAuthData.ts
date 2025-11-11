@@ -275,6 +275,20 @@ export const seedModules = async () => {
       icon: 'Building',
       orden: 25,
       requiereAprobacion: false
+    },
+    balances: {
+      id: 'balances',
+      nombre: 'Balances',
+      icon: 'FileBarChart',
+      orden: 26,
+      requiereAprobacion: false
+    },
+    admin_balances: {
+      id: 'admin_balances',
+      nombre: 'Administrador de Balances',
+      icon: 'Settings',
+      orden: 27,
+      requiereAprobacion: true
     }
   };
 
