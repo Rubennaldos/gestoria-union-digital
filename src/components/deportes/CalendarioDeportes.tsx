@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -41,19 +41,32 @@ export const CalendarioDeportes: React.FC<CalendarioDeportesProps> = ({ events, 
 
   return (
     <div className="mb-8">
-      <Calendar
-        localizer={localizer}
-        events={events}
-        startAccessor="start"
-        endAccessor="end"
-        titleAccessor="title"
-        onSelectEvent={onSelectEvent as any}
-        selectable
-        onSelectSlot={handleSelectSlot as any}
-        views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
-        style={{ height: 500 }}
-        popup
-      />
+      {/* Carga: mostrar indicador si no hay canchas cargadas aún */}
+      {(!canchas || canchas.length === 0) ? (
+        <div className="p-6 bg-muted/10 rounded-lg text-center">
+          <div className="animate-pulse">
+            <div className="h-6 w-48 mx-auto mb-2 bg-muted rounded" />
+            <div className="text-sm text-muted-foreground">Cargando calendario...</div>
+          </div>
+        </div>
+      ) : (
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          titleAccessor="title"
+          onSelectEvent={onSelectEvent as any}
+          selectable
+          onSelectSlot={handleSelectSlot as any}
+          defaultView="week"
+          views={["week", "day", "agenda"]}
+          min={new Date(0, 0, 0, 7, 0, 0)}
+          max={new Date(0, 0, 0, 21, 0, 0)}
+          style={{ height: '70vh' }}
+          popup
+        />
+      )}
 
       <NuevaReservaModal
         open={openNueva}

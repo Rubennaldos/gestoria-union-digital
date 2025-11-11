@@ -223,16 +223,7 @@ export default function Deportes() {
             </Dialog>
           </div>
         </div>
-        {/* Calendario */}
-        <CalendarioDeportes
-          events={calendarEvents}
-          canchas={canchas}
-          onSelectEvent={(ev) => {
-            // seleccionar evento -> navegar o abrir detalle (por ahora solo log)
-            console.debug('Calendario: evento seleccionado', ev);
-          }}
-          onSuccess={() => cargarDatos()}
-        />
+        {/* El calendario se muestra dentro del modal 'Ver Horario Disponible' */}
 
         {/* Historial de Reservas */}
         <div className="space-y-4">
