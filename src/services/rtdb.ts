@@ -304,6 +304,30 @@ export const listModules = async (): Promise<Module[]> => {
     });
   }
 
+  // Agregar módulo balances si no existe en la BD
+  const hasBalances = modules.some(m => m.id === 'balances');
+  if (!hasBalances) {
+    modules.push({
+      id: 'balances',
+      nombre: 'Balances',
+      icon: 'FileBarChart',
+      orden: 26,
+      requiereAprobacion: false
+    });
+  }
+
+  // Agregar módulo admin_balances si no existe en la BD
+  const hasAdminBalances = modules.some(m => m.id === 'admin_balances');
+  if (!hasAdminBalances) {
+    modules.push({
+      id: 'admin_balances',
+      nombre: 'Administrador de Balances',
+      icon: 'Settings',
+      orden: 27,
+      requiereAprobacion: true
+    });
+  }
+
   // Normalize orden and sort safely
   modules.forEach(m => { if (typeof m.orden !== 'number') m.orden = Number(m.orden) || 9999; });
   return modules.sort((a, b) => a.orden - b.orden);
