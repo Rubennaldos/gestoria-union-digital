@@ -134,10 +134,11 @@ const Index = () => {
           return;
         }
 
-        // Filtrar módulos según permisos del usuario
-        const accessibleModules = allModules.filter((module) =>
-          can(module.id, "read") // Solo mostrar módulos con al menos permiso de lectura
-        );
+        // Filtrar módulos según permisos del usuario (todos los módulos requieren permiso explícito)
+        const accessibleModules = allModules.filter((module) => {
+          if (!module) return false;
+          return can(module.id, "read");
+        });
 
         setModules(accessibleModules);
       } catch (error) {
