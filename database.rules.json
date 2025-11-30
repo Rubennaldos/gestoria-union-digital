@@ -41,63 +41,6 @@
       ".write": "auth != null"
     },
 
-    "cobranzas": {
-      "configuracion": {
-        ".read": "auth != null",
-        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-      },
-      "$uid": {
-        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-      }
-    },
-
-    "usernames": {
-      ".read": true,
-      ".write": "root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-    },
-
-    "users": {
-      ".read": true,
-      ".indexOn": ["email"],
-      "$uid": {
-        ".read": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        ".indexOn": ["empadronadoId"],
-
-        "modules": {
-          ".write": "auth.uid === $uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        }
-      }
-    },
-
-    "empadronados": {
-      ".read": "auth != null",
-      "$empadronadoId": {
-        ".read": "auth != null",
-        ".write": "data.child('authUid').val() === auth.uid || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'",
-        "dni": {
-          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        },
-        "numeroPadron": {
-          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        },
-        "nombre": {
-          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        },
-        "apellidos": {
-          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        },
-        "manzana": {
-          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        },
-        "lote": {
-          ".validate": "!data.exists() || newData.val() === data.val() || root.child('users').child(auth.uid).child('modules').child('padron').val() === 'admin'"
-        }
-      },
-      ".indexOn": ["authUid","dni","numeroPadron"]
-    },
-
     "correlativos": {
       ".read": "auth != null",
       ".write": "auth != null"

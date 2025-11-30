@@ -79,31 +79,37 @@ export const registrarSalidaVisita = async (visitaId: string): Promise<void> => 
 };
 
 /* ──────────────────────────────────────────────────────────
-   Seguimiento de Pagos (integrado con cobranzas)
+   Seguimiento de Pagos (integrado con cobranzas_v2)
    ────────────────────────────────────────────────────────── */
 
 export const obtenerSeguimientoPagos = async (empadronadoId: string): Promise<SeguimientoPago[]> => {
-  // Obtener los cargos del empadronado desde el módulo de cobranzas
-  const cargosRef = ref(db, 'cobranzas/cargos');
-  const cargosQuery = query(cargosRef, orderByChild('empadronadoId'), equalTo(empadronadoId));
-  const cargosSnapshot = await get(cargosQuery);
+  // ✅ Actualizado para usar cobranzas_v2
+  // Obtener los charges del empadronado desde todos los períodos
+  const chargesRef = ref(db, 'cobranzas_v2/charges');
+  const chargesSnapshot = await get(chargesRef);
   
-  if (!cargosSnapshot.exists()) return [];
+  if (!chargesSnapshot.exists()) return [];
   
   const seguimientos: SeguimientoPago[] = [];
-  cargosSnapshot.forEach((child) => {
-    const cargo = child.val();
-    seguimientos.push({
-      periodo: cargo.periodo,
-      monto: cargo.monto,
-      fechaVencimiento: cargo.fechaVencimiento,
-      fechaPago: cargo.fechaPago,
-      metodoPago: cargo.metodoPago,
-      estado: cargo.estado,
-      recargo: cargo.recargo || 0,
-      descuento: cargo.descuento || 0,
-      observaciones: cargo.observaciones
-    });
+  
+  // Recorrer todos los períodos y buscar los charges del empadronado
+  chargesSnapshot.forEach((periodoChild) => {
+    const periodoData = periodoChild.val();
+    if (periodoData && periodoData[empadronadoId]) {
+      Object.values(periodoData[empadronadoId]).forEach((charge: any) => {
+        seguimientos.push({
+          periodo: charge.periodo,
+          monto: charge.montoOriginal,
+          fechaVencimiento: charge.fechaVencimiento,
+          fechaPago: charge.estado === 'pagado' ? charge.fechaCreacion : undefined,
+          metodoPago: undefined, // El charge no almacena el método de pago
+          estado: charge.estado,
+          recargo: charge.montoMorosidad || 0,
+          descuento: 0,
+          observaciones: undefined
+        });
+      });
+    }
   });
   
   return seguimientos.sort((a, b) => b.fechaVencimiento - a.fechaVencimiento);
@@ -113,8 +119,8 @@ export const obtenerResumenDeuda = async (empadronadoId: string): Promise<Resume
   const pagos = await obtenerSeguimientoPagos(empadronadoId);
   const ahora = Date.now();
   
-  const pendientes = pagos.filter(p => p.estado === 'pendiente');
-  const vencidos = pagos.filter(p => p.estado === 'vencido' || (p.estado === 'pendiente' && p.fechaVencimiento < ahora));
+  const pendientes = pagos.filter(p => p.estado === 'pendiente' || p.estado === 'moroso');
+  const vencidos = pagos.filter(p => p.estado === 'moroso' || (p.estado === 'pendiente' && p.fechaVencimiento < ahora));
   const recientes = pagos.filter(p => p.estado === 'pagado').slice(0, 5);
   
   const totalPendiente = pendientes.reduce((sum, p) => sum + p.monto + (p.recargo || 0) - (p.descuento || 0), 0);

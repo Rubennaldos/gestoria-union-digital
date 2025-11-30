@@ -46,7 +46,8 @@ export function BillingConfigProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const r = ref(db, "cobranzas/configuracion");
+    // ✅ Actualizado para usar cobranzas_v2 (sistema nuevo)
+    const r = ref(db, "cobranzas_v2/configuracion");
     const unsub = onValue(
       r,
       (snap) => {
@@ -73,7 +74,7 @@ export function BillingConfigProvider({ children }: { children: ReactNode }) {
         setCfg(parsed);
       },
       (err) => {
-        console.error("Error leyendo cobranzas/configuracion:", err);
+        console.error("Error leyendo cobranzas_v2/configuracion:", err);
         setCfg(DEFAULT_CFG);
       }
     );
