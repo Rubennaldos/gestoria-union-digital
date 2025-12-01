@@ -202,7 +202,7 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
           </div>
 
           {/* Carga de archivo */}
-          {!resultado && (
+          {!resultado && !procesando && (
             <div className="space-y-4">
               <div className="border-2 border-dashed rounded-lg p-6 text-center">
                 <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -259,9 +259,42 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
             </div>
           )}
 
+          {/* Indicador de progreso mientras procesa */}
+          {procesando && !resultado && (
+            <div className="space-y-4">
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold mb-2">Procesando importación...</h3>
+                <p className="text-sm text-muted-foreground">
+                  Esto puede tomar varios minutos dependiendo del tamaño del archivo.
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Por favor, no cierres esta ventana.
+                </p>
+              </div>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Los errores "Ya existe un pago" son normales si ya importaste estos datos antes.
+                  El sistema los saltará automáticamente.
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
           {/* Resultado de la importación */}
           {resultado && (
             <div className="space-y-4">
+              {/* Alert importante sobre aprobación */}
+              <Alert className="bg-blue-50 border-blue-200">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-900">
+                  <strong>✅ Importación Completada:</strong> Los pagos han sido registrados como <strong>"PENDIENTES"</strong>.
+                  <br />
+                  <strong>Próximo paso:</strong> Ve a la pestaña "Pagos" para revisar y aprobar los pagos importados.
+                </AlertDescription>
+              </Alert>
+
               {/* Resumen */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
