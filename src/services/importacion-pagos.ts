@@ -319,8 +319,19 @@ export async function procesarImportacionPagos(
             `Importación masiva de pagos - ${nombreMes} ${año}`
           );
           
-          // Aprobar automáticamente
-          await aprobarPagoV2(pago.id, 'Aprobación automática por importación masiva');
+          // Intentar aprobar automáticamente (puede fallar por permisos)
+          try {
+            await aprobarPagoV2(pago.id, 'Aprobación automática por importación masiva');
+          } catch (approvalError: any) {
+            console.warn(`No se pudo aprobar automáticamente el pago ${pago.id}:`, approvalError.message);
+            // No es crítico, el pago quedará pendiente de aprobación manual
+            resultado.warnings.push({
+              numeroPadron,
+              mes: nombreMes,
+              razon: 'Pago registrado pero quedó pendiente de aprobación manual',
+              detalle: 'Aprueba el pago manualmente desde la bandeja de pagos'
+            });
+          }
           
           // Verificar si es pago total o parcial
           if (monto >= cargo.saldo) {
@@ -352,6 +363,7 @@ export async function procesarImportacionPagos(
           resultado.resumen.montoTotalImportado += monto;
           
         } catch (error: any) {
+          console.error(`Error procesando pago para ${numeroPadron} - ${nombreMes}:`, error);
           resultado.errores.push({
             numeroPadron,
             mes: nombreMes,
