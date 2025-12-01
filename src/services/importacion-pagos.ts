@@ -65,19 +65,19 @@ export interface ResumenImportacion {
 }
 
 export interface FilaExcel {
-  Padron: string;
-  Enero?: string;
-  Febrero?: string;
-  Marzo?: string;
-  Abril?: string;
-  Mayo?: string;
-  Junio?: string;
-  Julio?: string;
-  Agosto?: string;
-  Septiembre?: string;
-  Octubre?: string;
-  Noviembre?: string;
-  Diciembre?: string;
+  Padron: string | number;
+  Enero?: string | number;
+  Febrero?: string | number;
+  Marzo?: string | number;
+  Abril?: string | number;
+  Mayo?: string | number;
+  Junio?: string | number;
+  Julio?: string | number;
+  Agosto?: string | number;
+  Septiembre?: string | number;
+  Octubre?: string | number;
+  Noviembre?: string | number;
+  Diciembre?: string | number;
 }
 
 // Mapeo de nombres de meses a números
@@ -99,35 +99,48 @@ const MESES_MAP: Record<string, string> = {
 /**
  * Limpia y convierte el valor del monto a número
  */
-function limpiarMonto(valor: string | undefined): number | null {
-  if (!valor) return null;
+function limpiarMonto(valor: string | number | undefined): number | null {
+  if (!valor && valor !== 0) return null;
   
-  // Quitar comillas múltiples, espacios, y caracteres especiales
-  let limpio = valor.trim().replace(/["']+/g, '');
+  // Si ya es un número, retornarlo directamente
+  if (typeof valor === 'number') {
+    return valor > 0 ? valor : null;
+  }
   
-  // Si está vacío después de limpiar, es null
-  if (!limpio || limpio === '') return null;
+  // Si es string, procesarlo
+  if (typeof valor === 'string') {
+    // Quitar comillas múltiples, espacios, y caracteres especiales
+    let limpio = valor.trim().replace(/["']+/g, '');
+    
+    // Si está vacío después de limpiar, es null
+    if (!limpio || limpio === '') return null;
+    
+    // Quitar símbolos de moneda y espacios
+    limpio = limpio.replace(/[S\/$\s]/g, '');
+    
+    // Intentar convertir a número
+    const numero = parseFloat(limpio);
+    
+    // Validar que sea un número válido y mayor a 0
+    return !isNaN(numero) && numero > 0 ? numero : null;
+  }
   
-  // Quitar símbolos de moneda y espacios
-  limpio = limpio.replace(/[S\/$\s]/g, '');
-  
-  // Intentar convertir a número
-  const numero = parseFloat(limpio);
-  
-  // Validar que sea un número válido y mayor a 0
-  return !isNaN(numero) && numero > 0 ? numero : null;
+  return null;
 }
 
 /**
  * Busca un empadronado por número de padrón
  */
 function buscarEmpadronadoPorPadron(
-  numeroPadron: string, 
+  numeroPadron: string | number, 
   empadronados: Empadronado[]
 ): Empadronado | null {
+  // Convertir a string si es número
+  const padronStr = String(numeroPadron).trim();
+  
   return empadronados.find(emp => 
-    emp.numeroPadron === numeroPadron || 
-    emp.numeroPadron === numeroPadron.trim()
+    emp.numeroPadron === padronStr || 
+    emp.numeroPadron === numeroPadron.toString()
   ) || null;
 }
 
@@ -222,7 +235,8 @@ export async function procesarImportacionPagos(
     
     // Procesar cada fila del Excel
     for (const fila of datos) {
-      const numeroPadron = fila.Padron?.trim();
+      // Manejar Padron como string o número
+      const numeroPadron = fila.Padron ? String(fila.Padron).trim() : '';
       
       if (!numeroPadron) {
         resultado.errores.push({
