@@ -49,6 +49,26 @@
     "cobranzas_v2": {
       ".read": "auth != null",
       ".write": "auth != null",
+      "configuracion": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "charges": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "pagos": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "pagos_index": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "periods": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
       "comprobantes": { 
         ".read": "auth != null",
         ".write": "auth != null" 
