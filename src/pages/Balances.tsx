@@ -377,7 +377,7 @@ const Balances = () => {
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="al-dia">Al Día (0 meses)</SelectItem>
                     <SelectItem value="puntuales">Puntuales (≤1 mes)</SelectItem>
-                    <SelectItem value="morosos">Morosos (>3 meses)</SelectItem>
+                    <SelectItem value="morosos">Morosos (&gt;3 meses)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
