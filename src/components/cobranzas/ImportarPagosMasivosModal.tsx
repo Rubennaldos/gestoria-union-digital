@@ -14,6 +14,7 @@ import {
   procesarImportacionPagos, 
   validarDatosImportacion,
   exportarResultadoJSON,
+  exportarResultadoExcel,
   type ResultadoImportacion,
   type FilaExcel
 } from "@/services/importacion-pagos";
@@ -167,6 +168,26 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
     URL.revokeObjectURL(url);
   };
 
+  const handleDescargarReporteExcel = () => {
+    if (!resultado) return;
+
+    const csv = exportarResultadoExcel(resultado);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte-importacion-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "✅ Reporte descargado",
+      description: "Abre el archivo CSV con Excel para ver el reporte detallado",
+    });
+  };
+
   const handleCerrar = () => {
     setArchivo(null);
     setDatos([]);
@@ -275,8 +296,8 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Los errores "Ya existe un pago" son normales si ya importaste estos datos antes.
-                  El sistema los saltará automáticamente.
+                  ℹ️ Los errores NO aparecerán en la consola. Al finalizar, verás un reporte completo aquí
+                  con todos los éxitos, advertencias y errores.
                 </AlertDescription>
               </Alert>
             </div>
@@ -292,6 +313,8 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
                   <strong>✅ Importación Completada:</strong> Los pagos han sido registrados como <strong>"PENDIENTES"</strong>.
                   <br />
                   <strong>Próximo paso:</strong> Ve a la pestaña "Pagos" para revisar y aprobar los pagos importados.
+                  <br />
+                  <strong>💡 Reporte:</strong> Descarga el reporte Excel para ver todos los detalles, errores y advertencias.
                 </AlertDescription>
               </Alert>
 
@@ -412,11 +435,15 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
 
               {/* Botones finales */}
               <div className="flex gap-2">
+                <Button onClick={handleDescargarReporteExcel} variant="default">
+                  <Download className="h-4 w-4 mr-2" />
+                  Descargar Reporte Excel
+                </Button>
                 <Button onClick={handleDescargarReporte} variant="outline">
                   <Download className="h-4 w-4 mr-2" />
-                  Descargar Reporte Completo
+                  Descargar JSON
                 </Button>
-                <Button onClick={handleCerrar}>
+                <Button onClick={handleCerrar} variant="secondary">
                   Cerrar
                 </Button>
               </div>

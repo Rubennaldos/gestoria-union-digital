@@ -221,16 +221,12 @@ export async function procesarImportacionPagos(
   };
   
   try {
-    // Cargar datos necesarios
-    console.log('📥 Cargando empadronados y cargos...');
+    // Cargar datos necesarios (sin logs en consola)
     const [empadronados, charges, config] = await Promise.all([
       getEmpadronados(),
       obtenerChargesV2(),
       obtenerConfiguracionV2()
     ]);
-    
-    console.log(`✅ ${empadronados.length} empadronados cargados`);
-    console.log(`✅ ${charges.length} cargos cargados`);
     
     // Procesar cada fila del Excel
     for (const fila of datos) {
@@ -351,13 +347,28 @@ export async function procesarImportacionPagos(
           resultado.resumen.montoTotalImportado += monto;
           
         } catch (error: any) {
-          console.error(`Error procesando pago para ${numeroPadron} - ${nombreMes}:`, error);
-          resultado.errores.push({
-            numeroPadron,
-            mes: nombreMes,
-            razon: 'Error al registrar el pago',
-            detalle: error.message || 'Error desconocido'
-          });
+          // SILENCIAR ERROR EN CONSOLA - Solo agregarlo al reporte
+          
+          // Detectar si es un error de "Ya existe un pago"
+          const mensajeError = error.message || '';
+          
+          if (mensajeError.includes('Ya existe un pago para este período')) {
+            // Este es un warning, no un error crítico
+            resultado.warnings.push({
+              numeroPadron,
+              mes: nombreMes,
+              razon: 'Ya existe un pago registrado para este período',
+              detalle: 'Este pago ya fue importado anteriormente'
+            });
+          } else {
+            // Error real
+            resultado.errores.push({
+              numeroPadron,
+              mes: nombreMes,
+              razon: 'Error al registrar el pago',
+              detalle: mensajeError || 'Error desconocido'
+            });
+          }
         }
       }
     }
@@ -366,12 +377,11 @@ export async function procesarImportacionPagos(
     resultado.resumen.warnings = resultado.warnings.length;
     resultado.resumen.errores = resultado.errores.length;
     
-    console.log('✅ Importación completada:', resultado.resumen);
-    
+    // Importación completada silenciosamente
     return resultado;
     
   } catch (error: any) {
-    console.error('❌ Error fatal en importación:', error);
+    // Error fatal - solo lanzar excepción
     throw new Error(`Error en la importación: ${error.message}`);
   }
 }
@@ -387,5 +397,70 @@ export function exportarResultadoJSON(resultado: ResultadoImportacion): string {
   };
   
   return JSON.stringify(reporte, null, 2);
+}
+
+/**
+ * Exporta el resultado a formato Excel-compatible (CSV)
+ */
+export function exportarResultadoExcel(resultado: ResultadoImportacion): string {
+  const lineas: string[] = [];
+  
+  // Encabezado
+  lineas.push('=== REPORTE DE IMPORTACIÓN MASIVA DE PAGOS ===');
+  lineas.push(`Fecha: ${new Date().toLocaleString('es-PE')}`);
+  lineas.push('');
+  
+  // Resumen
+  lineas.push('=== RESUMEN ===');
+  lineas.push(`Total de filas procesadas: ${resultado.resumen.totalFilas}`);
+  lineas.push(`Total de pagos intentados: ${resultado.resumen.totalPagosIntentados}`);
+  lineas.push(`Pagos exitosos: ${resultado.resumen.exitosos}`);
+  lineas.push(`Pagos parciales: ${resultado.resumen.parciales}`);
+  lineas.push(`Advertencias: ${resultado.resumen.warnings}`);
+  lineas.push(`Errores: ${resultado.resumen.errores}`);
+  lineas.push(`Monto total importado: S/ ${resultado.resumen.montoTotalImportado.toFixed(2)}`);
+  lineas.push('');
+  
+  // Éxitos
+  if (resultado.exitos.length > 0) {
+    lineas.push('=== PAGOS COMPLETOS ===');
+    lineas.push('Padrón,Nombre,Mes,Monto,ID Pago');
+    resultado.exitos.forEach(item => {
+      lineas.push(`${item.numeroPadron},${item.empadronadoNombre},${item.mes},${item.monto.toFixed(2)},${item.pagoId}`);
+    });
+    lineas.push('');
+  }
+  
+  // Parciales
+  if (resultado.parciales.length > 0) {
+    lineas.push('=== PAGOS PARCIALES ===');
+    lineas.push('Padrón,Nombre,Mes,Monto Cargo,Monto Pagado,Saldo Restante,ID Pago');
+    resultado.parciales.forEach(item => {
+      lineas.push(`${item.numeroPadron},${item.empadronadoNombre},${item.mes},${item.montoCargo.toFixed(2)},${item.montoPagado.toFixed(2)},${item.saldoRestante.toFixed(2)},${item.pagoId}`);
+    });
+    lineas.push('');
+  }
+  
+  // Warnings
+  if (resultado.warnings.length > 0) {
+    lineas.push('=== ADVERTENCIAS ===');
+    lineas.push('Padrón,Mes,Razón,Detalle');
+    resultado.warnings.forEach(item => {
+      lineas.push(`${item.numeroPadron},${item.mes},${item.razon},"${item.detalle || ''}"`);
+    });
+    lineas.push('');
+  }
+  
+  // Errores
+  if (resultado.errores.length > 0) {
+    lineas.push('=== ERRORES ===');
+    lineas.push('Padrón,Mes,Razón,Detalle');
+    resultado.errores.forEach(item => {
+      lineas.push(`${item.numeroPadron},${item.mes || 'N/A'},${item.razon},"${item.detalle || ''}"`);
+    });
+    lineas.push('');
+  }
+  
+  return lineas.join('\n');
 }
 
