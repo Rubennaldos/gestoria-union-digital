@@ -19,9 +19,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getEmpadronados } from "@/services/empadronados";
-import { obtenerChargesV2 } from "@/services/cobranzas-v2";
+import { obtenerChargesV2, obtenerPagosV2 } from "@/services/cobranzas-v2";
 import type { Empadronado } from "@/types/empadronados";
-import type { ChargeV2 } from "@/types/cobranzas-v2";
+import type { ChargeV2, PagoV2 } from "@/types/cobranzas-v2";
 
 interface FilaBalance {
   empadronado: Empadronado;
@@ -36,6 +36,7 @@ const Balances = () => {
   const { toast } = useToast();
   const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
   const [charges, setCharges] = useState<ChargeV2[]>([]);
+  const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "morosos" | "puntuales" | "al-dia">("todos");
@@ -49,13 +50,15 @@ const Balances = () => {
   const cargarDatos = async () => {
     setLoading(true);
     try {
-      const [emps, chgs] = await Promise.all([
+      const [emps, chgs, pgs] = await Promise.all([
         getEmpadronados(),
-        obtenerChargesV2()
+        obtenerChargesV2(),
+        obtenerPagosV2()
       ]);
       
       setEmpadronados(emps.filter(e => e.habilitado));
       setCharges(chgs);
+      setPagos(pgs);
     } catch (error) {
       console.error('Error cargando datos:', error);
       toast({
@@ -88,6 +91,7 @@ const Balances = () => {
   const filasBalance = useMemo(() => {
     const filas: FilaBalance[] = empadronados.map(emp => {
       const chargesEmp = charges.filter(c => c.empadronadoId === emp.id);
+      const pagosEmp = pagos.filter(p => p.empadronadoId === emp.id);
       const mesesPagados: Record<string, boolean> = {};
       
       // Para cada mes del año, verificar si está pagado
@@ -95,8 +99,23 @@ const Balances = () => {
         const periodo = `${añoSeleccionado}${mes.num}`;
         const charge = chargesEmp.find(c => c.periodo === periodo);
         
-        // Está pagado si el cargo existe y tiene saldo 0
-        mesesPagados[periodo] = charge ? charge.saldo === 0 : false;
+        if (!charge) {
+          // No hay cargo para este período, considerarlo como no pagado
+          mesesPagados[periodo] = false;
+        } else {
+          // Verificar si hay pagos para este cargo
+          const pagosDelCargo = pagosEmp.filter(p => p.chargeId === charge.id);
+          
+          // Calcular total de pagos aprobados o pendientes
+          const totalPagado = pagosDelCargo
+            .filter(p => p.estado === 'aprobado' || p.estado === 'pendiente')
+            .reduce((sum, p) => sum + p.monto, 0);
+          
+          // Está pagado si:
+          // 1. El saldo del cargo es 0 (completamente pagado y aprobado), O
+          // 2. Hay pagos pendientes/aprobados que cubren el monto original
+          mesesPagados[periodo] = charge.saldo === 0 || totalPagado >= charge.montoOriginal;
+        }
       });
 
       // Calcular meses de deuda (solo meses que ya pasaron o están en curso)
@@ -131,7 +150,7 @@ const Balances = () => {
     });
 
     return filas;
-  }, [empadronados, charges, añoSeleccionado]);
+  }, [empadronados, charges, pagos, añoSeleccionado]);
 
   // Filtrar y buscar
   const filasFiltradas = useMemo(() => {
