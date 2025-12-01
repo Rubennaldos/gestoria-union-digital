@@ -64,6 +64,7 @@ import { getEmpadronados } from "@/services/empadronados";
 import DetalleEmpadronadoModalV2 from "@/components/cobranzas/DetalleEmpadronadoModalV2";
 import { RevisarPagoModal } from "@/components/cobranzas/RevisarPagoModal";
 import { EnvioWhatsAppMasivoModal } from "@/components/cobranzas/EnvioWhatsAppMasivoModal";
+import ImportarPagosMasivosModal from "@/components/cobranzas/ImportarPagosMasivosModal";
 
 import { 
   ConfiguracionCobranzasV2, 
@@ -105,6 +106,9 @@ export default function CobranzasV2() {
   // Estados para selección y WhatsApp masivo
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  
+  // Modal de importación masiva
+  const [showImportarModal, setShowImportarModal] = useState(false);
 
   const [nuevoPago, setNuevoPago] = useState({
     empadronadoId: '',
@@ -626,6 +630,17 @@ export default function CobranzasV2() {
               >
                 <Download className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 <span className="text-xs md:text-sm">Exportar</span>
+              </Button>
+
+              <Button 
+                onClick={() => setShowImportarModal(true)}
+                disabled={procesando}
+                variant="default"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              >
+                <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">Importar Excel</span>
               </Button>
             </div>
           </CardContent>
@@ -1557,6 +1572,13 @@ export default function CobranzasV2() {
             .filter(e => seleccionados.has(e.id))
             .map(e => [e.id, calcularDeudaEmpadronado(e.id)])
         )}
+      />
+
+      {/* Modal de importación masiva de pagos */}
+      <ImportarPagosMasivosModal
+        open={showImportarModal}
+        onOpenChange={setShowImportarModal}
+        onImportacionCompleta={cargarDatos}
       />
     </div>
   );
