@@ -166,6 +166,8 @@ const PagosCuotas = () => {
 
       // Obtener estado de cuenta completo desde Cobranzas V2
       console.log('🔍 Obteniendo estado de cuenta para empadronado:', miEmpadronado.id);
+      console.log('🔍 Número de padrón:', miEmpadronado.numeroPadron);
+      
       const estadoCuenta = await obtenerEstadoCuentaEmpadronado(miEmpadronado.id);
       
       console.log('📊 Charges obtenidos:', estadoCuenta.charges.length);
@@ -174,14 +176,25 @@ const PagosCuotas = () => {
         periodo: c.periodo,
         estado: c.estado,
         saldo: c.saldo,
-        montoPagado: c.montoPagado
+        montoPagado: c.montoPagado,
+        empadronadoId: c.empadronadoId
       })));
-      console.log('📊 Detalle pagos:', estadoCuenta.pagos.map(p => ({
-        periodo: p.periodo,
-        estado: p.estado,
-        monto: p.monto,
-        empadronadoId: p.empadronadoId
-      })));
+      
+      // Obtener TODOS los pagos para debug
+      const { obtenerPagosV2 } = await import('@/services/cobranzas-v2');
+      const todosPagos = await obtenerPagosV2();
+      console.log('📊 TODOS los pagos en el sistema:', todosPagos.length);
+      console.log('📊 Pagos con empadronadoIds únicos:', [...new Set(todosPagos.map(p => p.empadronadoId))]);
+      
+      // Ver si hay pagos con el numeroPadron
+      const pagosConPadron = todosPagos.filter(p => 
+        p.empadronadoId === miEmpadronado.numeroPadron || 
+        p.empadronadoId === miEmpadronado.id
+      );
+      console.log('📊 Pagos que coinciden con este empadronado:', pagosConPadron.length);
+      if (pagosConPadron.length > 0) {
+        console.log('📊 Detalle de pagos encontrados:', pagosConPadron);
+      }
       
       // Guardar TODOS los charges (pendientes y pagados)
       setAllCharges(estadoCuenta.charges);
