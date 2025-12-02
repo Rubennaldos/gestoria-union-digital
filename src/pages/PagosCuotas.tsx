@@ -165,7 +165,23 @@ const PagosCuotas = () => {
       setEmpadronado(miEmpadronado);
 
       // Obtener estado de cuenta completo desde Cobranzas V2
+      console.log('🔍 Obteniendo estado de cuenta para empadronado:', miEmpadronado.id);
       const estadoCuenta = await obtenerEstadoCuentaEmpadronado(miEmpadronado.id);
+      
+      console.log('📊 Charges obtenidos:', estadoCuenta.charges.length);
+      console.log('📊 Pagos obtenidos:', estadoCuenta.pagos.length);
+      console.log('📊 Detalle charges:', estadoCuenta.charges.map(c => ({
+        periodo: c.periodo,
+        estado: c.estado,
+        saldo: c.saldo,
+        montoPagado: c.montoPagado
+      })));
+      console.log('📊 Detalle pagos:', estadoCuenta.pagos.map(p => ({
+        periodo: p.periodo,
+        estado: p.estado,
+        monto: p.monto,
+        empadronadoId: p.empadronadoId
+      })));
       
       // Guardar TODOS los charges (pendientes y pagados)
       setAllCharges(estadoCuenta.charges);
