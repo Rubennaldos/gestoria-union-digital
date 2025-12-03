@@ -172,13 +172,17 @@ const PagosCuotas = () => {
       
       console.log('📊 Charges obtenidos:', estadoCuenta.charges.length);
       console.log('📊 Pagos obtenidos:', estadoCuenta.pagos.length);
-      console.log('📊 Detalle charges:', estadoCuenta.charges.map(c => ({
-        periodo: c.periodo,
-        estado: c.estado,
-        saldo: c.saldo,
-        montoPagado: c.montoPagado,
-        empadronadoId: c.empadronadoId
-      })));
+      // Mostrar detalle completo de los charges
+      estadoCuenta.charges.forEach(c => {
+        console.log(`📋 Charge ${c.periodo}: estado=${c.estado}, saldo=${c.saldo}, montoPagado=${c.montoPagado}, original=${c.montoOriginal}`);
+      });
+      
+      // Ver si hay charges con montoPagado > 0
+      const chargesConPago = estadoCuenta.charges.filter(c => c.montoPagado > 0);
+      console.log('💰 Charges con montoPagado > 0:', chargesConPago.length);
+      if (chargesConPago.length > 0) {
+        console.log('💰 Detalle:', chargesConPago.map(c => ({ periodo: c.periodo, montoPagado: c.montoPagado, estado: c.estado })));
+      }
       
       // Obtener TODOS los pagos para debug
       const { obtenerPagosV2 } = await import('@/services/cobranzas-v2');
