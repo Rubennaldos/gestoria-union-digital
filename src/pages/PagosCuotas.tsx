@@ -89,10 +89,11 @@ const PagosCuotas = () => {
     ).sort((a, b) => a.periodo.localeCompare(b.periodo));
   }, [allCharges, filtroAnio]);
 
-  // Filtrar cuotas pagadas (saldo === 0)
+  // Filtrar cuotas pagadas (saldo === 0 O estado === 'pagado' O montoPagado > 0)
+  // Esto asegura que se muestren las cuotas pagadas aunque no haya registro de pago
   const chargesPagados = useMemo(() => {
     return allCharges.filter(c => 
-      c.estado === 'pagado' && 
+      (c.saldo === 0 || c.estado === 'pagado' || c.montoPagado >= c.montoOriginal) && 
       c.periodo.startsWith(filtroAnio)
     ).sort((a, b) => b.periodo.localeCompare(a.periodo));
   }, [allCharges, filtroAnio]);
@@ -104,10 +105,13 @@ const PagosCuotas = () => {
     ).sort((a, b) => b.fechaCreacion - a.fechaCreacion);
   }, [allPagos, filtroAnio]);
 
-  // Estadísticas rápidas
+  // Estadísticas rápidas - basadas en los charges (más confiable)
   const estadisticas = useMemo(() => {
     const totalPendiente = chargesPendientes.reduce((sum, c) => sum + c.saldo, 0);
-    const totalPagado = chargesPagados.reduce((sum, c) => sum + c.montoOriginal, 0);
+    // Total pagado: suma de montoPagado de todos los charges del año
+    const totalPagado = allCharges
+      .filter(c => c.periodo.startsWith(filtroAnio))
+      .reduce((sum, c) => sum + (c.montoPagado || 0), 0);
     const cuotasMorosas = chargesPendientes.filter(c => c.esMoroso).length;
     const pagosPendientesAprobacion = misPagos.filter(p => p.estado === 'pendiente').length;
     
@@ -117,7 +121,7 @@ const PagosCuotas = () => {
       cuotasMorosas,
       pagosPendientesAprobacion
     };
-  }, [chargesPendientes, chargesPagados, misPagos]);
+  }, [chargesPendientes, allCharges, filtroAnio, misPagos]);
 
   useEffect(() => {
     if (user) {
@@ -165,40 +169,7 @@ const PagosCuotas = () => {
       setEmpadronado(miEmpadronado);
 
       // Obtener estado de cuenta completo desde Cobranzas V2
-      console.log('🔍 Obteniendo estado de cuenta para empadronado:', miEmpadronado.id);
-      console.log('🔍 Número de padrón:', miEmpadronado.numeroPadron);
-      
       const estadoCuenta = await obtenerEstadoCuentaEmpadronado(miEmpadronado.id);
-      
-      console.log('📊 Charges obtenidos:', estadoCuenta.charges.length);
-      console.log('📊 Pagos obtenidos:', estadoCuenta.pagos.length);
-      // Mostrar detalle completo de los charges
-      estadoCuenta.charges.forEach(c => {
-        console.log(`📋 Charge ${c.periodo}: estado=${c.estado}, saldo=${c.saldo}, montoPagado=${c.montoPagado}, original=${c.montoOriginal}`);
-      });
-      
-      // Ver si hay charges con montoPagado > 0
-      const chargesConPago = estadoCuenta.charges.filter(c => c.montoPagado > 0);
-      console.log('💰 Charges con montoPagado > 0:', chargesConPago.length);
-      if (chargesConPago.length > 0) {
-        console.log('💰 Detalle:', chargesConPago.map(c => ({ periodo: c.periodo, montoPagado: c.montoPagado, estado: c.estado })));
-      }
-      
-      // Obtener TODOS los pagos para debug
-      const { obtenerPagosV2 } = await import('@/services/cobranzas-v2');
-      const todosPagos = await obtenerPagosV2();
-      console.log('📊 TODOS los pagos en el sistema:', todosPagos.length);
-      console.log('📊 Pagos con empadronadoIds únicos:', [...new Set(todosPagos.map(p => p.empadronadoId))]);
-      
-      // Ver si hay pagos con el numeroPadron
-      const pagosConPadron = todosPagos.filter(p => 
-        p.empadronadoId === miEmpadronado.numeroPadron || 
-        p.empadronadoId === miEmpadronado.id
-      );
-      console.log('📊 Pagos que coinciden con este empadronado:', pagosConPadron.length);
-      if (pagosConPadron.length > 0) {
-        console.log('📊 Detalle de pagos encontrados:', pagosConPadron);
-      }
       
       // Guardar TODOS los charges (pendientes y pagados)
       setAllCharges(estadoCuenta.charges);
