@@ -216,112 +216,99 @@ export async function generarMesActual(generadoPor: string): Promise<void> {
 }
 
 // === GENERACIÓN AUTOMÁTICA ===
-// Esta función se ejecuta automáticamente al cargar el módulo
-// OPTIMIZADA: Solo genera cargos para períodos que faltan, en paralelo
+// Ejecuta en segundo plano, no bloquea la UI
 export async function verificarYGenerarCargosAutomaticos(): Promise<{ 
   cargosGenerados: number; 
   cierreEjecutado: boolean;
   mensaje: string;
 }> {
   try {
-    // Verificar qué períodos ya están generados
     const currentDate = new Date();
     const currentPeriod = formatPeriod(currentDate);
     
-    // Solo verificar el mes actual y el anterior (para no procesar todo cada vez)
-    const prevMonth = new Date(currentDate);
-    prevMonth.setMonth(prevMonth.getMonth() - 1);
-    const prevPeriod = formatPeriod(prevMonth);
-    
-    const periodsToCheck = [prevPeriod, currentPeriod];
-    const periodosNuevos: string[] = [];
-    
-    // Verificar cuáles períodos necesitan generarse
-    for (const period of periodsToCheck) {
-      if (!(await isPeriodGenerated(period))) {
-        periodosNuevos.push(period);
-      }
-    }
+    // Solo verificar el mes actual
+    const isGenerated = await isPeriodGenerated(currentPeriod);
     
     let cargosGenerados = 0;
     
-    // Solo generar si hay períodos nuevos
-    if (periodosNuevos.length > 0) {
-      const config = await obtenerConfiguracionV2();
-      const empadronados = await getEmpadronados();
+    // Solo generar si el mes actual no está generado
+    if (!isGenerated) {
+      const [config, empadronados] = await Promise.all([
+        obtenerConfiguracionV2(),
+        getEmpadronados()
+      ]);
       const empadronadosActivos = empadronados.filter(e => e.habilitado);
       
-      // Generar cargos en PARALELO por período
-      for (const period of periodosNuevos) {
-        const promises = empadronadosActivos.map(emp => 
-          generarCargoMensual(emp.id, period, config)
+      // Generar cargos en lotes de 50 para no sobrecargar
+      const batchSize = 50;
+      for (let i = 0; i < empadronadosActivos.length; i += batchSize) {
+        const batch = empadronadosActivos.slice(i, i + batchSize);
+        const promises = batch.map(emp => 
+          generarCargoMensualOptimizado(emp, currentPeriod, config)
         );
-        
         const results = await Promise.all(promises);
         cargosGenerados += results.filter(r => r !== null).length;
-        
-        // Marcar período como generado
-        await markPeriodGenerated(period, 'sistema_automatico');
       }
-    }
-    
-    // Ejecutar cierre solo si es después del día de vencimiento
-    let cierreEjecutado = false;
-    const config = await obtenerConfiguracionV2();
-    const diaActual = currentDate.getDate();
-    
-    if (diaActual > config.diaVencimiento) {
-      try {
-        const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
-        if (chargesSnapshot.exists()) {
-          const allCharges = chargesSnapshot.val();
-          const currentTime = Date.now();
-          const updates: { [path: string]: any } = {};
-          
-          for (const period in allCharges) {
-            for (const empId in allCharges[period]) {
-              for (const chargeId in allCharges[period][empId]) {
-                const charge: ChargeV2 = allCharges[period][empId][chargeId];
-                
-                // Marcar como moroso si está vencido y tiene saldo
-                if (charge.saldo > 0 && currentTime > charge.fechaVencimiento && !charge.esMoroso) {
-                  const montoMorosidad = (charge.saldo * config.porcentajeMorosidad) / 100;
-                  const chargePath = `${BASE_PATH}/charges/${period}/${empId}/${chargeId}`;
-                  
-                  updates[`${chargePath}/esMoroso`] = true;
-                  updates[`${chargePath}/montoMorosidad`] = montoMorosidad;
-                  updates[`${chargePath}/estado`] = 'moroso';
-                }
-              }
-            }
-          }
-          
-          // Hacer todos los updates en una sola operación
-          if (Object.keys(updates).length > 0) {
-            await update(ref(db), updates);
-            cierreEjecutado = true;
-          }
-        }
-      } catch (e) {
-        console.error('Error en cierre automático:', e);
-      }
+      
+      // Marcar período como generado
+      await markPeriodGenerated(currentPeriod, 'sistema_automatico');
     }
     
     let mensaje = '';
-    if (cargosGenerados > 0 && cierreEjecutado) {
-      mensaje = `${cargosGenerados} cargos generados y cierre ejecutado`;
-    } else if (cargosGenerados > 0) {
-      mensaje = `${cargosGenerados} cargos generados`;
-    } else if (cierreEjecutado) {
-      mensaje = 'Cierre ejecutado';
-    } else {
-      mensaje = 'Sistema al día';
+    if (cargosGenerados > 0) {
+      mensaje = `${cargosGenerados} cargos generados para ${currentPeriod}`;
     }
     
-    return { cargosGenerados, cierreEjecutado, mensaje };
+    return { cargosGenerados, cierreEjecutado: false, mensaje };
   } catch (error) {
     console.error("Error en verificación automática:", error);
     return { cargosGenerados: 0, cierreEjecutado: false, mensaje: '' };
+  }
+}
+
+// Versión optimizada que recibe el empadronado directamente
+async function generarCargoMensualOptimizado(
+  empadronado: any, 
+  period: string, 
+  config: ConfiguracionCobranzasV2
+): Promise<ChargeV2 | null> {
+  try {
+    const chargesRef = ref(db, `${BASE_PATH}/charges/${period}/${empadronado.id}`);
+    const existingSnapshot = await get(chargesRef);
+    
+    if (existingSnapshot.exists()) {
+      return null;
+    }
+
+    const chargeStartDate = calculateChargeDate(empadronado, config);
+    const periodDate = new Date(parseInt(period.substring(0, 4)), parseInt(period.substring(4)) - 1, 1);
+    
+    if (periodDate < chargeStartDate) {
+      return null;
+    }
+
+    const dueDate = calculateDueDate(periodDate, config);
+    
+    const charge: ChargeV2 = {
+      id: `${period}_${empadronado.id}`,
+      empadronadoId: empadronado.id,
+      periodo: period,
+      montoOriginal: config.montoMensual,
+      montoPagado: 0,
+      saldo: config.montoMensual,
+      fechaVencimiento: dueDate.getTime(),
+      fechaCreacion: Date.now(),
+      estado: 'pendiente',
+      esMoroso: false
+    };
+
+    const chargeRef = push(chargesRef);
+    charge.id = chargeRef.key!;
+    await set(chargeRef, charge);
+    
+    return charge;
+  } catch (error) {
+    return null;
   }
 }
 

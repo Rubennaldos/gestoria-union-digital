@@ -126,24 +126,15 @@ export default function CobranzasV2() {
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'morosos' | 'al-dia' | 'con-deuda'>('todos');
 
   useEffect(() => {
-    cargarDatos(true); // true = mostrar toast si hubo cambios automáticos
+    cargarDatosRapido();
   }, []);
 
-  const cargarDatos = async (mostrarToastAuto = false) => {
+  // Carga rápida: primero los datos, luego verificación en segundo plano
+  const cargarDatosRapido = async () => {
     try {
       setLoading(true);
       
-      // Primero ejecutar verificación automática (genera cargos faltantes y cierre)
-      const resultadoAuto = await verificarYGenerarCargosAutomaticos();
-      
-      if (mostrarToastAuto && (resultadoAuto.cargosGenerados > 0 || resultadoAuto.cierreEjecutado)) {
-        toast({
-          title: "✅ Sistema actualizado",
-          description: resultadoAuto.mensaje
-        });
-      }
-      
-      // Luego cargar todos los datos
+      // Cargar datos inmediatamente
       const [configData, statsData, empadronadosData, pagosData, egresosData, chargesData] = await Promise.all([
         obtenerConfiguracionV2(),
         generarEstadisticasV2(),
@@ -159,6 +150,20 @@ export default function CobranzasV2() {
       setPagos(pagosData);
       setEgresos(egresosData);
       setCharges(chargesData);
+      setLoading(false);
+      
+      // Verificación automática en SEGUNDO PLANO (no bloquea la UI)
+      verificarYGenerarCargosAutomaticos().then(resultado => {
+        if (resultado.cargosGenerados > 0 || resultado.cierreEjecutado) {
+          toast({
+            title: "✅ Sistema actualizado",
+            description: resultado.mensaje
+          });
+          // Recargar datos si hubo cambios
+          recargarDatos();
+        }
+      }).catch(err => console.error("Error en verificación automática:", err));
+      
     } catch (error) {
       console.error("Error cargando datos V2:", error);
       toast({
@@ -166,9 +171,27 @@ export default function CobranzasV2() {
         description: "No se pudieron cargar los datos",
         variant: "destructive"
       });
-    } finally {
       setLoading(false);
     }
+  };
+
+  // Recarga silenciosa de datos
+  const recargarDatos = async () => {
+    try {
+      const [statsData, chargesData] = await Promise.all([
+        generarEstadisticasV2(),
+        obtenerChargesV2()
+      ]);
+      setEstadisticas(statsData);
+      setCharges(chargesData);
+    } catch (error) {
+      console.error("Error recargando datos:", error);
+    }
+  };
+
+  // Función para recargar manualmente
+  const cargarDatos = async () => {
+    await cargarDatosRapido();
   };
 
   const actualizarConfig = async () => {
