@@ -202,16 +202,25 @@ export default function CobranzasV2() {
     }
   };
 
+  // Calcular deuda: SOLO cargos vencidos (fecha actual > fecha vencimiento)
   const calcularDeudaEmpadronado = (empId: string): number => {
+    const ahora = Date.now();
     return charges
-      .filter(c => c.empadronadoId === empId)
+      .filter(c => c.empadronadoId === empId && c.saldo > 0 && ahora > c.fechaVencimiento)
       .reduce((total, charge) => total + charge.saldo, 0);
   };
 
-  const esMoroso = (empId: string): boolean => {
+  // Contar meses de deuda vencida
+  const contarMesesDeuda = (empId: string): number => {
+    const ahora = Date.now();
     return charges
-      .filter(c => c.empadronadoId === empId)
-      .some(c => c.esMoroso);
+      .filter(c => c.empadronadoId === empId && c.saldo > 0 && ahora > c.fechaVencimiento)
+      .length;
+  };
+
+  // Moroso si tiene más de 3 meses vencidos sin pagar (consistente con Balances)
+  const esMoroso = (empId: string): boolean => {
+    return contarMesesDeuda(empId) > 3;
   };
 
   const verDetallesEmpadronado = async (empId: string) => {
@@ -858,6 +867,7 @@ export default function CobranzasV2() {
                   ) : (
                     empadronadosFiltrados.map((emp) => {
                       const deuda = calcularDeudaEmpadronado(emp.id);
+                      const mesesDeuda = contarMesesDeuda(emp.id);
                       const moroso = esMoroso(emp.id);
                       const isSelected = seleccionados.has(emp.id);
                       
@@ -889,9 +899,21 @@ export default function CobranzasV2() {
                               <div className={`font-medium ${deuda > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                                 {formatearMoneda(deuda)}
                               </div>
-                              <Badge variant={moroso ? "destructive" : deuda > 0 ? "secondary" : "default"}>
-                                {moroso ? "Moroso" : deuda > 0 ? "Debe" : "Al día"}
-                              </Badge>
+                              <div className="flex items-center gap-1">
+                                {moroso ? (
+                                  <Badge variant="destructive">
+                                    Moroso ({mesesDeuda}m)
+                                  </Badge>
+                                ) : mesesDeuda > 0 ? (
+                                  <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                                    Debe {mesesDeuda} mes{mesesDeuda > 1 ? 'es' : ''}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="default" className="bg-green-100 text-green-700">
+                                    Al día
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             
                             <Button 
