@@ -189,27 +189,29 @@ export async function generarMesActual(generadoPor: string): Promise<void> {
     const config = await obtenerConfiguracionV2();
     const currentPeriod = getCurrentPeriod();
     
-    // Verificar si ya está generado
-    if (await isPeriodGenerated(currentPeriod)) {
-      throw new Error(`El período ${currentPeriod} ya está generado`);
-    }
-
     const empadronados = await getEmpadronados();
     const empadronadosActivos = empadronados.filter(e => e.habilitado);
 
     console.log(`Generando mes actual ${currentPeriod} para ${empadronadosActivos.length} empadronados`);
 
+    let cargosGenerados = 0;
+    
     // Generar cargos para todos los empadronados activos
-    const promises = empadronadosActivos.map(emp => 
-      generarCargoMensual(emp.id, currentPeriod, config)
-    );
+    for (const emp of empadronadosActivos) {
+      const result = await generarCargoMensual(emp.id, currentPeriod, config);
+      if (result) cargosGenerados++;
+    }
     
-    await Promise.all(promises);
+    // Marcar período como generado si no lo está
+    if (!(await isPeriodGenerated(currentPeriod))) {
+      await markPeriodGenerated(currentPeriod, generadoPor);
+    }
     
-    // Marcar período como generado
-    await markPeriodGenerated(currentPeriod, generadoPor);
-    
-    console.log(`Generación completada para período ${currentPeriod}`);
+    if (cargosGenerados === 0) {
+      console.log(`El período ${currentPeriod} ya estaba completamente generado`);
+    } else {
+      console.log(`Generación completada para período ${currentPeriod}. ${cargosGenerados} cargos nuevos.`);
+    }
   } catch (error) {
     console.error("Error en generarMesActual:", error);
     throw error;
@@ -227,26 +229,30 @@ export async function generarDesdeEnero2025(generadoPor: string): Promise<void> 
     const currentDate = new Date();
     const startDate = new Date(2025, 0, 1); // enero 2025
     
-    // Generar todos los períodos desde enero 2025 hasta ahora
+    // Generar todos los períodos desde enero 2025 hasta el MES ACTUAL (inclusive)
     const periods: string[] = [];
     const tempDate = new Date(startDate);
     
-    while (tempDate <= currentDate) {
+    // Incluir el mes actual completo
+    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    
+    while (tempDate <= endDate) {
       periods.push(formatPeriod(tempDate));
       tempDate.setMonth(tempDate.getMonth() + 1);
     }
 
     console.log(`Períodos a generar: ${periods.join(', ')}`);
 
+    let cargosGenerados = 0;
+    
     // Generar cargos para cada período y empadronado
     for (const period of periods) {
       console.log(`Procesando período ${period}...`);
       
-      const promises = empadronadosActivos.map(emp => 
-        generarCargoMensual(emp.id, period, config)
-      );
-      
-      await Promise.all(promises);
+      for (const emp of empadronadosActivos) {
+        const result = await generarCargoMensual(emp.id, period, config);
+        if (result) cargosGenerados++;
+      }
       
       // Marcar período como generado si no lo está
       if (!(await isPeriodGenerated(period))) {
@@ -254,7 +260,7 @@ export async function generarDesdeEnero2025(generadoPor: string): Promise<void> 
       }
     }
     
-    console.log("Backfill completado exitosamente");
+    console.log(`Backfill completado. ${cargosGenerados} cargos nuevos generados.`);
   } catch (error) {
     console.error("Error en generarDesdeEnero2025:", error);
     throw error;
