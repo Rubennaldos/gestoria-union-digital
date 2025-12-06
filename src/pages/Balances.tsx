@@ -9,12 +9,10 @@ import {
   FileBarChart, 
   Search, 
   Filter, 
-  Download,
   CheckCircle,
   XCircle,
   AlertCircle,
-  Users,
-  Calendar
+  Users
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -220,75 +218,6 @@ const Balances = () => {
     };
   }, [filasBalance]);
 
-  // Obtener inicial
-  const obtenerInicial = (texto: string | undefined): string => {
-    if (!texto) return "";
-    return texto.charAt(0).toUpperCase() + ".";
-  };
-
-  // Obtener primer y segundo nombre/apellido
-  const dividirNombre = (nombreCompleto: string | undefined): { primero: string; segundo: string } => {
-    if (!nombreCompleto) return { primero: "", segundo: "" };
-    const partes = nombreCompleto.trim().split(/\s+/);
-    return {
-      primero: partes[0] || "",
-      segundo: partes[1] || ""
-    };
-  };
-
-  // Exportar a CSV
-  const exportarCSV = () => {
-    const headers = [
-      "Padrón",
-      "Primer Nombre",
-      "Inicial 2do Nombre",
-      "Primer Apellido",
-      "Inicial 2do Apellido",
-      "Dirección",
-      ...meses.map(m => m.nombre)
-    ];
-
-    const rows = filasFiltradas.map(fila => {
-      const emp = fila.empadronado;
-      const { primero: primerNombre, segundo: segundoNombre } = dividirNombre(emp.nombre);
-      const { primero: primerApellido, segundo: segundoApellido } = dividirNombre(emp.apellidos);
-      const direccion = `Mz ${emp.manzana || ""} Lt ${emp.lote || ""} ${emp.etapa || ""}`.trim();
-      
-      const row = [
-        emp.numeroPadron || "",
-        primerNombre,
-        obtenerInicial(segundoNombre),
-        primerApellido,
-        obtenerInicial(segundoApellido),
-        direccion
-      ];
-
-      // Agregar meses
-      meses.forEach(mes => {
-        const periodo = `${añoSeleccionado}${mes.num}`;
-        row.push(fila.mesesPagados[periodo] ? "✓" : "✗");
-      });
-
-      return row;
-    });
-
-    const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `balances-${añoSeleccionado}-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "✅ Exportado",
-      description: "El archivo CSV se ha descargado correctamente"
-    });
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-0">
@@ -379,13 +308,7 @@ const Balances = () => {
         {/* Filtros y búsqueda */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Filtros y Búsqueda</span>
-              <Button onClick={exportarCSV} variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Exportar CSV
-              </Button>
-            </CardTitle>
+            <CardTitle>Filtros y Búsqueda</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

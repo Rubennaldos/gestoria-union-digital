@@ -12,7 +12,8 @@ import {
   Eye,
   ExternalLink,
   XCircle,
-  Loader2
+  Loader2,
+  FileDown
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import BackButton from "@/components/layout/BackButton";
@@ -37,6 +38,8 @@ import {
 import { Empadronado } from "@/types/empadronados";
 import { useDeudaAsociado } from "@/hooks/useDeudaAsociado";
 import { useBillingConfig } from "@/contexts/BillingConfigContext";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const PagosCuotas = () => {
   const { user } = useAuth();
@@ -373,6 +376,135 @@ const PagosCuotas = () => {
     }
   };
 
+  // Exportar mis pagos a PDF
+  const exportarMisPagosPDF = () => {
+    if (!empadronado) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    // Título
+    doc.setFontSize(18);
+    doc.setFont("helvetica", "bold");
+    doc.text("Estado de Cuenta", pageWidth / 2, 20, { align: "center" });
+    
+    // Subtítulo
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Año ${filtroAnio}`, pageWidth / 2, 28, { align: "center" });
+    
+    // Línea separadora
+    doc.setDrawColor(200, 200, 200);
+    doc.line(20, 32, pageWidth - 20, 32);
+    
+    // Datos del asociado
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("Datos del Asociado:", 20, 42);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Nombre: ${empadronado.nombre} ${empadronado.apellidos}`, 20, 50);
+    doc.text(`Padrón: ${empadronado.numeroPadron}`, 20, 56);
+    doc.text(`DNI: ${empadronado.dni || 'No registrado'}`, 20, 62);
+    doc.text(`Dirección: Mz ${empadronado.manzana || '-'} Lt ${empadronado.lote || '-'} ${empadronado.etapa || ''}`, 20, 68);
+    
+    // Resumen financiero
+    doc.setFont("helvetica", "bold");
+    doc.text("Resumen Financiero:", 20, 80);
+    
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total Pagado (${filtroAnio}): S/ ${estadisticas.totalPagado.toFixed(2)}`, 20, 88);
+    doc.text(`Total Pendiente: S/ ${estadisticas.totalPendiente.toFixed(2)}`, 20, 94);
+    doc.text(`Cuotas Vencidas: ${estadisticas.cuotasMorosas}`, 20, 100);
+    
+    // Tabla de cuotas pagadas
+    if (chargesPagados.length > 0) {
+      doc.setFont("helvetica", "bold");
+      doc.text("Cuotas Pagadas:", 20, 115);
+      
+      autoTable(doc, {
+        startY: 120,
+        head: [["Período", "Monto", "Estado", "Fecha"]],
+        body: chargesPagados.map(charge => [
+          formatPeriodo(charge.periodo),
+          `S/ ${charge.montoOriginal.toFixed(2)}`,
+          "Pagado",
+          formatFecha(charge.fechaCreacion)
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [34, 139, 34] },
+        styles: { fontSize: 9 },
+        margin: { left: 20, right: 20 }
+      });
+    }
+    
+    // Tabla de cuotas pendientes
+    if (chargesPendientes.length > 0) {
+      const startY = (doc as any).lastAutoTable?.finalY + 15 || 120;
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("Cuotas Pendientes:", 20, startY);
+      
+      autoTable(doc, {
+        startY: startY + 5,
+        head: [["Período", "Monto", "Saldo", "Estado", "Vencimiento"]],
+        body: chargesPendientes.map(charge => [
+          formatPeriodo(charge.periodo),
+          `S/ ${charge.montoOriginal.toFixed(2)}`,
+          `S/ ${charge.saldo.toFixed(2)}`,
+          charge.esMoroso ? "Vencida" : "Pendiente",
+          formatFecha(charge.fechaVencimiento)
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [220, 53, 69] },
+        styles: { fontSize: 9 },
+        margin: { left: 20, right: 20 }
+      });
+    }
+    
+    // Historial de pagos
+    if (misPagos.length > 0) {
+      const startY = (doc as any).lastAutoTable?.finalY + 15 || 120;
+      
+      doc.setFont("helvetica", "bold");
+      doc.text("Historial de Pagos:", 20, startY);
+      
+      autoTable(doc, {
+        startY: startY + 5,
+        head: [["Período", "Monto", "Método", "N° Operación", "Estado", "Fecha"]],
+        body: misPagos.map(pago => [
+          formatPeriodo(pago.periodo),
+          `S/ ${pago.monto.toFixed(2)}`,
+          pago.metodoPago,
+          pago.numeroOperacion || '-',
+          pago.estado === 'aprobado' ? 'Aprobado' : pago.estado === 'rechazado' ? 'Rechazado' : 'En revisión',
+          formatFecha(pago.fechaPagoRegistrada)
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [0, 123, 255] },
+        styles: { fontSize: 8 },
+        margin: { left: 20, right: 20 }
+      });
+    }
+    
+    // Pie de página
+    const finalY = (doc as any).lastAutoTable?.finalY + 20 || 200;
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(`Documento generado el ${new Date().toLocaleString('es-PE')}`, pageWidth / 2, finalY, { align: "center" });
+    doc.text("Este documento es informativo y no constituye un comprobante oficial.", pageWidth / 2, finalY + 5, { align: "center" });
+    
+    // Descargar
+    const fileName = `estado-cuenta-${empadronado.numeroPadron}-${filtroAnio}.pdf`;
+    doc.save(fileName);
+    
+    toast({
+      title: "✅ PDF Generado",
+      description: `Se descargó ${fileName}`
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-0 flex items-center justify-center">
@@ -421,6 +553,17 @@ const PagosCuotas = () => {
               {empadronado.nombre} {empadronado.apellidos} • Padrón: {empadronado.numeroPadron}
             </p>
           </div>
+          
+          {/* Botón exportar PDF */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={exportarMisPagosPDF}
+            className="h-8 text-xs gap-1"
+          >
+            <FileDown className="h-3 w-3" />
+            <span className="hidden sm:inline">Exportar PDF</span>
+          </Button>
           
           {/* Filtro de año */}
           <Select value={filtroAnio} onValueChange={setFiltroAnio}>
