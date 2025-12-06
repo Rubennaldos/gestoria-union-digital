@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
@@ -80,15 +80,15 @@ export default function DetalleEmpadronadoModalV2({
     }
   };
 
-  // Calcular deuda total y items (considerando pagos pendientes y aprobados)
-  const { deudaTotal, deudaItems } = useMemo(() => {
-    if (!empadronado) return { deudaTotal: 0, deudaItems: [] };
+  // Calcular deuda total y items (solo VENCIDOS, considerando pagos)
+  const { deudaTotal, deudaItems, deudaFutura, deudaItemsFuturos } = useMemo(() => {
+    if (!empadronado) return { deudaTotal: 0, deudaItems: [], deudaFutura: 0, deudaItemsFuturos: [] };
 
-    const items: DeudaItem[] = charges
+    const ahora = Date.now();
+    
+    const allItems = charges
       .filter(charge => {
         if (charge.empadronadoId !== empadronado.id) return false;
-        
-        // Si el saldo es 0, ya está pagado
         if (charge.saldo <= 0) return false;
         
         // Verificar si hay pagos pendientes/aprobados que cubran el cargo
@@ -98,11 +98,9 @@ export default function DetalleEmpadronadoModalV2({
         );
         const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
         
-        // Solo mostrar si NO está cubierto por pagos
         return totalPagado < charge.montoOriginal;
       })
       .map(charge => {
-        // Calcular saldo real considerando pagos pendientes
         const pagosDelCargo = pagos.filter(p => 
           p.chargeId === charge.id && 
           (p.estado === 'aprobado' || p.estado === 'pendiente')
@@ -117,14 +115,25 @@ export default function DetalleEmpadronadoModalV2({
           estado: charge.estado,
           fechaVencimiento: charge.fechaVencimiento,
           esMoroso: charge.esMoroso,
-          montoMorosidad: charge.montoMorosidad
+          montoMorosidad: charge.montoMorosidad,
+          esVencido: ahora > charge.fechaVencimiento
         };
       })
       .sort((a, b) => a.periodo.localeCompare(b.periodo));
 
-    const total = items.reduce((sum, item) => sum + item.saldo, 0);
+    // Separar vencidos de futuros
+    const vencidos = allItems.filter(item => item.esVencido);
+    const futuros = allItems.filter(item => !item.esVencido);
+    
+    const totalVencido = vencidos.reduce((sum, item) => sum + item.saldo, 0);
+    const totalFuturo = futuros.reduce((sum, item) => sum + item.saldo, 0);
 
-    return { deudaTotal: total, deudaItems: items };
+    return { 
+      deudaTotal: totalVencido, 
+      deudaItems: vencidos,
+      deudaFutura: totalFuturo,
+      deudaItemsFuturos: futuros
+    };
   }, [empadronado, charges, pagos]);
 
   const generarLinkCompartir = () => {
@@ -283,21 +292,29 @@ export default function DetalleEmpadronadoModalV2({
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
-                Resumen de Deuda
-                <span className="text-2xl font-bold text-primary">
+                Resumen de Deuda Vencida
+                <span className={`text-2xl font-bold ${deudaTotal > 0 ? 'text-destructive' : 'text-green-600'}`}>
                   {formatearMoneda(deudaTotal)}
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-                <div className="flex-1">
-                  <Label className="text-xs sm:text-sm font-medium">Períodos pendientes</Label>
-                  <p className="text-sm font-semibold">{deudaItems.length}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-2 bg-red-50 rounded-lg">
+                  <Label className="text-xs font-medium text-red-700">Meses vencidos</Label>
+                  <p className="text-lg font-bold text-red-600">{deudaItems.length}</p>
                 </div>
-                <div className="flex-1">
-                  <Label className="text-xs sm:text-sm font-medium">Períodos morosos</Label>
-                  <p className="text-sm font-semibold text-destructive">{deudaItems.filter(item => item.esMoroso).length}</p>
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Label className="text-xs font-medium text-orange-700">Morosos</Label>
+                  <p className="text-lg font-bold text-orange-600">{deudaItems.filter(item => item.esMoroso).length}</p>
+                </div>
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Label className="text-xs font-medium text-blue-700">Próximos</Label>
+                  <p className="text-lg font-bold text-blue-600">{deudaItemsFuturos.length}</p>
+                </div>
+                <div className="p-2 bg-gray-50 rounded-lg">
+                  <Label className="text-xs font-medium text-gray-700">Deuda futura</Label>
+                  <p className="text-sm font-bold text-gray-600">{formatearMoneda(deudaFutura)}</p>
                 </div>
               </div>
             </CardContent>
@@ -323,66 +340,116 @@ export default function DetalleEmpadronadoModalV2({
 
             {/* Estado de Cuenta */}
             <TabsContent value="estado-cuenta">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Detalle de Deudas Pendientes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {deudaItems.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">
-                        No hay deudas pendientes
-                      </p>
-                    ) : (
-                      deudaItems.map((item) => (
-                        <div key={item.chargeId} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border rounded-lg gap-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm sm:text-base">Período: {item.periodo}</div>
-                            <div className="text-xs sm:text-sm text-muted-foreground">
-                              Vence: {formatearFecha(item.fechaVencimiento)}
-                              {item.montoMorosidad && (
-                                <span className="block sm:inline sm:ml-2 text-destructive">
-                                  (+ {formatearMoneda(item.montoMorosidad)} mora)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                            <div className="text-center sm:text-right">
-                              <div className="font-medium text-sm sm:text-base">{formatearMoneda(item.saldo)}</div>
-                              <Badge variant={
-                                item.estado === 'pagado' ? 'default' : 
-                                item.esMoroso ? 'destructive' : 'secondary'
-                              } className="text-xs">
-                                {item.esMoroso ? 'Moroso' : item.estado}
-                              </Badge>
+              <div className="space-y-4">
+                {/* Deudas VENCIDAS */}
+                <Card className="border-red-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                      <AlertCircle className="h-4 w-4" />
+                      Deudas Vencidas ({deudaItems.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {deudaItems.length === 0 ? (
+                        <p className="text-center text-green-600 py-2 text-sm">
+                          ✓ Sin deudas vencidas
+                        </p>
+                      ) : (
+                        deudaItems.map((item) => (
+                          <div key={item.chargeId} className="flex items-center justify-between p-2 bg-red-50 rounded-lg gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">{item.periodo}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Venció: {formatearFecha(item.fechaVencimiento)}
+                              </div>
                             </div>
                             
-                            <Button 
-                              size="sm" 
-                              onClick={() => {
-                                setNuevoPago({
-                                  chargeId: item.chargeId,
-                                  monto: item.saldo.toString(),
-                                  metodoPago: '',
-                                  numeroOperacion: '',
-                                  observaciones: ''
-                                });
-                                setActiveTab("registrar-pago");
-                              }}
-                              className="w-full sm:w-auto"
-                            >
-                              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                              <span className="text-xs sm:text-sm">Pagar</span>
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <div className="text-right">
+                                <div className="font-bold text-red-600">{formatearMoneda(item.saldo)}</div>
+                                <Badge variant="destructive" className="text-[10px]">
+                                  {item.esMoroso ? 'Moroso' : 'Vencido'}
+                                </Badge>
+                              </div>
+                              
+                              <Button 
+                                size="sm" 
+                                onClick={() => {
+                                  setNuevoPago({
+                                    chargeId: item.chargeId,
+                                    monto: item.saldo.toString(),
+                                    metodoPago: '',
+                                    numeroOperacion: '',
+                                    observaciones: ''
+                                  });
+                                  setActiveTab("registrar-pago");
+                                }}
+                              >
+                                <CreditCard className="h-3 w-3 mr-1" />
+                                Pagar
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Cuotas PRÓXIMAS */}
+                {deudaItemsFuturos.length > 0 && (
+                  <Card className="border-blue-200">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base flex items-center gap-2 text-blue-700">
+                        <Calendar className="h-4 w-4" />
+                        Próximas Cuotas ({deudaItemsFuturos.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {deudaItemsFuturos.map((item) => (
+                          <div key={item.chargeId} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">{item.periodo}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Vence: {formatearFecha(item.fechaVencimiento)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <div className="text-right">
+                                <div className="font-bold text-blue-600">{formatearMoneda(item.saldo)}</div>
+                                <Badge variant="secondary" className="text-[10px]">
+                                  Por vencer
+                                </Badge>
+                              </div>
+                              
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => {
+                                  setNuevoPago({
+                                    chargeId: item.chargeId,
+                                    monto: item.saldo.toString(),
+                                    metodoPago: '',
+                                    numeroOperacion: '',
+                                    observaciones: ''
+                                  });
+                                  setActiveTab("registrar-pago");
+                                }}
+                              >
+                                <CreditCard className="h-3 w-3 mr-1" />
+                                Adelantar
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </TabsContent>
 
             {/* Historial de Pagos */}

@@ -524,6 +524,7 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
     const currentPeriod = getCurrentPeriod();
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
+    const ahora = Date.now();
 
     // Inicializar estadísticas
     let recaudadoMes = 0;
@@ -538,9 +539,33 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
     const empadronadosActivos = empadronados.filter(e => e.habilitado);
     totalEmpadronados = empadronadosActivos.length;
 
+    // Cargar todos los pagos primero para verificar cobertura
+    const pagosSnapshot = await get(ref(db, `${BASE_PATH}/pagos`));
+    const allPagos: Record<string, PagoV2> = pagosSnapshot.exists() ? pagosSnapshot.val() : {};
+    
+    // Crear mapa de pagos por chargeId
+    const pagosPorCharge: Record<string, number> = {};
+    for (const pagoId in allPagos) {
+      const pago = allPagos[pagoId];
+      if (pago.estado === 'aprobado' || pago.estado === 'pendiente') {
+        if (!pagosPorCharge[pago.chargeId]) {
+          pagosPorCharge[pago.chargeId] = 0;
+        }
+        pagosPorCharge[pago.chargeId] += pago.monto;
+      }
+      
+      // Contar recaudado del mes (pagos aprobados)
+      if (pago.estado === 'aprobado') {
+        const pagoDate = new Date(pago.fechaPagoRegistrada);
+        if (pagoDate.getMonth() + 1 === currentMonth && pagoDate.getFullYear() === currentYear) {
+          recaudadoMes += pago.monto;
+        }
+      }
+    }
+
     // Obtener todos los cargos
     const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
-    const empadronadosMorosos = new Set<string>();
+    const mesesVencidosPorEmp: Record<string, number> = {};
 
     if (chargesSnapshot.exists()) {
       const allCharges = chargesSnapshot.val();
@@ -549,42 +574,36 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
         for (const empId in allCharges[period]) {
           for (const chargeId in allCharges[period][empId]) {
             const charge: ChargeV2 = allCharges[period][empId][chargeId];
+            const totalPagado = pagosPorCharge[charge.id] || 0;
+            const estaCubierto = totalPagado >= charge.montoOriginal || charge.saldo <= 0;
+            const estaVencido = ahora > charge.fechaVencimiento;
             
-            // Pendiente total (todos los saldos)
-            pendienteTotal += charge.saldo;
+            // Pendiente = solo cargos VENCIDOS no cubiertos
+            if (estaVencido && !estaCubierto) {
+              const saldoReal = Math.max(0, charge.montoOriginal - totalPagado);
+              pendienteTotal += saldoReal;
+              
+              // Contar meses vencidos por empadronado
+              if (!mesesVencidosPorEmp[empId]) {
+                mesesVencidosPorEmp[empId] = 0;
+              }
+              mesesVencidosPorEmp[empId]++;
+            }
             
             // Cargos del mes actual
             if (period === currentPeriod) {
               cargosMesTotal++;
-              if (charge.estado === 'pagado') {
+              if (estaCubierto) {
                 cargosMesPagados++;
               }
-            }
-            
-            // Marcar morosos
-            if (charge.esMoroso) {
-              empadronadosMorosos.add(empId);
             }
           }
         }
       }
     }
 
-    morosCount = empadronadosMorosos.size;
-
-    // Obtener pagos del mes actual
-    const pagosSnapshot = await get(ref(db, `${BASE_PATH}/pagos`));
-    if (pagosSnapshot.exists()) {
-      const allPagos = pagosSnapshot.val();
-      for (const pagoId in allPagos) {
-        const pago: PagoV2 = allPagos[pagoId];
-        const pagoDate = new Date(pago.fechaPagoRegistrada);
-        
-        if (pagoDate.getMonth() + 1 === currentMonth && pagoDate.getFullYear() === currentYear) {
-          recaudadoMes += pago.monto;
-        }
-      }
-    }
+    // Morosos = empadronados con más de 3 meses vencidos
+    morosCount = Object.values(mesesVencidosPorEmp).filter(meses => meses > 3).length;
 
     // Obtener ingresos del mes
     let ingresosMes = recaudadoMes; // Los pagos ya están incluidos
