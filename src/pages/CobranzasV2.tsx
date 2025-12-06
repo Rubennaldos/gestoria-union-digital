@@ -202,19 +202,46 @@ export default function CobranzasV2() {
     }
   };
 
-  // Calcular deuda: SOLO cargos vencidos (fecha actual > fecha vencimiento)
+  // Verificar si un cargo está cubierto (considerando pagos pendientes y aprobados)
+  // Esto es consistente con la lógica de Balances.tsx
+  const estaCargoCubierto = (charge: ChargeV2): boolean => {
+    // Si el saldo es 0, ya está pagado
+    if (charge.saldo <= 0) return true;
+    
+    // Buscar pagos para este cargo que estén pendientes o aprobados
+    const pagosDelCargo = pagos.filter(p => 
+      p.chargeId === charge.id && 
+      (p.estado === 'aprobado' || p.estado === 'pendiente')
+    );
+    
+    // Sumar los montos de los pagos
+    const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
+    
+    // Está cubierto si los pagos cubren el monto original
+    return totalPagado >= charge.montoOriginal;
+  };
+
+  // Calcular deuda real: SOLO cargos vencidos que NO están cubiertos por pagos
   const calcularDeudaEmpadronado = (empId: string): number => {
     const ahora = Date.now();
     return charges
-      .filter(c => c.empadronadoId === empId && c.saldo > 0 && ahora > c.fechaVencimiento)
-      .reduce((total, charge) => total + charge.saldo, 0);
+      .filter(c => c.empadronadoId === empId && ahora > c.fechaVencimiento && !estaCargoCubierto(c))
+      .reduce((total, charge) => {
+        // Calcular deuda real: monto original menos pagos pendientes/aprobados
+        const pagosDelCargo = pagos.filter(p => 
+          p.chargeId === charge.id && 
+          (p.estado === 'aprobado' || p.estado === 'pendiente')
+        );
+        const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
+        return total + Math.max(0, charge.montoOriginal - totalPagado);
+      }, 0);
   };
 
-  // Contar meses de deuda vencida
+  // Contar meses de deuda vencida (que no están cubiertos por pagos)
   const contarMesesDeuda = (empId: string): number => {
     const ahora = Date.now();
     return charges
-      .filter(c => c.empadronadoId === empId && c.saldo > 0 && ahora > c.fechaVencimiento)
+      .filter(c => c.empadronadoId === empId && ahora > c.fechaVencimiento && !estaCargoCubierto(c))
       .length;
   };
 

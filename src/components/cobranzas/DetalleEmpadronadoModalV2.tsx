@@ -80,27 +80,52 @@ export default function DetalleEmpadronadoModalV2({
     }
   };
 
-  // Calcular deuda total y items
+  // Calcular deuda total y items (considerando pagos pendientes y aprobados)
   const { deudaTotal, deudaItems } = useMemo(() => {
     if (!empadronado) return { deudaTotal: 0, deudaItems: [] };
 
     const items: DeudaItem[] = charges
-      .filter(charge => charge.empadronadoId === empadronado.id && charge.saldo > 0)
-      .map(charge => ({
-        chargeId: charge.id,
-        periodo: charge.periodo,
-        saldo: charge.saldo,
-        estado: charge.estado,
-        fechaVencimiento: charge.fechaVencimiento,
-        esMoroso: charge.esMoroso,
-        montoMorosidad: charge.montoMorosidad
-      }))
+      .filter(charge => {
+        if (charge.empadronadoId !== empadronado.id) return false;
+        
+        // Si el saldo es 0, ya está pagado
+        if (charge.saldo <= 0) return false;
+        
+        // Verificar si hay pagos pendientes/aprobados que cubran el cargo
+        const pagosDelCargo = pagos.filter(p => 
+          p.chargeId === charge.id && 
+          (p.estado === 'aprobado' || p.estado === 'pendiente')
+        );
+        const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
+        
+        // Solo mostrar si NO está cubierto por pagos
+        return totalPagado < charge.montoOriginal;
+      })
+      .map(charge => {
+        // Calcular saldo real considerando pagos pendientes
+        const pagosDelCargo = pagos.filter(p => 
+          p.chargeId === charge.id && 
+          (p.estado === 'aprobado' || p.estado === 'pendiente')
+        );
+        const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
+        const saldoReal = Math.max(0, charge.montoOriginal - totalPagado);
+        
+        return {
+          chargeId: charge.id,
+          periodo: charge.periodo,
+          saldo: saldoReal,
+          estado: charge.estado,
+          fechaVencimiento: charge.fechaVencimiento,
+          esMoroso: charge.esMoroso,
+          montoMorosidad: charge.montoMorosidad
+        };
+      })
       .sort((a, b) => a.periodo.localeCompare(b.periodo));
 
     const total = items.reduce((sum, item) => sum + item.saldo, 0);
 
     return { deudaTotal: total, deudaItems: items };
-  }, [empadronado, charges]);
+  }, [empadronado, charges, pagos]);
 
   const generarLinkCompartir = () => {
     if (!empadronado) return '';
