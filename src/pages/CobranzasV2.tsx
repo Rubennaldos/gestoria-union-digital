@@ -275,9 +275,9 @@ export default function CobranzasV2() {
       .length;
   };
 
-  // Moroso si tiene más de 3 meses vencidos sin pagar (consistente con Balances)
+  // Moroso si tiene AL MENOS 1 mes vencido (pasó del día 15)
   const esMoroso = (empId: string): boolean => {
-    return contarMesesDeuda(empId) > 3;
+    return contarMesesDeuda(empId) >= 1;
   };
 
   const verDetallesEmpadronado = async (empId: string) => {

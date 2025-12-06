@@ -133,8 +133,9 @@ const Balances = () => {
         }
       });
 
-      const esMoroso = mesesDeuda > 3;
-      const esPuntual = mesesDeuda <= 1 && mesesDeuda > 0;
+      // Moroso = tiene al menos 1 mes vencido (pasó del día 15)
+      const esMoroso = mesesDeuda >= 1;
+      const esPuntual = false; // Ya no usamos esta categoría
       const esAlDia = mesesDeuda === 0;
 
       return {

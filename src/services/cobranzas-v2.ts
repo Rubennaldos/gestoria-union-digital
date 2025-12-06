@@ -87,9 +87,9 @@ function calculateChargeDate(empadronado: any, config: ConfiguracionCobranzasV2)
 }
 
 function calculateDueDate(chargeDate: Date, config: ConfiguracionCobranzasV2): Date {
-  // Vencimiento: día configurable del mes siguiente
-  const nextMonth = new Date(chargeDate.getFullYear(), chargeDate.getMonth() + 1, config.diaVencimiento);
-  return nextMonth;
+  // Vencimiento: día 15 del MISMO MES del cargo
+  // Ej: Cargo de diciembre 2025 → vence el 15 de diciembre 2025
+  return new Date(chargeDate.getFullYear(), chargeDate.getMonth(), config.diaVencimiento);
 }
 
 // === LOCKS Y ANTI-DUPLICADOS ===
@@ -602,8 +602,8 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
       }
     }
 
-    // Morosos = empadronados con más de 3 meses vencidos
-    morosCount = Object.values(mesesVencidosPorEmp).filter(meses => meses > 3).length;
+    // Morosos = empadronados con AL MENOS 1 mes vencido (después del día 15)
+    morosCount = Object.values(mesesVencidosPorEmp).filter(meses => meses >= 1).length;
 
     // Obtener ingresos del mes
     let ingresosMes = recaudadoMes; // Los pagos ya están incluidos
