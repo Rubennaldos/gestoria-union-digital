@@ -137,16 +137,14 @@ export async function generarCargoMensual(empadronadoId: string, period: string,
     const existingSnapshot = await get(chargesRef);
     
     if (existingSnapshot.exists()) {
-      console.log(`Cargo ya existe para ${empadronadoId} en período ${period}`);
-      return null;
+      return null; // Ya existe
     }
 
     const empadronados = await getEmpadronados();
     const empadronado = empadronados.find(e => e.id === empadronadoId);
     
     if (!empadronado || !empadronado.habilitado) {
-      console.log(`Empadronado ${empadronadoId} no encontrado o no habilitado`);
-      return null;
+      return null; // No encontrado o no habilitado
     }
 
     const chargeStartDate = calculateChargeDate(empadronado, config);
@@ -154,8 +152,7 @@ export async function generarCargoMensual(empadronadoId: string, period: string,
     
     // Solo generar si el período es >= fecha de inicio de cobro
     if (periodDate < chargeStartDate) {
-      console.log(`Período ${period} anterior a fecha de inicio de cobro para ${empadronadoId}`);
-      return null;
+      return null; // Período anterior a fecha de inicio
     }
 
     const dueDate = calculateDueDate(periodDate, config);
@@ -220,92 +217,103 @@ export async function generarMesActual(generadoPor: string): Promise<void> {
 
 // === GENERACIÓN AUTOMÁTICA ===
 // Esta función se ejecuta automáticamente al cargar el módulo
+// OPTIMIZADA: Solo genera cargos para períodos que faltan, en paralelo
 export async function verificarYGenerarCargosAutomaticos(): Promise<{ 
   cargosGenerados: number; 
   cierreEjecutado: boolean;
   mensaje: string;
 }> {
   try {
-    const config = await obtenerConfiguracionV2();
-    const empadronados = await getEmpadronados();
-    const empadronadosActivos = empadronados.filter(e => e.habilitado);
-    
+    // Verificar qué períodos ya están generados
     const currentDate = new Date();
-    const startDate = new Date(2025, 0, 1); // enero 2025
+    const currentPeriod = formatPeriod(currentDate);
     
-    // Generar todos los períodos desde enero 2025 hasta el mes actual
-    const periods: string[] = [];
-    const tempDate = new Date(startDate);
-    const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    // Solo verificar el mes actual y el anterior (para no procesar todo cada vez)
+    const prevMonth = new Date(currentDate);
+    prevMonth.setMonth(prevMonth.getMonth() - 1);
+    const prevPeriod = formatPeriod(prevMonth);
     
-    while (tempDate <= endDate) {
-      periods.push(formatPeriod(tempDate));
-      tempDate.setMonth(tempDate.getMonth() + 1);
+    const periodsToCheck = [prevPeriod, currentPeriod];
+    const periodosNuevos: string[] = [];
+    
+    // Verificar cuáles períodos necesitan generarse
+    for (const period of periodsToCheck) {
+      if (!(await isPeriodGenerated(period))) {
+        periodosNuevos.push(period);
+      }
     }
     
     let cargosGenerados = 0;
     
-    // Generar cargos faltantes para cada período
-    for (const period of periods) {
-      for (const emp of empadronadosActivos) {
-        const result = await generarCargoMensual(emp.id, period, config);
-        if (result) cargosGenerados++;
-      }
+    // Solo generar si hay períodos nuevos
+    if (periodosNuevos.length > 0) {
+      const config = await obtenerConfiguracionV2();
+      const empadronados = await getEmpadronados();
+      const empadronadosActivos = empadronados.filter(e => e.habilitado);
       
-      // Marcar período como generado
-      if (!(await isPeriodGenerated(period))) {
+      // Generar cargos en PARALELO por período
+      for (const period of periodosNuevos) {
+        const promises = empadronadosActivos.map(emp => 
+          generarCargoMensual(emp.id, period, config)
+        );
+        
+        const results = await Promise.all(promises);
+        cargosGenerados += results.filter(r => r !== null).length;
+        
+        // Marcar período como generado
         await markPeriodGenerated(period, 'sistema_automatico');
       }
     }
     
-    // Ejecutar cierre automático para cargos vencidos
+    // Ejecutar cierre solo si es después del día de vencimiento
     let cierreEjecutado = false;
-    try {
-      const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
-      if (chargesSnapshot.exists()) {
-        const allCharges = chargesSnapshot.val();
-        const currentTime = Date.now();
-        let cargosProcesados = 0;
-        
-        for (const period in allCharges) {
-          for (const empId in allCharges[period]) {
-            for (const chargeId in allCharges[period][empId]) {
-              const charge: ChargeV2 = allCharges[period][empId][chargeId];
-              
-              // Marcar como moroso si está vencido y tiene saldo
-              if (charge.saldo > 0 && currentTime > charge.fechaVencimiento && !charge.esMoroso) {
-                const montoMorosidad = (charge.saldo * config.porcentajeMorosidad) / 100;
+    const config = await obtenerConfiguracionV2();
+    const diaActual = currentDate.getDate();
+    
+    if (diaActual > config.diaVencimiento) {
+      try {
+        const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+        if (chargesSnapshot.exists()) {
+          const allCharges = chargesSnapshot.val();
+          const currentTime = Date.now();
+          const updates: { [path: string]: any } = {};
+          
+          for (const period in allCharges) {
+            for (const empId in allCharges[period]) {
+              for (const chargeId in allCharges[period][empId]) {
+                const charge: ChargeV2 = allCharges[period][empId][chargeId];
                 
-                const updates = {
-                  esMoroso: true,
-                  montoMorosidad,
-                  estado: 'moroso'
-                };
-                
-                const chargePath = `${BASE_PATH}/charges/${period}/${empId}/${chargeId}`;
-                await update(ref(db, chargePath), updates);
-                cargosProcesados++;
+                // Marcar como moroso si está vencido y tiene saldo
+                if (charge.saldo > 0 && currentTime > charge.fechaVencimiento && !charge.esMoroso) {
+                  const montoMorosidad = (charge.saldo * config.porcentajeMorosidad) / 100;
+                  const chargePath = `${BASE_PATH}/charges/${period}/${empId}/${chargeId}`;
+                  
+                  updates[`${chargePath}/esMoroso`] = true;
+                  updates[`${chargePath}/montoMorosidad`] = montoMorosidad;
+                  updates[`${chargePath}/estado`] = 'moroso';
+                }
               }
             }
           }
+          
+          // Hacer todos los updates en una sola operación
+          if (Object.keys(updates).length > 0) {
+            await update(ref(db), updates);
+            cierreEjecutado = true;
+          }
         }
-        
-        if (cargosProcesados > 0) {
-          cierreEjecutado = true;
-          console.log(`Cierre automático: ${cargosProcesados} cargos marcados como morosos`);
-        }
+      } catch (e) {
+        console.error('Error en cierre automático:', e);
       }
-    } catch (e) {
-      console.error('Error en cierre automático:', e);
     }
     
     let mensaje = '';
     if (cargosGenerados > 0 && cierreEjecutado) {
-      mensaje = `${cargosGenerados} cargos generados y cierre ejecutado automáticamente`;
+      mensaje = `${cargosGenerados} cargos generados y cierre ejecutado`;
     } else if (cargosGenerados > 0) {
-      mensaje = `${cargosGenerados} cargos generados automáticamente`;
+      mensaje = `${cargosGenerados} cargos generados`;
     } else if (cierreEjecutado) {
-      mensaje = 'Cierre ejecutado automáticamente';
+      mensaje = 'Cierre ejecutado';
     } else {
       mensaje = 'Sistema al día';
     }
@@ -313,7 +321,7 @@ export async function verificarYGenerarCargosAutomaticos(): Promise<{
     return { cargosGenerados, cierreEjecutado, mensaje };
   } catch (error) {
     console.error("Error en verificación automática:", error);
-    return { cargosGenerados: 0, cierreEjecutado: false, mensaje: 'Error en verificación' };
+    return { cargosGenerados: 0, cierreEjecutado: false, mensaje: '' };
   }
 }
 
