@@ -215,6 +215,56 @@ export async function generarMesActual(generadoPor: string): Promise<void> {
   }
 }
 
+// === CORRECCIÓN DE FECHAS DE VENCIMIENTO ===
+// Corrige todos los cargos existentes para que venzan el día 15 del MISMO mes
+export async function corregirFechasVencimiento(): Promise<number> {
+  try {
+    const config = await obtenerConfiguracionV2();
+    const chargesSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+    
+    if (!chargesSnapshot.exists()) {
+      return 0;
+    }
+
+    const allCharges = chargesSnapshot.val();
+    const updates: { [path: string]: any } = {};
+    let corregidos = 0;
+
+    for (const period in allCharges) {
+      // Extraer año y mes del período (YYYYMM)
+      const año = parseInt(period.substring(0, 4));
+      const mes = parseInt(period.substring(4, 6)) - 1; // 0-indexed
+      
+      // Fecha de vencimiento correcta: día 15 del MISMO mes
+      const fechaVencimientoCorrecta = new Date(año, mes, config.diaVencimiento).getTime();
+      
+      for (const empId in allCharges[period]) {
+        for (const chargeId in allCharges[period][empId]) {
+          const charge = allCharges[period][empId][chargeId];
+          
+          // Si la fecha es diferente, corregir
+          if (charge.fechaVencimiento !== fechaVencimientoCorrecta) {
+            const chargePath = `${BASE_PATH}/charges/${period}/${empId}/${chargeId}/fechaVencimiento`;
+            updates[chargePath] = fechaVencimientoCorrecta;
+            corregidos++;
+          }
+        }
+      }
+    }
+
+    // Aplicar todas las correcciones
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db), updates);
+      console.log(`✅ Corregidas ${corregidos} fechas de vencimiento`);
+    }
+
+    return corregidos;
+  } catch (error) {
+    console.error("Error corrigiendo fechas:", error);
+    return 0;
+  }
+}
+
 // === GENERACIÓN AUTOMÁTICA ===
 // Ejecuta en segundo plano, no bloquea la UI
 export async function verificarYGenerarCargosAutomaticos(): Promise<{ 
@@ -223,6 +273,20 @@ export async function verificarYGenerarCargosAutomaticos(): Promise<{
   mensaje: string;
 }> {
   try {
+    // Verificar si ya se corrigieron las fechas (una sola vez)
+    const correccionRef = ref(db, `${BASE_PATH}/config/fechasCorregidas`);
+    const correccionSnapshot = await get(correccionRef);
+    
+    if (!correccionSnapshot.exists() || !correccionSnapshot.val()) {
+      // Corregir todas las fechas de vencimiento existentes
+      const corregidos = await corregirFechasVencimiento();
+      if (corregidos > 0) {
+        console.log(`✅ Se corrigieron ${corregidos} fechas de vencimiento`);
+      }
+      // Marcar como corregido
+      await set(correccionRef, true);
+    }
+    
     const currentDate = new Date();
     const currentPeriod = formatPeriod(currentDate);
     
