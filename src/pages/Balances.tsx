@@ -218,6 +218,22 @@ const Balances = () => {
     };
   }, [filasBalance]);
 
+  // Obtener inicial de un nombre
+  const obtenerInicial = (texto: string | undefined): string => {
+    if (!texto) return "";
+    return texto.charAt(0).toUpperCase() + ".";
+  };
+
+  // Obtener primer y segundo nombre/apellido
+  const dividirNombre = (nombreCompleto: string | undefined): { primero: string; segundo: string } => {
+    if (!nombreCompleto) return { primero: "", segundo: "" };
+    const partes = nombreCompleto.trim().split(/\s+/);
+    return {
+      primero: partes[0] || "",
+      segundo: partes[1] || ""
+    };
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-0">
