@@ -182,13 +182,13 @@ export default function Login() {
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">
-                Junta de Propietarios
+                JPUSAP
               </h1>
               <h2 className="text-xl lg:text-2xl font-semibold text-blue-300">
-                Urbanización San Antonio de Padua
+                Trabajando con el proposito de vivir mejor!
               </h2>
               <p className="text-sm lg:text-base text-slate-300 max-w-md">
-                Sistema de Gestión Vecinal
+                Sistema de Gestión Vecinal - Elaborado por la empresa Arquisia
               </p>
             </div>
           </div>
