@@ -40,6 +40,7 @@ import { useDeudaAsociado } from "@/hooks/useDeudaAsociado";
 import { useBillingConfig } from "@/contexts/BillingConfigContext";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import logoUrbanizacion from "@/assets/logo-urbanizacion.png";
 
 const PagosCuotas = () => {
   const { user } = useAuth();
@@ -377,54 +378,135 @@ const PagosCuotas = () => {
   };
 
   // Exportar mis pagos a PDF
-  const exportarMisPagosPDF = () => {
+  const exportarMisPagosPDF = async () => {
     if (!empadronado) return;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     
-    // Título
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("Estado de Cuenta", pageWidth / 2, 20, { align: "center" });
+    // Cargar logo como imagen
+    const loadImage = (src: string): Promise<HTMLImageElement> => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    };
+
+    try {
+      // Intentar cargar el logo
+      const logoImg = await loadImage(logoUrbanizacion);
+      
+      // Encabezado con fondo azul
+      doc.setFillColor(30, 58, 138); // Azul oscuro
+      doc.rect(0, 0, pageWidth, 45, 'F');
+      
+      // Logo (lado izquierdo)
+      doc.addImage(logoImg, 'PNG', 15, 8, 28, 28);
+      
+      // Nombre de la empresa (lado derecho del logo)
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("Junta de Propietarios", 50, 18);
+      doc.setFontSize(11);
+      doc.text("Urbanización San Antonio de Padua", 50, 26);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.text("Sistema de Gestión Vecinal", 50, 33);
+      
+      // Título del documento (derecha)
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("ESTADO DE CUENTA", pageWidth - 20, 20, { align: "right" });
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Año ${filtroAnio}`, pageWidth - 20, 28, { align: "right" });
+      
+    } catch (e) {
+      // Si falla el logo, solo mostrar texto
+      doc.setFillColor(30, 58, 138);
+      doc.rect(0, 0, pageWidth, 35, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("JPUSAP - Estado de Cuenta", pageWidth / 2, 15, { align: "center" });
+      doc.setFontSize(11);
+      doc.text(`Urbanización San Antonio de Padua - Año ${filtroAnio}`, pageWidth / 2, 25, { align: "center" });
+    }
     
-    // Subtítulo
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Año ${filtroAnio}`, pageWidth / 2, 28, { align: "center" });
+    // Restablecer color de texto
+    doc.setTextColor(0, 0, 0);
     
-    // Línea separadora
-    doc.setDrawColor(200, 200, 200);
-    doc.line(20, 32, pageWidth - 20, 32);
+    // Datos del asociado en un recuadro
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(15, 52, pageWidth - 30, 32, 3, 3, 'F');
     
-    // Datos del asociado
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("Datos del Asociado:", 20, 42);
+    doc.setTextColor(30, 58, 138);
+    doc.text("DATOS DEL ASOCIADO", 20, 62);
     
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
     doc.setFontSize(10);
-    doc.text(`Nombre: ${empadronado.nombre} ${empadronado.apellidos}`, 20, 50);
-    doc.text(`Padrón: ${empadronado.numeroPadron}`, 20, 56);
-    doc.text(`DNI: ${empadronado.dni || 'No registrado'}`, 20, 62);
-    doc.text(`Dirección: Mz ${empadronado.manzana || '-'} Lt ${empadronado.lote || '-'} ${empadronado.etapa || ''}`, 20, 68);
+    doc.text(`Nombre: ${empadronado.nombre} ${empadronado.apellidos}`, 20, 70);
+    doc.text(`Padrón: ${empadronado.numeroPadron}`, 20, 78);
+    doc.text(`DNI: ${empadronado.dni || 'No registrado'}`, pageWidth / 2, 70);
+    doc.text(`Dirección: Mz ${empadronado.manzana || '-'} Lt ${empadronado.lote || '-'} ${empadronado.etapa || ''}`, pageWidth / 2, 78);
     
-    // Resumen financiero
+    // Resumen financiero en cards
+    const cardY = 92;
+    const cardWidth = (pageWidth - 50) / 3;
+    
+    // Card 1: Total Pagado
+    doc.setFillColor(220, 252, 231);
+    doc.roundedRect(15, cardY, cardWidth, 22, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(22, 101, 52);
+    doc.text("PAGADO " + filtroAnio, 15 + cardWidth/2, cardY + 7, { align: "center" });
+    doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text("Resumen Financiero:", 20, 80);
+    doc.text(`S/ ${estadisticas.totalPagado.toFixed(2)}`, 15 + cardWidth/2, cardY + 17, { align: "center" });
     
+    // Card 2: Total Pendiente
+    doc.setFillColor(254, 226, 226);
+    doc.roundedRect(20 + cardWidth, cardY, cardWidth, 22, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(153, 27, 27);
     doc.setFont("helvetica", "normal");
-    doc.text(`Total Pagado (${filtroAnio}): S/ ${estadisticas.totalPagado.toFixed(2)}`, 20, 88);
-    doc.text(`Total Pendiente: S/ ${estadisticas.totalPendiente.toFixed(2)}`, 20, 94);
-    doc.text(`Cuotas Vencidas: ${estadisticas.cuotasMorosas}`, 20, 100);
+    doc.text("PENDIENTE", 20 + cardWidth + cardWidth/2, cardY + 7, { align: "center" });
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`S/ ${estadisticas.totalPendiente.toFixed(2)}`, 20 + cardWidth + cardWidth/2, cardY + 17, { align: "center" });
+    
+    // Card 3: Cuotas Vencidas
+    doc.setFillColor(254, 243, 199);
+    doc.roundedRect(25 + cardWidth * 2, cardY, cardWidth, 22, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(146, 64, 14);
+    doc.setFont("helvetica", "normal");
+    doc.text("CUOTAS VENCIDAS", 25 + cardWidth * 2 + cardWidth/2, cardY + 7, { align: "center" });
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${estadisticas.cuotasMorosas}`, 25 + cardWidth * 2 + cardWidth/2, cardY + 17, { align: "center" });
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    
+    let currentY = 122;
     
     // Tabla de cuotas pagadas
     if (chargesPagados.length > 0) {
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("Cuotas Pagadas:", 20, 115);
+      doc.setTextColor(22, 101, 52);
+      doc.text("✓ CUOTAS PAGADAS", 15, currentY);
       
       autoTable(doc, {
-        startY: 120,
+        startY: currentY + 4,
         head: [["Período", "Monto", "Estado", "Fecha"]],
         body: chargesPagados.map(charge => [
           formatPeriodo(charge.periodo),
@@ -433,67 +515,80 @@ const PagosCuotas = () => {
           formatFecha(charge.fechaCreacion)
         ]),
         theme: 'striped',
-        headStyles: { fillColor: [34, 139, 34] },
-        styles: { fontSize: 9 },
-        margin: { left: 20, right: 20 }
+        headStyles: { fillColor: [34, 139, 34], fontSize: 9 },
+        styles: { fontSize: 9, cellPadding: 3 },
+        margin: { left: 15, right: 15 }
       });
+      
+      currentY = (doc as any).lastAutoTable?.finalY + 10;
     }
     
     // Tabla de cuotas pendientes
     if (chargesPendientes.length > 0) {
-      const startY = (doc as any).lastAutoTable?.finalY + 15 || 120;
-      
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("Cuotas Pendientes:", 20, startY);
+      doc.setTextColor(153, 27, 27);
+      doc.text("✗ CUOTAS PENDIENTES", 15, currentY);
       
       autoTable(doc, {
-        startY: startY + 5,
+        startY: currentY + 4,
         head: [["Período", "Monto", "Saldo", "Estado", "Vencimiento"]],
         body: chargesPendientes.map(charge => [
           formatPeriodo(charge.periodo),
           `S/ ${charge.montoOriginal.toFixed(2)}`,
           `S/ ${charge.saldo.toFixed(2)}`,
-          charge.esMoroso ? "Vencida" : "Pendiente",
+          charge.esMoroso ? "VENCIDA" : "Pendiente",
           formatFecha(charge.fechaVencimiento)
         ]),
         theme: 'striped',
-        headStyles: { fillColor: [220, 53, 69] },
-        styles: { fontSize: 9 },
-        margin: { left: 20, right: 20 }
+        headStyles: { fillColor: [220, 53, 69], fontSize: 9 },
+        styles: { fontSize: 9, cellPadding: 3 },
+        margin: { left: 15, right: 15 },
+        bodyStyles: { 
+          textColor: (data: any) => {
+            if (data.row.raw[3] === 'VENCIDA') return [153, 27, 27];
+            return [0, 0, 0];
+          }
+        }
       });
+      
+      currentY = (doc as any).lastAutoTable?.finalY + 10;
     }
     
     // Historial de pagos
     if (misPagos.length > 0) {
-      const startY = (doc as any).lastAutoTable?.finalY + 15 || 120;
-      
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("Historial de Pagos:", 20, startY);
+      doc.setTextColor(30, 64, 175);
+      doc.text("📋 HISTORIAL DE PAGOS REGISTRADOS", 15, currentY);
       
       autoTable(doc, {
-        startY: startY + 5,
+        startY: currentY + 4,
         head: [["Período", "Monto", "Método", "N° Operación", "Estado", "Fecha"]],
         body: misPagos.map(pago => [
           formatPeriodo(pago.periodo),
           `S/ ${pago.monto.toFixed(2)}`,
-          pago.metodoPago,
+          pago.metodoPago.toUpperCase(),
           pago.numeroOperacion || '-',
-          pago.estado === 'aprobado' ? 'Aprobado' : pago.estado === 'rechazado' ? 'Rechazado' : 'En revisión',
+          pago.estado === 'aprobado' ? '✓ Aprobado' : pago.estado === 'rechazado' ? '✗ Rechazado' : '⏳ En revisión',
           formatFecha(pago.fechaPagoRegistrada)
         ]),
         theme: 'striped',
-        headStyles: { fillColor: [0, 123, 255] },
-        styles: { fontSize: 8 },
-        margin: { left: 20, right: 20 }
+        headStyles: { fillColor: [30, 64, 175], fontSize: 8 },
+        styles: { fontSize: 8, cellPadding: 2 },
+        margin: { left: 15, right: 15 }
       });
     }
     
     // Pie de página
-    const finalY = (doc as any).lastAutoTable?.finalY + 20 || 200;
-    doc.setFontSize(8);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFillColor(248, 250, 252);
+    doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
+    
+    doc.setFontSize(7);
     doc.setTextColor(128, 128, 128);
-    doc.text(`Documento generado el ${new Date().toLocaleString('es-PE')}`, pageWidth / 2, finalY, { align: "center" });
-    doc.text("Este documento es informativo y no constituye un comprobante oficial.", pageWidth / 2, finalY + 5, { align: "center" });
+    doc.text(`Documento generado el ${new Date().toLocaleString('es-PE')}`, pageWidth / 2, pageHeight - 12, { align: "center" });
+    doc.text("Este documento es informativo. Para comprobantes oficiales contacte a administración.", pageWidth / 2, pageHeight - 7, { align: "center" });
     
     // Descargar
     const fileName = `estado-cuenta-${empadronado.numeroPadron}-${filtroAnio}.pdf`;
