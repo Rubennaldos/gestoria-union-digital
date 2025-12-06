@@ -82,7 +82,8 @@ export default function DetalleEmpadronadoModalV2({
 
   // Calcular deuda total y items (solo VENCIDOS, considerando pagos)
   const { deudaTotal, deudaItems, deudaFutura, deudaItemsFuturos } = useMemo(() => {
-    if (!empadronado) return { deudaTotal: 0, deudaItems: [], deudaFutura: 0, deudaItemsFuturos: [] };
+    // Esperar a que se carguen los pagos para calcular correctamente
+    if (!empadronado || cargandoPagos) return { deudaTotal: 0, deudaItems: [], deudaFutura: 0, deudaItemsFuturos: [] };
 
     const ahora = Date.now();
     
@@ -134,7 +135,7 @@ export default function DetalleEmpadronadoModalV2({
       deudaFutura: totalFuturo,
       deudaItemsFuturos: futuros
     };
-  }, [empadronado, charges, pagos]);
+  }, [empadronado, charges, pagos, cargandoPagos]);
 
   const generarLinkCompartir = () => {
     if (!empadronado) return '';
@@ -293,30 +294,40 @@ export default function DetalleEmpadronadoModalV2({
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 Resumen de Deuda Vencida
-                <span className={`text-2xl font-bold ${deudaTotal > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                  {formatearMoneda(deudaTotal)}
-                </span>
+                {cargandoPagos ? (
+                  <span className="text-muted-foreground text-sm">Calculando...</span>
+                ) : (
+                  <span className={`text-2xl font-bold ${deudaTotal > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                    {formatearMoneda(deudaTotal)}
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-2 bg-red-50 rounded-lg">
-                  <Label className="text-xs font-medium text-red-700">Meses vencidos</Label>
-                  <p className="text-lg font-bold text-red-600">{deudaItems.length}</p>
+              {cargandoPagos ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  Cargando información de pagos...
                 </div>
-                <div className="p-2 bg-orange-50 rounded-lg">
-                  <Label className="text-xs font-medium text-orange-700">Morosos</Label>
-                  <p className="text-lg font-bold text-orange-600">{deudaItems.filter(item => item.esMoroso).length}</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-2 bg-red-50 rounded-lg">
+                    <Label className="text-xs font-medium text-red-700">Meses vencidos</Label>
+                    <p className="text-lg font-bold text-red-600">{deudaItems.length}</p>
+                  </div>
+                  <div className="p-2 bg-orange-50 rounded-lg">
+                    <Label className="text-xs font-medium text-orange-700">Morosos</Label>
+                    <p className="text-lg font-bold text-orange-600">{deudaItems.filter(item => item.esMoroso).length}</p>
+                  </div>
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <Label className="text-xs font-medium text-blue-700">Próximos</Label>
+                    <p className="text-lg font-bold text-blue-600">{deudaItemsFuturos.length}</p>
+                  </div>
+                  <div className="p-2 bg-gray-50 rounded-lg">
+                    <Label className="text-xs font-medium text-gray-700">Deuda futura</Label>
+                    <p className="text-sm font-bold text-gray-600">{formatearMoneda(deudaFutura)}</p>
+                  </div>
                 </div>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Label className="text-xs font-medium text-blue-700">Próximos</Label>
-                  <p className="text-lg font-bold text-blue-600">{deudaItemsFuturos.length}</p>
-                </div>
-                <div className="p-2 bg-gray-50 rounded-lg">
-                  <Label className="text-xs font-medium text-gray-700">Deuda futura</Label>
-                  <p className="text-sm font-bold text-gray-600">{formatearMoneda(deudaFutura)}</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
