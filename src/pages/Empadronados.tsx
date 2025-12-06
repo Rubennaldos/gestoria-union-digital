@@ -143,18 +143,32 @@ const Empadronados: React.FC = () => {
     let filtered = [...empadronados];
 
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(e =>
-        e.nombre.toLowerCase().includes(term) ||
-        e.apellidos.toLowerCase().includes(term) ||
-        e.numeroPadron.toLowerCase().includes(term) ||
-        e.dni.toLowerCase().includes(term) ||
-        (e.miembrosFamilia &&
-          e.miembrosFamilia.some(miembro =>
-            miembro.nombre.toLowerCase().includes(term) ||
-            miembro.apellidos.toLowerCase().includes(term)
-          ))
-      );
+      const term = searchTerm.toLowerCase().trim();
+      
+      // Si busca solo números, también buscar por el número de padrón extraído
+      const esNumero = /^\d+$/.test(term);
+      const numeroLimpio = parseInt(term, 10);
+      
+      filtered = filtered.filter(e => {
+        // Si es número, comparar el número extraído del padrón
+        if (esNumero && !isNaN(numeroLimpio)) {
+          const numPadron = parseInt((e.numeroPadron || '').replace(/\D/g, '') || '0', 10);
+          if (numPadron === numeroLimpio) return true;
+        }
+        
+        // Búsqueda normal por texto
+        return (
+          e.nombre.toLowerCase().includes(term) ||
+          e.apellidos.toLowerCase().includes(term) ||
+          e.numeroPadron.toLowerCase().includes(term) ||
+          e.dni.toLowerCase().includes(term) ||
+          (e.miembrosFamilia &&
+            e.miembrosFamilia.some(miembro =>
+              miembro.nombre.toLowerCase().includes(term) ||
+              miembro.apellidos.toLowerCase().includes(term)
+            ))
+        );
+      });
     }
 
     if (filterStatus !== 'all') {
@@ -191,8 +205,16 @@ const Empadronados: React.FC = () => {
       );
     }
 
-    // Ordenar: los que tienen email de acceso primero
+    // Ordenar: primero por número de padrón (numérico), luego los que tienen email de acceso
     filtered.sort((a, b) => {
+      // Extraer números de padrón para ordenar numéricamente
+      const numA = parseInt((a.numeroPadron || '').replace(/\D/g, '') || '0', 10);
+      const numB = parseInt((b.numeroPadron || '').replace(/\D/g, '') || '0', 10);
+      
+      // Ordenar por número de padrón
+      if (numA !== numB) return numA - numB;
+      
+      // Si tienen el mismo número, ordenar por email de acceso
       const aHasEmail = a.emailAcceso ? 1 : 0;
       const bHasEmail = b.emailAcceso ? 1 : 0;
       return bHasEmail - aHasEmail;

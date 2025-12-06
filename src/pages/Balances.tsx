@@ -165,13 +165,27 @@ const Balances = () => {
       resultado = resultado.filter(f => f.esAlDia);
     }
 
-    // Búsqueda
+    // Búsqueda (inteligente para números de padrón)
     if (busqueda.trim()) {
-      const termino = busqueda.toLowerCase();
+      const termino = busqueda.toLowerCase().trim();
+      
+      // Si busca solo números, buscar también en el número de padrón sin prefijo
+      const esNumero = /^\d+$/.test(termino);
+      const numeroLimpio = parseInt(termino, 10);
+      
       resultado = resultado.filter(f => {
         const emp = f.empadronado;
+        const padron = emp.numeroPadron || "";
+        
+        // Si es número, comparar el número extraído del padrón
+        if (esNumero && !isNaN(numeroLimpio)) {
+          const numPadron = parseInt(padron.replace(/\D/g, "") || "0", 10);
+          if (numPadron === numeroLimpio) return true;
+        }
+        
+        // Búsqueda normal por texto
         return (
-          emp.numeroPadron?.toLowerCase().includes(termino) ||
+          padron.toLowerCase().includes(termino) ||
           emp.nombre?.toLowerCase().includes(termino) ||
           emp.apellidos?.toLowerCase().includes(termino) ||
           emp.manzana?.toLowerCase().includes(termino) ||
@@ -180,11 +194,17 @@ const Balances = () => {
       });
     }
 
-    // Ordenar por número de padrón
+    // Ordenar por número de padrón (extrae el número para ordenar correctamente)
+    // Funciona con formatos: P00002, P002, P2, 002, etc.
     resultado.sort((a, b) => {
       const padronA = a.empadronado.numeroPadron || "";
       const padronB = b.empadronado.numeroPadron || "";
-      return padronA.localeCompare(padronB);
+      
+      // Extraer solo los dígitos del número de padrón
+      const numA = parseInt(padronA.replace(/\D/g, "") || "0", 10);
+      const numB = parseInt(padronB.replace(/\D/g, "") || "0", 10);
+      
+      return numA - numB;
     });
 
     return resultado;

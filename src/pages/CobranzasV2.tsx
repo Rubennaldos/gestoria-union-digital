@@ -349,9 +349,26 @@ export default function CobranzasV2() {
     const deuda = calcularDeudaEmpadronado(emp.id);
     const moroso = esMoroso(emp.id);
     
-    // Filtro por texto de búsqueda
-    const textoCompleto = `${emp.nombre} ${emp.apellidos} ${emp.numeroPadron} ${emp.dni}`.toLowerCase();
-    const cumpleBusqueda = busquedaTexto === '' || textoCompleto.includes(busquedaTexto.toLowerCase());
+    // Filtro por texto de búsqueda (inteligente para números de padrón)
+    const termino = busquedaTexto.toLowerCase().trim();
+    let cumpleBusqueda = termino === '';
+    
+    if (!cumpleBusqueda) {
+      // Si busca solo números, también buscar en el número de padrón sin prefijo
+      const esNumero = /^\d+$/.test(termino);
+      const numeroLimpio = parseInt(termino, 10);
+      
+      if (esNumero && !isNaN(numeroLimpio)) {
+        const numPadron = parseInt((emp.numeroPadron || '').replace(/\D/g, '') || '0', 10);
+        if (numPadron === numeroLimpio) cumpleBusqueda = true;
+      }
+      
+      // Búsqueda normal por texto
+      if (!cumpleBusqueda) {
+        const textoCompleto = `${emp.nombre} ${emp.apellidos} ${emp.numeroPadron} ${emp.dni}`.toLowerCase();
+        cumpleBusqueda = textoCompleto.includes(termino);
+      }
+    }
     
     // Filtro por estado
     let cumpleEstado = true;
@@ -378,7 +395,10 @@ export default function CobranzasV2() {
         resultado = `${a.nombre} ${a.apellidos}`.localeCompare(`${b.nombre} ${b.apellidos}`);
         break;
       case 'padron':
-        resultado = a.numeroPadron.localeCompare(b.numeroPadron);
+        // Ordenar numéricamente extrayendo el número del padrón
+        const numA = parseInt((a.numeroPadron || '').replace(/\D/g, '') || '0', 10);
+        const numB = parseInt((b.numeroPadron || '').replace(/\D/g, '') || '0', 10);
+        resultado = numA - numB;
         break;
       case 'deuda':
         const deudaA = calcularDeudaEmpadronado(a.id);
