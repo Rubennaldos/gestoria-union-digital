@@ -116,11 +116,13 @@ export default function Login() {
       } else if (msg.includes('usuario_suspendido') || msg.includes('user-disabled')) {
         errorMessage = 'Tu acceso está deshabilitado, contacta a Presidencia.';
       } else if (msg.includes('user-not-found') || msg.includes('usuario no encontrado')) {
-        errorMessage = 'Usuario no encontrado';
-      } else if (msg.includes('wrong-password')) {
-        errorMessage = 'Contraseña incorrecta';
+        errorMessage = 'Usuario no encontrado. Verifica tu email o nombre de usuario.';
+      } else if (msg.includes('wrong-password') || msg.includes('invalid-credential')) {
+        errorMessage = 'Usuario o contraseña incorrectos. Verifica tus credenciales.';
       } else if (msg.includes('invalid-email')) {
-        errorMessage = 'Email inválido';
+        errorMessage = 'El formato del email no es válido.';
+      } else if (msg.includes('too-many-requests')) {
+        errorMessage = 'Demasiados intentos fallidos. Espera unos minutos e intenta de nuevo.';
       }
       
       console.log('📝 Setting error message:', errorMessage);
@@ -305,7 +307,7 @@ export default function Login() {
       {/* Footer */}
       <div className="fixed bottom-4 text-center w-full">
         <p className="text-xs text-slate-400">
-          © {new Date().getFullYear()} JPUSAP - Todos los derechos reservados
+          © {new Date().getFullYear()} JPUSAP - Soluciones de Software Arquisia  Todos los derechos reservados - www.arquisia.com
         </p>
       </div>
     </div>
