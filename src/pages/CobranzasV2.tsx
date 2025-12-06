@@ -275,9 +275,23 @@ export default function CobranzasV2() {
       .length;
   };
 
-  // Moroso si tiene AL MENOS 1 mes vencido (pasó del día 15)
+  // Clasificación por meses de deuda:
+  // 0 = Al día, 1 = Atrasado, 2 = Moroso, 3+ = Deudor
+  const obtenerEstadoDeuda = (empId: string): { 
+    estado: 'al-dia' | 'atrasado' | 'moroso' | 'deudor';
+    label: string;
+    meses: number;
+  } => {
+    const meses = contarMesesDeuda(empId);
+    if (meses === 0) return { estado: 'al-dia', label: 'Al día', meses };
+    if (meses === 1) return { estado: 'atrasado', label: 'Atrasado', meses };
+    if (meses === 2) return { estado: 'moroso', label: 'Moroso', meses };
+    return { estado: 'deudor', label: 'Deudor', meses };
+  };
+
+  // Para filtros (mantener compatibilidad)
   const esMoroso = (empId: string): boolean => {
-    return contarMesesDeuda(empId) >= 1;
+    return contarMesesDeuda(empId) >= 2;
   };
 
   const verDetallesEmpadronado = async (empId: string) => {
@@ -887,9 +901,16 @@ export default function CobranzasV2() {
                   ) : (
                     empadronadosFiltrados.map((emp) => {
                       const deuda = calcularDeudaEmpadronado(emp.id);
-                      const mesesDeuda = contarMesesDeuda(emp.id);
-                      const moroso = esMoroso(emp.id);
+                      const estadoDeuda = obtenerEstadoDeuda(emp.id);
                       const isSelected = seleccionados.has(emp.id);
+                      
+                      // Colores según estado
+                      const badgeStyles = {
+                        'al-dia': 'bg-green-100 text-green-700 border-green-300',
+                        'atrasado': 'bg-orange-100 text-orange-700 border-orange-300',
+                        'moroso': 'bg-red-100 text-red-700 border-red-300',
+                        'deudor': 'bg-red-200 text-red-900 border-red-500 font-bold'
+                      };
                       
                       return (
                         <div key={emp.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -916,24 +937,13 @@ export default function CobranzasV2() {
                           
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <div className={`font-medium ${deuda > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                              <div className={`font-medium ${deuda > 0 ? 'text-destructive' : 'text-green-600'}`}>
                                 {formatearMoneda(deuda)}
                               </div>
-                              <div className="flex items-center gap-1">
-                                {moroso ? (
-                                  <Badge variant="destructive">
-                                    Moroso ({mesesDeuda}m)
-                                  </Badge>
-                                ) : mesesDeuda > 0 ? (
-                                  <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-                                    Debe {mesesDeuda} mes{mesesDeuda > 1 ? 'es' : ''}
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="default" className="bg-green-100 text-green-700">
-                                    Al día
-                                  </Badge>
-                                )}
-                              </div>
+                              <Badge className={badgeStyles[estadoDeuda.estado]}>
+                                {estadoDeuda.label}
+                                {estadoDeuda.meses > 0 && ` (${estadoDeuda.meses}m)`}
+                              </Badge>
                             </div>
                             
                             <Button 

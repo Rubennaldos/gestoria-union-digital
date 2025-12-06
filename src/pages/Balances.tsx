@@ -25,9 +25,10 @@ interface FilaBalance {
   empadronado: Empadronado;
   mesesPagados: Record<string, boolean>; // "202501": true/false
   mesesDeuda: number;
-  esMoroso: boolean;
-  esAlDia: boolean;
-  esPuntual: boolean;
+  esAlDia: boolean;      // 0 meses
+  esAtrasado: boolean;   // 1 mes
+  esMoroso: boolean;     // 2 meses
+  esDeudor: boolean;     // 3+ meses
 }
 
 const Balances = () => {
@@ -37,7 +38,7 @@ const Balances = () => {
   const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "morosos" | "puntuales" | "al-dia">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "al-dia" | "atrasados" | "morosos" | "deudores">("todos");
   const [añoSeleccionado, setAñoSeleccionado] = useState(2025);
 
   // Cargar datos iniciales
@@ -133,18 +134,20 @@ const Balances = () => {
         }
       });
 
-      // Moroso = tiene al menos 1 mes vencido (pasó del día 15)
-      const esMoroso = mesesDeuda >= 1;
-      const esPuntual = false; // Ya no usamos esta categoría
+      // Clasificación: 0=Al día, 1=Atrasado, 2=Moroso, 3+=Deudor
       const esAlDia = mesesDeuda === 0;
+      const esAtrasado = mesesDeuda === 1;
+      const esMoroso = mesesDeuda === 2;
+      const esDeudor = mesesDeuda >= 3;
 
       return {
         empadronado: emp,
         mesesPagados,
         mesesDeuda,
-        esMoroso,
         esAlDia,
-        esPuntual
+        esAtrasado,
+        esMoroso,
+        esDeudor
       };
     });
 
@@ -156,12 +159,14 @@ const Balances = () => {
     let resultado = filasBalance;
 
     // Filtro por estado
-    if (filtroEstado === "morosos") {
-      resultado = resultado.filter(f => f.esMoroso);
-    } else if (filtroEstado === "puntuales") {
-      resultado = resultado.filter(f => f.esPuntual);
-    } else if (filtroEstado === "al-dia") {
+    if (filtroEstado === "al-dia") {
       resultado = resultado.filter(f => f.esAlDia);
+    } else if (filtroEstado === "atrasados") {
+      resultado = resultado.filter(f => f.esAtrasado);
+    } else if (filtroEstado === "morosos") {
+      resultado = resultado.filter(f => f.esMoroso);
+    } else if (filtroEstado === "deudores") {
+      resultado = resultado.filter(f => f.esDeudor);
     }
 
     // Búsqueda (inteligente para números de padrón)
@@ -213,9 +218,10 @@ const Balances = () => {
   const estadisticas = useMemo(() => {
     return {
       total: filasBalance.length,
+      alDia: filasBalance.filter(f => f.esAlDia).length,
+      atrasados: filasBalance.filter(f => f.esAtrasado).length,
       morosos: filasBalance.filter(f => f.esMoroso).length,
-      puntuales: filasBalance.filter(f => f.esPuntual).length,
-      alDia: filasBalance.filter(f => f.esAlDia).length
+      deudores: filasBalance.filter(f => f.esDeudor).length
     };
   }, [filasBalance]);
 
@@ -272,50 +278,62 @@ const Balances = () => {
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Users className="h-8 w-8 text-blue-600" />
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-6 w-6 text-blue-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{estadisticas.total}</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-xl font-bold">{estadisticas.total}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-8 w-8 text-green-600" />
+          <Card className="border-green-200 bg-green-50/50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-6 w-6 text-green-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Al Día</p>
-                  <p className="text-2xl font-bold text-green-600">{estadisticas.alDia}</p>
+                  <p className="text-xs text-green-700">Al Día</p>
+                  <p className="text-xl font-bold text-green-600">{estadisticas.alDia}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="h-8 w-8 text-orange-600" />
+          <Card className="border-orange-200 bg-orange-50/50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-6 w-6 text-orange-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Puntuales</p>
-                  <p className="text-2xl font-bold text-orange-600">{estadisticas.puntuales}</p>
+                  <p className="text-xs text-orange-700">Atrasados</p>
+                  <p className="text-xl font-bold text-orange-600">{estadisticas.atrasados}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <XCircle className="h-8 w-8 text-red-600" />
+          <Card className="border-red-200 bg-red-50/50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-6 w-6 text-red-600" />
                 <div>
-                  <p className="text-sm text-muted-foreground">Morosos</p>
-                  <p className="text-2xl font-bold text-red-600">{estadisticas.morosos}</p>
+                  <p className="text-xs text-red-700">Morosos</p>
+                  <p className="text-xl font-bold text-red-600">{estadisticas.morosos}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-300 bg-red-100/50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-6 w-6 text-red-800" />
+                <div>
+                  <p className="text-xs text-red-800">Deudores</p>
+                  <p className="text-xl font-bold text-red-800">{estadisticas.deudores}</p>
                 </div>
               </div>
             </CardContent>
@@ -354,9 +372,10 @@ const Balances = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="al-dia">Al Día (0 meses)</SelectItem>
-                    <SelectItem value="puntuales">Puntuales (≤1 mes)</SelectItem>
-                    <SelectItem value="morosos">Morosos (&gt;3 meses)</SelectItem>
+                    <SelectItem value="al-dia">🟢 Al Día (0 meses)</SelectItem>
+                    <SelectItem value="atrasados">🟠 Atrasados (1 mes)</SelectItem>
+                    <SelectItem value="morosos">🔴 Morosos (2 meses)</SelectItem>
+                    <SelectItem value="deudores">🔴 Deudores (3+ meses)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -375,27 +394,24 @@ const Balances = () => {
             </div>
 
             {/* Leyenda */}
-            <div className="flex flex-wrap items-center gap-4 p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="text-sm">= Pagado</span>
+            <div className="flex flex-wrap items-center gap-3 p-3 bg-muted rounded-lg text-xs">
+              <div className="flex items-center gap-1">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span>Pagado</span>
               </div>
-              <div className="flex items-center gap-2">
-                <XCircle className="h-5 w-5 text-red-600" />
-                <span className="text-sm">= No Pagado</span>
+              <div className="flex items-center gap-1">
+                <XCircle className="h-4 w-4 text-red-600" />
+                <span>No Pagado</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="default" className="bg-green-600">Al Día</Badge>
-                <span className="text-sm">= 0 meses de deuda</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="default" className="bg-orange-600">Puntual</Badge>
-                <span className="text-sm">= ≤1 mes de deuda</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="destructive">Moroso</Badge>
-                <span className="text-sm">= &gt;3 meses de deuda</span>
-              </div>
+              <span className="text-muted-foreground">|</span>
+              <Badge className="bg-green-100 text-green-700 text-xs">Al Día</Badge>
+              <span>0 meses</span>
+              <Badge className="bg-orange-100 text-orange-700 text-xs">Atrasado</Badge>
+              <span>1 mes</span>
+              <Badge className="bg-red-100 text-red-700 text-xs">Moroso</Badge>
+              <span>2 meses</span>
+              <Badge className="bg-red-200 text-red-900 text-xs font-bold">Deudor</Badge>
+              <span>3+ meses</span>
             </div>
           </CardContent>
         </Card>
@@ -483,23 +499,23 @@ const Balances = () => {
                           {/* Estado */}
                           <td className="border p-2 text-center">
                             {fila.esAlDia && (
-                              <Badge variant="default" className="bg-green-600 text-xs">
+                              <Badge className="bg-green-100 text-green-700 text-xs">
                                 Al Día
                               </Badge>
                             )}
-                            {fila.esPuntual && (
-                              <Badge variant="default" className="bg-orange-600 text-xs">
-                                Puntual
+                            {fila.esAtrasado && (
+                              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                                Atrasado
                               </Badge>
                             )}
                             {fila.esMoroso && (
-                              <Badge variant="destructive" className="text-xs">
+                              <Badge className="bg-red-100 text-red-700 text-xs">
                                 Moroso
                               </Badge>
                             )}
-                            {!fila.esAlDia && !fila.esPuntual && !fila.esMoroso && (
-                              <Badge variant="secondary" className="text-xs">
-                                {fila.mesesDeuda}m
+                            {fila.esDeudor && (
+                              <Badge className="bg-red-200 text-red-900 text-xs font-bold">
+                                Deudor ({fila.mesesDeuda}m)
                               </Badge>
                             )}
                           </td>

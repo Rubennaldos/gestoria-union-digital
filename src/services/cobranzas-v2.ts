@@ -602,8 +602,13 @@ export async function generarEstadisticasV2(): Promise<EstadisticasV2> {
       }
     }
 
-    // Morosos = empadronados con AL MENOS 1 mes vencido (después del día 15)
-    morosCount = Object.values(mesesVencidosPorEmp).filter(meses => meses >= 1).length;
+    // Conteo por categorías:
+    // - Al día = 0 meses
+    // - Atrasado = 1 mes (no se cuenta en morosos)
+    // - Moroso = 2 meses
+    // - Deudor = 3+ meses
+    // Para el KPI "Morosos" contamos los que tienen 2+ meses
+    morosCount = Object.values(mesesVencidosPorEmp).filter(meses => meses >= 2).length;
 
     // Obtener ingresos del mes
     let ingresosMes = recaudadoMes; // Los pagos ya están incluidos
