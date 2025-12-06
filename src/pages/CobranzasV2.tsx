@@ -8,10 +8,7 @@ import {
   FileText,
   RefreshCw,
   Settings,
-  Play,
-  Calendar,
   Receipt,
-  UserCheck,
   Download,
   ArrowUpCircle,
   ArrowDownCircle,
@@ -42,9 +39,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   obtenerConfiguracionV2,
   actualizarConfiguracionV2,
-  generarMesActual,
-  generarDesdeEnero2025,
-  ejecutarCierreMensualV2,
   generarEstadisticasV2,
   obtenerPagosV2,
   obtenerEgresosV2,
@@ -57,7 +51,8 @@ import {
   eliminarPagoV2,
   crearIngresoV2,
   obtenerIngresosV2,
-  obtenerReporteDeudores
+  obtenerReporteDeudores,
+  verificarYGenerarCargosAutomaticos
 } from "@/services/cobranzas-v2";
 
 import { getEmpadronados } from "@/services/empadronados";
@@ -131,12 +126,24 @@ export default function CobranzasV2() {
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'morosos' | 'al-dia' | 'con-deuda'>('todos');
 
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(true); // true = mostrar toast si hubo cambios automáticos
   }, []);
 
-  const cargarDatos = async () => {
+  const cargarDatos = async (mostrarToastAuto = false) => {
     try {
       setLoading(true);
+      
+      // Primero ejecutar verificación automática (genera cargos faltantes y cierre)
+      const resultadoAuto = await verificarYGenerarCargosAutomaticos();
+      
+      if (mostrarToastAuto && (resultadoAuto.cargosGenerados > 0 || resultadoAuto.cierreEjecutado)) {
+        toast({
+          title: "✅ Sistema actualizado",
+          description: resultadoAuto.mensaje
+        });
+      }
+      
+      // Luego cargar todos los datos
       const [configData, statsData, empadronadosData, pagosData, egresosData, chargesData] = await Promise.all([
         obtenerConfiguracionV2(),
         generarEstadisticasV2(),
@@ -586,60 +593,23 @@ export default function CobranzasV2() {
           </div>
         )}
 
-        {/* Acciones Rápidas - Mobile Optimized */}
+        {/* Acciones Rápidas - Simplificado */}
         <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-          <CardHeader className="p-3 md:p-6 bg-gradient-to-r from-primary/5 to-primary/10">
-            <CardTitle className="flex items-center gap-2 text-sm md:text-base">
-              <div className="p-1.5 md:p-2 rounded-lg bg-primary/10">
-                <Play className="h-3.5 w-3.5 md:h-5 md:w-5 text-primary" />
+          <CardHeader className="p-3 md:p-4 bg-gradient-to-r from-primary/5 to-primary/10">
+            <CardTitle className="flex items-center justify-between text-sm md:text-base">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-green-500/10">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </div>
+                <span>Sistema Automático</span>
               </div>
-              Acciones del Sistema
+              <span className="text-xs font-normal text-muted-foreground">
+                Los cargos y cierres se generan automáticamente
+              </span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-3 md:p-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-              <Button 
-                onClick={() => ejecutarAccion(
-                  () => generarDesdeEnero2025(user?.uid || 'sistema'),
-                  'Backfill completado desde enero 2025'
-                )}
-                disabled={procesando}
-                variant="default"
-                size="sm"
-                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
-              >
-                <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="text-xs md:text-sm">Generar Desde 2025</span>
-              </Button>
-
-              <Button 
-                onClick={() => ejecutarAccion(
-                  () => generarMesActual(user?.uid || 'sistema'),
-                  'Mes actual generado correctamente'
-                )}
-                disabled={procesando}
-                variant="outline"
-                size="sm"
-                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
-              >
-                <RefreshCw className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="text-xs md:text-sm">Mes Actual</span>
-              </Button>
-
-              <Button 
-                onClick={() => ejecutarAccion(
-                  ejecutarCierreMensualV2,
-                  'Cierre mensual ejecutado correctamente'
-                )}
-                disabled={procesando}
-                variant="destructive"
-                size="sm"
-                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
-              >
-                <UserCheck className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                <span className="text-xs md:text-sm">Ejecutar Cierre</span>
-              </Button>
-
+          <CardContent className="p-3 md:p-4">
+            <div className="flex flex-wrap gap-2">
               <Button 
                 onClick={async () => {
                   try {
