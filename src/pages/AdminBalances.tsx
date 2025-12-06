@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
-  Settings, FileSpreadsheet, Upload, Search, Filter, 
-  Download, Printer, FileText, TrendingUp, TrendingDown,
+  FileSpreadsheet, Search, Filter, 
+  Download, Printer, FileText, TrendingUp,
   Users, DollarSign, CheckCircle, AlertCircle, X, ChevronDown,
-  BarChart3, RefreshCw
+  BarChart3, RefreshCw, AlertTriangle, Skull
 } from "lucide-react";
 import {
   Select,
@@ -29,64 +29,49 @@ import {
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { db } from "@/config/firebase";
-import { ref, push, set, get } from "firebase/database";
 import { useToast } from "@/hooks/use-toast";
 import logoUrbanizacion from "@/assets/logo-urbanizacion.png";
 
+// Importar servicios reales
+import { getEmpadronados } from "@/services/empadronados";
+import { obtenerChargesV2, obtenerPagosV2 } from "@/services/cobranzas-v2";
+import type { Empadronado } from "@/types/empadronados";
+import type { ChargeV2, PagoV2 } from "@/types/cobranzas-v2";
+
 // Tipos
-interface BalanceRecord {
-  id: string;
-  manzana: string;
-  lote: string;
-  nombre: string;
-  meses: {
-    enero: string | number;
-    febrero: string | number;
-    marzo: string | number;
-    abril: string | number;
-    mayo: string | number;
-    junio: string | number;
-    julio: string | number;
-    agosto: string | number;
-    septiembre: string | number;
-    octubre: string | number;
-    noviembre: string | number;
-    diciembre: string | number;
-  };
-  busqueda_id: string;
-  createdAt: number;
-}
-
 interface BalanceRow {
-  Manzana: string;
-  Lote: string;
-  Nombre: string;
-  Enero?: any;
-  Febrero?: any;
-  Marzo?: any;
-  Abril?: any;
-  Mayo?: any;
-  Junio?: any;
-  Julio?: any;
-  Agosto?: any;
-  Septiembre?: any;
-  Octubre?: any;
-  Noviembre?: any;
-  Diciembre?: any;
+  empadronado: Empadronado;
+  meses: { [periodo: string]: { cargo: ChargeV2 | null; pagado: boolean; saldo: number } };
+  totalPagado: number;
+  totalDeuda: number;
+  mesesPagados: number;
+  mesesVencidos: number;
+  estadoDeuda: 'al-dia' | 'atrasado' | 'moroso' | 'deudor';
 }
 
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const MESES_INFO = [
+  { nombre: 'Enero', corto: 'Ene', periodo: '01' },
+  { nombre: 'Febrero', corto: 'Feb', periodo: '02' },
+  { nombre: 'Marzo', corto: 'Mar', periodo: '03' },
+  { nombre: 'Abril', corto: 'Abr', periodo: '04' },
+  { nombre: 'Mayo', corto: 'May', periodo: '05' },
+  { nombre: 'Junio', corto: 'Jun', periodo: '06' },
+  { nombre: 'Julio', corto: 'Jul', periodo: '07' },
+  { nombre: 'Agosto', corto: 'Ago', periodo: '08' },
+  { nombre: 'Septiembre', corto: 'Sep', periodo: '09' },
+  { nombre: 'Octubre', corto: 'Oct', periodo: '10' },
+  { nombre: 'Noviembre', corto: 'Nov', periodo: '11' },
+  { nombre: 'Diciembre', corto: 'Dic', periodo: '12' },
+];
 
 const AdminBalances = () => {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   
   // Estados
-  const [balances, setBalances] = useState<BalanceRecord[]>([]);
+  const [empadronados, setEmpadronados] = useState<Empadronado[]>([]);
+  const [charges, setCharges] = useState<ChargeV2[]>([]);
+  const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(false);
   const [año, setAño] = useState("2025");
   
   // Filtros
@@ -95,26 +80,25 @@ const AdminBalances = () => {
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [filasSeleccionadas, setFilasSeleccionadas] = useState<Set<string>>(new Set());
   
-  // Cargar datos
-  const cargarBalances = async () => {
+  // Cargar datos reales
+  const cargarDatos = async () => {
     setLoading(true);
     try {
-      const snapshot = await get(ref(db, `balances/${año}`));
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const lista: BalanceRecord[] = Object.entries(data).map(([id, val]: [string, any]) => ({
-          id,
-          ...val
-        }));
-        setBalances(lista);
-      } else {
-        setBalances([]);
-      }
+      const [empsData, chargesData, pagosData] = await Promise.all([
+        getEmpadronados(),
+        obtenerChargesV2(),
+        obtenerPagosV2()
+      ]);
+      
+      // Solo empadronados habilitados
+      setEmpadronados(empsData.filter(e => e.habilitado));
+      setCharges(chargesData);
+      setPagos(pagosData);
     } catch (error) {
-      console.error("Error cargando balances:", error);
+      console.error("Error cargando datos:", error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los balances",
+        description: "No se pudieron cargar los datos",
         variant: "destructive"
       });
     } finally {
@@ -123,185 +107,167 @@ const AdminBalances = () => {
   };
 
   useEffect(() => {
-    cargarBalances();
-  }, [año]);
+    cargarDatos();
+  }, []);
 
   // Obtener manzanas únicas
   const manzanasUnicas = useMemo(() => {
-    const manzanas = new Set(balances.map(b => b.manzana));
+    const manzanas = new Set(empadronados.map(e => e.manzana || 'Sin Mz'));
     return Array.from(manzanas).sort();
-  }, [balances]);
+  }, [empadronados]);
 
-  // Calcular total pagado por registro
-  const calcularTotalPagado = (record: BalanceRecord): number => {
-    return MESES.reduce((total, mes) => {
-      const valor = record.meses[mes as keyof typeof record.meses];
-      const num = typeof valor === 'number' ? valor : parseFloat(String(valor).replace(/[^\d.-]/g, '') || '0');
-      return total + (isNaN(num) ? 0 : num);
-    }, 0);
-  };
-
-  // Calcular meses pagados
-  const calcularMesesPagados = (record: BalanceRecord): number => {
-    return MESES.filter(mes => {
-      const valor = record.meses[mes as keyof typeof record.meses];
-      const num = typeof valor === 'number' ? valor : parseFloat(String(valor).replace(/[^\d.-]/g, '') || '0');
-      return num > 0;
-    }).length;
-  };
+  // Construir datos de balance para cada empadronado
+  const balancesData = useMemo(() => {
+    const ahora = Date.now();
+    
+    return empadronados.map(emp => {
+      const meses: { [periodo: string]: { cargo: ChargeV2 | null; pagado: boolean; saldo: number } } = {};
+      let totalPagado = 0;
+      let totalDeuda = 0;
+      let mesesPagados = 0;
+      let mesesVencidos = 0;
+      
+      // Procesar cada mes del año seleccionado
+      MESES_INFO.forEach(mesInfo => {
+        const periodo = `${año}${mesInfo.periodo}`;
+        const cargo = charges.find(c => c.empadronadoId === emp.id && c.periodo === periodo);
+        
+        if (cargo) {
+          // Calcular pagos para este cargo
+          const pagosDelCargo = pagos.filter(p => 
+            p.chargeId === cargo.id && 
+            (p.estado === 'aprobado' || p.estado === 'pendiente')
+          );
+          const montoPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
+          const saldo = Math.max(0, cargo.montoOriginal - montoPagado);
+          const estaPagado = saldo === 0;
+          
+          meses[periodo] = {
+            cargo,
+            pagado: estaPagado,
+            saldo
+          };
+          
+          if (estaPagado) {
+            mesesPagados++;
+            totalPagado += cargo.montoOriginal;
+          } else {
+            // Solo contar como vencido si ya pasó la fecha
+            if (ahora > cargo.fechaVencimiento) {
+              mesesVencidos++;
+              totalDeuda += saldo;
+            }
+          }
+        } else {
+          meses[periodo] = { cargo: null, pagado: false, saldo: 0 };
+        }
+      });
+      
+      // Determinar estado de deuda
+      let estadoDeuda: 'al-dia' | 'atrasado' | 'moroso' | 'deudor' = 'al-dia';
+      if (mesesVencidos === 1) estadoDeuda = 'atrasado';
+      else if (mesesVencidos === 2) estadoDeuda = 'moroso';
+      else if (mesesVencidos >= 3) estadoDeuda = 'deudor';
+      
+      return {
+        empadronado: emp,
+        meses,
+        totalPagado,
+        totalDeuda,
+        mesesPagados,
+        mesesVencidos,
+        estadoDeuda
+      } as BalanceRow;
+    });
+  }, [empadronados, charges, pagos, año]);
 
   // Filtrar registros
   const balancesFiltrados = useMemo(() => {
-    let resultado = [...balances];
+    let resultado = [...balancesData];
 
-    // Búsqueda por nombre
+    // Búsqueda por nombre o padrón
     if (busqueda.trim()) {
       const termino = busqueda.toLowerCase();
-      resultado = resultado.filter(b => 
-        b.nombre.toLowerCase().includes(termino) ||
-        b.manzana.toLowerCase().includes(termino) ||
-        b.lote.toLowerCase().includes(termino) ||
-        b.busqueda_id.toLowerCase().includes(termino)
-      );
+      resultado = resultado.filter(b => {
+        const nombreCompleto = `${b.empadronado.nombre} ${b.empadronado.apellidos}`.toLowerCase();
+        const padron = (b.empadronado.numeroPadron || '').toLowerCase();
+        const manzana = (b.empadronado.manzana || '').toLowerCase();
+        const lote = (b.empadronado.lote || '').toLowerCase();
+        return nombreCompleto.includes(termino) || 
+               padron.includes(termino) ||
+               manzana.includes(termino) ||
+               lote.includes(termino);
+      });
     }
 
     // Filtro por manzana
     if (filtroManzana !== "todas") {
-      resultado = resultado.filter(b => b.manzana === filtroManzana);
+      resultado = resultado.filter(b => (b.empadronado.manzana || 'Sin Mz') === filtroManzana);
     }
 
     // Filtro por estado
     if (filtroEstado === "aldia") {
-      resultado = resultado.filter(b => calcularMesesPagados(b) >= new Date().getMonth() + 1);
+      resultado = resultado.filter(b => b.estadoDeuda === 'al-dia');
+    } else if (filtroEstado === "atrasado") {
+      resultado = resultado.filter(b => b.estadoDeuda === 'atrasado');
+    } else if (filtroEstado === "moroso") {
+      resultado = resultado.filter(b => b.estadoDeuda === 'moroso');
+    } else if (filtroEstado === "deudor") {
+      resultado = resultado.filter(b => b.estadoDeuda === 'deudor');
     } else if (filtroEstado === "pendiente") {
-      resultado = resultado.filter(b => calcularMesesPagados(b) < new Date().getMonth() + 1);
-    } else if (filtroEstado === "completo") {
-      resultado = resultado.filter(b => calcularMesesPagados(b) === 12);
+      resultado = resultado.filter(b => b.mesesVencidos > 0);
     }
 
     // Ordenar por manzana y lote
     resultado.sort((a, b) => {
-      if (a.manzana !== b.manzana) return a.manzana.localeCompare(b.manzana);
-      return a.lote.localeCompare(b.lote);
+      const mzA = a.empadronado.manzana || '';
+      const mzB = b.empadronado.manzana || '';
+      if (mzA !== mzB) return mzA.localeCompare(mzB);
+      const ltA = a.empadronado.lote || '';
+      const ltB = b.empadronado.lote || '';
+      return ltA.localeCompare(ltB);
     });
 
     return resultado;
-  }, [balances, busqueda, filtroManzana, filtroEstado]);
+  }, [balancesData, busqueda, filtroManzana, filtroEstado]);
 
   // Estadísticas
   const estadisticas = useMemo(() => {
     const totalRecords = balancesFiltrados.length;
-    const totalRecaudado = balancesFiltrados.reduce((sum, b) => sum + calcularTotalPagado(b), 0);
-    const alDia = balancesFiltrados.filter(b => calcularMesesPagados(b) >= new Date().getMonth() + 1).length;
-    const pendientes = totalRecords - alDia;
-    const promedioMeses = totalRecords > 0 
-      ? balancesFiltrados.reduce((sum, b) => sum + calcularMesesPagados(b), 0) / totalRecords 
-      : 0;
+    const totalRecaudado = balancesFiltrados.reduce((sum, b) => sum + b.totalPagado, 0);
+    const totalPendiente = balancesFiltrados.reduce((sum, b) => sum + b.totalDeuda, 0);
+    const alDia = balancesFiltrados.filter(b => b.estadoDeuda === 'al-dia').length;
+    const atrasados = balancesFiltrados.filter(b => b.estadoDeuda === 'atrasado').length;
+    const morosos = balancesFiltrados.filter(b => b.estadoDeuda === 'moroso').length;
+    const deudores = balancesFiltrados.filter(b => b.estadoDeuda === 'deudor').length;
 
-    return { totalRecords, totalRecaudado, alDia, pendientes, promedioMeses };
+    return { totalRecords, totalRecaudado, totalPendiente, alDia, atrasados, morosos, deudores };
   }, [balancesFiltrados]);
-
-  // Importar Excel
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setImporting(true);
-
-      if (!/\.(xlsx|xls)$/i.test(file.name)) {
-        toast({
-          title: "Formato inválido",
-          description: "Usa un archivo .xlsx o .xls",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: "array" });
-      const firstSheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[firstSheetName];
-      const rows: BalanceRow[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-      const yearPath = `balances/${año}`;
-      const baseRef = ref(db, yearPath);
-
-      let count = 0;
-      for (const row of rows) {
-        if (!row.Manzana || !row.Lote || !row.Nombre) continue;
-
-        const manzana = String(row.Manzana).trim();
-        const lote = String(row.Lote).trim();
-        const nombre = String(row.Nombre).trim();
-
-        const meses = {
-          enero: row.Enero ?? "",
-          febrero: row.Febrero ?? "",
-          marzo: row.Marzo ?? "",
-          abril: row.Abril ?? "",
-          mayo: row.Mayo ?? "",
-          junio: row.Junio ?? "",
-          julio: row.Julio ?? "",
-          agosto: row.Agosto ?? "",
-          septiembre: row.Septiembre ?? "",
-          octubre: row.Octubre ?? "",
-          noviembre: row.Noviembre ?? "",
-          diciembre: row.Diciembre ?? ""
-        };
-
-        const newRef = push(baseRef);
-        await set(newRef, {
-          manzana,
-          lote,
-          nombre,
-          meses,
-          busqueda_id: `${manzana}-${lote}`,
-          createdAt: Date.now()
-        });
-        count++;
-      }
-
-      toast({
-        title: "✅ Importación completada",
-        description: `${count} registros importados correctamente`
-      });
-      
-      cargarBalances();
-    } catch (err) {
-      console.error("Error importando:", err);
-      toast({
-        title: "Error",
-        description: "Error importando el archivo",
-        variant: "destructive"
-      });
-    } finally {
-      setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
 
   // Exportar a Excel
   const exportarExcel = () => {
-    const datos = balancesFiltrados.map(b => ({
-      Manzana: b.manzana,
-      Lote: b.lote,
-      Nombre: b.nombre,
-      Enero: b.meses.enero || '',
-      Febrero: b.meses.febrero || '',
-      Marzo: b.meses.marzo || '',
-      Abril: b.meses.abril || '',
-      Mayo: b.meses.mayo || '',
-      Junio: b.meses.junio || '',
-      Julio: b.meses.julio || '',
-      Agosto: b.meses.agosto || '',
-      Septiembre: b.meses.septiembre || '',
-      Octubre: b.meses.octubre || '',
-      Noviembre: b.meses.noviembre || '',
-      Diciembre: b.meses.diciembre || '',
-      'Total Pagado': calcularTotalPagado(b).toFixed(2),
-      'Meses Pagados': calcularMesesPagados(b)
-    }));
+    const datos = balancesFiltrados.map(b => {
+      const row: any = {
+        'Padrón': b.empadronado.numeroPadron,
+        'Manzana': b.empadronado.manzana || '',
+        'Lote': b.empadronado.lote || '',
+        'Nombre': `${b.empadronado.nombre} ${b.empadronado.apellidos}`,
+      };
+      
+      MESES_INFO.forEach(mesInfo => {
+        const periodo = `${año}${mesInfo.periodo}`;
+        const mesData = b.meses[periodo];
+        row[mesInfo.nombre] = mesData?.pagado ? '✓ Pagado' : (mesData?.cargo ? `S/${mesData.saldo.toFixed(0)}` : '-');
+      });
+      
+      row['Total Pagado'] = `S/ ${b.totalPagado.toFixed(2)}`;
+      row['Deuda'] = `S/ ${b.totalDeuda.toFixed(2)}`;
+      row['Estado'] = b.estadoDeuda === 'al-dia' ? 'Al día' : 
+                      b.estadoDeuda === 'atrasado' ? 'Atrasado' :
+                      b.estadoDeuda === 'moroso' ? 'Moroso' : 'Deudor';
+      
+      return row;
+    });
 
     const ws = XLSX.utils.json_to_sheet(datos);
     const wb = XLSX.utils.book_new();
@@ -356,23 +322,29 @@ const AdminBalances = () => {
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(`Total Asociados: ${estadisticas.totalRecords}`, 15, 40);
-    doc.text(`Total Recaudado: S/ ${estadisticas.totalRecaudado.toFixed(2)}`, 80, 40);
-    doc.text(`Al Día: ${estadisticas.alDia}`, 170, 40);
-    doc.text(`Pendientes: ${estadisticas.pendientes}`, 220, 40);
+    doc.text(`Total: ${estadisticas.totalRecords}`, 15, 40);
+    doc.text(`Recaudado: S/ ${estadisticas.totalRecaudado.toFixed(2)}`, 60, 40);
+    doc.text(`Pendiente: S/ ${estadisticas.totalPendiente.toFixed(2)}`, 130, 40);
+    doc.text(`Al Día: ${estadisticas.alDia}`, 200, 40);
+    doc.text(`Morosos: ${estadisticas.morosos + estadisticas.deudores}`, 240, 40);
 
     // Tabla
-    const headers = ['Mz', 'Lt', 'Nombre', ...MESES_CORTOS, 'Total', 'Meses'];
+    const headers = ['Padrón', 'Mz', 'Lt', 'Nombre', ...MESES_INFO.map(m => m.corto), 'Pagado', 'Deuda', 'Estado'];
     const rows = balancesFiltrados.map(b => [
-      b.manzana,
-      b.lote,
-      b.nombre.substring(0, 20),
-      ...MESES.map(m => {
-        const val = b.meses[m as keyof typeof b.meses];
-        return val ? String(val) : '-';
+      b.empadronado.numeroPadron || '',
+      b.empadronado.manzana || '',
+      b.empadronado.lote || '',
+      `${b.empadronado.nombre} ${b.empadronado.apellidos}`.substring(0, 18),
+      ...MESES_INFO.map(mesInfo => {
+        const periodo = `${año}${mesInfo.periodo}`;
+        const mesData = b.meses[periodo];
+        return mesData?.pagado ? '✓' : (mesData?.cargo ? '-' : '');
       }),
-      `S/${calcularTotalPagado(b).toFixed(0)}`,
-      calcularMesesPagados(b).toString()
+      `S/${b.totalPagado.toFixed(0)}`,
+      `S/${b.totalDeuda.toFixed(0)}`,
+      b.estadoDeuda === 'al-dia' ? 'OK' : 
+      b.estadoDeuda === 'atrasado' ? 'ATR' :
+      b.estadoDeuda === 'moroso' ? 'MOR' : 'DEU'
     ]);
 
     autoTable(doc, {
@@ -383,9 +355,10 @@ const AdminBalances = () => {
       headStyles: { fillColor: [30, 58, 138], fontSize: 7, cellPadding: 1 },
       styles: { fontSize: 6, cellPadding: 1 },
       columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 10 },
-        2: { cellWidth: 35 },
+        0: { cellWidth: 18 },
+        1: { cellWidth: 8 },
+        2: { cellWidth: 8 },
+        3: { cellWidth: 30 },
       },
       margin: { left: 5, right: 5 }
     });
@@ -417,7 +390,7 @@ const AdminBalances = () => {
     if (filasSeleccionadas.size === balancesFiltrados.length) {
       setFilasSeleccionadas(new Set());
     } else {
-      setFilasSeleccionadas(new Set(balancesFiltrados.map(b => b.id)));
+      setFilasSeleccionadas(new Set(balancesFiltrados.map(b => b.empadronado.id)));
     }
   };
 
@@ -426,6 +399,27 @@ const AdminBalances = () => {
     setBusqueda("");
     setFiltroManzana("todas");
     setFiltroEstado("todos");
+  };
+
+  // Estilos de badge según estado
+  const getBadgeStyles = (estado: string) => {
+    switch (estado) {
+      case 'al-dia': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'atrasado': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'moroso': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'deudor': return 'bg-red-700/30 text-red-300 border-red-600/50 font-bold';
+      default: return 'bg-slate-500/20 text-slate-400';
+    }
+  };
+
+  const getEstadoLabel = (estado: string) => {
+    switch (estado) {
+      case 'al-dia': return 'Al día';
+      case 'atrasado': return 'Atrasado';
+      case 'moroso': return 'Moroso';
+      case 'deudor': return 'Deudor';
+      default: return estado;
+    }
   };
 
   return (
@@ -449,7 +443,7 @@ const AdminBalances = () => {
                   Administrador de Balances
                 </h1>
                 <p className="text-blue-100 text-sm md:text-base">
-                  Gestión financiera • Año {año}
+                  Datos en tiempo real • Año {año}
                 </p>
               </div>
             </div>
@@ -469,7 +463,7 @@ const AdminBalances = () => {
               <Button 
                 variant="secondary" 
                 size="icon"
-                onClick={cargarBalances}
+                onClick={cargarDatos}
                 className="bg-white/20 hover:bg-white/30 text-white border-0"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
@@ -522,13 +516,35 @@ const AdminBalances = () => {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-slate-400 text-xs md:text-sm">Pendientes</p>
-                  <p className="text-2xl md:text-3xl font-bold text-amber-400">{estadisticas.pendientes}</p>
+                  <p className="text-slate-400 text-xs md:text-sm">Deuda Total</p>
+                  <p className="text-xl md:text-2xl font-bold text-red-400">
+                    S/ {estadisticas.totalPendiente.toLocaleString('es-PE', { minimumFractionDigits: 0 })}
+                  </p>
                 </div>
-                <AlertCircle className="h-8 w-8 text-amber-400 opacity-80" />
+                <AlertCircle className="h-8 w-8 text-red-400 opacity-80" />
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Mini estadísticas de estados */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 text-center">
+            <p className="text-green-400 text-xs">Al Día</p>
+            <p className="text-green-300 font-bold text-lg">{estadisticas.alDia}</p>
+          </div>
+          <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 text-center">
+            <p className="text-orange-400 text-xs">Atrasados</p>
+            <p className="text-orange-300 font-bold text-lg">{estadisticas.atrasados}</p>
+          </div>
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-center">
+            <p className="text-red-400 text-xs">Morosos</p>
+            <p className="text-red-300 font-bold text-lg">{estadisticas.morosos}</p>
+          </div>
+          <div className="bg-red-700/20 border border-red-600/30 rounded-lg p-2 text-center">
+            <p className="text-red-300 text-xs">Deudores</p>
+            <p className="text-red-200 font-bold text-lg">{estadisticas.deudores}</p>
+          </div>
         </div>
 
         {/* Barra de Acciones */}
@@ -539,7 +555,7 @@ const AdminBalances = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Buscar por nombre, manzana, lote..."
+                  placeholder="Buscar por nombre, padrón, manzana, lote..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   className="pl-10 bg-slate-900/50 border-slate-600 text-white placeholder:text-slate-400"
@@ -572,14 +588,16 @@ const AdminBalances = () => {
                 </Select>
                 
                 <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-                  <SelectTrigger className="w-[130px] bg-slate-900/50 border-slate-600 text-white">
+                  <SelectTrigger className="w-[140px] bg-slate-900/50 border-slate-600 text-white">
                     <SelectValue placeholder="Estado" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="aldia">Al día</SelectItem>
-                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                    <SelectItem value="completo">Completo</SelectItem>
+                    <SelectItem value="aldia">✅ Al día</SelectItem>
+                    <SelectItem value="atrasado">🟠 Atrasado</SelectItem>
+                    <SelectItem value="moroso">🔴 Moroso</SelectItem>
+                    <SelectItem value="deudor">💀 Deudor</SelectItem>
+                    <SelectItem value="pendiente">⚠️ Con deuda</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -598,25 +616,6 @@ const AdminBalances = () => {
               
               {/* Acciones */}
               <div className="flex gap-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={importing}
-                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {importing ? "Importando..." : "Importar"}
-                </Button>
-                
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-700">
@@ -673,8 +672,8 @@ const AdminBalances = () => {
             ) : balancesFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <FileSpreadsheet className="h-16 w-16 mb-4 opacity-50" />
-                <p className="text-lg">No hay balances registrados</p>
-                <p className="text-sm">Importa un archivo Excel para comenzar</p>
+                <p className="text-lg">No hay registros</p>
+                <p className="text-sm">Ajusta los filtros para ver resultados</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -684,62 +683,69 @@ const AdminBalances = () => {
                       <th className="px-2 py-3 text-left text-slate-400 font-medium w-10">
                         <input 
                           type="checkbox" 
-                          checked={filasSeleccionadas.size === balancesFiltrados.length}
+                          checked={filasSeleccionadas.size === balancesFiltrados.length && balancesFiltrados.length > 0}
                           onChange={seleccionarTodos}
                           className="rounded border-slate-600"
                         />
                       </th>
+                      <th className="px-2 py-3 text-left text-slate-400 font-medium">Padrón</th>
                       <th className="px-2 py-3 text-left text-slate-400 font-medium">Mz</th>
                       <th className="px-2 py-3 text-left text-slate-400 font-medium">Lt</th>
                       <th className="px-2 py-3 text-left text-slate-400 font-medium min-w-[150px]">Nombre</th>
-                      {MESES_CORTOS.map((mes, i) => (
+                      {MESES_INFO.map((mes, i) => (
                         <th key={i} className="px-1 py-3 text-center text-slate-400 font-medium text-xs">
-                          {mes}
+                          {mes.corto}
                         </th>
                       ))}
-                      <th className="px-2 py-3 text-right text-slate-400 font-medium">Total</th>
+                      <th className="px-2 py-3 text-right text-slate-400 font-medium">Pagado</th>
+                      <th className="px-2 py-3 text-right text-slate-400 font-medium">Deuda</th>
                       <th className="px-2 py-3 text-center text-slate-400 font-medium">Estado</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/50">
                     {balancesFiltrados.map((balance) => {
-                      const totalPagado = calcularTotalPagado(balance);
-                      const mesesPagados = calcularMesesPagados(balance);
-                      const mesActual = new Date().getMonth() + 1;
-                      const alDia = mesesPagados >= mesActual;
-                      
                       return (
                         <tr 
-                          key={balance.id}
+                          key={balance.empadronado.id}
                           className={`hover:bg-slate-700/30 transition-colors ${
-                            filasSeleccionadas.has(balance.id) ? 'bg-blue-900/20' : ''
+                            filasSeleccionadas.has(balance.empadronado.id) ? 'bg-blue-900/20' : ''
                           }`}
                         >
                           <td className="px-2 py-2">
                             <input 
                               type="checkbox"
-                              checked={filasSeleccionadas.has(balance.id)}
-                              onChange={() => toggleSeleccion(balance.id)}
+                              checked={filasSeleccionadas.has(balance.empadronado.id)}
+                              onChange={() => toggleSeleccion(balance.empadronado.id)}
                               className="rounded border-slate-600"
                             />
                           </td>
-                          <td className="px-2 py-2 text-white font-medium">{balance.manzana}</td>
-                          <td className="px-2 py-2 text-white">{balance.lote}</td>
-                          <td className="px-2 py-2 text-white truncate max-w-[150px]" title={balance.nombre}>
-                            {balance.nombre}
+                          <td className="px-2 py-2 text-blue-400 font-mono text-xs">
+                            {balance.empadronado.numeroPadron}
                           </td>
-                          {MESES.map((mes, i) => {
-                            const valor = balance.meses[mes as keyof typeof balance.meses];
-                            const tienePago = valor && String(valor).trim() !== '';
+                          <td className="px-2 py-2 text-white font-medium">{balance.empadronado.manzana || '-'}</td>
+                          <td className="px-2 py-2 text-white">{balance.empadronado.lote || '-'}</td>
+                          <td className="px-2 py-2 text-white truncate max-w-[150px]" title={`${balance.empadronado.nombre} ${balance.empadronado.apellidos}`}>
+                            {balance.empadronado.nombre} {balance.empadronado.apellidos}
+                          </td>
+                          {MESES_INFO.map((mes, i) => {
+                            const periodo = `${año}${mes.periodo}`;
+                            const mesData = balance.meses[periodo];
+                            const tieneCargo = mesData?.cargo !== null;
+                            const estaPagado = mesData?.pagado;
+                            
                             return (
                               <td key={i} className="px-1 py-2 text-center">
-                                {tienePago ? (
+                                {!tieneCargo ? (
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-700/30 text-slate-600 text-xs">
+                                    -
+                                  </span>
+                                ) : estaPagado ? (
                                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium">
                                     ✓
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-700/50 text-slate-500 text-xs">
-                                    -
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20 text-red-400 text-xs font-medium">
+                                    ✗
                                   </span>
                                 )}
                               </td>
@@ -747,23 +753,20 @@ const AdminBalances = () => {
                           })}
                           <td className="px-2 py-2 text-right">
                             <span className="text-emerald-400 font-semibold">
-                              S/ {totalPagado.toFixed(0)}
+                              S/ {balance.totalPagado.toFixed(0)}
+                            </span>
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <span className={balance.totalDeuda > 0 ? "text-red-400 font-semibold" : "text-slate-500"}>
+                              S/ {balance.totalDeuda.toFixed(0)}
                             </span>
                           </td>
                           <td className="px-2 py-2 text-center">
-                            {mesesPagados === 12 ? (
-                              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
-                                Completo
-                              </Badge>
-                            ) : alDia ? (
-                              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                                Al día
-                              </Badge>
-                            ) : (
-                              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
-                                Debe {mesActual - mesesPagados}
-                              </Badge>
-                            )}
+                            <Badge className={getBadgeStyles(balance.estadoDeuda)}>
+                              {balance.estadoDeuda === 'deudor' && <Skull className="h-3 w-3 mr-1" />}
+                              {balance.estadoDeuda === 'moroso' && <AlertTriangle className="h-3 w-3 mr-1" />}
+                              {getEstadoLabel(balance.estadoDeuda)}
+                            </Badge>
                           </td>
                         </tr>
                       );
@@ -779,20 +782,21 @@ const AdminBalances = () => {
             <div className="border-t border-slate-700 bg-slate-900/50 px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-4 text-sm">
                 <div className="flex items-center gap-4 text-slate-400">
-                  <span>Mostrando <strong className="text-white">{balancesFiltrados.length}</strong> de {balances.length}</span>
+                  <span>Mostrando <strong className="text-white">{balancesFiltrados.length}</strong> de {balancesData.length}</span>
                 </div>
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-4 w-4 text-emerald-400" />
-                    <span className="text-slate-400">Total:</span>
+                    <span className="text-slate-400">Recaudado:</span>
                     <span className="text-emerald-400 font-bold text-lg">
                       S/ {estadisticas.totalRecaudado.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400">Promedio meses:</span>
-                    <span className="text-blue-400 font-semibold">
-                      {estadisticas.promedioMeses.toFixed(1)}
+                    <AlertCircle className="h-4 w-4 text-red-400" />
+                    <span className="text-slate-400">Pendiente:</span>
+                    <span className="text-red-400 font-semibold">
+                      S/ {estadisticas.totalPendiente.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
