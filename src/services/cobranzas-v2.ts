@@ -283,35 +283,77 @@ export async function verificarYGenerarCargosAutomaticos(): Promise<{
       await set(correccionRef, true);
     }
     
-    const currentDate = new Date();
-    const currentPeriod = formatPeriod(currentDate);
-    
-    // Solo verificar el mes actual
-    const isGenerated = await isPeriodGenerated(currentPeriod);
+    // =====================================================
+    // GENERAR TODOS LOS CARGOS DESDE ENERO 2025 (una sola vez)
+    // =====================================================
+    const backfillRef = ref(db, `${BASE_PATH}/config/backfillEnero2025Completado`);
+    const backfillSnapshot = await get(backfillRef);
     
     let cargosGenerados = 0;
     
-    // Solo generar si el mes actual no está generado
-    if (!isGenerated) {
+    if (!backfillSnapshot.exists() || !backfillSnapshot.val()) {
+      console.log('🔄 Iniciando backfill de cargos desde Enero 2025...');
+      
       const [config, empadronados] = await Promise.all([
         obtenerConfiguracionV2(),
         getEmpadronados()
       ]);
       const empadronadosActivos = empadronados.filter(e => e.habilitado);
       
-      // Generar cargos en lotes de 50 para no sobrecargar
-      const batchSize = 50;
-      for (let i = 0; i < empadronadosActivos.length; i += batchSize) {
-        const batch = empadronadosActivos.slice(i, i + batchSize);
-        const promises = batch.map(emp => 
-          generarCargoMensualOptimizado(emp, currentPeriod, config)
-        );
-        const results = await Promise.all(promises);
-        cargosGenerados += results.filter(r => r !== null).length;
+      // Generar todos los períodos desde Enero 2025 hasta el mes actual
+      const currentDate = new Date();
+      const periods: string[] = [];
+      const tempDate = new Date(2025, 0, 1); // Enero 2025
+      
+      while (tempDate <= currentDate) {
+        periods.push(formatPeriod(tempDate));
+        tempDate.setMonth(tempDate.getMonth() + 1);
       }
       
-      // Marcar período como generado
-      await markPeriodGenerated(currentPeriod, 'sistema_automatico');
+      console.log(`📅 Períodos a generar: ${periods.join(', ')}`);
+      console.log(`👥 Empadronados activos: ${empadronadosActivos.length}`);
+      
+      // Generar cargos para cada período y empadronado
+      for (const period of periods) {
+        const batchSize = 50;
+        for (let i = 0; i < empadronadosActivos.length; i += batchSize) {
+          const batch = empadronadosActivos.slice(i, i + batchSize);
+          const promises = batch.map(emp => 
+            generarCargoMensualOptimizado(emp, period, config)
+          );
+          const results = await Promise.all(promises);
+          cargosGenerados += results.filter(r => r !== null).length;
+        }
+      }
+      
+      // Marcar backfill como completado
+      await set(backfillRef, true);
+      console.log(`✅ Backfill completado. ${cargosGenerados} cargos nuevos generados.`);
+    } else {
+      // Solo generar el mes actual si no existe
+      const currentDate = new Date();
+      const currentPeriod = formatPeriod(currentDate);
+      const isGenerated = await isPeriodGenerated(currentPeriod);
+      
+      if (!isGenerated) {
+        const [config, empadronados] = await Promise.all([
+          obtenerConfiguracionV2(),
+          getEmpadronados()
+        ]);
+        const empadronadosActivos = empadronados.filter(e => e.habilitado);
+        
+        const batchSize = 50;
+        for (let i = 0; i < empadronadosActivos.length; i += batchSize) {
+          const batch = empadronadosActivos.slice(i, i + batchSize);
+          const promises = batch.map(emp => 
+            generarCargoMensualOptimizado(emp, currentPeriod, config)
+          );
+          const results = await Promise.all(promises);
+          cargosGenerados += results.filter(r => r !== null).length;
+        }
+        
+        await markPeriodGenerated(currentPeriod, 'sistema_automatico');
+      }
     }
     
     let mensaje = '';
