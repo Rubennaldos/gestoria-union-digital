@@ -1226,3 +1226,78 @@ export async function obtenerEstadoCuentaEmpadronado(empadronadoId: string): Pro
     throw error;
   }
 }
+
+// === ANULAR BOLETAS ===
+export async function anularChargeV2(
+  chargeId: string,
+  motivoAnulacion: string,
+  anuladoPor: string,
+  anuladoPorNombre: string
+): Promise<void> {
+  try {
+    // Buscar el cargo en todos los períodos
+    const chargeSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+    if (!chargeSnapshot.exists()) {
+      throw new Error("No hay cargos en el sistema");
+    }
+    
+    let chargePath = '';
+    const allCharges = chargeSnapshot.val();
+    
+    for (const period in allCharges) {
+      for (const empId in allCharges[period]) {
+        for (const cId in allCharges[period][empId]) {
+          if (cId === chargeId) {
+            chargePath = `${BASE_PATH}/charges/${period}/${empId}/${cId}`;
+            break;
+          }
+        }
+        if (chargePath) break;
+      }
+      if (chargePath) break;
+    }
+    
+    if (!chargePath) {
+      throw new Error("Cargo no encontrado");
+    }
+    
+    // Actualizar el cargo como anulado
+    await update(ref(db, chargePath), {
+      anulado: true,
+      estado: 'anulado',
+      saldo: 0,
+      fechaAnulacion: Date.now(),
+      anuladoPor,
+      anuladoPorNombre,
+      motivoAnulacion
+    });
+    
+    console.log(`✅ Cargo ${chargeId} anulado correctamente`);
+  } catch (error) {
+    console.error("Error anulando cargo:", error);
+    throw error;
+  }
+}
+
+// Anular múltiples boletas a la vez
+export async function anularMultiplesChargesV2(
+  chargeIds: string[],
+  motivoAnulacion: string,
+  anuladoPor: string,
+  anuladoPorNombre: string
+): Promise<{ exitosos: number; fallidos: number }> {
+  let exitosos = 0;
+  let fallidos = 0;
+  
+  for (const chargeId of chargeIds) {
+    try {
+      await anularChargeV2(chargeId, motivoAnulacion, anuladoPor, anuladoPorNombre);
+      exitosos++;
+    } catch (error) {
+      console.error(`Error anulando cargo ${chargeId}:`, error);
+      fallidos++;
+    }
+  }
+  
+  return { exitosos, fallidos };
+}

@@ -13,7 +13,9 @@ import {
   ExternalLink,
   XCircle,
   Loader2,
-  FileDown
+  FileDown,
+  Ban,
+  CheckCheck
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import BackButton from "@/components/layout/BackButton";
@@ -32,12 +34,14 @@ import {
   obtenerChargesPorEmpadronadoV2, 
   registrarPagoV2, 
   obtenerEstadoCuentaEmpadronado,
-  obtenerPagosV2 
+  obtenerPagosV2,
+  anularMultiplesChargesV2
 } from "@/services/cobranzas-v2";
 import { Empadronado } from "@/types/empadronados";
 import { useDeudaAsociado } from "@/hooks/useDeudaAsociado";
 import { useBillingConfig } from "@/contexts/BillingConfigContext";
 import { PasarelaPagoCuotasModal } from "@/components/cobranzas/PasarelaPagoCuotasModal";
+import { AnularBoletasModal } from "@/components/cobranzas/AnularBoletasModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoUrbanizacion from "@/assets/logo-urbanizacion.png";
@@ -60,6 +64,9 @@ const PagosCuotas = () => {
   
   // Modal de pasarela de pago
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  
+  // Modal de anulación
+  const [showAnularModal, setShowAnularModal] = useState(false);
 
   // Modal de detalle de pago
   const [pagoDetalle, setPagoDetalle] = useState<PagoV2 | null>(null);
@@ -77,19 +84,30 @@ const PagosCuotas = () => {
     return anios;
   }, []);
 
-  // Filtrar cuotas pendientes (saldo > 0)
+  // Filtrar cuotas pendientes (saldo > 0 y no anuladas)
   const chargesPendientes = useMemo(() => {
     return allCharges.filter(c => 
       c.saldo > 0 && 
+      !c.anulado &&
+      c.estado !== 'anulado' &&
       c.periodo.startsWith(filtroAnio)
     ).sort((a, b) => a.periodo.localeCompare(b.periodo));
   }, [allCharges, filtroAnio]);
 
-  // Filtrar cuotas pagadas (saldo === 0 O estado === 'pagado' O montoPagado > 0)
-  // Esto asegura que se muestren las cuotas pagadas aunque no haya registro de pago
+  // Filtrar cuotas pagadas (saldo === 0 O estado === 'pagado' O montoPagado > 0) y NO anuladas
   const chargesPagados = useMemo(() => {
     return allCharges.filter(c => 
+      !c.anulado &&
+      c.estado !== 'anulado' &&
       (c.saldo === 0 || c.estado === 'pagado' || c.montoPagado >= c.montoOriginal) && 
+      c.periodo.startsWith(filtroAnio)
+    ).sort((a, b) => b.periodo.localeCompare(a.periodo));
+  }, [allCharges, filtroAnio]);
+
+  // Filtrar cuotas anuladas
+  const chargesAnulados = useMemo(() => {
+    return allCharges.filter(c => 
+      (c.anulado || c.estado === 'anulado') &&
       c.periodo.startsWith(filtroAnio)
     ).sort((a, b) => b.periodo.localeCompare(a.periodo));
   }, [allCharges, filtroAnio]);
@@ -302,6 +320,38 @@ const PagosCuotas = () => {
       
       setProcesandoPago(false);
       throw error; // Re-throw para que el modal pueda manejarlo
+    }
+  };
+
+  const handleAnulacionConfirmada = async (motivoAnulacion: string) => {
+    if (!user || !empadronado) return;
+    
+    try {
+      const chargesArray = Array.from(chargesSeleccionados);
+      const result = await anularMultiplesChargesV2(
+        chargesArray,
+        motivoAnulacion,
+        user.uid,
+        user.email || 'Admin'
+      );
+      
+      if (result.exitosos > 0) {
+        toast({
+          title: "Boletas anuladas",
+          description: `Se anularon ${result.exitosos} boleta(s) correctamente${result.fallidos > 0 ? `. ${result.fallidos} fallaron.` : ''}`,
+        });
+        
+        setChargesSeleccionados(new Set());
+        cargarDatos();
+      }
+    } catch (error) {
+      console.error('Error anulando boletas:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron anular las boletas",
+        variant: "destructive"
+      });
+      throw error;
     }
   };
 
@@ -698,14 +748,33 @@ const PagosCuotas = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab: Cuotas Pendientes */}
           <TabsContent value="pendientes" className="mt-4">
             <Card>
               <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 p-3 md:p-4">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg text-red-700">
-                  <Calculator className="h-4 w-4 md:h-5 md:w-5" />
-                  Cuotas por Pagar - {filtroAnio}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base md:text-lg text-red-700">
+                    <Calculator className="h-4 w-4 md:h-5 md:w-5" />
+                    Cuotas por Pagar - {filtroAnio}
+                  </CardTitle>
+                  
+                  {chargesPendientes.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-8 gap-1"
+                      onClick={() => {
+                        if (chargesSeleccionados.size === chargesPendientes.length) {
+                          setChargesSeleccionados(new Set());
+                        } else {
+                          setChargesSeleccionados(new Set(chargesPendientes.map(c => c.id)));
+                        }
+                      }}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      {chargesSeleccionados.size === chargesPendientes.length ? 'Quitar todas' : 'Seleccionar todas'}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-3 md:p-4">
                 {chargesPendientes.length === 0 ? (
@@ -958,8 +1027,8 @@ const PagosCuotas = () => {
         {activeTab === 'pendientes' && chargesSeleccionados.size > 0 && (
           <Card className="sticky bottom-24 md:bottom-6 border-primary shadow-lg animate-fade-in z-10">
             <CardContent className="p-3 md:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-center justify-between gap-2 md:gap-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs md:text-sm text-muted-foreground">
                     {chargesSeleccionados.size} cuota{chargesSeleccionados.size !== 1 ? 's' : ''} seleccionada{chargesSeleccionados.size !== 1 ? 's' : ''}
                   </p>
@@ -967,16 +1036,27 @@ const PagosCuotas = () => {
                     S/ {totalSeleccionado.toFixed(2)}
                   </p>
                 </div>
-                <Button 
-                  size="sm" 
-                  className="gap-1 md:gap-2 h-9 md:h-10 text-xs md:text-sm hover:scale-105 transition-transform shrink-0"
-                  onClick={() => setShowConfirmModal(true)}
-                  disabled={procesandoPago}
-                >
-                  <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
-                  <span className="hidden sm:inline">Registrar Pago</span>
-                  <span className="sm:hidden">Pagar</span>
-                </Button>
+                <div className="flex gap-2 shrink-0">
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    className="gap-1 h-9 md:h-10 text-xs md:text-sm"
+                    onClick={() => setShowAnularModal(true)}
+                  >
+                    <Ban className="h-3 w-3 md:h-4 md:w-4" />
+                    <span className="hidden sm:inline">Anular</span>
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    className="gap-1 md:gap-2 h-9 md:h-10 text-xs md:text-sm hover:scale-105 transition-transform"
+                    onClick={() => setShowConfirmModal(true)}
+                    disabled={procesandoPago}
+                  >
+                    <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
+                    <span className="hidden sm:inline">Registrar Pago</span>
+                    <span className="sm:hidden">Pagar</span>
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -991,6 +1071,14 @@ const PagosCuotas = () => {
           asociadoNombre={empadronado ? `${empadronado.nombre} ${empadronado.apellidos}` : ""}
           asociadoPadron={empadronado?.numeroPadron || ""}
           onPagoConfirmado={handlePagoConfirmado}
+        />
+
+        {/* Modal de Anulación */}
+        <AnularBoletasModal
+          open={showAnularModal}
+          onOpenChange={setShowAnularModal}
+          chargesSeleccionados={chargesPendientes.filter(c => chargesSeleccionados.has(c.id))}
+          onAnulacionConfirmada={handleAnulacionConfirmada}
         />
       </main>
 
