@@ -6,7 +6,8 @@ import {
   obtenerChargesV2, 
   registrarPagoV2, 
   aprobarPagoV2,
-  obtenerConfiguracionV2 
+  obtenerConfiguracionV2,
+  generarCargoMensual
 } from "./cobranzas-v2";
 import type { Empadronado } from "@/types/empadronados";
 import type { ChargeV2 } from "@/types/cobranzas-v2";
@@ -292,16 +293,35 @@ export async function procesarImportacionPagos(
         const periodo = `${año}${numeroMes}`; // Ej: 202501 para Enero 2025
         
         // Buscar el cargo
-        const cargo = buscarCargo(empadronado.id, periodo, charges);
+        let cargo = buscarCargo(empadronado.id, periodo, charges);
         
+        // Si no existe el cargo, crearlo automáticamente
         if (!cargo) {
-          resultado.errores.push({
-            numeroPadron,
-            mes: nombreMes,
-            razon: 'No existe cargo generado para este período',
-            detalle: `Debe generar primero los cargos del período ${año}-${numeroMes}`
-          });
-          continue;
+          try {
+            const nuevoCargo = await generarCargoMensual(empadronado.id, periodo, config);
+            if (nuevoCargo) {
+              cargo = nuevoCargo;
+              // Agregar a la lista local para futuras referencias
+              charges.push(nuevoCargo);
+            } else {
+              // El cargo ya existía o no se pudo crear
+              resultado.warnings.push({
+                numeroPadron,
+                mes: nombreMes,
+                razon: 'No se pudo crear el cargo automáticamente',
+                detalle: `El empadronado podría no estar habilitado o el cargo ya existe`
+              });
+              continue;
+            }
+          } catch (errorCargo) {
+            resultado.errores.push({
+              numeroPadron,
+              mes: nombreMes,
+              razon: 'Error al crear cargo automáticamente',
+              detalle: `${errorCargo}`
+            });
+            continue;
+          }
         }
         
         // Verificar si ya está pagado
