@@ -581,16 +581,16 @@ export default function DetalleEmpadronadoModalV2({
                               )}
 
                               {/* Información de aprobación */}
-                              {pago.estado === 'aprobado' && pago.fechaAprobacion && (
+                              {pago.estado === 'aprobado' && (
                                 <div className="pt-2 border-t bg-green-50 -m-4 p-4 rounded-b-lg">
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                                     <div>
-                                      <Label className="text-xs font-medium text-green-700">Aprobado Por</Label>
-                                      <p className="font-medium text-green-900">{pago.aprobadoPor || 'Sistema'}</p>
+                                      <Label className="text-xs font-medium text-green-700">Estado</Label>
+                                      <p className="font-medium text-green-900">Aprobado</p>
                                     </div>
                                     <div>
-                                      <Label className="text-xs font-medium text-green-700">Fecha de Aprobación</Label>
-                                      <p className="text-green-900">{formatearFechaHora(pago.fechaAprobacion)}</p>
+                                      <Label className="text-xs font-medium text-green-700">Fecha de Registro</Label>
+                                      <p className="text-green-900">{formatearFechaHora(pago.fechaCreacion)}</p>
                                     </div>
                                   </div>
                                 </div>

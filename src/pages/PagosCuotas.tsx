@@ -24,7 +24,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +37,7 @@ import {
 import { Empadronado } from "@/types/empadronados";
 import { useDeudaAsociado } from "@/hooks/useDeudaAsociado";
 import { useBillingConfig } from "@/contexts/BillingConfigContext";
+import { PasarelaPagoCuotasModal } from "@/components/cobranzas/PasarelaPagoCuotasModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoUrbanizacion from "@/assets/logo-urbanizacion.png";
@@ -58,16 +58,8 @@ const PagosCuotas = () => {
   const [filtroAnio, setFiltroAnio] = useState<string>(new Date().getFullYear().toString());
   const [activeTab, setActiveTab] = useState("pendientes");
   
-  // Formulario de pago
-  const [metodoPago, setMetodoPago] = useState<string>("");
-  const [numeroOperacion, setNumeroOperacion] = useState("");
-  const [observaciones, setObservaciones] = useState("");
-  const [fechaPago, setFechaPago] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
-
-  // Modal de confirmación
+  // Modal de pasarela de pago
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pagoEnviado, setPagoEnviado] = useState(false);
 
   // Modal de detalle de pago
   const [pagoDetalle, setPagoDetalle] = useState<PagoV2 | null>(null);
@@ -226,34 +218,18 @@ const PagosCuotas = () => {
     });
   };
 
-  const handleRegistrarPago = async () => {
-    if (chargesSeleccionados.size === 0) {
-      toast({
-        title: "Error",
-        description: "Debes seleccionar al menos un cargo",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!metodoPago || !numeroOperacion || !fechaPago || !archivoComprobante) {
-      toast({
-        title: "Error", 
-        description: "Completa todos los campos requeridos (incluyendo archivo)",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setShowConfirmModal(true);
-  };
-
-  const confirmarPago = async () => {
+  const handlePagoConfirmado = async (
+    fechaPago: Date,
+    archivoComprobante: File,
+    metodoPago: string,
+    numeroOperacion: string,
+    observaciones: string
+  ) => {
     try {
       setProcesandoPago(true);
 
-      if (!archivoComprobante || !empadronado) {
-        throw new Error("Falta archivo o empadronado");
+      if (!empadronado) {
+        throw new Error("Falta empadronado");
       }
 
       // Subir archivo primero
@@ -272,7 +248,7 @@ const PagosCuotas = () => {
       console.log('✅ Comprobante subido:', archivoUrl);
 
       // Registrar pago para cada charge seleccionado
-      const fechaPagoTimestamp = new Date(fechaPago).getTime();
+      const fechaPagoTimestamp = fechaPago.getTime();
       
       for (const chargeId of chargesArray) {
         const charge = chargesPendientes.find(c => c.id === chargeId);
@@ -289,9 +265,6 @@ const PagosCuotas = () => {
         }
       }
 
-      // Marcar como enviado
-      setPagoEnviado(true);
-
       toast({
         title: "✅ Pago enviado",
         description: "Tu pago está siendo revisado. Recibirás una confirmación pronto.",
@@ -299,16 +272,10 @@ const PagosCuotas = () => {
 
       // Limpiar formulario
       setChargesSeleccionados(new Set());
-      setMetodoPago("");
-      setNumeroOperacion("");
-      setObservaciones("");
-      setFechaPago(new Date().toISOString().split('T')[0]);
-      setArchivoComprobante(null);
       
-      // Esperar 2 segundos para mostrar el mensaje y luego cerrar
+      // Esperar para mostrar el mensaje y recargar datos
       setTimeout(() => {
         setShowConfirmModal(false);
-        setPagoEnviado(false);
         setProcesandoPago(false);
         cargarDatos();
       }, 2000);
@@ -334,7 +301,7 @@ const PagosCuotas = () => {
       });
       
       setProcesandoPago(false);
-      setPagoEnviado(false);
+      throw error; // Re-throw para que el modal pueda manejarlo
     }
   };
 
@@ -1000,148 +967,29 @@ const PagosCuotas = () => {
                     S/ {totalSeleccionado.toFixed(2)}
                   </p>
                 </div>
-                <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1 md:gap-2 h-9 md:h-10 text-xs md:text-sm hover:scale-105 transition-transform shrink-0">
-                      <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
-                      <span className="hidden sm:inline">Registrar Pago</span>
-                      <span className="sm:hidden">Pagar</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md mx-auto max-h-[90vh] overflow-y-auto" aria-describedby="dialog-description">
-                    <DialogHeader>
-                      <DialogTitle className="text-base md:text-lg">
-                        {pagoEnviado ? "⏳ Pago Enviado" : "Registrar Pago"}
-                      </DialogTitle>
-                      <p id="dialog-description" className="sr-only">
-                        {pagoEnviado 
-                          ? "Tu pago está siendo procesado y revisado" 
-                          : "Formulario para registrar un nuevo pago de cuotas"}
-                      </p>
-                    </DialogHeader>
-                    
-                    {pagoEnviado ? (
-                      <div className="py-6 md:py-8 text-center">
-                        <div className="text-4xl md:text-6xl mb-3 md:mb-4">✅</div>
-                        <h3 className="text-base md:text-lg font-semibold mb-2">
-                          ¡Pago enviado correctamente!
-                        </h3>
-                        <p className="text-sm md:text-base text-muted-foreground">
-                          Tu pago será revisado y aprobado pronto. Puedes ver el estado en "Mis Pagos".
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 md:space-y-4">
-                        <div>
-                          <Label className="text-xs md:text-sm">Fecha de Pago *</Label>
-                          <Input
-                            type="date"
-                            value={fechaPago}
-                            onChange={(e) => setFechaPago(e.target.value)}
-                            max={new Date().toISOString().split('T')[0]}
-                            className="h-9 md:h-10 text-xs md:text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Método de Pago *</Label>
-                          <Select value={metodoPago} onValueChange={setMetodoPago}>
-                            <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm">
-                              <SelectValue placeholder="Seleccionar método" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="efectivo">💵 Efectivo</SelectItem>
-                              <SelectItem value="transferencia">🏦 Transferencia</SelectItem>
-                              <SelectItem value="yape">📱 Yape</SelectItem>
-                              <SelectItem value="plin">📱 Plin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Número de Operación *</Label>
-                          <Input
-                            value={numeroOperacion}
-                            onChange={(e) => setNumeroOperacion(e.target.value)}
-                            placeholder="Ingresa el número de operación"
-                            className="h-9 md:h-10 text-xs md:text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Comprobante de Pago * (PDF, JPG, PNG)</Label>
-                          <Input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => setArchivoComprobante(e.target.files?.[0] || null)}
-                            className="cursor-pointer h-9 md:h-10 text-xs md:text-sm"
-                          />
-                          {archivoComprobante && (
-                            <p className="text-[10px] md:text-xs text-green-600 mt-1">
-                              ✓ {archivoComprobante.name} ({(archivoComprobante.size / 1024).toFixed(0)} KB)
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Observaciones (opcional)</Label>
-                          <Input
-                            value={observaciones}
-                            onChange={(e) => setObservaciones(e.target.value)}
-                            placeholder="Notas adicionales"
-                            className="h-9 md:h-10 text-xs md:text-sm"
-                          />
-                        </div>
-
-                        <div className="bg-gradient-to-br from-primary/5 to-primary/10 p-3 md:p-4 rounded-lg border border-primary/20">
-                          <h4 className="font-semibold mb-2 text-sm md:text-base">Resumen del Pago</h4>
-                          <div className="text-xs md:text-sm space-y-1">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Cuotas seleccionadas:</span>
-                              <span className="font-medium">{chargesSeleccionados.size}</span>
-                            </div>
-                            <div className="flex justify-between font-semibold text-sm md:text-base border-t border-primary/20 pt-1">
-                              <span>Total a pagar:</span>
-                              <span className="text-primary">S/ {totalSeleccionado.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setShowConfirmModal(false);
-                              setArchivoComprobante(null);
-                            }}
-                            className="flex-1 h-9 md:h-10 text-xs md:text-sm"
-                            disabled={procesandoPago}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            onClick={confirmarPago}
-                            disabled={procesandoPago || !metodoPago || !numeroOperacion || !archivoComprobante}
-                            className="flex-1 h-9 md:h-10 text-xs md:text-sm"
-                          >
-                            {procesandoPago ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Enviando...
-                              </>
-                            ) : (
-                              "Confirmar Pago"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  size="sm" 
+                  className="gap-1 md:gap-2 h-9 md:h-10 text-xs md:text-sm hover:scale-105 transition-transform shrink-0"
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={procesandoPago}
+                >
+                  <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
+                  <span className="hidden sm:inline">Registrar Pago</span>
+                  <span className="sm:hidden">Pagar</span>
+                </Button>
               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Modal de Pasarela de Pago */}
+        <PasarelaPagoCuotasModal
+          open={showConfirmModal}
+          onOpenChange={setShowConfirmModal}
+          chargesSeleccionados={chargesPendientes.filter(c => chargesSeleccionados.has(c.id))}
+          montoTotal={totalSeleccionado}
+          onPagoConfirmado={handlePagoConfirmado}
+        />
       </main>
 
       <BottomNavigation />
