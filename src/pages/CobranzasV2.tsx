@@ -316,7 +316,15 @@ export default function CobranzasV2() {
     if (!pagoSeleccionado) return;
     
     try {
-      await aprobarPagoV2(pagoSeleccionado.id, comentario);
+      // Obtener nombre del usuario que aprueba
+      const nombreAprobador = user?.displayName || user?.email || 'Usuario';
+      
+      await aprobarPagoV2(
+        pagoSeleccionado.id, 
+        comentario,
+        user?.uid,
+        nombreAprobador
+      );
       
       toast({
         title: "✅ Pago aprobado",

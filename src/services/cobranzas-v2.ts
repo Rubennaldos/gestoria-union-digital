@@ -845,8 +845,34 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
   }
 }
 
+// Obtener solo pagos pendientes de aprobación
+export async function obtenerPagosPendientesV2(): Promise<PagoV2[]> {
+  try {
+    const pagosSnapshot = await get(ref(db, `${BASE_PATH}/pagos`));
+    if (!pagosSnapshot.exists()) {
+      return [];
+    }
+
+    const pagosData = pagosSnapshot.val();
+    const todosPagos = Object.values(pagosData) as PagoV2[];
+    
+    // Filtrar solo los pendientes y ordenar por fecha
+    return todosPagos
+      .filter(p => p.estado === 'pendiente')
+      .sort((a, b) => b.fechaCreacion - a.fechaCreacion);
+  } catch (error) {
+    console.error("Error obteniendo pagos pendientes V2:", error);
+    return [];
+  }
+}
+
 // === APROBAR/RECHAZAR PAGOS ===
-export async function aprobarPagoV2(pagoId: string, comentario?: string): Promise<void> {
+export async function aprobarPagoV2(
+  pagoId: string, 
+  comentario?: string,
+  aprobadoPor?: string,
+  aprobadoPorNombre?: string
+): Promise<void> {
   try {
     // Obtener el pago
     const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
@@ -870,6 +896,14 @@ export async function aprobarPagoV2(pagoId: string, comentario?: string): Promis
 
     if (comentario) {
       updates.comentarioAprobacion = comentario;
+    }
+    
+    if (aprobadoPor) {
+      updates.aprobadoPor = aprobadoPor;
+    }
+    
+    if (aprobadoPorNombre) {
+      updates.aprobadoPorNombre = aprobadoPorNombre;
     }
 
     await update(pagoRef, updates);
