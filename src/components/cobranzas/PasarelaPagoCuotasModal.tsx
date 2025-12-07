@@ -7,7 +7,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, Upload, Building2, Smartphone, CheckCircle2, Loader2 } from "lucide-react";
+import { CalendarIcon, Upload, Building2, Smartphone, CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -15,12 +15,15 @@ import { cn } from "@/lib/utils";
 import { obtenerMediosPago } from "@/services/medios-pago";
 import { CuentaBancaria, BilleteraDigital } from "@/types/medios-pago";
 import { ChargeV2 } from "@/types/cobranzas-v2";
+import { getConfigWhatsAppPagos, enviarNotificacionPagoWhatsApp } from "@/lib/whatsappPagos";
 
 interface PasarelaPagoCuotasModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   chargesSeleccionados: ChargeV2[];
   montoTotal: number;
+  asociadoNombre: string;
+  asociadoPadron: string;
   onPagoConfirmado: (
     fechaPago: Date,
     archivoComprobante: File,
@@ -41,6 +44,8 @@ export const PasarelaPagoCuotasModal = ({
   onOpenChange,
   chargesSeleccionados,
   montoTotal,
+  asociadoNombre,
+  asociadoPadron,
   onPagoConfirmado,
 }: PasarelaPagoCuotasModalProps) => {
   const [fechaPago, setFechaPago] = useState<Date>(new Date());
@@ -147,12 +152,33 @@ export const PasarelaPagoCuotasModal = ({
         numeroOperacion,
         observaciones
       );
+      
+      // Enviar notificación por WhatsApp
+      try {
+        const configWhatsApp = await getConfigWhatsAppPagos();
+        if (configWhatsApp && configWhatsApp.numero1) {
+          enviarNotificacionPagoWhatsApp(configWhatsApp, {
+            asociado: asociadoNombre,
+            padron: asociadoPadron,
+            monto: montoTotal,
+            periodos: chargesSeleccionados.map(c => c.periodo),
+            metodoPago: medioSeleccionado.nombre,
+            numeroOperacion: numeroOperacion,
+            fechaPago: format(fechaPago, "dd/MM/yyyy", { locale: es })
+          });
+          toast.success("Se abrirá WhatsApp para notificar el pago");
+        }
+      } catch (whatsappError) {
+        console.error("Error enviando notificación WhatsApp:", whatsappError);
+        // No bloquear el flujo si falla WhatsApp
+      }
+      
       setPagoEnviado(true);
       
       // Cerrar después de mostrar éxito
       setTimeout(() => {
         onOpenChange(false);
-      }, 2000);
+      }, 3000);
     } catch (error) {
       console.error("Error al confirmar pago:", error);
       toast.error("Error al procesar el pago");

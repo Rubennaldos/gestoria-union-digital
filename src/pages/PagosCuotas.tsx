@@ -988,6 +988,8 @@ const PagosCuotas = () => {
           onOpenChange={setShowConfirmModal}
           chargesSeleccionados={chargesPendientes.filter(c => chargesSeleccionados.has(c.id))}
           montoTotal={totalSeleccionado}
+          asociadoNombre={empadronado ? `${empadronado.nombre} ${empadronado.apellidos}` : ""}
+          asociadoPadron={empadronado?.numeroPadron || ""}
           onPagoConfirmado={handlePagoConfirmado}
         />
       </main>
