@@ -307,12 +307,12 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
           {resultado && (
             <div className="space-y-4">
               {/* Alert importante sobre aprobación */}
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertCircle className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-900">
-                  <strong>✅ Importación Completada:</strong> Los pagos han sido registrados como <strong>"PENDIENTES"</strong>.
+              <Alert className="bg-green-50 border-green-200">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-green-900">
+                  <strong>✅ Importación Completada:</strong> Los pagos han sido registrados y <strong>APROBADOS automáticamente</strong>.
                   <br />
-                  <strong>Próximo paso:</strong> Ve a la pestaña "Pagos" para revisar y aprobar los pagos importados.
+                  <strong>📊 Los balances ya están actualizados.</strong> Puedes verificar en Cobranzas V2 o Admin Balances.
                   <br />
                   <strong>💡 Reporte:</strong> Descarga el reporte Excel para ver todos los detalles, errores y advertencias.
                 </AlertDescription>

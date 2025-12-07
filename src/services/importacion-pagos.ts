@@ -5,6 +5,7 @@ import { getEmpadronados } from "./empadronados";
 import { 
   obtenerChargesV2, 
   registrarPagoV2, 
+  aprobarPagoV2,
   obtenerConfiguracionV2 
 } from "./cobranzas-v2";
 import type { Empadronado } from "@/types/empadronados";
@@ -339,8 +340,13 @@ export async function procesarImportacionPagos(
             `Importación masiva de pagos - ${nombreMes} ${año}`
           );
           
-          // NO intentar aprobar automáticamente - quedan pendientes para aprobación manual
-          // Esto evita problemas de permisos y permite revisar los pagos antes de aprobar
+          // Aprobar automáticamente el pago importado
+          try {
+            await aprobarPagoV2(pago.id, 'Aprobado automáticamente por importación masiva');
+          } catch (approveError) {
+            // Si falla la aprobación, el pago queda pendiente (no es crítico)
+            console.warn(`No se pudo aprobar automáticamente el pago ${pago.id}`);
+          }
           
           // Verificar si es pago total o parcial
           if (monto >= cargo.saldo) {
