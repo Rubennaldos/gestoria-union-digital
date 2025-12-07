@@ -92,17 +92,17 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
     setValidando(true);
 
     try {
-      const { valido, errores } = await validarDatosImportacion(datos);
+      const { valido, errores, columnas } = await validarDatosImportacion(datos);
       
       if (valido) {
         toast({
           title: "✅ Validación exitosa",
-          description: "Los datos están listos para importar",
+          description: `Columnas detectadas: ${columnas.join(', ')}`,
         });
       } else {
         toast({
           title: "❌ Errores de validación",
-          description: errores.join(', '),
+          description: errores.join(' | '),
           variant: "destructive"
         });
       }

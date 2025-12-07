@@ -66,19 +66,59 @@ export interface ResumenImportacion {
 }
 
 export interface FilaExcel {
-  Padron: string | number;
-  Enero?: string | number;
-  Febrero?: string | number;
-  Marzo?: string | number;
-  Abril?: string | number;
-  Mayo?: string | number;
-  Junio?: string | number;
-  Julio?: string | number;
-  Agosto?: string | number;
-  Septiembre?: string | number;
-  Octubre?: string | number;
-  Noviembre?: string | number;
-  Diciembre?: string | number;
+  [key: string]: string | number | undefined;
+}
+
+// Alias para nombres de columna de padrón
+const PADRON_ALIASES = ['Padron', 'Padrón', 'padron', 'padrón', 'PADRON', 'NumeroPadron', 'Numero Padron', 'N° Padron', 'Nro Padron', 'Nro', 'N°', 'Numero'];
+
+// Alias para nombres de meses (con y sin tilde)
+const MESES_ALIASES: Record<string, string[]> = {
+  'Enero': ['Enero', 'enero', 'ENERO', 'Ene', 'ENE', '01', '1'],
+  'Febrero': ['Febrero', 'febrero', 'FEBRERO', 'Feb', 'FEB', '02', '2'],
+  'Marzo': ['Marzo', 'marzo', 'MARZO', 'Mar', 'MAR', '03', '3'],
+  'Abril': ['Abril', 'abril', 'ABRIL', 'Abr', 'ABR', '04', '4'],
+  'Mayo': ['Mayo', 'mayo', 'MAYO', 'May', 'MAY', '05', '5'],
+  'Junio': ['Junio', 'junio', 'JUNIO', 'Jun', 'JUN', '06', '6'],
+  'Julio': ['Julio', 'julio', 'JULIO', 'Jul', 'JUL', '07', '7'],
+  'Agosto': ['Agosto', 'agosto', 'AGOSTO', 'Ago', 'AGO', '08', '8'],
+  'Septiembre': ['Septiembre', 'septiembre', 'SEPTIEMBRE', 'Sep', 'SEP', 'Sept', '09', '9'],
+  'Octubre': ['Octubre', 'octubre', 'OCTUBRE', 'Oct', 'OCT', '10'],
+  'Noviembre': ['Noviembre', 'noviembre', 'NOVIEMBRE', 'Nov', 'NOV', '11'],
+  'Diciembre': ['Diciembre', 'diciembre', 'DICIEMBRE', 'Dic', 'DIC', '12']
+};
+
+/**
+ * Busca el valor de padrón en una fila usando múltiples alias
+ */
+function obtenerPadronDeFila(fila: FilaExcel): string | number | undefined {
+  for (const alias of PADRON_ALIASES) {
+    if (fila[alias] !== undefined && fila[alias] !== null && String(fila[alias]).trim() !== '') {
+      return fila[alias];
+    }
+  }
+  // También buscar cualquier columna que contenga "padron" en el nombre
+  for (const key of Object.keys(fila)) {
+    if (key.toLowerCase().includes('padron') || key.toLowerCase().includes('padrón')) {
+      if (fila[key] !== undefined && fila[key] !== null && String(fila[key]).trim() !== '') {
+        return fila[key];
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Busca el valor de un mes en una fila usando múltiples alias
+ */
+function obtenerMesDeFila(fila: FilaExcel, mesNombre: string): string | number | undefined {
+  const aliases = MESES_ALIASES[mesNombre] || [mesNombre];
+  for (const alias of aliases) {
+    if (fila[alias] !== undefined && fila[alias] !== null) {
+      return fila[alias];
+    }
+  }
+  return undefined;
 }
 
 // Mapeo de nombres de meses a números
@@ -189,37 +229,54 @@ function buscarCargo(
  */
 export async function validarDatosImportacion(
   datos: FilaExcel[]
-): Promise<{ valido: boolean; errores: string[] }> {
+): Promise<{ valido: boolean; errores: string[]; columnas: string[] }> {
   const errores: string[] = [];
   
   // Validar que haya datos
   if (!datos || datos.length === 0) {
     errores.push("El archivo está vacío");
-    return { valido: false, errores };
+    return { valido: false, errores, columnas: [] };
   }
   
-  // Validar que tenga la columna Padron
-  if (!datos[0].hasOwnProperty('Padron')) {
-    errores.push("El archivo debe tener una columna 'Padron'");
+  // Mostrar columnas detectadas
+  const columnasDetectadas = Object.keys(datos[0]);
+  
+  // Validar que tenga alguna columna de padrón
+  const tienePadron = obtenerPadronDeFila(datos[0]) !== undefined || 
+    columnasDetectadas.some(col => 
+      col.toLowerCase().includes('padron') || col.toLowerCase().includes('padrón')
+    );
+  
+  if (!tienePadron) {
+    errores.push(`No se encontró columna de padrón. Columnas detectadas: ${columnasDetectadas.join(', ')}`);
   }
   
   // Validar que tenga al menos una columna de mes
-  const columnasMeses = Object.keys(MESES_MAP);
-  const tieneAlgunMes = columnasMeses.some(mes => datos[0].hasOwnProperty(mes));
+  const mesesEncontrados: string[] = [];
+  for (const mesNombre of Object.keys(MESES_ALIASES)) {
+    if (obtenerMesDeFila(datos[0], mesNombre) !== undefined) {
+      mesesEncontrados.push(mesNombre);
+    }
+  }
   
-  if (!tieneAlgunMes) {
-    errores.push("El archivo debe tener al menos una columna de mes (Enero, Febrero, etc.)");
+  if (mesesEncontrados.length === 0) {
+    errores.push(`No se encontraron columnas de meses. Columnas detectadas: ${columnasDetectadas.join(', ')}`);
   }
   
   // Validar padrones no vacíos
-  const padronesVacios = datos.filter((fila, idx) => !fila.Padron || fila.Padron.trim() === '');
+  const padronesVacios = datos.filter(fila => {
+    const padron = obtenerPadronDeFila(fila);
+    return !padron || String(padron).trim() === '';
+  });
+  
   if (padronesVacios.length > 0) {
     errores.push(`${padronesVacios.length} fila(s) tienen el número de padrón vacío`);
   }
   
   return { 
     valido: errores.length === 0, 
-    errores 
+    errores,
+    columnas: columnasDetectadas
   };
 }
 
@@ -257,13 +314,15 @@ export async function procesarImportacionPagos(
     
     // Procesar cada fila del Excel
     for (const fila of datos) {
-      // Manejar Padron como string o número
-      const numeroPadron = fila.Padron ? String(fila.Padron).trim() : '';
+      // Buscar padrón usando aliases flexibles
+      const padronRaw = obtenerPadronDeFila(fila);
+      const numeroPadron = padronRaw ? String(padronRaw).trim() : '';
       
       if (!numeroPadron) {
         resultado.errores.push({
           numeroPadron: 'N/A',
-          razon: 'Número de padrón vacío'
+          razon: 'Número de padrón vacío',
+          detalle: `Fila: ${JSON.stringify(fila).substring(0, 100)}`
         });
         continue;
       }
@@ -282,7 +341,7 @@ export async function procesarImportacionPagos(
       
       // Procesar cada mes
       for (const [nombreMes, numeroMes] of Object.entries(MESES_MAP)) {
-        const valorMes = fila[nombreMes as keyof FilaExcel];
+        const valorMes = obtenerMesDeFila(fila, nombreMes);
         const monto = limpiarMonto(valorMes);
         
         // Si no hay monto, saltar (no es error, simplemente no pagó)
