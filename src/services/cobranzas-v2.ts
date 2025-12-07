@@ -67,23 +67,19 @@ function getCurrentPeriod(): string {
 }
 
 function calculateChargeDate(empadronado: any, config: ConfiguracionCobranzasV2): Date {
-  const fechaIngreso = new Date(empadronado.fechaIngreso);
-  const policyDate = new Date(2025, 0, 15); // 15/01/2025
+  // =====================================================
+  // POLÍTICA TEMPORAL (Diciembre 2024):
+  // TODOS los empadronados habilitados cobran desde 01/01/2025
+  // Ignoramos la fecha de ingreso porque no es confiable.
+  // 
+  // FUTURO: Los empadronados confirmarán su fecha real de ingreso
+  // al entrar a su portal, y la secretaría validará.
+  // =====================================================
   
-  // Si ingresó antes del 15/01/2025, cobra desde enero 2025
-  if (fechaIngreso < policyDate) {
-    return new Date(2025, 0, 1); // enero 2025
-  }
+  // Fecha base fija: 01 de Enero 2025
+  const FECHA_BASE_COBRO = new Date(2025, 0, 1); // 01/01/2025
   
-  // Si ingresó después, aplicar regla de día de cierre
-  const day = fechaIngreso.getDate();
-  if (day <= config.diaCierre) {
-    // Cobra desde ese mes
-    return new Date(fechaIngreso.getFullYear(), fechaIngreso.getMonth(), 1);
-  } else {
-    // Cobra desde el mes siguiente
-    return new Date(fechaIngreso.getFullYear(), fechaIngreso.getMonth() + 1, 1);
-  }
+  return FECHA_BASE_COBRO;
 }
 
 function calculateDueDate(chargeDate: Date, config: ConfiguracionCobranzasV2): Date {
