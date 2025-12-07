@@ -433,7 +433,7 @@ export default function DetalleEmpadronadoModalV2({
                         <Badge variant="secondary">
                           {chargesSeleccionados.length} seleccionadas
                         </Badge>
-                        <Badge variant="outline" className="font-bold">
+                        <Badge variant="outline" className="font-bold text-primary">
                           Total: {formatearMoneda(
                             [...deudaItems, ...deudaItemsFuturos]
                               .filter(item => chargesSeleccionados.includes(item.chargeId))
@@ -442,6 +442,7 @@ export default function DetalleEmpadronadoModalV2({
                         </Badge>
                         <Button
                           size="sm"
+                          className="bg-primary hover:bg-primary/90"
                           onClick={() => {
                             const totalSeleccionado = [...deudaItems, ...deudaItemsFuturos]
                               .filter(item => chargesSeleccionados.includes(item.chargeId))
