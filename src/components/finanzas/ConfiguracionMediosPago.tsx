@@ -17,6 +17,7 @@ import {
   actualizarBilleteraDigital,
   eliminarBilleteraDigital,
 } from "@/services/medios-pago";
+import { ConfiguracionWhatsAppPagos } from "@/components/cobranzas/ConfiguracionWhatsAppPagos";
 
 export const ConfiguracionMediosPago = () => {
   const [cuentasBancarias, setCuentasBancarias] = useState<CuentaBancaria[]>([]);
@@ -335,6 +336,9 @@ export const ConfiguracionMediosPago = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Configuración de WhatsApp para notificaciones de pago */}
+      <ConfiguracionWhatsAppPagos />
     </div>
   );
 };
