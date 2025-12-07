@@ -429,10 +429,36 @@ export default function DetalleEmpadronadoModalV2({
                     </Button>
                     
                     {chargesSeleccionados.length > 0 && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">
                           {chargesSeleccionados.length} seleccionadas
                         </Badge>
+                        <Badge variant="outline" className="font-bold">
+                          Total: {formatearMoneda(
+                            [...deudaItems, ...deudaItemsFuturos]
+                              .filter(item => chargesSeleccionados.includes(item.chargeId))
+                              .reduce((sum, item) => sum + item.saldo, 0)
+                          )}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            const totalSeleccionado = [...deudaItems, ...deudaItemsFuturos]
+                              .filter(item => chargesSeleccionados.includes(item.chargeId))
+                              .reduce((sum, item) => sum + item.saldo, 0);
+                            setNuevoPago({
+                              chargeId: chargesSeleccionados.join(','),
+                              monto: totalSeleccionado.toString(),
+                              metodoPago: '',
+                              numeroOperacion: '',
+                              observaciones: `Pago conjunto de ${chargesSeleccionados.length} cuotas`
+                            });
+                            setActiveTab("registrar-pago");
+                          }}
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Pagar Seleccionadas
+                        </Button>
                         <Button
                           variant="destructive"
                           size="sm"
