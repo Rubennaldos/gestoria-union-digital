@@ -64,21 +64,6 @@ const App: React.FC = () => {
         <Toaster />
         <Sonner />
 
-        {/* Barra superior simple con el botón de notificaciones */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 12px",
-            borderBottom: "1px solid #eee",
-            background: "#fff",
-          }}
-        >
-          <span style={{ fontWeight: 600 }}>Administración de Seguridad</span>
-          <NotificationsButton />
-        </div>
-
         {/* 👇 NINGÚN Router aquí. El Router va en main.tsx */}
         <AuthProvider>
           {/* Overlay de mensajes masivos - aparece globalmente para todos los usuarios autenticados */}
