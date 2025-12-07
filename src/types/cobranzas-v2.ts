@@ -21,9 +21,15 @@ export interface ChargeV2 {
   saldo: number;
   fechaVencimiento: number;
   fechaCreacion: number;
-  estado: 'pendiente' | 'pagado' | 'moroso';
+  estado: 'pendiente' | 'pagado' | 'moroso' | 'anulado';
   esMoroso: boolean;
   montoMorosidad?: number;
+  // Campos de anulación
+  anulado?: boolean;
+  fechaAnulacion?: number;
+  anuladoPor?: string;
+  anuladoPorNombre?: string;
+  motivoAnulacion?: string;
 }
 
 export interface PagoV2 {
