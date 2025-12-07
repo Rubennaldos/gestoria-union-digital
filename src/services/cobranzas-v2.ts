@@ -838,7 +838,14 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
     }
 
     const pagosData = pagosSnapshot.val();
-    return (Object.values(pagosData) as PagoV2[]).sort((a, b) => b.fechaPagoRegistrada - a.fechaPagoRegistrada);
+    
+    // Convertir a array preservando el ID de Firebase como el ID del pago
+    const todosPagos: PagoV2[] = Object.entries(pagosData).map(([key, value]) => ({
+      ...(value as PagoV2),
+      id: key // Usar la key de Firebase como ID
+    }));
+    
+    return todosPagos.sort((a, b) => b.fechaPagoRegistrada - a.fechaPagoRegistrada);
   } catch (error) {
     console.error("Error obteniendo pagos V2:", error);
     return [];
@@ -854,7 +861,12 @@ export async function obtenerPagosPendientesV2(): Promise<PagoV2[]> {
     }
 
     const pagosData = pagosSnapshot.val();
-    const todosPagos = Object.values(pagosData) as PagoV2[];
+    
+    // Convertir a array preservando el ID de Firebase como el ID del pago
+    const todosPagos: PagoV2[] = Object.entries(pagosData).map(([key, value]) => ({
+      ...(value as PagoV2),
+      id: key // Usar la key de Firebase como ID
+    }));
     
     // Filtrar solo los pendientes y ordenar por fecha
     return todosPagos
