@@ -128,19 +128,44 @@ function limpiarMonto(valor: string | number | undefined): number | null {
 }
 
 /**
- * Busca un empadronado por número de padrón
+ * Normaliza un número de padrón para comparación
+ * Extrae solo la parte numérica y la convierte a número
+ * "P00123" -> 123, "123" -> 123, "P123" -> 123
+ */
+function normalizarPadron(padron: string | number): { original: string; numero: number } {
+  const original = String(padron).trim().toUpperCase();
+  // Extraer solo dígitos
+  const soloNumeros = original.replace(/\D/g, '');
+  const numero = parseInt(soloNumeros, 10) || 0;
+  return { original, numero };
+}
+
+/**
+ * Busca un empadronado por número de padrón (búsqueda inteligente)
+ * Soporta múltiples formatos: "123", "P123", "P00123", "p00123", etc.
  */
 function buscarEmpadronadoPorPadron(
   numeroPadron: string | number, 
   empadronados: Empadronado[]
 ): Empadronado | null {
-  // Convertir a string si es número
-  const padronStr = String(numeroPadron).trim();
+  const { original, numero: numBuscado } = normalizarPadron(numeroPadron);
   
-  return empadronados.find(emp => 
-    emp.numeroPadron === padronStr || 
-    emp.numeroPadron === numeroPadron.toString()
-  ) || null;
+  // Primero intentar coincidencia exacta
+  const exacto = empadronados.find(emp => 
+    emp.numeroPadron?.toUpperCase() === original
+  );
+  if (exacto) return exacto;
+  
+  // Si no hay coincidencia exacta, buscar por número
+  if (numBuscado > 0) {
+    const porNumero = empadronados.find(emp => {
+      const { numero: numEmp } = normalizarPadron(emp.numeroPadron || '');
+      return numEmp === numBuscado;
+    });
+    if (porNumero) return porNumero;
+  }
+  
+  return null;
 }
 
 /**
