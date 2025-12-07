@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Ban, CheckSquare, Square } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
-import { obtenerPagosV2 } from '@/services/cobranzas-v2';
+import { obtenerPagosV2, anularMultiplesChargesV2 } from '@/services/cobranzas-v2';
+import { AnularBoletasModal } from './AnularBoletasModal';
 
 interface DetalleEmpadronadoModalV2Props {
   open: boolean;
@@ -49,6 +51,8 @@ export default function DetalleEmpadronadoModalV2({
     numeroOperacion: '',
     observaciones: ''
   });
+  const [chargesSeleccionados, setChargesSeleccionados] = useState<string[]>([]);
+  const [showAnularModal, setShowAnularModal] = useState(false);
 
   // Cargar pagos del empadronado cuando se abre el modal
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function DetalleEmpadronadoModalV2({
       .filter(charge => {
         if (charge.empadronadoId !== empadronado.id) return false;
         if (charge.saldo <= 0) return false;
+        if (charge.anulado) return false; // Excluir anulados
         
         // Verificar si hay pagos pendientes/aprobados que cubran el cargo
         const pagosDelCargo = pagos.filter(p => 
@@ -136,6 +141,56 @@ export default function DetalleEmpadronadoModalV2({
       deudaItemsFuturos: futuros
     };
   }, [empadronado, charges, pagos, cargandoPagos]);
+
+  // Charges seleccionados para anular
+  const chargesParaAnular = useMemo(() => {
+    return charges.filter(c => chargesSeleccionados.includes(c.id));
+  }, [charges, chargesSeleccionados]);
+
+  const toggleChargeSeleccion = (chargeId: string) => {
+    setChargesSeleccionados(prev => 
+      prev.includes(chargeId) 
+        ? prev.filter(id => id !== chargeId)
+        : [...prev, chargeId]
+    );
+  };
+
+  const seleccionarTodosDeudas = () => {
+    const todosIds = [...deudaItems, ...deudaItemsFuturos].map(item => item.chargeId);
+    if (chargesSeleccionados.length === todosIds.length) {
+      setChargesSeleccionados([]);
+    } else {
+      setChargesSeleccionados(todosIds);
+    }
+  };
+
+  const handleAnulacionConfirmada = async (motivoAnulacion: string) => {
+    if (!empadronado) return;
+    
+    try {
+      await anularMultiplesChargesV2(
+        chargesSeleccionados, 
+        motivoAnulacion, 
+        empadronado.id,
+        `${empadronado.nombre} ${empadronado.apellidos}`
+      );
+      
+      toast({
+        title: "Boletas anuladas",
+        description: `Se anularon ${chargesSeleccionados.length} boleta(s) correctamente`,
+      });
+      
+      setChargesSeleccionados([]);
+    } catch (error) {
+      console.error("Error anulando boletas:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron anular las boletas",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
 
   const generarLinkCompartir = () => {
     if (!empadronado) return '';
@@ -352,6 +407,45 @@ export default function DetalleEmpadronadoModalV2({
             {/* Estado de Cuenta */}
             <TabsContent value="estado-cuenta">
               <div className="space-y-4">
+                {/* Botón seleccionar todos y anular */}
+                {(deudaItems.length > 0 || deudaItemsFuturos.length > 0) && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-muted rounded-lg">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={seleccionarTodosDeudas}
+                    >
+                      {chargesSeleccionados.length === [...deudaItems, ...deudaItemsFuturos].length && chargesSeleccionados.length > 0 ? (
+                        <>
+                          <Square className="h-4 w-4 mr-1" />
+                          Quitar todas
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="h-4 w-4 mr-1" />
+                          Seleccionar todas
+                        </>
+                      )}
+                    </Button>
+                    
+                    {chargesSeleccionados.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {chargesSeleccionados.length} seleccionadas
+                        </Badge>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setShowAnularModal(true)}
+                        >
+                          <Ban className="h-4 w-4 mr-1" />
+                          Anular
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Deudas VENCIDAS */}
                 <Card className="border-red-200">
                   <CardHeader className="pb-2">
@@ -369,6 +463,10 @@ export default function DetalleEmpadronadoModalV2({
                       ) : (
                         deudaItems.map((item) => (
                           <div key={item.chargeId} className="flex items-center justify-between p-2 bg-red-50 rounded-lg gap-2">
+                            <Checkbox
+                              checked={chargesSeleccionados.includes(item.chargeId)}
+                              onCheckedChange={() => toggleChargeSeleccion(item.chargeId)}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm">{item.periodo}</div>
                               <div className="text-xs text-muted-foreground">
@@ -421,6 +519,10 @@ export default function DetalleEmpadronadoModalV2({
                       <div className="space-y-2">
                         {deudaItemsFuturos.map((item) => (
                           <div key={item.chargeId} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg gap-2">
+                            <Checkbox
+                              checked={chargesSeleccionados.includes(item.chargeId)}
+                              onCheckedChange={() => toggleChargeSeleccion(item.chargeId)}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm">{item.periodo}</div>
                               <div className="text-xs text-muted-foreground">
@@ -724,6 +826,14 @@ export default function DetalleEmpadronadoModalV2({
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Modal de anulación */}
+        <AnularBoletasModal
+          open={showAnularModal}
+          onOpenChange={setShowAnularModal}
+          chargesSeleccionados={chargesParaAnular}
+          onAnulacionConfirmada={handleAnulacionConfirmada}
+        />
       </DialogContent>
     </Dialog>
   );
