@@ -358,7 +358,8 @@ export async function verificarYGenerarCargosAutomaticos(): Promise<{
     
     let mensaje = '';
     if (cargosGenerados > 0) {
-      mensaje = `${cargosGenerados} cargos generados para ${currentPeriod}`;
+      const currentPeriodForMessage = formatPeriod(new Date());
+      mensaje = `${cargosGenerados} cargos generados para ${currentPeriodForMessage}`;
     }
     
     return { cargosGenerados, cierreEjecutado: false, mensaje };
