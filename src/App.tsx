@@ -46,6 +46,7 @@ import AdminBalances from "./pages/AdminBalances";
 import Modulos from "./pages/Modulos";
 import RecuperarContrasena from "./pages/RecuperarContrasena";
 import Comunicaciones from "./pages/Comunicaciones";
+import Auditoria from "./pages/Auditoria";
 
 const queryClient = new QueryClient();
 
@@ -351,6 +352,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Modulos />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Auditoría */}
+              <Route
+                path="/auditoria"
+                element={
+                  <ProtectedRoute>
+                    <Auditoria />
                   </ProtectedRoute>
                 }
               />
