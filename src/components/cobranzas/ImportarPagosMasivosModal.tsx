@@ -16,7 +16,8 @@ import {
   exportarResultadoJSON,
   exportarResultadoExcel,
   type ResultadoImportacion,
-  type FilaExcel
+  type FilaExcel,
+  type ProgresoCallback
 } from "@/services/importacion-pagos";
 import * as XLSX from 'xlsx';
 
@@ -34,6 +35,14 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
   const [validando, setValidando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoImportacion | null>(null);
   const [año, setAño] = useState(2025);
+  
+  // Estado para el progreso
+  const [progreso, setProgreso] = useState({
+    porcentaje: 0,
+    filaActual: 0,
+    totalFilas: 0,
+    mensaje: ''
+  });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,9 +137,12 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
     }
 
     setProcesando(true);
+    setProgreso({ porcentaje: 0, filaActual: 0, totalFilas: datos.length, mensaje: 'Iniciando...' });
 
     try {
-      const result = await procesarImportacionPagos(datos, año);
+      const result = await procesarImportacionPagos(datos, año, (p) => {
+        setProgreso(p);
+      });
       setResultado(result);
       
       toast({
@@ -150,6 +162,7 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
       });
     } finally {
       setProcesando(false);
+      setProgreso({ porcentaje: 0, filaActual: 0, totalFilas: 0, mensaje: '' });
     }
   };
 
@@ -283,21 +296,57 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
           {/* Indicador de progreso mientras procesa */}
           {procesando && !resultado && (
             <div className="space-y-4">
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+              <div className="text-center py-6">
+                {/* Barra de progreso circular */}
+                <div className="relative w-32 h-32 mx-auto mb-4">
+                  <svg className="w-32 h-32 transform -rotate-90">
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="56"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="none"
+                      className="text-muted"
+                    />
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="56"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="none"
+                      strokeDasharray={`${2 * Math.PI * 56}`}
+                      strokeDashoffset={`${2 * Math.PI * 56 * (1 - progreso.porcentaje / 100)}`}
+                      className="text-primary transition-all duration-300"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-primary">{progreso.porcentaje}%</span>
+                  </div>
+                </div>
+                
                 <h3 className="text-lg font-semibold mb-2">Procesando importación...</h3>
-                <p className="text-sm text-muted-foreground">
-                  Esto puede tomar varios minutos dependiendo del tamaño del archivo.
+                <p className="text-sm text-muted-foreground font-medium">
+                  {progreso.mensaje}
                 </p>
+                
+                {/* Barra de progreso lineal */}
+                <div className="w-full bg-muted rounded-full h-3 mt-4 overflow-hidden">
+                  <div 
+                    className="bg-primary h-3 rounded-full transition-all duration-300"
+                    style={{ width: `${progreso.porcentaje}%` }}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Por favor, no cierres esta ventana.
+                  Fila {progreso.filaActual} de {progreso.totalFilas}
                 </p>
               </div>
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  ℹ️ Los errores NO aparecerán en la consola. Al finalizar, verás un reporte completo aquí
-                  con todos los éxitos, advertencias y errores.
+                  ⏳ Por favor, no cierres esta ventana. Al finalizar verás un reporte completo.
                 </AlertDescription>
               </Alert>
             </div>

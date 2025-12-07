@@ -434,14 +434,14 @@ const AdminBalances = () => {
           
           <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3 md:gap-4">
-              <BackButton />
+        <BackButton />
               <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
                 <BarChart3 className="h-6 w-6 md:h-7 md:w-7 text-white" />
-              </div>
-              <div>
+          </div>
+          <div>
                 <h1 className="text-xl md:text-3xl font-bold text-white">
-                  Administrador de Balances
-                </h1>
+              Administrador de Balances
+            </h1>
                 <p className="text-blue-100 text-sm md:text-base">
                   Datos en tiempo real • Año {año}
                 </p>
@@ -476,8 +476,8 @@ const AdminBalances = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center justify-between">
+                  <div>
                   <p className="text-slate-400 text-xs md:text-sm">Total Asociados</p>
                   <p className="text-2xl md:text-3xl font-bold text-white">{estadisticas.totalRecords}</p>
                 </div>
@@ -496,14 +496,14 @@ const AdminBalances = () => {
                   </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-emerald-400 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
-          
+                </div>
+              </CardContent>
+            </Card>
+
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center justify-between">
+                  <div>
                   <p className="text-slate-400 text-xs md:text-sm">Al Día</p>
                   <p className="text-2xl md:text-3xl font-bold text-green-400">{estadisticas.alDia}</p>
                 </div>
@@ -522,9 +522,9 @@ const AdminBalances = () => {
                   </p>
                 </div>
                 <AlertCircle className="h-8 w-8 text-red-400 opacity-80" />
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardContent>
+            </Card>
         </div>
 
         {/* Mini estadísticas de estados */}
@@ -602,7 +602,7 @@ const AdminBalances = () => {
                 </Select>
 
                 {(busqueda || filtroManzana !== "todas" || filtroEstado !== "todos") && (
-                  <Button 
+              <Button
                     variant="ghost" 
                     size="sm"
                     onClick={limpiarFiltros}
@@ -610,7 +610,7 @@ const AdminBalances = () => {
                   >
                     <X className="h-4 w-4 mr-1" />
                     Limpiar
-                  </Button>
+              </Button>
                 )}
               </div>
               
@@ -666,8 +666,20 @@ const AdminBalances = () => {
           
           <ScrollArea className="h-[400px] md:h-[500px]">
             {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <RefreshCw className="h-8 w-8 text-blue-400 animate-spin" />
+              <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                {/* Spinner con animación */}
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-blue-400/20 animate-ping" />
+                  <RefreshCw className="h-12 w-12 text-blue-400 animate-spin relative z-10" />
+                </div>
+                <p className="text-lg font-medium text-white animate-pulse">Cargando balances...</p>
+                <p className="text-sm text-slate-400">Conectando con el sistema</p>
+                {/* Puntos animados */}
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               </div>
             ) : balancesFiltrados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">

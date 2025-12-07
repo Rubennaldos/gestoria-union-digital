@@ -280,12 +280,21 @@ export async function validarDatosImportacion(
   };
 }
 
+// Callback para reportar progreso
+export type ProgresoCallback = (progreso: {
+  porcentaje: number;
+  filaActual: number;
+  totalFilas: number;
+  mensaje: string;
+}) => void;
+
 /**
  * Procesa la importación masiva de pagos
  */
 export async function procesarImportacionPagos(
   datos: FilaExcel[],
-  año: number = 2025
+  año: number = 2025,
+  onProgreso?: ProgresoCallback
 ): Promise<ResultadoImportacion> {
   
   const resultado: ResultadoImportacion = {
@@ -313,7 +322,23 @@ export async function procesarImportacionPagos(
     ]);
     
     // Procesar cada fila del Excel
+    let filaActual = 0;
+    const totalFilas = datos.length;
+    
     for (const fila of datos) {
+      filaActual++;
+      
+      // Reportar progreso
+      if (onProgreso) {
+        const porcentaje = Math.round((filaActual / totalFilas) * 100);
+        onProgreso({
+          porcentaje,
+          filaActual,
+          totalFilas,
+          mensaje: `Procesando fila ${filaActual} de ${totalFilas}...`
+        });
+      }
+      
       // Buscar padrón usando aliases flexibles
       const padronRaw = obtenerPadronDeFila(fila);
       const numeroPadron = padronRaw ? String(padronRaw).trim() : '';

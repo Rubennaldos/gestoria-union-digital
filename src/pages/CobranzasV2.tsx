@@ -510,8 +510,20 @@ export default function CobranzasV2() {
     return (
       <div className="min-h-screen bg-background">
         <TopNavigation />
-        <div className="flex items-center justify-center h-[60vh]">
-          <RefreshCw className="h-8 w-8 animate-spin" />
+        <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+          {/* Spinner con animación */}
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+            <RefreshCw className="h-12 w-12 text-primary animate-spin relative z-10" />
+          </div>
+          <p className="text-lg font-medium animate-pulse">Cargando cobranzas...</p>
+          <p className="text-sm text-muted-foreground">Preparando datos del sistema</p>
+          {/* Puntos animados */}
+          <div className="flex space-x-1">
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
         <BottomNavigation />
       </div>
