@@ -9,6 +9,7 @@ import { ModuleCard } from "@/components/ui/module-card";
 import { ModuleCircle } from "@/components/ui/module-circle";
 import { QuickAccessSection } from "@/components/dashboard/QuickAccessSection";
 import { SolicitudesPendientesWidget } from "@/components/dashboard/SolicitudesPendientesWidget";
+import { PagosPendientesWidget } from "@/components/dashboard/PagosPendientesWidget";
 import { useAuthz } from "@/contexts/AuthzContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
@@ -223,6 +224,9 @@ const Index = () => {
 
         {/* Solicitudes Pendientes Widget */}
         <SolicitudesPendientesWidget />
+
+        {/* Widget de Pagos Pendientes para aprobar */}
+        <PagosPendientesWidget />
 
         {/* Quick Access Section - Only Mobile */}
         {isMobile && (

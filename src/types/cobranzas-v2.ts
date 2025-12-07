@@ -42,6 +42,11 @@ export interface PagoV2 {
   estado: 'pendiente' | 'aprobado' | 'rechazado';
   archivoComprobante?: string; // URL del archivo adjunto
   motivoRechazo?: string;
+  // Campos de aprobación
+  fechaAprobacion?: number;
+  aprobadoPor?: string; // UID del usuario que aprobó
+  aprobadoPorNombre?: string; // Nombre del usuario que aprobó
+  comentarioAprobacion?: string;
 }
 
 export interface IngresoV2 {
