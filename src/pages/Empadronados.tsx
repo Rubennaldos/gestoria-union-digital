@@ -24,7 +24,6 @@ import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
 import { ActualizacionMasivaModal } from '@/components/empadronados/ActualizacionMasivaModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAuthz } from '@/contexts/AuthzContext';
 import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
@@ -47,9 +46,7 @@ const Empadronados: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmpadronado, setSelectedEmpadronado] = useState<Empadronado | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
   const [deleteMotivo, setDeleteMotivo] = useState('');
-  const [deletePdf, setDeletePdf] = useState<File | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'habilitado' | 'deshabilitado'>('all');
   const [filterVivienda, setFilterVivienda] = useState<'all' | 'construida' | 'construccion' | 'terreno'>('all');
@@ -68,7 +65,6 @@ const Empadronados: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { canDeleteWithoutAuth } = useAuthz();
 
   // XLSX: input de archivo
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -233,23 +229,12 @@ const Empadronados: React.FC = () => {
       return;
     }
 
-    if (!canDeleteWithoutAuth && deletePassword !== 'admin123') {
-      toast({
-        title: "Error",
-        description: "Verifique la clave de presidencia",
-        variant: "destructive"
-      });
-      return;
-    }
-
     try {
       const success = await deleteEmpadronado(selectedEmpadronado.id, user?.uid || 'system', deleteMotivo);
       if (success) {
         toast({ title: "Éxito", description: "Empadronado eliminado correctamente" });
         setShowDeleteDialog(false);
-        setDeletePassword('');
         setDeleteMotivo('');
-        setDeletePdf(null);
         setSelectedEmpadronado(null);
         loadData();
       } else {
@@ -921,50 +906,27 @@ const Empadronados: React.FC = () => {
                             <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
                             <AlertDialogDescription>
                               Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
-                              {!canDeleteWithoutAuth && " Se requiere autorización de presidencia."}
-                              {canDeleteWithoutAuth && " Como Presidente, puede eliminar directamente."}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
 
                           <div className="space-y-4">
-                            {!canDeleteWithoutAuth && (
-                              <div>
-                                <Label htmlFor="delete-password">Clave de Presidencia</Label>
-                                <Input
-                                  id="delete-password"
-                                  type="password"
-                                  value={deletePassword}
-                                  onChange={(e) => setDeletePassword(e.target.value)}
-                                  placeholder="Ingrese la clave"
-                                />
-                              </div>
-                            )}
-
                             <div>
-                              <Label htmlFor="delete-motivo">Motivo de Eliminación</Label>
+                              <Label htmlFor="delete-motivo">Motivo de Eliminación *</Label>
                               <Textarea
                                 id="delete-motivo"
                                 value={deleteMotivo}
                                 onChange={(e) => setDeleteMotivo(e.target.value)}
                                 placeholder="Describa el motivo de la eliminación"
-                              />
-                            </div>
-
-                            <div>
-                              <Label htmlFor="delete-pdf">Acta de Eliminación (PDF)</Label>
-                              <Input
-                                id="delete-pdf"
-                                type="file"
-                                accept=".pdf"
-                                onChange={(e) => setDeletePdf(e.target.files?.[0] || null)}
+                                className="min-h-[80px]"
                               />
                             </div>
                           </div>
 
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogCancel onClick={() => setDeleteMotivo('')}>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={handleDelete}
+                              disabled={!deleteMotivo.trim()}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Eliminar
