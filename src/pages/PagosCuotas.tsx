@@ -70,6 +70,10 @@ const PagosCuotas = () => {
 
   // Modal de detalle de pago
   const [pagoDetalle, setPagoDetalle] = useState<PagoV2 | null>(null);
+  
+  // Modal de visualización de comprobante
+  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
+  const [showComprobanteModal, setShowComprobanteModal] = useState(false);
 
   // Calcular deuda usando el motor
   const deudaCalculada = useDeudaAsociado(empadronado || {});
@@ -1007,7 +1011,10 @@ const PagosCuotas = () => {
                               variant="outline"
                               size="sm"
                               className="shrink-0 h-8 text-xs"
-                              onClick={() => window.open(pago.archivoComprobante, '_blank')}
+                              onClick={() => {
+                                setComprobanteUrl(pago.archivoComprobante || null);
+                                setShowComprobanteModal(true);
+                              }}
                             >
                               <Download className="h-3 w-3 mr-1" />
                               <span className="hidden sm:inline">Ver</span>
@@ -1080,6 +1087,32 @@ const PagosCuotas = () => {
           chargesSeleccionados={chargesPendientes.filter(c => chargesSeleccionados.has(c.id))}
           onAnulacionConfirmada={handleAnulacionConfirmada}
         />
+
+        {/* Modal de Visualización de Comprobante */}
+        {showComprobanteModal && comprobanteUrl && (
+          <div 
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowComprobanteModal(false)}
+          >
+            <div className="relative max-w-3xl max-h-[90vh] w-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="absolute -top-10 right-0 gap-2"
+                onClick={() => setShowComprobanteModal(false)}
+              >
+                <XCircle className="h-4 w-4" />
+                Cerrar
+              </Button>
+              <img 
+                src={comprobanteUrl} 
+                alt="Comprobante de pago" 
+                className="max-w-full max-h-[85vh] object-contain mx-auto rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        )}
       </main>
 
       <BottomNavigation />
