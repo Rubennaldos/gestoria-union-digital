@@ -220,17 +220,12 @@ const Empadronados: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!selectedEmpadronado || !deleteMotivo.trim()) {
-      toast({
-        title: "Error",
-        description: "Debe especificar un motivo para la eliminación",
-        variant: "destructive"
-      });
+    if (!selectedEmpadronado) {
       return;
     }
 
     try {
-      const success = await deleteEmpadronado(selectedEmpadronado.id, user?.uid || 'system', deleteMotivo);
+      const success = await deleteEmpadronado(selectedEmpadronado.id, user?.uid || 'system', deleteMotivo || 'Sin motivo especificado');
       if (success) {
         toast({ title: "Éxito", description: "Empadronado eliminado correctamente" });
         setShowDeleteDialog(false);
@@ -905,19 +900,19 @@ const Empadronados: React.FC = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
+                              ¿Está seguro que desea eliminar a {empadronado.nombre} {empadronado.apellidos} del padrón? Esta acción no se puede deshacer.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
 
                           <div className="space-y-4">
                             <div>
-                              <Label htmlFor="delete-motivo">Motivo de Eliminación *</Label>
+                              <Label htmlFor="delete-motivo">Motivo de Eliminación (opcional)</Label>
                               <Textarea
                                 id="delete-motivo"
                                 value={deleteMotivo}
                                 onChange={(e) => setDeleteMotivo(e.target.value)}
                                 placeholder="Describa el motivo de la eliminación"
-                                className="min-h-[80px]"
+                                className="min-h-[60px]"
                               />
                             </div>
                           </div>
@@ -926,7 +921,6 @@ const Empadronados: React.FC = () => {
                             <AlertDialogCancel onClick={() => setDeleteMotivo('')}>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={handleDelete}
-                              disabled={!deleteMotivo.trim()}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
                               Eliminar
