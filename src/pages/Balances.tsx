@@ -26,9 +26,9 @@ interface FilaBalance {
   mesesPagados: Record<string, boolean>; // "202501": true/false
   mesesDeuda: number;
   esAlDia: boolean;        // 0 meses
-  esPuntual: boolean;      // 1 mes
-  esResponsable: boolean;  // 2 meses
-  esPendiente: boolean;    // 3 meses
+  esCasiAlDia: boolean;    // 1 mes
+  esPonteAlDia: boolean;   // 2 meses
+  esActuaYa: boolean;      // 3 meses
   esUrgente: boolean;      // 4+ meses
 }
 
@@ -39,7 +39,7 @@ const Balances = () => {
   const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "al-dia" | "puntual" | "responsable" | "pendiente" | "urgente">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "al-dia" | "casi-al-dia" | "ponte-al-dia" | "actua-ya" | "urgente">("todos");
   const [añoSeleccionado, setAñoSeleccionado] = useState(2025);
 
   // Cargar datos iniciales
@@ -135,11 +135,11 @@ const Balances = () => {
         }
       });
 
-      // Clasificación: 0=Al día, 1=Puntual, 2=Responsable, 3=Pendiente, 4+=Urgente
+      // Clasificación con mensajes motivadores
       const esAlDia = mesesDeuda === 0;
-      const esPuntual = mesesDeuda === 1;
-      const esResponsable = mesesDeuda === 2;
-      const esPendiente = mesesDeuda === 3;
+      const esCasiAlDia = mesesDeuda === 1;
+      const esPonteAlDia = mesesDeuda === 2;
+      const esActuaYa = mesesDeuda === 3;
       const esUrgente = mesesDeuda >= 4;
 
       return {
@@ -147,9 +147,9 @@ const Balances = () => {
         mesesPagados,
         mesesDeuda,
         esAlDia,
-        esPuntual,
-        esResponsable,
-        esPendiente,
+        esCasiAlDia,
+        esPonteAlDia,
+        esActuaYa,
         esUrgente
       };
     });
@@ -164,12 +164,12 @@ const Balances = () => {
     // Filtro por estado
     if (filtroEstado === "al-dia") {
       resultado = resultado.filter(f => f.esAlDia);
-    } else if (filtroEstado === "puntual") {
-      resultado = resultado.filter(f => f.esPuntual);
-    } else if (filtroEstado === "responsable") {
-      resultado = resultado.filter(f => f.esResponsable);
-    } else if (filtroEstado === "pendiente") {
-      resultado = resultado.filter(f => f.esPendiente);
+    } else if (filtroEstado === "casi-al-dia") {
+      resultado = resultado.filter(f => f.esCasiAlDia);
+    } else if (filtroEstado === "ponte-al-dia") {
+      resultado = resultado.filter(f => f.esPonteAlDia);
+    } else if (filtroEstado === "actua-ya") {
+      resultado = resultado.filter(f => f.esActuaYa);
     } else if (filtroEstado === "urgente") {
       resultado = resultado.filter(f => f.esUrgente);
     }
@@ -224,9 +224,9 @@ const Balances = () => {
     return {
       total: filasBalance.length,
       alDia: filasBalance.filter(f => f.esAlDia).length,
-      puntual: filasBalance.filter(f => f.esPuntual).length,
-      responsable: filasBalance.filter(f => f.esResponsable).length,
-      pendiente: filasBalance.filter(f => f.esPendiente).length,
+      casiAlDia: filasBalance.filter(f => f.esCasiAlDia).length,
+      ponteAlDia: filasBalance.filter(f => f.esPonteAlDia).length,
+      actuaYa: filasBalance.filter(f => f.esActuaYa).length,
       urgente: filasBalance.filter(f => f.esUrgente).length
     };
   }, [filasBalance]);
@@ -314,8 +314,8 @@ const Balances = () => {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-6 w-6 text-blue-600" />
                 <div>
-                  <p className="text-xs text-blue-700">Puntual</p>
-                  <p className="text-xl font-bold text-blue-600">{estadisticas.puntual}</p>
+                  <p className="text-xs text-blue-700">Casi al Día</p>
+                  <p className="text-xl font-bold text-blue-600">{estadisticas.casiAlDia}</p>
                 </div>
               </div>
             </CardContent>
@@ -326,32 +326,32 @@ const Balances = () => {
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-6 w-6 text-yellow-600" />
                 <div>
-                  <p className="text-xs text-yellow-700">Sé Responsable</p>
-                  <p className="text-xl font-bold text-yellow-600">{estadisticas.responsable}</p>
+                  <p className="text-xs text-yellow-700">¡Ponte al Día!</p>
+                  <p className="text-xl font-bold text-yellow-600">{estadisticas.ponteAlDia}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-orange-200 bg-orange-50/50">
+          <Card className="border-orange-300 bg-orange-100/70">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-6 w-6 text-orange-600" />
+                <XCircle className="h-6 w-6 text-orange-700" />
                 <div>
-                  <p className="text-xs text-orange-700">Pendiente</p>
-                  <p className="text-xl font-bold text-orange-600">{estadisticas.pendiente}</p>
+                  <p className="text-xs text-orange-800 font-semibold">¡Actúa Ya!</p>
+                  <p className="text-xl font-bold text-orange-700">{estadisticas.actuaYa}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-red-300 bg-red-100/50">
+          <Card className="border-red-400 bg-red-200/70">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <XCircle className="h-6 w-6 text-red-700" />
+                <XCircle className="h-6 w-6 text-red-800" />
                 <div>
-                  <p className="text-xs text-red-700">Urgente</p>
-                  <p className="text-xl font-bold text-red-700">{estadisticas.urgente}</p>
+                  <p className="text-xs text-red-900 font-bold">¡URGENTE!</p>
+                  <p className="text-xl font-bold text-red-800">{estadisticas.urgente}</p>
                 </div>
               </div>
             </CardContent>
@@ -391,10 +391,10 @@ const Balances = () => {
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="al-dia">🟢 Al Día (0 meses)</SelectItem>
-                    <SelectItem value="puntual">🔵 Puntual (1 mes)</SelectItem>
-                    <SelectItem value="responsable">🟡 Sé Responsable (2 meses)</SelectItem>
-                    <SelectItem value="pendiente">🟠 Pendiente (3 meses)</SelectItem>
-                    <SelectItem value="urgente">🔴 Urgente (4+ meses)</SelectItem>
+                    <SelectItem value="casi-al-dia">🔵 Casi al Día (1 mes)</SelectItem>
+                    <SelectItem value="ponte-al-dia">🟡 ¡Ponte al Día! (2 meses)</SelectItem>
+                    <SelectItem value="actua-ya">🟠 ¡Actúa Ya! (3 meses)</SelectItem>
+                    <SelectItem value="urgente">🔴 ¡URGENTE! (4+ meses)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -424,15 +424,15 @@ const Balances = () => {
               </div>
               <span className="text-muted-foreground">|</span>
               <Badge className="bg-green-100 text-green-700 text-xs">Al Día</Badge>
-              <span>0 meses</span>
-              <Badge className="bg-blue-100 text-blue-700 text-xs">Puntual</Badge>
-              <span>1 mes</span>
-              <Badge className="bg-yellow-100 text-yellow-700 text-xs">Sé Responsable</Badge>
-              <span>2 meses</span>
-              <Badge className="bg-orange-100 text-orange-700 text-xs">Pendiente</Badge>
-              <span>3 meses</span>
-              <Badge className="bg-red-200 text-red-800 text-xs font-bold">Urgente</Badge>
-              <span>4+ meses</span>
+              <span>0</span>
+              <Badge className="bg-blue-100 text-blue-700 text-xs">Casi al Día</Badge>
+              <span>1</span>
+              <Badge className="bg-yellow-100 text-yellow-700 text-xs">¡Ponte al Día!</Badge>
+              <span>2</span>
+              <Badge className="bg-orange-200 text-orange-800 text-xs font-semibold">¡Actúa Ya!</Badge>
+              <span>3</span>
+              <Badge className="bg-red-300 text-red-900 text-xs font-bold animate-pulse">¡URGENTE!</Badge>
+              <span>4+</span>
             </div>
           </CardContent>
         </Card>
@@ -524,24 +524,24 @@ const Balances = () => {
                                 Al Día
                               </Badge>
                             )}
-                            {fila.esPuntual && (
+                            {fila.esCasiAlDia && (
                               <Badge className="bg-blue-100 text-blue-700 text-xs">
-                                Puntual
+                                Casi al Día
                               </Badge>
                             )}
-                            {fila.esResponsable && (
+                            {fila.esPonteAlDia && (
                               <Badge className="bg-yellow-100 text-yellow-700 text-xs">
-                                Sé Responsable
+                                ¡Ponte al Día!
                               </Badge>
                             )}
-                            {fila.esPendiente && (
-                              <Badge className="bg-orange-100 text-orange-700 text-xs">
-                                Pendiente
+                            {fila.esActuaYa && (
+                              <Badge className="bg-orange-200 text-orange-800 text-xs font-semibold">
+                                ¡Actúa Ya!
                               </Badge>
                             )}
                             {fila.esUrgente && (
-                              <Badge className="bg-red-200 text-red-800 text-xs font-bold">
-                                Urgente ({fila.mesesDeuda}m)
+                              <Badge className="bg-red-300 text-red-900 text-xs font-bold animate-pulse">
+                                ¡URGENTE! ({fila.mesesDeuda}m)
                               </Badge>
                             )}
                           </td>
