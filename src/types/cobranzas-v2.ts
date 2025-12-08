@@ -40,7 +40,7 @@ export interface PagoV2 {
   monto: number;
   montoOriginal: number;
   descuentoProntoPago?: number;
-  metodoPago: 'efectivo' | 'transferencia' | 'yape' | 'plin';
+  metodoPago: 'efectivo' | 'transferencia' | 'yape' | 'plin' | 'importacion_masiva';
   numeroOperacion?: string;
   fechaPagoRegistrada: number; // Fecha que el usuario indica que pagó
   fechaCreacion: number; // Fecha que se registró en el sistema
