@@ -25,10 +25,11 @@ interface FilaBalance {
   empadronado: Empadronado;
   mesesPagados: Record<string, boolean>; // "202501": true/false
   mesesDeuda: number;
-  esAlDia: boolean;      // 0 meses
-  esAtrasado: boolean;   // 1 mes
-  esMoroso: boolean;     // 2 meses
-  esDeudor: boolean;     // 3+ meses
+  esAlDia: boolean;        // 0 meses
+  esPuntual: boolean;      // 1 mes
+  esResponsable: boolean;  // 2 meses
+  esPendiente: boolean;    // 3 meses
+  esUrgente: boolean;      // 4+ meses
 }
 
 const Balances = () => {
@@ -38,7 +39,7 @@ const Balances = () => {
   const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "al-dia" | "atrasados" | "morosos" | "deudores">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "al-dia" | "puntual" | "responsable" | "pendiente" | "urgente">("todos");
   const [añoSeleccionado, setAñoSeleccionado] = useState(2025);
 
   // Cargar datos iniciales
@@ -134,20 +135,22 @@ const Balances = () => {
         }
       });
 
-      // Clasificación: 0=Al día, 1=Atrasado, 2=Moroso, 3+=Deudor
+      // Clasificación: 0=Al día, 1=Puntual, 2=Responsable, 3=Pendiente, 4+=Urgente
       const esAlDia = mesesDeuda === 0;
-      const esAtrasado = mesesDeuda === 1;
-      const esMoroso = mesesDeuda === 2;
-      const esDeudor = mesesDeuda >= 3;
+      const esPuntual = mesesDeuda === 1;
+      const esResponsable = mesesDeuda === 2;
+      const esPendiente = mesesDeuda === 3;
+      const esUrgente = mesesDeuda >= 4;
 
       return {
         empadronado: emp,
         mesesPagados,
         mesesDeuda,
         esAlDia,
-        esAtrasado,
-        esMoroso,
-        esDeudor
+        esPuntual,
+        esResponsable,
+        esPendiente,
+        esUrgente
       };
     });
 
@@ -161,12 +164,14 @@ const Balances = () => {
     // Filtro por estado
     if (filtroEstado === "al-dia") {
       resultado = resultado.filter(f => f.esAlDia);
-    } else if (filtroEstado === "atrasados") {
-      resultado = resultado.filter(f => f.esAtrasado);
-    } else if (filtroEstado === "morosos") {
-      resultado = resultado.filter(f => f.esMoroso);
-    } else if (filtroEstado === "deudores") {
-      resultado = resultado.filter(f => f.esDeudor);
+    } else if (filtroEstado === "puntual") {
+      resultado = resultado.filter(f => f.esPuntual);
+    } else if (filtroEstado === "responsable") {
+      resultado = resultado.filter(f => f.esResponsable);
+    } else if (filtroEstado === "pendiente") {
+      resultado = resultado.filter(f => f.esPendiente);
+    } else if (filtroEstado === "urgente") {
+      resultado = resultado.filter(f => f.esUrgente);
     }
 
     // Búsqueda (inteligente para números de padrón)
@@ -219,9 +224,10 @@ const Balances = () => {
     return {
       total: filasBalance.length,
       alDia: filasBalance.filter(f => f.esAlDia).length,
-      atrasados: filasBalance.filter(f => f.esAtrasado).length,
-      morosos: filasBalance.filter(f => f.esMoroso).length,
-      deudores: filasBalance.filter(f => f.esDeudor).length
+      puntual: filasBalance.filter(f => f.esPuntual).length,
+      responsable: filasBalance.filter(f => f.esResponsable).length,
+      pendiente: filasBalance.filter(f => f.esPendiente).length,
+      urgente: filasBalance.filter(f => f.esUrgente).length
     };
   }, [filasBalance]);
 
@@ -278,7 +284,7 @@ const Balances = () => {
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <Card>
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
@@ -303,25 +309,37 @@ const Balances = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-orange-200 bg-orange-50/50">
+          <Card className="border-blue-200 bg-blue-50/50">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-6 w-6 text-orange-600" />
+                <AlertCircle className="h-6 w-6 text-blue-600" />
                 <div>
-                  <p className="text-xs text-orange-700">Atrasados</p>
-                  <p className="text-xl font-bold text-orange-600">{estadisticas.atrasados}</p>
+                  <p className="text-xs text-blue-700">Puntual</p>
+                  <p className="text-xl font-bold text-blue-600">{estadisticas.puntual}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-red-200 bg-red-50/50">
+          <Card className="border-yellow-200 bg-yellow-50/50">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <XCircle className="h-6 w-6 text-red-600" />
+                <AlertCircle className="h-6 w-6 text-yellow-600" />
                 <div>
-                  <p className="text-xs text-red-700">Morosos</p>
-                  <p className="text-xl font-bold text-red-600">{estadisticas.morosos}</p>
+                  <p className="text-xs text-yellow-700">Sé Responsable</p>
+                  <p className="text-xl font-bold text-yellow-600">{estadisticas.responsable}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-orange-200 bg-orange-50/50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-6 w-6 text-orange-600" />
+                <div>
+                  <p className="text-xs text-orange-700">Pendiente</p>
+                  <p className="text-xl font-bold text-orange-600">{estadisticas.pendiente}</p>
                 </div>
               </div>
             </CardContent>
@@ -330,10 +348,10 @@ const Balances = () => {
           <Card className="border-red-300 bg-red-100/50">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <XCircle className="h-6 w-6 text-red-800" />
+                <XCircle className="h-6 w-6 text-red-700" />
                 <div>
-                  <p className="text-xs text-red-800">Deudores</p>
-                  <p className="text-xl font-bold text-red-800">{estadisticas.deudores}</p>
+                  <p className="text-xs text-red-700">Urgente</p>
+                  <p className="text-xl font-bold text-red-700">{estadisticas.urgente}</p>
                 </div>
               </div>
             </CardContent>
@@ -373,9 +391,10 @@ const Balances = () => {
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="al-dia">🟢 Al Día (0 meses)</SelectItem>
-                    <SelectItem value="atrasados">🟠 Atrasados (1 mes)</SelectItem>
-                    <SelectItem value="morosos">🔴 Morosos (2 meses)</SelectItem>
-                    <SelectItem value="deudores">🔴 Deudores (3+ meses)</SelectItem>
+                    <SelectItem value="puntual">🔵 Puntual (1 mes)</SelectItem>
+                    <SelectItem value="responsable">🟡 Sé Responsable (2 meses)</SelectItem>
+                    <SelectItem value="pendiente">🟠 Pendiente (3 meses)</SelectItem>
+                    <SelectItem value="urgente">🔴 Urgente (4+ meses)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -406,12 +425,14 @@ const Balances = () => {
               <span className="text-muted-foreground">|</span>
               <Badge className="bg-green-100 text-green-700 text-xs">Al Día</Badge>
               <span>0 meses</span>
-              <Badge className="bg-orange-100 text-orange-700 text-xs">Atrasado</Badge>
+              <Badge className="bg-blue-100 text-blue-700 text-xs">Puntual</Badge>
               <span>1 mes</span>
-              <Badge className="bg-red-100 text-red-700 text-xs">Moroso</Badge>
+              <Badge className="bg-yellow-100 text-yellow-700 text-xs">Sé Responsable</Badge>
               <span>2 meses</span>
-              <Badge className="bg-red-200 text-red-900 text-xs font-bold">Deudor</Badge>
-              <span>3+ meses</span>
+              <Badge className="bg-orange-100 text-orange-700 text-xs">Pendiente</Badge>
+              <span>3 meses</span>
+              <Badge className="bg-red-200 text-red-800 text-xs font-bold">Urgente</Badge>
+              <span>4+ meses</span>
             </div>
           </CardContent>
         </Card>
@@ -503,19 +524,24 @@ const Balances = () => {
                                 Al Día
                               </Badge>
                             )}
-                            {fila.esAtrasado && (
+                            {fila.esPuntual && (
+                              <Badge className="bg-blue-100 text-blue-700 text-xs">
+                                Puntual
+                              </Badge>
+                            )}
+                            {fila.esResponsable && (
+                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                                Sé Responsable
+                              </Badge>
+                            )}
+                            {fila.esPendiente && (
                               <Badge className="bg-orange-100 text-orange-700 text-xs">
-                                Atrasado
+                                Pendiente
                               </Badge>
                             )}
-                            {fila.esMoroso && (
-                              <Badge className="bg-red-100 text-red-700 text-xs">
-                                Moroso
-                              </Badge>
-                            )}
-                            {fila.esDeudor && (
-                              <Badge className="bg-red-200 text-red-900 text-xs font-bold">
-                                Deudor ({fila.mesesDeuda}m)
+                            {fila.esUrgente && (
+                              <Badge className="bg-red-200 text-red-800 text-xs font-bold">
+                                Urgente ({fila.mesesDeuda}m)
                               </Badge>
                             )}
                           </td>
