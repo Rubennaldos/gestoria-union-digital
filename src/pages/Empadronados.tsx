@@ -18,7 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
   Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye,
-  Download, KeyRound, Settings, Upload, Mail
+  Download, KeyRound, Settings, Upload, Mail, Lock
 } from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
@@ -29,6 +29,7 @@ import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
 import { CorreosAccesoModal } from '@/components/empadronados/CorreosAccesoModal';
 import { EstadoDeudaBadge } from '@/components/empadronados/EstadoDeudaBadge';
+import { AccesosMasivosModal } from '@/components/empadronados/AccesosMasivosModal';
 
 // >>> XLSX: exportar / importar plantilla de DNI + fechaIngreso
 import {
@@ -61,6 +62,7 @@ const Empadronados: React.FC = () => {
   const [editingPermissions, setEditingPermissions] = useState(false);
   const [actualizacionMasivaOpen, setActualizacionMasivaOpen] = useState(false);
   const [correosAccesoOpen, setCorreosAccesoOpen] = useState(false);
+  const [accesosMasivosOpen, setAccesosMasivosOpen] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -351,6 +353,16 @@ const Empadronados: React.FC = () => {
             className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
           >
             <Mail className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden sm:inline">Activos</span>
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setAccesosMasivosOpen(true)}
+            className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <Lock className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden sm:inline">Accesos</span>
           </Button>
 
@@ -940,6 +952,14 @@ const Empadronados: React.FC = () => {
       <CorreosAccesoModal
         open={correosAccesoOpen}
         onOpenChange={setCorreosAccesoOpen}
+      />
+
+      {/* Modal de accesos masivos */}
+      <AccesosMasivosModal
+        open={accesosMasivosOpen}
+        onOpenChange={setAccesosMasivosOpen}
+        empadronados={empadronados}
+        onComplete={loadData}
       />
 
       {/* Dialog de confirmación de eliminación */}
