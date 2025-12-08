@@ -882,52 +882,17 @@ const Empadronados: React.FC = () => {
                         <Edit3 className="h-3 w-3 md:h-4 md:w-4" />
                       </Button>
 
-                      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEmpadronado(empadronado);
-                              setShowDeleteDialog(true);
-                            }}
-                            className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
-                          >
-                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              ¿Está seguro que desea eliminar a {empadronado.nombre} {empadronado.apellidos} del padrón? Esta acción no se puede deshacer.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="delete-motivo">Motivo de Eliminación (opcional)</Label>
-                              <Textarea
-                                id="delete-motivo"
-                                value={deleteMotivo}
-                                onChange={(e) => setDeleteMotivo(e.target.value)}
-                                placeholder="Describa el motivo de la eliminación"
-                                className="min-h-[60px]"
-                              />
-                            </div>
-                          </div>
-
-                          <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setDeleteMotivo('')}>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleDelete}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEmpadronado(empadronado);
+                          setShowDeleteDialog(true);
+                        }}
+                        className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
+                      >
+                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -976,6 +941,41 @@ const Empadronados: React.FC = () => {
         open={correosAccesoOpen}
         onOpenChange={setCorreosAccesoOpen}
       />
+
+      {/* Dialog de confirmación de eliminación */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Está seguro que desea eliminar a {selectedEmpadronado?.nombre} {selectedEmpadronado?.apellidos} del padrón? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="delete-motivo">Motivo de Eliminación (opcional)</Label>
+              <Textarea
+                id="delete-motivo"
+                value={deleteMotivo}
+                onChange={(e) => setDeleteMotivo(e.target.value)}
+                placeholder="Describa el motivo de la eliminación"
+                className="min-h-[60px]"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteMotivo('')}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
