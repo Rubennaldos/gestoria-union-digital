@@ -20,6 +20,7 @@ import {
   SortDesc,
   MessageCircle,
   Trash2,
+  XCircle,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -1141,6 +1142,94 @@ export default function CobranzasV2() {
                 </CardContent>
               </Card>
 
+              {/* Sección de Pagos Pendientes de Aprobar */}
+              {pagos.filter(p => p.estado === 'pendiente').length > 0 && (
+                <Card className="border-amber-200 bg-amber-50/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-amber-800">
+                      <AlertTriangle className="h-5 w-5" />
+                      Pagos Pendientes de Aprobar ({pagos.filter(p => p.estado === 'pendiente').length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {pagos.filter(p => p.estado === 'pendiente').map((pago) => {
+                        const emp = empadronados.find(e => e.id === pago.empadronadoId);
+                        
+                        return (
+                          <div 
+                            key={pago.id} 
+                            className="p-3 bg-white rounded-lg border border-amber-200 shadow-sm"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">
+                                  {emp ? `${emp.nombre} ${emp.apellidos}` : 'No encontrado'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {emp?.numeroPadron} • {pago.periodo}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="font-bold text-amber-700">
+                                  {formatearMoneda(pago.monto)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatearFecha(pago.fechaPagoRegistrada)}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 h-7 text-xs"
+                                onClick={() => {
+                                  setPagoSeleccionado(pago);
+                                  setShowRevisarPagoModal(true);
+                                }}
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                Detalle
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                                onClick={async () => {
+                                  try {
+                                    const nombreAprobador = user?.displayName || user?.email || 'Usuario';
+                                    await aprobarPagoV2(pago.id, "", user?.uid, nombreAprobador);
+                                    toast({ title: "✅ Pago aprobado" });
+                                    await cargarDatos();
+                                  } catch (error) {
+                                    toast({ title: "Error", description: "No se pudo aprobar", variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
+                                onClick={() => {
+                                  setPagoSeleccionado(pago);
+                                  setShowRevisarPagoModal(true);
+                                }}
+                              >
+                                <XCircle className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Lista de pagos recientes */}
               <Card>
                 <CardHeader>
@@ -1170,13 +1259,7 @@ export default function CobranzasV2() {
                           key={pago.id} 
                           className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
-                          <div 
-                            className="flex-1 cursor-pointer"
-                            onClick={() => {
-                              setPagoSeleccionado(pago);
-                              setShowRevisarPagoModal(true);
-                            }}
-                          >
+                          <div className="flex-1">
                             <div className="font-medium">
                               {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
                             </div>
@@ -1190,7 +1273,7 @@ export default function CobranzasV2() {
                             )}
                           </div>
                           
-                          <div className="text-right flex items-center gap-3">
+                          <div className="text-right flex items-center gap-2">
                             <div>
                               <div className="font-medium text-green-600">
                                 {formatearMoneda(pago.monto)}
@@ -1200,6 +1283,20 @@ export default function CobranzasV2() {
                               </Badge>
                             </div>
                             {getBadgeEstado()}
+                            
+                            {/* Botón Ver Detalle - siempre visible */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setPagoSeleccionado(pago);
+                                setShowRevisarPagoModal(true);
+                              }}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                            
                             <Button
                               size="sm"
                               variant="ghost"
