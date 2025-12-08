@@ -435,10 +435,7 @@ const Balances = () => {
                 <thead>
                   <tr className="bg-muted">
                     <th className="border p-2 text-left sticky left-0 bg-muted z-10 min-w-[80px]">Padrón</th>
-                    <th className="border p-2 text-left min-w-[100px]">Nombre</th>
-                    <th className="border p-2 text-center min-w-[40px]">2°N</th>
-                    <th className="border p-2 text-left min-w-[100px]">Apellido</th>
-                    <th className="border p-2 text-center min-w-[40px]">2°A</th>
+                    <th className="border p-2 text-left min-w-[200px]">Nombre Completo</th>
                     <th className="border p-2 text-left min-w-[120px]">Dirección</th>
                     {meses.map(mes => (
                       <th key={mes.num} className="border p-2 text-center min-w-[40px] bg-blue-50">
@@ -467,13 +464,8 @@ const Balances = () => {
                           <td className="border p-2 font-medium sticky left-0 bg-background">
                             {emp.numeroPadron}
                           </td>
-                          <td className="border p-2">{primerNombre}</td>
-                          <td className="border p-2 text-center text-muted-foreground">
-                            {obtenerInicial(segundoNombre)}
-                          </td>
-                          <td className="border p-2">{primerApellido}</td>
-                          <td className="border p-2 text-center text-muted-foreground">
-                            {obtenerInicial(segundoApellido)}
+                          <td className="border p-2 font-semibold text-foreground">
+                            {emp.nombre} {emp.apellidos}
                           </td>
                           <td className="border p-2 text-xs">{direccion}</td>
                           
