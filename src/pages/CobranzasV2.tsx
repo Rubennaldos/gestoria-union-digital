@@ -53,7 +53,8 @@ import {
   crearIngresoV2,
   obtenerIngresosV2,
   obtenerReporteDeudores,
-  verificarYGenerarCargosAutomaticos
+  verificarYGenerarCargosAutomaticos,
+  aprobarPagosMasivosImportacion
 } from "@/services/cobranzas-v2";
 
 import { getEmpadronados } from "@/services/empadronados";
@@ -1146,14 +1147,62 @@ export default function CobranzasV2() {
               {pagos.filter(p => p.estado === 'pendiente').length > 0 && (
                 <Card className="border-amber-200 bg-amber-50/50">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-amber-800">
-                      <AlertTriangle className="h-5 w-5" />
-                      Pagos Pendientes de Aprobar ({pagos.filter(p => p.estado === 'pendiente').length})
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-amber-800">
+                        <AlertTriangle className="h-5 w-5" />
+                        Pagos Pendientes de Aprobar ({pagos.filter(p => p.estado === 'pendiente').length})
+                      </CardTitle>
+                      
+                      {/* Botón para aprobar masivamente pagos de importación */}
+                      {pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length > 0 && (
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={async () => {
+                            const pagosImportacion = pagos.filter(p => 
+                              p.estado === 'pendiente' && 
+                              (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))
+                            ).length;
+                            
+                            if (!window.confirm(`¿Aprobar automáticamente ${pagosImportacion} pagos de importación masiva?`)) {
+                              return;
+                            }
+                            
+                            try {
+                              setProcesando(true);
+                              toast({ title: "Procesando...", description: "Aprobando pagos de importación masiva..." });
+                              
+                              const resultado = await aprobarPagosMasivosImportacion((procesados, total) => {
+                                // Podrías mostrar progreso aquí
+                              });
+                              
+                              toast({
+                                title: "✅ Aprobación masiva completada",
+                                description: `${resultado.aprobados} pagos aprobados, ${resultado.errores} errores`
+                              });
+                              
+                              await cargarDatos();
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Error en la aprobación masiva",
+                                variant: "destructive"
+                              });
+                            } finally {
+                              setProcesando(false);
+                            }
+                          }}
+                          disabled={procesando}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Aprobar Importación ({pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length})
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {pagos.filter(p => p.estado === 'pendiente').map((pago) => {
+                      {pagos.filter(p => p.estado === 'pendiente').slice(0, 12).map((pago) => {
                         const emp = empadronados.find(e => e.id === pago.empadronadoId);
                         
                         return (

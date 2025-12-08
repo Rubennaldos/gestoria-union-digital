@@ -1012,6 +1012,56 @@ export async function aprobarPagoV2(
   }
 }
 
+// Función para aprobar masivamente todos los pagos de importación pendientes
+export async function aprobarPagosMasivosImportacion(
+  onProgreso?: (procesados: number, total: number) => void
+): Promise<{ aprobados: number; errores: number }> {
+  try {
+    const pagosPendientes = await obtenerPagosPendientesV2();
+    
+    // Filtrar solo los pagos de importación masiva
+    const pagosImportacion = pagosPendientes.filter(p => 
+      p.metodoPago === 'importacion_masiva' || 
+      p.numeroOperacion?.startsWith('IMPORT-')
+    );
+    
+    let aprobados = 0;
+    let errores = 0;
+    const total = pagosImportacion.length;
+    
+    for (let i = 0; i < pagosImportacion.length; i++) {
+      const pago = pagosImportacion[i];
+      
+      try {
+        await aprobarPagoV2(
+          pago.id, 
+          'Aprobación masiva de pagos importados',
+          'sistema',
+          'Sistema - Importación Masiva'
+        );
+        aprobados++;
+      } catch (error) {
+        console.error(`Error aprobando pago ${pago.id}:`, error);
+        errores++;
+      }
+      
+      if (onProgreso) {
+        onProgreso(i + 1, total);
+      }
+      
+      // Pequeña pausa para no sobrecargar Firebase
+      if (i % 10 === 0 && i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return { aprobados, errores };
+  } catch (error) {
+    console.error("Error en aprobación masiva:", error);
+    throw error;
+  }
+}
+
 export async function rechazarPagoV2(pagoId: string, motivoRechazo: string): Promise<void> {
   try {
     if (!motivoRechazo || !motivoRechazo.trim()) {
