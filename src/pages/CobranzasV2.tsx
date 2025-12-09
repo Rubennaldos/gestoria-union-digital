@@ -373,11 +373,26 @@ export default function CobranzasV2() {
 
   const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => {
     try {
-      await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+      // Manejar pago múltiple (chargeIds separados por coma)
+      const chargeIds = chargeId.split(',').map(id => id.trim()).filter(id => id);
+      
+      if (chargeIds.length > 1) {
+        // Pago conjunto: distribuir el monto entre los cargos
+        const montoPorCargo = monto / chargeIds.length;
+        
+        for (const cId of chargeIds) {
+          await registrarPagoV2(cId, montoPorCargo, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+        }
+      } else {
+        // Pago individual
+        await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+      }
       
       toast({
         title: "Pago registrado",
-        description: "El pago se ha registrado correctamente"
+        description: chargeIds.length > 1 
+          ? `Se registraron ${chargeIds.length} pagos correctamente`
+          : "El pago se ha registrado correctamente"
       });
       
       // Recargar datos
