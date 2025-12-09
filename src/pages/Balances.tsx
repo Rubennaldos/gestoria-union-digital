@@ -12,7 +12,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Users
+  Users,
+  CircleDot
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +24,7 @@ import type { ChargeV2, PagoV2 } from "@/types/cobranzas-v2";
 
 interface FilaBalance {
   empadronado: Empadronado;
-  mesesPagados: Record<string, boolean | 'anulado'>; // "202501": true/false/'anulado'
+  mesesPagados: Record<string, boolean | 'anulado' | 'parcial'>; // "202501": true/false/'anulado'/'parcial'
   mesesDeuda: number;
   mesesPosibles: number;   // Meses que deberían haberse pagado hasta ahora
   esExcelente: boolean;    // 0 meses de deuda
@@ -94,7 +95,7 @@ const Balances = () => {
     const filas: FilaBalance[] = empadronados.map(emp => {
       const chargesEmp = charges.filter(c => c.empadronadoId === emp.id);
       const pagosEmp = pagos.filter(p => p.empadronadoId === emp.id);
-      const mesesPagados: Record<string, boolean | 'anulado'> = {};
+      const mesesPagados: Record<string, boolean | 'anulado' | 'parcial'> = {};
       
       // Para cada mes del año, verificar si está pagado
       meses.forEach(mes => {
@@ -116,10 +117,17 @@ const Balances = () => {
             .filter(p => p.estado === 'aprobado' || p.estado === 'pendiente')
             .reduce((sum, p) => sum + p.monto, 0);
           
-          // Está pagado si:
-          // 1. El saldo del cargo es 0 (completamente pagado y aprobado), O
-          // 2. Hay pagos pendientes/aprobados que cubren el monto original
-          mesesPagados[periodo] = charge.saldo === 0 || totalPagado >= charge.montoOriginal;
+          // Verificar estados:
+          // 1. Completamente pagado: saldo es 0 o pagos cubren monto original
+          // 2. Pago parcial: hay pagos pero no cubren el monto completo
+          // 3. No pagado: sin pagos
+          if (charge.saldo === 0 || totalPagado >= charge.montoOriginal) {
+            mesesPagados[periodo] = true;
+          } else if (totalPagado > 0 && totalPagado < charge.montoOriginal) {
+            mesesPagados[periodo] = 'parcial';
+          } else {
+            mesesPagados[periodo] = false;
+          }
         }
       });
 
@@ -449,6 +457,10 @@ const Balances = () => {
                 <span>Pagado</span>
               </div>
               <div className="flex items-center gap-1">
+                <CircleDot className="h-4 w-4 text-violet-600" />
+                <span>Parcial</span>
+              </div>
+              <div className="flex items-center gap-1">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <span>No Pagado</span>
               </div>
@@ -539,6 +551,7 @@ const Balances = () => {
                             const periodo = `${añoSeleccionado}${mes.num}`;
                             const estadoMes = fila.mesesPagados[periodo];
                             const esAnulado = estadoMes === 'anulado';
+                            const esParcial = estadoMes === 'parcial';
                             const pagado = estadoMes === true;
                             
                             return (
@@ -546,11 +559,14 @@ const Balances = () => {
                                 key={mes.num} 
                                 className={`border p-2 text-center ${
                                   esAnulado ? 'bg-amber-50' : 
+                                  esParcial ? 'bg-violet-50' :
                                   pagado ? 'bg-green-50' : 'bg-red-50'
                                 }`}
                               >
                                 {esAnulado ? (
                                   <AlertCircle className="h-4 w-4 text-amber-500 mx-auto" />
+                                ) : esParcial ? (
+                                  <CircleDot className="h-4 w-4 text-violet-600 mx-auto" />
                                 ) : pagado ? (
                                   <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
                                 ) : (
