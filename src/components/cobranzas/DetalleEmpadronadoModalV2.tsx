@@ -209,7 +209,16 @@ export default function DetalleEmpadronadoModalV2({
   };
 
   const handleRegistrarPago = async () => {
-    if (!nuevoPago.chargeId || !nuevoPago.monto || !nuevoPago.metodoPago) {
+    if (!nuevoPago.chargeId) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar las cuotas a pagar desde Estado de Cuenta",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!nuevoPago.monto || !nuevoPago.metodoPago) {
       toast({
         title: "Error",
         description: "Complete todos los campos obligatorios",
@@ -764,34 +773,52 @@ export default function DetalleEmpadronadoModalV2({
                   <CardTitle>Registrar Nuevo Pago</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="cargo">Período a Pagar</Label>
-                      <Select 
-                        value={nuevoPago.chargeId} 
-                        onValueChange={(value) => {
-                          const selectedCharge = deudaItems.find(item => item.chargeId === value);
-                          setNuevoPago(prev => ({ 
-                            ...prev, 
-                            chargeId: value,
-                            monto: selectedCharge ? selectedCharge.saldo.toString() : ''
-                          }));
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un período" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deudaItems.map((item) => (
-                            <SelectItem key={item.chargeId} value={item.chargeId}>
-                              {item.periodo} - {formatearMoneda(item.saldo)}
-                              {item.esMoroso && ' (Moroso)'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* Resumen de cuotas seleccionadas */}
+                  {nuevoPago.chargeId && nuevoPago.chargeId.includes(',') ? (
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <Label className="text-sm font-medium text-primary">Cuotas Seleccionadas</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {nuevoPago.chargeId.split(',').map(chargeId => {
+                          const item = [...deudaItems, ...deudaItemsFuturos].find(i => i.chargeId === chargeId);
+                          return item ? (
+                            <Badge key={chargeId} variant="secondary" className="text-xs">
+                              {obtenerNombreMes(item.periodo)} - {formatearMoneda(item.saldo)}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
                     </div>
+                  ) : nuevoPago.chargeId ? (
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <Label className="text-sm font-medium text-primary">Cuota Seleccionada</Label>
+                      <div className="mt-2">
+                        {(() => {
+                          const item = [...deudaItems, ...deudaItemsFuturos].find(i => i.chargeId === nuevoPago.chargeId);
+                          return item ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {obtenerNombreMes(item.periodo)} - {formatearMoneda(item.saldo)}
+                            </Badge>
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-muted border border-border rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Seleccione las cuotas a pagar desde la pestaña "Estado de Cuenta"
+                      </p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="mt-1"
+                        onClick={() => setActiveTab("estado-cuenta")}
+                      >
+                        Ir a Estado de Cuenta
+                      </Button>
+                    </div>
+                  )}
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="monto">Monto</Label>
                       <Input
