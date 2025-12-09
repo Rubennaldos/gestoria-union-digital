@@ -23,7 +23,7 @@ import type { ChargeV2, PagoV2 } from "@/types/cobranzas-v2";
 
 interface FilaBalance {
   empadronado: Empadronado;
-  mesesPagados: Record<string, boolean>; // "202501": true/false
+  mesesPagados: Record<string, boolean | 'anulado'>; // "202501": true/false/'anulado'
   mesesDeuda: number;
   mesesPosibles: number;   // Meses que deberían haberse pagado hasta ahora
   esExcelente: boolean;    // 0 meses de deuda
@@ -94,7 +94,7 @@ const Balances = () => {
     const filas: FilaBalance[] = empadronados.map(emp => {
       const chargesEmp = charges.filter(c => c.empadronadoId === emp.id);
       const pagosEmp = pagos.filter(p => p.empadronadoId === emp.id);
-      const mesesPagados: Record<string, boolean> = {};
+      const mesesPagados: Record<string, boolean | 'anulado'> = {};
       
       // Para cada mes del año, verificar si está pagado
       meses.forEach(mes => {
@@ -104,6 +104,9 @@ const Balances = () => {
         if (!charge) {
           // No hay cargo para este período, considerarlo como no pagado
           mesesPagados[periodo] = false;
+        } else if (charge.anulado || charge.estado === 'anulado') {
+          // Si el cargo está anulado, marcarlo como tal
+          mesesPagados[periodo] = 'anulado';
         } else {
           // Verificar si hay pagos para este cargo
           const pagosDelCargo = pagosEmp.filter(p => p.chargeId === charge.id);
@@ -132,9 +135,12 @@ const Balances = () => {
         
         // Solo contar si el mes ya pasó o es el actual (en el año seleccionado)
         if (añoSeleccionado < añoActual || (añoSeleccionado === añoActual && numMes <= mesActual)) {
-          mesesPosibles++;
-          if (!mesesPagados[periodo]) {
-            mesesDeuda++;
+          // Los meses anulados no cuentan como deuda ni como mes posible
+          if (mesesPagados[periodo] !== 'anulado') {
+            mesesPosibles++;
+            if (!mesesPagados[periodo]) {
+              mesesDeuda++;
+            }
           }
         }
       });
@@ -446,6 +452,10 @@ const Balances = () => {
                 <XCircle className="h-4 w-4 text-red-600" />
                 <span>No Pagado</span>
               </div>
+              <div className="flex items-center gap-1">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <span>Otros (Anulado)</span>
+              </div>
               <span className="text-muted-foreground">|</span>
               <Badge className="bg-emerald-100 text-emerald-700 text-xs font-semibold">Excelente</Badge>
               <span>0</span>
@@ -527,14 +537,21 @@ const Balances = () => {
                           {/* Meses */}
                           {meses.map(mes => {
                             const periodo = `${añoSeleccionado}${mes.num}`;
-                            const pagado = fila.mesesPagados[periodo];
+                            const estadoMes = fila.mesesPagados[periodo];
+                            const esAnulado = estadoMes === 'anulado';
+                            const pagado = estadoMes === true;
                             
                             return (
                               <td 
                                 key={mes.num} 
-                                className={`border p-2 text-center ${pagado ? 'bg-green-50' : 'bg-red-50'}`}
+                                className={`border p-2 text-center ${
+                                  esAnulado ? 'bg-amber-50' : 
+                                  pagado ? 'bg-green-50' : 'bg-red-50'
+                                }`}
                               >
-                                {pagado ? (
+                                {esAnulado ? (
+                                  <AlertCircle className="h-4 w-4 text-amber-500 mx-auto" />
+                                ) : pagado ? (
                                   <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
                                 ) : (
                                   <XCircle className="h-4 w-4 text-red-600 mx-auto" />
