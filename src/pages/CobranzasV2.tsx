@@ -106,6 +106,10 @@ export default function CobranzasV2() {
   
   // Modal de importación masiva
   const [showImportarModal, setShowImportarModal] = useState(false);
+  
+  // Paginación de pagos pendientes
+  const [paginaPagosPendientes, setPaginaPagosPendientes] = useState(1);
+  const PAGOS_PENDIENTES_POR_PAGINA = 12;
 
   const [nuevoPago, setNuevoPago] = useState({
     empadronadoId: '',
@@ -1159,43 +1163,58 @@ export default function CobranzasV2() {
               </Card>
 
               {/* Sección de Pagos Pendientes de Aprobar */}
-              {pagos.filter(p => p.estado === 'pendiente').length > 0 && (
+              {(() => {
+                const pagosPendientes = pagos.filter(p => p.estado === 'pendiente');
+                const totalPaginas = Math.ceil(pagosPendientes.length / PAGOS_PENDIENTES_POR_PAGINA);
+                const pagosPaginados = pagosPendientes.slice(
+                  (paginaPagosPendientes - 1) * PAGOS_PENDIENTES_POR_PAGINA,
+                  paginaPagosPendientes * PAGOS_PENDIENTES_POR_PAGINA
+                );
+                
+                if (pagosPendientes.length === 0) return null;
+                
+                return (
                 <Card className="border-amber-200 bg-amber-50/50">
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                       <CardTitle className="flex items-center gap-2 text-amber-800">
                         <AlertTriangle className="h-5 w-5" />
-                        Pagos Pendientes de Aprobar ({pagos.filter(p => p.estado === 'pendiente').length})
+                        Pagos Pendientes de Aprobar ({pagosPendientes.length})
                       </CardTitle>
                       
-                      {/* Botón para aprobar masivamente pagos de importación */}
-                      {pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {/* Botón para aprobar TODAS las pendientes */}
                         <Button
                           size="sm"
                           className="bg-green-600 hover:bg-green-700"
                           onClick={async () => {
-                            const pagosImportacion = pagos.filter(p => 
-                              p.estado === 'pendiente' && 
-                              (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))
-                            ).length;
-                            
-                            if (!window.confirm(`¿Aprobar automáticamente ${pagosImportacion} pagos de importación masiva?`)) {
+                            if (!window.confirm(`¿Aprobar TODOS los ${pagosPendientes.length} pagos pendientes?`)) {
                               return;
                             }
                             
                             try {
                               setProcesando(true);
-                              toast({ title: "Procesando...", description: "Aprobando pagos de importación masiva..." });
+                              toast({ title: "Procesando...", description: `Aprobando ${pagosPendientes.length} pagos...` });
                               
-                              const resultado = await aprobarPagosMasivosImportacion((procesados, total) => {
-                                // Podrías mostrar progreso aquí
-                              });
+                              const nombreAprobador = user?.displayName || user?.email || 'Usuario';
+                              let aprobados = 0;
+                              let errores = 0;
+                              
+                              for (const pago of pagosPendientes) {
+                                try {
+                                  await aprobarPagoV2(pago.id, "", user?.uid, nombreAprobador);
+                                  aprobados++;
+                                } catch (e) {
+                                  errores++;
+                                }
+                              }
                               
                               toast({
                                 title: "✅ Aprobación masiva completada",
-                                description: `${resultado.aprobados} pagos aprobados, ${resultado.errores} errores`
+                                description: `${aprobados} pagos aprobados, ${errores} errores`
                               });
                               
+                              setPaginaPagosPendientes(1);
                               await cargarDatos();
                             } catch (error) {
                               toast({
@@ -1210,14 +1229,60 @@ export default function CobranzasV2() {
                           disabled={procesando}
                         >
                           <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Aprobar Importación ({pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length})
+                          Aprobar Todas ({pagosPendientes.length})
                         </Button>
-                      )}
+                        
+                        {/* Botón para aprobar masivamente pagos de importación */}
+                        {pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-green-300 text-green-700 hover:bg-green-50"
+                            onClick={async () => {
+                              const pagosImportacion = pagos.filter(p => 
+                                p.estado === 'pendiente' && 
+                                (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))
+                              ).length;
+                              
+                              if (!window.confirm(`¿Aprobar automáticamente ${pagosImportacion} pagos de importación masiva?`)) {
+                                return;
+                              }
+                              
+                              try {
+                                setProcesando(true);
+                                toast({ title: "Procesando...", description: "Aprobando pagos de importación masiva..." });
+                                
+                                const resultado = await aprobarPagosMasivosImportacion((procesados, total) => {});
+                                
+                                toast({
+                                  title: "✅ Aprobación masiva completada",
+                                  description: `${resultado.aprobados} pagos aprobados, ${resultado.errores} errores`
+                                });
+                                
+                                setPaginaPagosPendientes(1);
+                                await cargarDatos();
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Error en la aprobación masiva",
+                                  variant: "destructive"
+                                });
+                              } finally {
+                                setProcesando(false);
+                              }
+                            }}
+                            disabled={procesando}
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            Solo Importación ({pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length})
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {pagos.filter(p => p.estado === 'pendiente').slice(0, 12).map((pago) => {
+                      {pagosPaginados.map((pago) => {
                         const emp = empadronados.find(e => e.id === pago.empadronadoId);
                         
                         return (
@@ -1290,9 +1355,47 @@ export default function CobranzasV2() {
                         );
                       })}
                     </div>
+                    
+                    {/* Paginación */}
+                    {totalPaginas > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={paginaPagosPendientes === 1}
+                          onClick={() => setPaginaPagosPendientes(p => p - 1)}
+                        >
+                          Anterior
+                        </Button>
+                        
+                        <div className="flex gap-1">
+                          {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pagina) => (
+                            <Button
+                              key={pagina}
+                              size="sm"
+                              variant={pagina === paginaPagosPendientes ? "default" : "outline"}
+                              className="w-8 h-8 p-0"
+                              onClick={() => setPaginaPagosPendientes(pagina)}
+                            >
+                              {pagina}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={paginaPagosPendientes === totalPaginas}
+                          onClick={() => setPaginaPagosPendientes(p => p + 1)}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              )}
+                );
+              })()}
 
               {/* Lista de pagos recientes */}
               <Card>
