@@ -506,11 +506,8 @@ export async function registrarPagoV2(
       throw new Error("El cargo ya está pagado");
     }
 
-    // Verificar si ya existe pago para este período (anti-duplicados)
-    const existePago = await existsPagoForPeriod(charge.empadronadoId, charge.periodo);
-    if (existePago) {
-      throw new Error("Ya existe un pago para este período");
-    }
+    // Permitir pagos adicionales (abonos) siempre que el cargo tenga saldo pendiente
+    // La validación de saldo > 0 ya se hizo arriba, así que permitimos registrar el abono
 
     // Calcular descuento por pronto pago si aplica
     let descuentoProntoPago = 0;
@@ -559,13 +556,7 @@ export async function registrarPagoV2(
 
     // NO actualizar el cargo aún, esperamos la aprobación
     // El cargo se actualizará cuando se apruebe el pago
-
-    // Crear índice anti-duplicados
-    const indexRef = ref(db, `${BASE_PATH}/pagos_index/${charge.empadronadoId}/${charge.periodo}`);
-    await set(indexRef, {
-      chargeId: charge.id,
-      fechaPago: Date.now()
-    });
+    // Nota: No creamos índice anti-duplicados para permitir abonos parciales
 
     return pago;
   } catch (error) {
