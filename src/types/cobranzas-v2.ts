@@ -38,10 +38,15 @@ export interface PagoV2 {
   numeroOperacion?: string;
   fechaPagoRegistrada: number; // Fecha que el usuario indica que pagó
   fechaCreacion: number; // Fecha que se registró en el sistema
+  fechaModificacion?: number; // Fecha de última modificación
   observaciones?: string;
   estado: 'pendiente' | 'aprobado' | 'rechazado';
   archivoComprobante?: string; // URL del archivo adjunto
   motivoRechazo?: string;
+  aprobadoPor?: string;
+  fechaAprobacion?: number;
+  comentarioAprobacion?: string;
+  fechaRechazo?: number;
 }
 
 export interface IngresoV2 {

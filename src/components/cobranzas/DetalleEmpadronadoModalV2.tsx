@@ -8,11 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
-import { obtenerPagosV2 } from '@/services/cobranzas-v2';
+import { obtenerPagosV2, eliminarPagoV2, actualizarPagoV2 } from '@/services/cobranzas-v2';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface DetalleEmpadronadoModalV2Props {
   open: boolean;
@@ -44,6 +58,15 @@ export default function DetalleEmpadronadoModalV2({
   const [cargandoPagos, setCargandoPagos] = useState(false);
   const [nuevoPago, setNuevoPago] = useState({
     chargeId: '',
+    monto: '',
+    metodoPago: '',
+    numeroOperacion: '',
+    observaciones: ''
+  });
+  const [pagosSeleccionados, setPagosSeleccionados] = useState<string[]>([]);
+  const [pagoEditando, setPagoEditando] = useState<PagoV2 | null>(null);
+  const [pagoAEliminar, setPagoAEliminar] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
     monto: '',
     metodoPago: '',
     numeroOperacion: '',
@@ -185,6 +208,9 @@ export default function DetalleEmpadronadoModalV2({
         title: "Pago registrado",
         description: "El pago ha sido registrado exitosamente"
       });
+      
+      // Recargar pagos
+      cargarPagosEmpadronado();
     } catch (error) {
       toast({
         title: "Error",
@@ -192,6 +218,197 @@ export default function DetalleEmpadronadoModalV2({
         variant: "destructive"
       });
     }
+  };
+
+  const handleSeleccionarTodos = (checked: boolean) => {
+    if (checked) {
+      setPagosSeleccionados(pagos.map(p => p.id));
+    } else {
+      setPagosSeleccionados([]);
+    }
+  };
+
+  const handleSeleccionarPago = (pagoId: string, checked: boolean) => {
+    if (checked) {
+      setPagosSeleccionados([...pagosSeleccionados, pagoId]);
+    } else {
+      setPagosSeleccionados(pagosSeleccionados.filter(id => id !== pagoId));
+    }
+  };
+
+  const handleEditarPago = (pago: PagoV2) => {
+    setPagoEditando(pago);
+    setEditForm({
+      monto: pago.monto.toString(),
+      metodoPago: pago.metodoPago,
+      numeroOperacion: pago.numeroOperacion || '',
+      observaciones: pago.observaciones || ''
+    });
+  };
+
+  const handleGuardarEdicion = async () => {
+    if (!pagoEditando) return;
+
+    try {
+      await actualizarPagoV2(pagoEditando.id, {
+        monto: parseFloat(editForm.monto),
+        metodoPago: editForm.metodoPago as any,
+        numeroOperacion: editForm.numeroOperacion || undefined,
+        observaciones: editForm.observaciones || undefined
+      });
+
+      toast({
+        title: "Pago actualizado",
+        description: "El pago ha sido actualizado exitosamente"
+      });
+
+      setPagoEditando(null);
+      cargarPagosEmpadronado();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error al actualizar el pago",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEliminarPago = async (pagoId: string) => {
+    try {
+      await eliminarPagoV2(pagoId);
+      
+      toast({
+        title: "Pago eliminado",
+        description: "El pago ha sido eliminado exitosamente"
+      });
+
+      setPagoAEliminar(null);
+      cargarPagosEmpadronado();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error al eliminar el pago",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleEliminarSeleccionados = async () => {
+    try {
+      for (const pagoId of pagosSeleccionados) {
+        await eliminarPagoV2(pagoId);
+      }
+      
+      toast({
+        title: "Pagos eliminados",
+        description: `${pagosSeleccionados.length} pago(s) eliminado(s) exitosamente`
+      });
+
+      setPagosSeleccionados([]);
+      cargarPagosEmpadronado();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Error al eliminar los pagos",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const exportarExcel = () => {
+    const pagosExportar = pagosSeleccionados.length > 0 
+      ? pagos.filter(p => pagosSeleccionados.includes(p.id))
+      : pagos;
+
+    const datosExcel = pagosExportar.map(pago => {
+      const charge = charges.find(c => c.id === pago.chargeId);
+      return {
+        'ID': pago.id,
+        'Período': charge ? obtenerNombreMes(charge.periodo) : pago.periodo,
+        'Monto': pago.monto,
+        'Método de Pago': formatearMetodoPago(pago.metodoPago),
+        'Nº Operación': pago.numeroOperacion || '-',
+        'Estado': pago.estado.charAt(0).toUpperCase() + pago.estado.slice(1),
+        'Fecha de Pago': formatearFecha(pago.fechaPagoRegistrada),
+        'Fecha de Registro': formatearFechaHora(pago.fechaCreacion),
+        'Observaciones': pago.observaciones || '-'
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(datosExcel);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial de Pagos');
+    
+    // Ajustar ancho de columnas
+    const colWidths = [
+      { wch: 25 }, // ID
+      { wch: 20 }, // Período
+      { wch: 12 }, // Monto
+      { wch: 20 }, // Método
+      { wch: 20 }, // Operación
+      { wch: 12 }, // Estado
+      { wch: 15 }, // Fecha Pago
+      { wch: 20 }, // Fecha Registro
+      { wch: 30 }  // Observaciones
+    ];
+    ws['!cols'] = colWidths;
+
+    const nombreArchivo = `Historial_Pagos_${empadronado?.numeroPadron}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, nombreArchivo);
+
+    toast({
+      title: "Excel generado",
+      description: `Se ha exportado ${datosExcel.length} pago(s) a Excel`
+    });
+  };
+
+  const exportarPDF = () => {
+    const pagosExportar = pagosSeleccionados.length > 0 
+      ? pagos.filter(p => pagosSeleccionados.includes(p.id))
+      : pagos;
+
+    const doc = new jsPDF();
+    
+    // Encabezado
+    doc.setFontSize(16);
+    doc.text('Historial de Pagos', 14, 15);
+    
+    if (empadronado) {
+      doc.setFontSize(10);
+      doc.text(`Asociado: ${empadronado.nombre} ${empadronado.apellidos}`, 14, 22);
+      doc.text(`DNI: ${empadronado.dni} | Padrón: ${empadronado.numeroPadron}`, 14, 28);
+      doc.text(`Fecha de exportación: ${formatearFechaHora(Date.now())}`, 14, 34);
+    }
+
+    // Tabla
+    const headers = [['Período', 'Monto', 'Método', 'Estado', 'Fecha', 'Nº Op.']];
+    const datos = pagosExportar.map(pago => {
+      const charge = charges.find(c => c.id === pago.chargeId);
+      return [
+        charge ? obtenerNombreMes(charge.periodo) : pago.periodo,
+        formatearMoneda(pago.monto),
+        formatearMetodoPago(pago.metodoPago),
+        pago.estado.charAt(0).toUpperCase() + pago.estado.slice(1),
+        formatearFecha(pago.fechaPagoRegistrada),
+        pago.numeroOperacion || '-'
+      ];
+    });
+
+    autoTable(doc, {
+      head: headers,
+      body: datos,
+      startY: 40,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    const nombreArchivo = `Historial_Pagos_${empadronado?.numeroPadron}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(nombreArchivo);
+
+    toast({
+      title: "PDF generado",
+      description: `Se ha exportado ${pagosExportar.length} pago(s) a PDF`
+    });
   };
 
   const formatearMoneda = (monto: number) => {
@@ -467,10 +684,50 @@ export default function DetalleEmpadronadoModalV2({
             <TabsContent value="historial-pagos">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Historial de Pagos</span>
-                    <Badge variant="outline">{pagos.length} pagos</Badge>
-                  </CardTitle>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <CardTitle className="flex items-center gap-2">
+                        <span>Historial de Pagos</span>
+                        <Badge variant="outline">{pagos.length} pagos</Badge>
+                      </CardTitle>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-2">
+                      {pagosSeleccionados.length > 0 && (
+                        <>
+                          <Badge variant="secondary" className="text-xs">
+                            {pagosSeleccionados.length} seleccionado(s)
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={handleEliminarSeleccionados}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Eliminar
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={exportarExcel}
+                        disabled={pagos.length === 0}
+                      >
+                        <FileSpreadsheet className="h-4 w-4 mr-1" />
+                        Excel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={exportarPDF}
+                        disabled={pagos.length === 0}
+                      >
+                        <FileText className="h-4 w-4 mr-1" />
+                        PDF
+                      </Button>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {cargandoPagos ? (
@@ -482,147 +739,200 @@ export default function DetalleEmpadronadoModalV2({
                       No hay pagos registrados
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {pagos.map((pago) => {
-                        const charge = charges.find(c => c.id === pago.chargeId);
-                        
-                        return (
-                          <Card key={pago.id} className="border-l-4" style={{
-                            borderLeftColor: 
-                              pago.estado === 'aprobado' ? '#22c55e' : 
-                              pago.estado === 'rechazado' ? '#ef4444' : 
-                              '#94a3b8'
-                          }}>
-                            <CardContent className="p-4 space-y-3">
-                              {/* Encabezado */}
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <div>
-                                  <div className="font-semibold text-base">
-                                    {charge ? obtenerNombreMes(charge.periodo) : `Período: ${pago.periodo}`}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    ID: {pago.id}
-                                  </div>
-                                </div>
-                                <div className="flex flex-col sm:items-end gap-1">
-                                  <div className="text-xl font-bold text-primary">
-                                    {formatearMoneda(pago.monto)}
-                                  </div>
-                                  <Badge variant={getBadgeVariantEstado(pago.estado)} className="w-fit">
-                                    {pago.estado === 'aprobado' && <CheckCircle className="h-3 w-3 mr-1" />}
-                                    {pago.estado === 'pendiente' && <Clock className="h-3 w-3 mr-1" />}
-                                    {pago.estado === 'rechazado' && <XCircle className="h-3 w-3 mr-1" />}
-                                    {pago.estado.charAt(0).toUpperCase() + pago.estado.slice(1)}
-                                  </Badge>
-                                </div>
-                              </div>
+                    <>
+                      {/* Seleccionar todos */}
+                      <div className="flex items-center space-x-2 mb-4 pb-3 border-b">
+                        <Checkbox
+                          id="select-all"
+                          checked={pagosSeleccionados.length === pagos.length && pagos.length > 0}
+                          onCheckedChange={handleSeleccionarTodos}
+                        />
+                        <label
+                          htmlFor="select-all"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          Seleccionar todos
+                        </label>
+                      </div>
 
-                              {/* Detalles del pago */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                                <div>
-                                  <Label className="text-xs font-medium text-muted-foreground">Método de Pago</Label>
-                                  <p className="font-medium">{formatearMetodoPago(pago.metodoPago)}</p>
-                                </div>
-                                
-                                {pago.numeroOperacion && (
-                                  <div>
-                                    <Label className="text-xs font-medium text-muted-foreground">Nº Operación</Label>
-                                    <p className="font-medium">{pago.numeroOperacion}</p>
-                                  </div>
-                                )}
+                      <div className="space-y-3">
+                        {pagos.map((pago) => {
+                          const charge = charges.find(c => c.id === pago.chargeId);
+                          const isSeleccionado = pagosSeleccionados.includes(pago.id);
+                          
+                          return (
+                            <Card 
+                              key={pago.id} 
+                              className={`border-l-4 transition-all ${isSeleccionado ? 'ring-2 ring-primary' : ''}`}
+                              style={{
+                                borderLeftColor: 
+                                  pago.estado === 'aprobado' ? '#22c55e' : 
+                                  pago.estado === 'rechazado' ? '#ef4444' : 
+                                  '#94a3b8'
+                              }}
+                            >
+                              <CardContent className="p-4 space-y-3">
+                                {/* Checkbox y encabezado */}
+                                <div className="flex items-start gap-3">
+                                  <Checkbox
+                                    checked={isSeleccionado}
+                                    onCheckedChange={(checked) => handleSeleccionarPago(pago.id, checked as boolean)}
+                                    className="mt-1"
+                                  />
+                                  
+                                  <div className="flex-1">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                      <div>
+                                        <div className="font-semibold text-base">
+                                          {charge ? obtenerNombreMes(charge.periodo) : `Período: ${pago.periodo}`}
+                                        </div>
+                                        <div className="text-sm text-muted-foreground">
+                                          ID: {pago.id}
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col sm:items-end gap-1">
+                                        <div className="text-xl font-bold text-primary">
+                                          {formatearMoneda(pago.monto)}
+                                        </div>
+                                        <Badge variant={getBadgeVariantEstado(pago.estado)} className="w-fit">
+                                          {pago.estado === 'aprobado' && <CheckCircle className="h-3 w-3 mr-1" />}
+                                          {pago.estado === 'pendiente' && <Clock className="h-3 w-3 mr-1" />}
+                                          {pago.estado === 'rechazado' && <XCircle className="h-3 w-3 mr-1" />}
+                                          {pago.estado.charAt(0).toUpperCase() + pago.estado.slice(1)}
+                                        </Badge>
+                                      </div>
+                                    </div>
 
-                                <div>
-                                  <Label className="text-xs font-medium text-muted-foreground">Fecha de Pago</Label>
-                                  <p>{formatearFecha(pago.fechaPagoRegistrada)}</p>
-                                </div>
+                                    {/* Botones de acción */}
+                                    <div className="flex gap-2 mt-3">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEditarPago(pago)}
+                                      >
+                                        <Edit className="h-3 w-3 mr-1" />
+                                        Editar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                        onClick={() => setPagoAEliminar(pago.id)}
+                                      >
+                                        <Trash2 className="h-3 w-3 mr-1" />
+                                        Eliminar
+                                      </Button>
+                                    </div>
 
-                                <div>
-                                  <Label className="text-xs font-medium text-muted-foreground">Fecha de Registro</Label>
-                                  <p>{formatearFechaHora(pago.fechaCreacion)}</p>
-                                </div>
-
-                                {pago.montoOriginal && pago.montoOriginal !== pago.monto && (
-                                  <div>
-                                    <Label className="text-xs font-medium text-muted-foreground">Monto Original</Label>
-                                    <p>{formatearMoneda(pago.montoOriginal)}</p>
-                                  </div>
-                                )}
-
-                                {pago.descuentoProntoPago && pago.descuentoProntoPago > 0 && (
-                                  <div>
-                                    <Label className="text-xs font-medium text-muted-foreground">Descuento Pronto Pago</Label>
-                                    <p className="text-green-600 font-medium">
-                                      -{formatearMoneda(pago.descuentoProntoPago)}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {charge && (
-                                  <div>
-                                    <Label className="text-xs font-medium text-muted-foreground">Cargo Asociado</Label>
-                                    <p className="text-xs">
-                                      {formatearMoneda(charge.montoOriginal)}
-                                      {charge.saldo > 0 && (
-                                        <span className="text-orange-600 ml-1">
-                                          (Saldo: {formatearMoneda(charge.saldo)})
-                                        </span>
+                                    {/* Detalles del pago */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm mt-3 pt-3 border-t">
+                                      <div>
+                                        <Label className="text-xs font-medium text-muted-foreground">Método de Pago</Label>
+                                        <p className="font-medium">{formatearMetodoPago(pago.metodoPago)}</p>
+                                      </div>
+                                      
+                                      {pago.numeroOperacion && (
+                                        <div>
+                                          <Label className="text-xs font-medium text-muted-foreground">Nº Operación</Label>
+                                          <p className="font-medium">{pago.numeroOperacion}</p>
+                                        </div>
                                       )}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
 
-                              {/* Observaciones */}
-                              {pago.observaciones && (
-                                <div className="pt-2 border-t">
-                                  <Label className="text-xs font-medium text-muted-foreground">Observaciones</Label>
-                                  <p className="text-sm mt-1">{pago.observaciones}</p>
-                                </div>
-                              )}
+                                      <div>
+                                        <Label className="text-xs font-medium text-muted-foreground">Fecha de Pago</Label>
+                                        <p>{formatearFecha(pago.fechaPagoRegistrada)}</p>
+                                      </div>
 
-                              {/* Información de aprobación */}
-                              {pago.estado === 'aprobado' && pago.fechaAprobacion && (
-                                <div className="pt-2 border-t bg-green-50 -m-4 p-4 rounded-b-lg">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                                    <div>
-                                      <Label className="text-xs font-medium text-green-700">Aprobado Por</Label>
-                                      <p className="font-medium text-green-900">{pago.aprobadoPor || 'Sistema'}</p>
+                                      <div>
+                                        <Label className="text-xs font-medium text-muted-foreground">Fecha de Registro</Label>
+                                        <p>{formatearFechaHora(pago.fechaCreacion)}</p>
+                                      </div>
+
+                                      {pago.montoOriginal && pago.montoOriginal !== pago.monto && (
+                                        <div>
+                                          <Label className="text-xs font-medium text-muted-foreground">Monto Original</Label>
+                                          <p>{formatearMoneda(pago.montoOriginal)}</p>
+                                        </div>
+                                      )}
+
+                                      {pago.descuentoProntoPago && pago.descuentoProntoPago > 0 && (
+                                        <div>
+                                          <Label className="text-xs font-medium text-muted-foreground">Descuento Pronto Pago</Label>
+                                          <p className="text-green-600 font-medium">
+                                            -{formatearMoneda(pago.descuentoProntoPago)}
+                                          </p>
+                                        </div>
+                                      )}
+
+                                      {charge && (
+                                        <div>
+                                          <Label className="text-xs font-medium text-muted-foreground">Cargo Asociado</Label>
+                                          <p className="text-xs">
+                                            {formatearMoneda(charge.montoOriginal)}
+                                            {charge.saldo > 0 && (
+                                              <span className="text-orange-600 ml-1">
+                                                (Saldo: {formatearMoneda(charge.saldo)})
+                                              </span>
+                                            )}
+                                          </p>
+                                        </div>
+                                      )}
                                     </div>
-                                    <div>
-                                      <Label className="text-xs font-medium text-green-700">Fecha de Aprobación</Label>
-                                      <p className="text-green-900">{formatearFechaHora(pago.fechaAprobacion)}</p>
-                                    </div>
+
+                                    {/* Observaciones */}
+                                    {pago.observaciones && (
+                                      <div className="pt-2 border-t">
+                                        <Label className="text-xs font-medium text-muted-foreground">Observaciones</Label>
+                                        <p className="text-sm mt-1">{pago.observaciones}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Información de aprobación */}
+                                    {pago.estado === 'aprobado' && pago.fechaAprobacion && (
+                                      <div className="pt-2 border-t bg-green-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg mt-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm pt-2">
+                                          <div>
+                                            <Label className="text-xs font-medium text-green-700">Aprobado Por</Label>
+                                            <p className="font-medium text-green-900">{pago.aprobadoPor || 'Sistema'}</p>
+                                          </div>
+                                          <div>
+                                            <Label className="text-xs font-medium text-green-700">Fecha de Aprobación</Label>
+                                            <p className="text-green-900">{formatearFechaHora(pago.fechaAprobacion)}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Información de rechazo */}
+                                    {pago.estado === 'rechazado' && pago.motivoRechazo && (
+                                      <div className="pt-2 border-t bg-red-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg mt-3">
+                                        <Label className="text-xs font-medium text-red-700">Motivo de Rechazo</Label>
+                                        <p className="text-sm text-red-900 mt-1">{pago.motivoRechazo}</p>
+                                      </div>
+                                    )}
+
+                                    {/* Comprobante */}
+                                    {pago.archivoComprobante && (
+                                      <div className="pt-2 border-t mt-3">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="w-full"
+                                          onClick={() => window.open(pago.archivoComprobante, '_blank')}
+                                        >
+                                          <Download className="h-4 w-4 mr-2" />
+                                          Descargar Comprobante
+                                        </Button>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
-                              )}
-
-                              {/* Información de rechazo */}
-                              {pago.estado === 'rechazado' && pago.motivoRechazo && (
-                                <div className="pt-2 border-t bg-red-50 -m-4 p-4 rounded-b-lg">
-                                  <Label className="text-xs font-medium text-red-700">Motivo de Rechazo</Label>
-                                  <p className="text-sm text-red-900 mt-1">{pago.motivoRechazo}</p>
-                                </div>
-                              )}
-
-                              {/* Comprobante */}
-                              {pago.archivoComprobante && (
-                                <div className="pt-2 border-t">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-full"
-                                    onClick={() => window.open(pago.archivoComprobante, '_blank')}
-                                  >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Descargar Comprobante
-                                  </Button>
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
@@ -724,6 +1034,97 @@ export default function DetalleEmpadronadoModalV2({
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Diálogo de edición de pago */}
+        <Dialog open={!!pagoEditando} onOpenChange={(open) => !open && setPagoEditando(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar Pago</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-monto">Monto</Label>
+                <Input
+                  id="edit-monto"
+                  type="number"
+                  step="0.01"
+                  value={editForm.monto}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, monto: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-metodo">Método de Pago</Label>
+                <Select 
+                  value={editForm.metodoPago} 
+                  onValueChange={(value) => setEditForm(prev => ({ ...prev, metodoPago: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione método" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="efectivo">Efectivo</SelectItem>
+                    <SelectItem value="transferencia">Transferencia</SelectItem>
+                    <SelectItem value="yape">Yape</SelectItem>
+                    <SelectItem value="plin">Plin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="edit-operacion">Número de Operación (Opcional)</Label>
+                <Input
+                  id="edit-operacion"
+                  value={editForm.numeroOperacion}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, numeroOperacion: e.target.value }))}
+                  placeholder="Número de operación"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-observaciones">Observaciones (Opcional)</Label>
+                <Textarea
+                  id="edit-observaciones"
+                  value={editForm.observaciones}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, observaciones: e.target.value }))}
+                  placeholder="Observaciones adicionales..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setPagoEditando(null)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleGuardarEdicion}>
+                  Guardar Cambios
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de confirmación de eliminación */}
+        <AlertDialog open={!!pagoAEliminar} onOpenChange={(open) => !open && setPagoAEliminar(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Está seguro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción eliminará el pago permanentemente. Si el pago fue aprobado, se revertirán los cambios en el cargo asociado.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => pagoAEliminar && handleEliminarPago(pagoAEliminar)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

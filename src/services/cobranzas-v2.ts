@@ -845,7 +845,7 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
 }
 
 // === APROBAR/RECHAZAR PAGOS ===
-export async function aprobarPagoV2(pagoId: string, comentario?: string): Promise<void> {
+export async function aprobarPagoV2(pagoId: string, aprobadoPor?: string, comentario?: string): Promise<void> {
   try {
     // Obtener el pago
     const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
@@ -866,6 +866,10 @@ export async function aprobarPagoV2(pagoId: string, comentario?: string): Promis
       estado: 'aprobado',
       fechaAprobacion: Date.now()
     };
+
+    if (aprobadoPor) {
+      updates.aprobadoPor = aprobadoPor;
+    }
 
     if (comentario) {
       updates.comentarioAprobacion = comentario;
@@ -1003,6 +1007,65 @@ export async function rechazarPagoV2(pagoId: string, motivoRechazo: string): Pro
   }
 }
 
+export async function actualizarPagoV2(pagoId: string, datosActualizados: Partial<PagoV2>): Promise<void> {
+  try {
+    // Obtener el pago actual
+    const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
+    const pagoSnapshot = await get(pagoRef);
+    
+    if (!pagoSnapshot.exists()) {
+      throw new Error("Pago no encontrado");
+    }
+
+    const pagoActual: PagoV2 = pagoSnapshot.val();
+
+    // Si el pago está aprobado y se está cambiando el monto, actualizar el charge
+    if (pagoActual.estado === 'aprobado' && datosActualizados.monto && datosActualizados.monto !== pagoActual.monto) {
+      const chargeSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+      
+      if (chargeSnapshot.exists()) {
+        const allCharges = chargeSnapshot.val();
+        for (const period in allCharges) {
+          for (const empId in allCharges[period]) {
+            for (const cId in allCharges[period][empId]) {
+              if (cId === pagoActual.chargeId) {
+                const charge: ChargeV2 = allCharges[period][empId][cId];
+                const diferenciaMonto = datosActualizados.monto - pagoActual.monto;
+                
+                const nuevoMontoPagado = charge.montoPagado + diferenciaMonto;
+                const nuevoSaldo = Math.max(0, charge.saldo - diferenciaMonto);
+                const nuevoEstado = nuevoSaldo === 0 ? 'pagado' : (Date.now() > charge.fechaVencimiento ? 'moroso' : 'pendiente');
+                
+                const chargePath = `${BASE_PATH}/charges/${period}/${empId}/${cId}`;
+                await update(ref(db, chargePath), {
+                  montoPagado: nuevoMontoPagado,
+                  saldo: nuevoSaldo,
+                  estado: nuevoEstado,
+                  esMoroso: nuevoEstado === 'moroso'
+                });
+                
+                console.log('🔄 Charge actualizado al editar pago:', pagoActual.chargeId);
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Actualizar el pago
+    await update(pagoRef, {
+      ...datosActualizados,
+      fechaModificacion: Date.now()
+    });
+
+    console.log('✏️ Pago actualizado:', pagoId);
+  } catch (error) {
+    console.error("Error actualizando pago:", error);
+    throw error;
+  }
+}
+
 export async function eliminarPagoV2(pagoId: string): Promise<void> {
   try {
     // Obtener el pago
@@ -1017,27 +1080,37 @@ export async function eliminarPagoV2(pagoId: string): Promise<void> {
 
     // Si el pago fue aprobado, actualizar el charge
     if (pago.estado === 'aprobado') {
-      const chargeRef = ref(db, `${BASE_PATH}/charges/${pago.periodo}/${pago.empadronadoId}/${pago.chargeId}`);
-      const chargeSnapshot = await get(chargeRef);
+      const chargeSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
       
       if (chargeSnapshot.exists()) {
-        const charge: ChargeV2 = chargeSnapshot.val();
-        
-        // Revertir el pago del charge
-        const nuevoMontoPagado = charge.montoPagado - pago.monto;
-        const nuevoSaldo = charge.saldo + pago.monto;
-        const nuevoEstado = nuevoSaldo > 0 
-          ? (Date.now() > charge.fechaVencimiento ? 'moroso' : 'pendiente')
-          : 'pagado';
-        
-        await update(chargeRef, {
-          montoPagado: nuevoMontoPagado,
-          saldo: nuevoSaldo,
-          estado: nuevoEstado,
-          esMoroso: nuevoEstado === 'moroso'
-        });
-        
-        console.log('🔄 Charge actualizado al eliminar pago:', pago.chargeId);
+        const allCharges = chargeSnapshot.val();
+        for (const period in allCharges) {
+          for (const empId in allCharges[period]) {
+            for (const cId in allCharges[period][empId]) {
+              if (cId === pago.chargeId) {
+                const charge: ChargeV2 = allCharges[period][empId][cId];
+                
+                // Revertir el pago del charge
+                const nuevoMontoPagado = Math.max(0, charge.montoPagado - pago.monto);
+                const nuevoSaldo = charge.saldo + pago.monto;
+                const nuevoEstado = nuevoSaldo > 0 
+                  ? (Date.now() > charge.fechaVencimiento ? 'moroso' : 'pendiente')
+                  : 'pagado';
+                
+                const chargePath = `${BASE_PATH}/charges/${period}/${empId}/${cId}`;
+                await update(ref(db, chargePath), {
+                  montoPagado: nuevoMontoPagado,
+                  saldo: nuevoSaldo,
+                  estado: nuevoEstado,
+                  esMoroso: nuevoEstado === 'moroso'
+                });
+                
+                console.log('🔄 Charge actualizado al eliminar pago:', pago.chargeId);
+                break;
+              }
+            }
+          }
+        }
       }
     }
 
