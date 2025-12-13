@@ -232,6 +232,12 @@
       }
     },
 
+    "empadronados": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["authUid", "numeroPadron", "dni"]
+    },
+
     "security_questions": {
       ".read": true,
       "$uid": {

@@ -13,7 +13,9 @@ import {
   ExternalLink,
   XCircle,
   Loader2,
-  FileDown
+  FileDown,
+  Ban,
+  CheckCheck
 } from "lucide-react";
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
 import BackButton from "@/components/layout/BackButton";
@@ -24,7 +26,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -33,11 +34,14 @@ import {
   obtenerChargesPorEmpadronadoV2, 
   registrarPagoV2, 
   obtenerEstadoCuentaEmpadronado,
-  obtenerPagosV2 
+  obtenerPagosV2,
+  anularMultiplesChargesV2
 } from "@/services/cobranzas-v2";
 import { Empadronado } from "@/types/empadronados";
 import { useDeudaAsociado } from "@/hooks/useDeudaAsociado";
 import { useBillingConfig } from "@/contexts/BillingConfigContext";
+import { PasarelaPagoCuotasModal } from "@/components/cobranzas/PasarelaPagoCuotasModal";
+import { AnularBoletasModal } from "@/components/cobranzas/AnularBoletasModal";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import logoUrbanizacion from "@/assets/logo-urbanizacion.png";
@@ -58,19 +62,18 @@ const PagosCuotas = () => {
   const [filtroAnio, setFiltroAnio] = useState<string>(new Date().getFullYear().toString());
   const [activeTab, setActiveTab] = useState("pendientes");
   
-  // Formulario de pago
-  const [metodoPago, setMetodoPago] = useState<string>("");
-  const [numeroOperacion, setNumeroOperacion] = useState("");
-  const [observaciones, setObservaciones] = useState("");
-  const [fechaPago, setFechaPago] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
-
-  // Modal de confirmación
+  // Modal de pasarela de pago
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [pagoEnviado, setPagoEnviado] = useState(false);
+  
+  // Modal de anulación
+  const [showAnularModal, setShowAnularModal] = useState(false);
 
   // Modal de detalle de pago
   const [pagoDetalle, setPagoDetalle] = useState<PagoV2 | null>(null);
+  
+  // Modal de visualización de comprobante
+  const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
+  const [showComprobanteModal, setShowComprobanteModal] = useState(false);
 
   // Calcular deuda usando el motor
   const deudaCalculada = useDeudaAsociado(empadronado || {});
@@ -85,19 +88,30 @@ const PagosCuotas = () => {
     return anios;
   }, []);
 
-  // Filtrar cuotas pendientes (saldo > 0)
+  // Filtrar cuotas pendientes (saldo > 0 y no anuladas)
   const chargesPendientes = useMemo(() => {
     return allCharges.filter(c => 
       c.saldo > 0 && 
+      !c.anulado &&
+      c.estado !== 'anulado' &&
       c.periodo.startsWith(filtroAnio)
     ).sort((a, b) => a.periodo.localeCompare(b.periodo));
   }, [allCharges, filtroAnio]);
 
-  // Filtrar cuotas pagadas (saldo === 0 O estado === 'pagado' O montoPagado > 0)
-  // Esto asegura que se muestren las cuotas pagadas aunque no haya registro de pago
+  // Filtrar cuotas pagadas (saldo === 0 O estado === 'pagado' O montoPagado > 0) y NO anuladas
   const chargesPagados = useMemo(() => {
     return allCharges.filter(c => 
+      !c.anulado &&
+      c.estado !== 'anulado' &&
       (c.saldo === 0 || c.estado === 'pagado' || c.montoPagado >= c.montoOriginal) && 
+      c.periodo.startsWith(filtroAnio)
+    ).sort((a, b) => b.periodo.localeCompare(a.periodo));
+  }, [allCharges, filtroAnio]);
+
+  // Filtrar cuotas anuladas
+  const chargesAnulados = useMemo(() => {
+    return allCharges.filter(c => 
+      (c.anulado || c.estado === 'anulado') &&
       c.periodo.startsWith(filtroAnio)
     ).sort((a, b) => b.periodo.localeCompare(a.periodo));
   }, [allCharges, filtroAnio]);
@@ -226,34 +240,18 @@ const PagosCuotas = () => {
     });
   };
 
-  const handleRegistrarPago = async () => {
-    if (chargesSeleccionados.size === 0) {
-      toast({
-        title: "Error",
-        description: "Debes seleccionar al menos un cargo",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!metodoPago || !numeroOperacion || !fechaPago || !archivoComprobante) {
-      toast({
-        title: "Error", 
-        description: "Completa todos los campos requeridos (incluyendo archivo)",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setShowConfirmModal(true);
-  };
-
-  const confirmarPago = async () => {
+  const handlePagoConfirmado = async (
+    fechaPago: Date,
+    archivoComprobante: File,
+    metodoPago: string,
+    numeroOperacion: string,
+    observaciones: string
+  ) => {
     try {
       setProcesandoPago(true);
 
-      if (!archivoComprobante || !empadronado) {
-        throw new Error("Falta archivo o empadronado");
+      if (!empadronado) {
+        throw new Error("Falta empadronado");
       }
 
       // Subir archivo primero
@@ -272,7 +270,7 @@ const PagosCuotas = () => {
       console.log('✅ Comprobante subido:', archivoUrl);
 
       // Registrar pago para cada charge seleccionado
-      const fechaPagoTimestamp = new Date(fechaPago).getTime();
+      const fechaPagoTimestamp = fechaPago.getTime();
       
       for (const chargeId of chargesArray) {
         const charge = chargesPendientes.find(c => c.id === chargeId);
@@ -289,9 +287,6 @@ const PagosCuotas = () => {
         }
       }
 
-      // Marcar como enviado
-      setPagoEnviado(true);
-
       toast({
         title: "✅ Pago enviado",
         description: "Tu pago está siendo revisado. Recibirás una confirmación pronto.",
@@ -299,16 +294,10 @@ const PagosCuotas = () => {
 
       // Limpiar formulario
       setChargesSeleccionados(new Set());
-      setMetodoPago("");
-      setNumeroOperacion("");
-      setObservaciones("");
-      setFechaPago(new Date().toISOString().split('T')[0]);
-      setArchivoComprobante(null);
       
-      // Esperar 2 segundos para mostrar el mensaje y luego cerrar
+      // Esperar para mostrar el mensaje y recargar datos
       setTimeout(() => {
         setShowConfirmModal(false);
-        setPagoEnviado(false);
         setProcesandoPago(false);
         cargarDatos();
       }, 2000);
@@ -334,7 +323,39 @@ const PagosCuotas = () => {
       });
       
       setProcesandoPago(false);
-      setPagoEnviado(false);
+      throw error; // Re-throw para que el modal pueda manejarlo
+    }
+  };
+
+  const handleAnulacionConfirmada = async (motivoAnulacion: string) => {
+    if (!user || !empadronado) return;
+    
+    try {
+      const chargesArray = Array.from(chargesSeleccionados);
+      const result = await anularMultiplesChargesV2(
+        chargesArray,
+        motivoAnulacion,
+        user.uid,
+        user.email || 'Admin'
+      );
+      
+      if (result.exitosos > 0) {
+        toast({
+          title: "Boletas anuladas",
+          description: `Se anularon ${result.exitosos} boleta(s) correctamente${result.fallidos > 0 ? `. ${result.fallidos} fallaron.` : ''}`,
+        });
+        
+        setChargesSeleccionados(new Set());
+        cargarDatos();
+      }
+    } catch (error) {
+      console.error('Error anulando boletas:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron anular las boletas",
+        variant: "destructive"
+      });
+      throw error;
     }
   };
 
@@ -731,14 +752,33 @@ const PagosCuotas = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Tab: Cuotas Pendientes */}
           <TabsContent value="pendientes" className="mt-4">
             <Card>
               <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 p-3 md:p-4">
-                <CardTitle className="flex items-center gap-2 text-base md:text-lg text-red-700">
-                  <Calculator className="h-4 w-4 md:h-5 md:w-5" />
-                  Cuotas por Pagar - {filtroAnio}
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base md:text-lg text-red-700">
+                    <Calculator className="h-4 w-4 md:h-5 md:w-5" />
+                    Cuotas por Pagar - {filtroAnio}
+                  </CardTitle>
+                  
+                  {chargesPendientes.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-8 gap-1"
+                      onClick={() => {
+                        if (chargesSeleccionados.size === chargesPendientes.length) {
+                          setChargesSeleccionados(new Set());
+                        } else {
+                          setChargesSeleccionados(new Set(chargesPendientes.map(c => c.id)));
+                        }
+                      }}
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      {chargesSeleccionados.size === chargesPendientes.length ? 'Quitar todas' : 'Seleccionar todas'}
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="p-3 md:p-4">
                 {chargesPendientes.length === 0 ? (
@@ -971,7 +1011,10 @@ const PagosCuotas = () => {
                               variant="outline"
                               size="sm"
                               className="shrink-0 h-8 text-xs"
-                              onClick={() => window.open(pago.archivoComprobante, '_blank')}
+                              onClick={() => {
+                                setComprobanteUrl(pago.archivoComprobante || null);
+                                setShowComprobanteModal(true);
+                              }}
                             >
                               <Download className="h-3 w-3 mr-1" />
                               <span className="hidden sm:inline">Ver</span>
@@ -991,8 +1034,8 @@ const PagosCuotas = () => {
         {activeTab === 'pendientes' && chargesSeleccionados.size > 0 && (
           <Card className="sticky bottom-24 md:bottom-6 border-primary shadow-lg animate-fade-in z-10">
             <CardContent className="p-3 md:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-center justify-between gap-2 md:gap-3">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs md:text-sm text-muted-foreground">
                     {chargesSeleccionados.size} cuota{chargesSeleccionados.size !== 1 ? 's' : ''} seleccionada{chargesSeleccionados.size !== 1 ? 's' : ''}
                   </p>
@@ -1000,147 +1043,75 @@ const PagosCuotas = () => {
                     S/ {totalSeleccionado.toFixed(2)}
                   </p>
                 </div>
-                <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1 md:gap-2 h-9 md:h-10 text-xs md:text-sm hover:scale-105 transition-transform shrink-0">
-                      <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
-                      <span className="hidden sm:inline">Registrar Pago</span>
-                      <span className="sm:hidden">Pagar</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md mx-auto max-h-[90vh] overflow-y-auto" aria-describedby="dialog-description">
-                    <DialogHeader>
-                      <DialogTitle className="text-base md:text-lg">
-                        {pagoEnviado ? "⏳ Pago Enviado" : "Registrar Pago"}
-                      </DialogTitle>
-                      <p id="dialog-description" className="sr-only">
-                        {pagoEnviado 
-                          ? "Tu pago está siendo procesado y revisado" 
-                          : "Formulario para registrar un nuevo pago de cuotas"}
-                      </p>
-                    </DialogHeader>
-                    
-                    {pagoEnviado ? (
-                      <div className="py-6 md:py-8 text-center">
-                        <div className="text-4xl md:text-6xl mb-3 md:mb-4">✅</div>
-                        <h3 className="text-base md:text-lg font-semibold mb-2">
-                          ¡Pago enviado correctamente!
-                        </h3>
-                        <p className="text-sm md:text-base text-muted-foreground">
-                          Tu pago será revisado y aprobado pronto. Puedes ver el estado en "Mis Pagos".
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 md:space-y-4">
-                        <div>
-                          <Label className="text-xs md:text-sm">Fecha de Pago *</Label>
-                          <Input
-                            type="date"
-                            value={fechaPago}
-                            onChange={(e) => setFechaPago(e.target.value)}
-                            max={new Date().toISOString().split('T')[0]}
-                            className="h-9 md:h-10 text-xs md:text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Método de Pago *</Label>
-                          <Select value={metodoPago} onValueChange={setMetodoPago}>
-                            <SelectTrigger className="h-9 md:h-10 text-xs md:text-sm">
-                              <SelectValue placeholder="Seleccionar método" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="efectivo">💵 Efectivo</SelectItem>
-                              <SelectItem value="transferencia">🏦 Transferencia</SelectItem>
-                              <SelectItem value="yape">📱 Yape</SelectItem>
-                              <SelectItem value="plin">📱 Plin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Número de Operación *</Label>
-                          <Input
-                            value={numeroOperacion}
-                            onChange={(e) => setNumeroOperacion(e.target.value)}
-                            placeholder="Ingresa el número de operación"
-                            className="h-9 md:h-10 text-xs md:text-sm"
-                          />
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Comprobante de Pago * (PDF, JPG, PNG)</Label>
-                          <Input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => setArchivoComprobante(e.target.files?.[0] || null)}
-                            className="cursor-pointer h-9 md:h-10 text-xs md:text-sm"
-                          />
-                          {archivoComprobante && (
-                            <p className="text-[10px] md:text-xs text-green-600 mt-1">
-                              ✓ {archivoComprobante.name} ({(archivoComprobante.size / 1024).toFixed(0)} KB)
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <Label className="text-xs md:text-sm">Observaciones (opcional)</Label>
-                          <Input
-                            value={observaciones}
-                            onChange={(e) => setObservaciones(e.target.value)}
-                            placeholder="Notas adicionales"
-                            className="h-9 md:h-10 text-xs md:text-sm"
-                          />
-                        </div>
-
-                        <div className="bg-gradient-to-br from-primary/5 to-primary/10 p-3 md:p-4 rounded-lg border border-primary/20">
-                          <h4 className="font-semibold mb-2 text-sm md:text-base">Resumen del Pago</h4>
-                          <div className="text-xs md:text-sm space-y-1">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Cuotas seleccionadas:</span>
-                              <span className="font-medium">{chargesSeleccionados.size}</span>
-                            </div>
-                            <div className="flex justify-between font-semibold text-sm md:text-base border-t border-primary/20 pt-1">
-                              <span>Total a pagar:</span>
-                              <span className="text-primary">S/ {totalSeleccionado.toFixed(2)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setShowConfirmModal(false);
-                              setArchivoComprobante(null);
-                            }}
-                            className="flex-1 h-9 md:h-10 text-xs md:text-sm"
-                            disabled={procesandoPago}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button
-                            onClick={confirmarPago}
-                            disabled={procesandoPago || !metodoPago || !numeroOperacion || !archivoComprobante}
-                            className="flex-1 h-9 md:h-10 text-xs md:text-sm"
-                          >
-                            {procesandoPago ? (
-                              <>
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                Enviando...
-                              </>
-                            ) : (
-                              "Confirmar Pago"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
+                <div className="flex gap-2 shrink-0">
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    className="gap-1 h-9 md:h-10 text-xs md:text-sm"
+                    onClick={() => setShowAnularModal(true)}
+                  >
+                    <Ban className="h-3 w-3 md:h-4 md:w-4" />
+                    <span className="hidden sm:inline">Anular</span>
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    className="gap-1 md:gap-2 h-9 md:h-10 text-xs md:text-sm hover:scale-105 transition-transform"
+                    onClick={() => setShowConfirmModal(true)}
+                    disabled={procesandoPago}
+                  >
+                    <CreditCard className="h-3 w-3 md:h-4 md:w-4" />
+                    <span className="hidden sm:inline">Registrar Pago</span>
+                    <span className="sm:hidden">Pagar</span>
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Modal de Pasarela de Pago */}
+        <PasarelaPagoCuotasModal
+          open={showConfirmModal}
+          onOpenChange={setShowConfirmModal}
+          chargesSeleccionados={chargesPendientes.filter(c => chargesSeleccionados.has(c.id))}
+          montoTotal={totalSeleccionado}
+          asociadoNombre={empadronado ? `${empadronado.nombre} ${empadronado.apellidos}` : ""}
+          asociadoPadron={empadronado?.numeroPadron || ""}
+          onPagoConfirmado={handlePagoConfirmado}
+        />
+
+        {/* Modal de Anulación */}
+        <AnularBoletasModal
+          open={showAnularModal}
+          onOpenChange={setShowAnularModal}
+          chargesSeleccionados={chargesPendientes.filter(c => chargesSeleccionados.has(c.id))}
+          onAnulacionConfirmada={handleAnulacionConfirmada}
+        />
+
+        {/* Modal de Visualización de Comprobante */}
+        {showComprobanteModal && comprobanteUrl && (
+          <div 
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowComprobanteModal(false)}
+          >
+            <div className="relative max-w-3xl max-h-[90vh] w-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="absolute -top-10 right-0 gap-2"
+                onClick={() => setShowComprobanteModal(false)}
+              >
+                <XCircle className="h-4 w-4" />
+                Cerrar
+              </Button>
+              <img 
+                src={comprobanteUrl} 
+                alt="Comprobante de pago" 
+                className="max-w-full max-h-[85vh] object-contain mx-auto rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
         )}
       </main>
 

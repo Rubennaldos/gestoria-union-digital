@@ -21,9 +21,15 @@ export interface ChargeV2 {
   saldo: number;
   fechaVencimiento: number;
   fechaCreacion: number;
-  estado: 'pendiente' | 'pagado' | 'moroso';
+  estado: 'pendiente' | 'pagado' | 'moroso' | 'anulado';
   esMoroso: boolean;
   montoMorosidad?: number;
+  // Campos de anulación
+  anulado?: boolean;
+  fechaAnulacion?: number;
+  anuladoPor?: string;
+  anuladoPorNombre?: string;
+  motivoAnulacion?: string;
 }
 
 export interface PagoV2 {
@@ -34,7 +40,7 @@ export interface PagoV2 {
   monto: number;
   montoOriginal: number;
   descuentoProntoPago?: number;
-  metodoPago: 'efectivo' | 'transferencia' | 'yape' | 'plin';
+  metodoPago: 'efectivo' | 'transferencia' | 'yape' | 'plin' | 'importacion_masiva';
   numeroOperacion?: string;
   fechaPagoRegistrada: number; // Fecha que el usuario indica que pagó
   fechaCreacion: number; // Fecha que se registró en el sistema
@@ -43,8 +49,10 @@ export interface PagoV2 {
   estado: 'pendiente' | 'aprobado' | 'rechazado';
   archivoComprobante?: string; // URL del archivo adjunto
   motivoRechazo?: string;
-  aprobadoPor?: string;
+  // Campos de aprobación
   fechaAprobacion?: number;
+  aprobadoPor?: string; // UID del usuario que aprobó
+  aprobadoPorNombre?: string; // Nombre del usuario que aprobó
   comentarioAprobacion?: string;
   fechaRechazo?: number;
 }

@@ -20,6 +20,7 @@ import {
   SortDesc,
   MessageCircle,
   Trash2,
+  XCircle,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -52,7 +53,8 @@ import {
   crearIngresoV2,
   obtenerIngresosV2,
   obtenerReporteDeudores,
-  verificarYGenerarCargosAutomaticos
+  verificarYGenerarCargosAutomaticos,
+  aprobarPagosMasivosImportacion
 } from "@/services/cobranzas-v2";
 
 import { getEmpadronados } from "@/services/empadronados";
@@ -104,6 +106,10 @@ export default function CobranzasV2() {
   
   // Modal de importación masiva
   const [showImportarModal, setShowImportarModal] = useState(false);
+  
+  // Paginación de pagos pendientes
+  const [paginaPagosPendientes, setPaginaPagosPendientes] = useState(1);
+  const PAGOS_PENDIENTES_POR_PAGINA = 12;
 
   const [nuevoPago, setNuevoPago] = useState({
     empadronadoId: '',
@@ -316,7 +322,15 @@ export default function CobranzasV2() {
     if (!pagoSeleccionado) return;
     
     try {
-      await aprobarPagoV2(pagoSeleccionado.id, comentario);
+      // Obtener nombre del usuario que aprueba
+      const nombreAprobador = user?.displayName || user?.email || 'Usuario';
+      
+      await aprobarPagoV2(
+        pagoSeleccionado.id, 
+        comentario,
+        user?.uid,
+        nombreAprobador
+      );
       
       toast({
         title: "✅ Pago aprobado",
@@ -363,11 +377,26 @@ export default function CobranzasV2() {
 
   const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => {
     try {
-      await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+      // Manejar pago múltiple (chargeIds separados por coma)
+      const chargeIds = chargeId.split(',').map(id => id.trim()).filter(id => id);
+      
+      if (chargeIds.length > 1) {
+        // Pago conjunto: distribuir el monto entre los cargos
+        const montoPorCargo = monto / chargeIds.length;
+        
+        for (const cId of chargeIds) {
+          await registrarPagoV2(cId, montoPorCargo, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+        }
+      } else {
+        // Pago individual
+        await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+      }
       
       toast({
         title: "Pago registrado",
-        description: "El pago se ha registrado correctamente"
+        description: chargeIds.length > 1 
+          ? `Se registraron ${chargeIds.length} pagos correctamente`
+          : "El pago se ha registrado correctamente"
       });
       
       // Recargar datos
@@ -1133,6 +1162,241 @@ export default function CobranzasV2() {
                 </CardContent>
               </Card>
 
+              {/* Sección de Pagos Pendientes de Aprobar */}
+              {(() => {
+                const pagosPendientes = pagos.filter(p => p.estado === 'pendiente');
+                const totalPaginas = Math.ceil(pagosPendientes.length / PAGOS_PENDIENTES_POR_PAGINA);
+                const pagosPaginados = pagosPendientes.slice(
+                  (paginaPagosPendientes - 1) * PAGOS_PENDIENTES_POR_PAGINA,
+                  paginaPagosPendientes * PAGOS_PENDIENTES_POR_PAGINA
+                );
+                
+                if (pagosPendientes.length === 0) return null;
+                
+                return (
+                <Card className="border-amber-200 bg-amber-50/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
+                      <CardTitle className="flex items-center gap-2 text-amber-800">
+                        <AlertTriangle className="h-5 w-5" />
+                        Pagos Pendientes de Aprobar ({pagosPendientes.length})
+                      </CardTitle>
+                      
+                      <div className="flex flex-wrap gap-2">
+                        {/* Botón para aprobar TODAS las pendientes */}
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={async () => {
+                            if (!window.confirm(`¿Aprobar TODOS los ${pagosPendientes.length} pagos pendientes?`)) {
+                              return;
+                            }
+                            
+                            try {
+                              setProcesando(true);
+                              toast({ title: "Procesando...", description: `Aprobando ${pagosPendientes.length} pagos...` });
+                              
+                              const nombreAprobador = user?.displayName || user?.email || 'Usuario';
+                              let aprobados = 0;
+                              let errores = 0;
+                              
+                              for (const pago of pagosPendientes) {
+                                try {
+                                  await aprobarPagoV2(pago.id, "", user?.uid, nombreAprobador);
+                                  aprobados++;
+                                } catch (e) {
+                                  errores++;
+                                }
+                              }
+                              
+                              toast({
+                                title: "✅ Aprobación masiva completada",
+                                description: `${aprobados} pagos aprobados, ${errores} errores`
+                              });
+                              
+                              setPaginaPagosPendientes(1);
+                              await cargarDatos();
+                            } catch (error) {
+                              toast({
+                                title: "Error",
+                                description: "Error en la aprobación masiva",
+                                variant: "destructive"
+                              });
+                            } finally {
+                              setProcesando(false);
+                            }
+                          }}
+                          disabled={procesando}
+                        >
+                          <CheckCircle2 className="h-4 w-4 mr-1" />
+                          Aprobar Todas ({pagosPendientes.length})
+                        </Button>
+                        
+                        {/* Botón para aprobar masivamente pagos de importación */}
+                        {pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-green-300 text-green-700 hover:bg-green-50"
+                            onClick={async () => {
+                              const pagosImportacion = pagos.filter(p => 
+                                p.estado === 'pendiente' && 
+                                (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))
+                              ).length;
+                              
+                              if (!window.confirm(`¿Aprobar automáticamente ${pagosImportacion} pagos de importación masiva?`)) {
+                                return;
+                              }
+                              
+                              try {
+                                setProcesando(true);
+                                toast({ title: "Procesando...", description: "Aprobando pagos de importación masiva..." });
+                                
+                                const resultado = await aprobarPagosMasivosImportacion((procesados, total) => {});
+                                
+                                toast({
+                                  title: "✅ Aprobación masiva completada",
+                                  description: `${resultado.aprobados} pagos aprobados, ${resultado.errores} errores`
+                                });
+                                
+                                setPaginaPagosPendientes(1);
+                                await cargarDatos();
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Error en la aprobación masiva",
+                                  variant: "destructive"
+                                });
+                              } finally {
+                                setProcesando(false);
+                              }
+                            }}
+                            disabled={procesando}
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            Solo Importación ({pagos.filter(p => p.estado === 'pendiente' && (p.metodoPago === 'importacion_masiva' || p.numeroOperacion?.startsWith('IMPORT-'))).length})
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {pagosPaginados.map((pago) => {
+                        const emp = empadronados.find(e => e.id === pago.empadronadoId);
+                        
+                        return (
+                          <div 
+                            key={pago.id} 
+                            className="p-3 bg-white rounded-lg border border-amber-200 shadow-sm"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">
+                                  {emp ? `${emp.nombre} ${emp.apellidos}` : 'No encontrado'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {emp?.numeroPadron} • {pago.periodo}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="font-bold text-amber-700">
+                                  {formatearMoneda(pago.monto)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatearFecha(pago.fechaPagoRegistrada)}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 h-7 text-xs"
+                                onClick={() => {
+                                  setPagoSeleccionado(pago);
+                                  setShowRevisarPagoModal(true);
+                                }}
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                Detalle
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-green-600 border-green-300 hover:bg-green-50"
+                                onClick={async () => {
+                                  try {
+                                    const nombreAprobador = user?.displayName || user?.email || 'Usuario';
+                                    await aprobarPagoV2(pago.id, "", user?.uid, nombreAprobador);
+                                    toast({ title: "✅ Pago aprobado" });
+                                    await cargarDatos();
+                                  } catch (error) {
+                                    toast({ title: "Error", description: "No se pudo aprobar", variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <CheckCircle2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-red-600 border-red-300 hover:bg-red-50"
+                                onClick={() => {
+                                  setPagoSeleccionado(pago);
+                                  setShowRevisarPagoModal(true);
+                                }}
+                              >
+                                <XCircle className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Paginación */}
+                    {totalPaginas > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={paginaPagosPendientes === 1}
+                          onClick={() => setPaginaPagosPendientes(p => p - 1)}
+                        >
+                          Anterior
+                        </Button>
+                        
+                        <div className="flex gap-1">
+                          {Array.from({ length: totalPaginas }, (_, i) => i + 1).map((pagina) => (
+                            <Button
+                              key={pagina}
+                              size="sm"
+                              variant={pagina === paginaPagosPendientes ? "default" : "outline"}
+                              className="w-8 h-8 p-0"
+                              onClick={() => setPaginaPagosPendientes(pagina)}
+                            >
+                              {pagina}
+                            </Button>
+                          ))}
+                        </div>
+                        
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={paginaPagosPendientes === totalPaginas}
+                          onClick={() => setPaginaPagosPendientes(p => p + 1)}
+                        >
+                          Siguiente
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                );
+              })()}
+
               {/* Lista de pagos recientes */}
               <Card>
                 <CardHeader>
@@ -1162,13 +1426,7 @@ export default function CobranzasV2() {
                           key={pago.id} 
                           className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
                         >
-                          <div 
-                            className="flex-1 cursor-pointer"
-                            onClick={() => {
-                              setPagoSeleccionado(pago);
-                              setShowRevisarPagoModal(true);
-                            }}
-                          >
+                          <div className="flex-1">
                             <div className="font-medium">
                               {emp ? `${emp.nombre} ${emp.apellidos}` : 'Empadronado no encontrado'}
                             </div>
@@ -1182,7 +1440,7 @@ export default function CobranzasV2() {
                             )}
                           </div>
                           
-                          <div className="text-right flex items-center gap-3">
+                          <div className="text-right flex items-center gap-2">
                             <div>
                               <div className="font-medium text-green-600">
                                 {formatearMoneda(pago.monto)}
@@ -1192,6 +1450,20 @@ export default function CobranzasV2() {
                               </Badge>
                             </div>
                             {getBadgeEstado()}
+                            
+                            {/* Botón Ver Detalle - siempre visible */}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setPagoSeleccionado(pago);
+                                setShowRevisarPagoModal(true);
+                              }}
+                            >
+                              <FileText className="h-4 w-4 mr-1" />
+                              Ver
+                            </Button>
+                            
                             <Button
                               size="sm"
                               variant="ghost"

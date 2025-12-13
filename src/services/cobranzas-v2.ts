@@ -358,7 +358,8 @@ export async function verificarYGenerarCargosAutomaticos(): Promise<{
     
     let mensaje = '';
     if (cargosGenerados > 0) {
-      mensaje = `${cargosGenerados} cargos generados para ${currentPeriod}`;
+      const currentPeriodForMessage = formatPeriod(new Date());
+      mensaje = `${cargosGenerados} cargos generados para ${currentPeriodForMessage}`;
     }
     
     return { cargosGenerados, cierreEjecutado: false, mensaje };
@@ -505,11 +506,8 @@ export async function registrarPagoV2(
       throw new Error("El cargo ya está pagado");
     }
 
-    // Verificar si ya existe pago para este período (anti-duplicados)
-    const existePago = await existsPagoForPeriod(charge.empadronadoId, charge.periodo);
-    if (existePago) {
-      throw new Error("Ya existe un pago para este período");
-    }
+    // Permitir pagos adicionales (abonos) siempre que el cargo tenga saldo pendiente
+    // La validación de saldo > 0 ya se hizo arriba, así que permitimos registrar el abono
 
     // Calcular descuento por pronto pago si aplica
     let descuentoProntoPago = 0;
@@ -558,13 +556,7 @@ export async function registrarPagoV2(
 
     // NO actualizar el cargo aún, esperamos la aprobación
     // El cargo se actualizará cuando se apruebe el pago
-
-    // Crear índice anti-duplicados
-    const indexRef = ref(db, `${BASE_PATH}/pagos_index/${charge.empadronadoId}/${charge.periodo}`);
-    await set(indexRef, {
-      chargeId: charge.id,
-      fechaPago: Date.now()
-    });
+    // Nota: No creamos índice anti-duplicados para permitir abonos parciales
 
     return pago;
   } catch (error) {
@@ -837,15 +829,53 @@ export async function obtenerPagosV2(): Promise<PagoV2[]> {
     }
 
     const pagosData = pagosSnapshot.val();
-    return (Object.values(pagosData) as PagoV2[]).sort((a, b) => b.fechaPagoRegistrada - a.fechaPagoRegistrada);
+    
+    // Convertir a array preservando el ID de Firebase como el ID del pago
+    const todosPagos: PagoV2[] = Object.entries(pagosData).map(([key, value]) => ({
+      ...(value as PagoV2),
+      id: key // Usar la key de Firebase como ID
+    }));
+    
+    return todosPagos.sort((a, b) => b.fechaPagoRegistrada - a.fechaPagoRegistrada);
   } catch (error) {
     console.error("Error obteniendo pagos V2:", error);
     return [];
   }
 }
 
+// Obtener solo pagos pendientes de aprobación
+export async function obtenerPagosPendientesV2(): Promise<PagoV2[]> {
+  try {
+    const pagosSnapshot = await get(ref(db, `${BASE_PATH}/pagos`));
+    if (!pagosSnapshot.exists()) {
+      return [];
+    }
+
+    const pagosData = pagosSnapshot.val();
+    
+    // Convertir a array preservando el ID de Firebase como el ID del pago
+    const todosPagos: PagoV2[] = Object.entries(pagosData).map(([key, value]) => ({
+      ...(value as PagoV2),
+      id: key // Usar la key de Firebase como ID
+    }));
+    
+    // Filtrar solo los pendientes y ordenar por fecha
+    return todosPagos
+      .filter(p => p.estado === 'pendiente')
+      .sort((a, b) => b.fechaCreacion - a.fechaCreacion);
+  } catch (error) {
+    console.error("Error obteniendo pagos pendientes V2:", error);
+    return [];
+  }
+}
+
 // === APROBAR/RECHAZAR PAGOS ===
-export async function aprobarPagoV2(pagoId: string, aprobadoPor?: string, comentario?: string): Promise<void> {
+export async function aprobarPagoV2(
+  pagoId: string, 
+  comentario?: string,
+  aprobadoPor?: string,
+  aprobadoPorNombre?: string
+): Promise<void> {
   try {
     // Obtener el pago
     const pagoRef = ref(db, `${BASE_PATH}/pagos/${pagoId}`);
@@ -869,6 +899,10 @@ export async function aprobarPagoV2(pagoId: string, aprobadoPor?: string, coment
 
     if (aprobadoPor) {
       updates.aprobadoPor = aprobadoPor;
+    }
+    
+    if (aprobadoPorNombre) {
+      updates.aprobadoPorNombre = aprobadoPorNombre;
     }
 
     if (comentario) {
@@ -965,6 +999,56 @@ export async function aprobarPagoV2(pagoId: string, aprobadoPor?: string, coment
     console.log('✅ Pago aprobado:', pagoId);
   } catch (error) {
     console.error("Error aprobando pago:", error);
+    throw error;
+  }
+}
+
+// Función para aprobar masivamente todos los pagos de importación pendientes
+export async function aprobarPagosMasivosImportacion(
+  onProgreso?: (procesados: number, total: number) => void
+): Promise<{ aprobados: number; errores: number }> {
+  try {
+    const pagosPendientes = await obtenerPagosPendientesV2();
+    
+    // Filtrar solo los pagos de importación masiva
+    const pagosImportacion = pagosPendientes.filter(p => 
+      p.metodoPago === 'importacion_masiva' || 
+      p.numeroOperacion?.startsWith('IMPORT-')
+    );
+    
+    let aprobados = 0;
+    let errores = 0;
+    const total = pagosImportacion.length;
+    
+    for (let i = 0; i < pagosImportacion.length; i++) {
+      const pago = pagosImportacion[i];
+      
+      try {
+        await aprobarPagoV2(
+          pago.id, 
+          'Aprobación masiva de pagos importados',
+          'sistema',
+          'Sistema - Importación Masiva'
+        );
+        aprobados++;
+      } catch (error) {
+        console.error(`Error aprobando pago ${pago.id}:`, error);
+        errores++;
+      }
+      
+      if (onProgreso) {
+        onProgreso(i + 1, total);
+      }
+      
+      // Pequeña pausa para no sobrecargar Firebase
+      if (i % 10 === 0 && i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return { aprobados, errores };
+  } catch (error) {
+    console.error("Error en aprobación masiva:", error);
     throw error;
   }
 }
@@ -1251,4 +1335,79 @@ export async function obtenerEstadoCuentaEmpadronado(empadronadoId: string): Pro
     console.error("Error obteniendo estado de cuenta V2:", error);
     throw error;
   }
+}
+
+// === ANULAR BOLETAS ===
+export async function anularChargeV2(
+  chargeId: string,
+  motivoAnulacion: string,
+  anuladoPor: string,
+  anuladoPorNombre: string
+): Promise<void> {
+  try {
+    // Buscar el cargo en todos los períodos
+    const chargeSnapshot = await get(ref(db, `${BASE_PATH}/charges`));
+    if (!chargeSnapshot.exists()) {
+      throw new Error("No hay cargos en el sistema");
+    }
+    
+    let chargePath = '';
+    const allCharges = chargeSnapshot.val();
+    
+    for (const period in allCharges) {
+      for (const empId in allCharges[period]) {
+        for (const cId in allCharges[period][empId]) {
+          if (cId === chargeId) {
+            chargePath = `${BASE_PATH}/charges/${period}/${empId}/${cId}`;
+            break;
+          }
+        }
+        if (chargePath) break;
+      }
+      if (chargePath) break;
+    }
+    
+    if (!chargePath) {
+      throw new Error("Cargo no encontrado");
+    }
+    
+    // Actualizar el cargo como anulado
+    await update(ref(db, chargePath), {
+      anulado: true,
+      estado: 'anulado',
+      saldo: 0,
+      fechaAnulacion: Date.now(),
+      anuladoPor,
+      anuladoPorNombre,
+      motivoAnulacion
+    });
+    
+    console.log(`✅ Cargo ${chargeId} anulado correctamente`);
+  } catch (error) {
+    console.error("Error anulando cargo:", error);
+    throw error;
+  }
+}
+
+// Anular múltiples boletas a la vez
+export async function anularMultiplesChargesV2(
+  chargeIds: string[],
+  motivoAnulacion: string,
+  anuladoPor: string,
+  anuladoPorNombre: string
+): Promise<{ exitosos: number; fallidos: number }> {
+  let exitosos = 0;
+  let fallidos = 0;
+  
+  for (const chargeId of chargeIds) {
+    try {
+      await anularChargeV2(chargeId, motivoAnulacion, anuladoPor, anuladoPorNombre);
+      exitosos++;
+    } catch (error) {
+      console.error(`Error anulando cargo ${chargeId}:`, error);
+      fallidos++;
+    }
+  }
+  
+  return { exitosos, fallidos };
 }

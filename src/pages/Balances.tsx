@@ -12,7 +12,8 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Users
+  Users,
+  CircleDot
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
@@ -23,12 +24,15 @@ import type { ChargeV2, PagoV2 } from "@/types/cobranzas-v2";
 
 interface FilaBalance {
   empadronado: Empadronado;
-  mesesPagados: Record<string, boolean>; // "202501": true/false
+  mesesPagados: Record<string, boolean | 'anulado' | 'parcial'>; // "202501": true/false/'anulado'/'parcial'
   mesesDeuda: number;
-  esAlDia: boolean;      // 0 meses
-  esAtrasado: boolean;   // 1 mes
-  esMoroso: boolean;     // 2 meses
-  esDeudor: boolean;     // 3+ meses
+  mesesPosibles: number;   // Meses que deberían haberse pagado hasta ahora
+  esExcelente: boolean;    // 0 meses de deuda
+  esBueno: boolean;        // 1 mes de deuda
+  esProgreso: boolean;     // 2 meses de deuda
+  esAtrasado: boolean;     // 3 meses de deuda
+  esCritico: boolean;      // 4+ meses de deuda
+  esIncumplido: boolean;   // No ha pagado ningún mes
 }
 
 const Balances = () => {
@@ -38,7 +42,7 @@ const Balances = () => {
   const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState<"todos" | "al-dia" | "atrasados" | "morosos" | "deudores">("todos");
+  const [filtroEstado, setFiltroEstado] = useState<"todos" | "excelente" | "bueno" | "progreso" | "atrasado" | "critico" | "incumplido">("todos");
   const [añoSeleccionado, setAñoSeleccionado] = useState(2025);
 
   // Cargar datos iniciales
@@ -91,7 +95,7 @@ const Balances = () => {
     const filas: FilaBalance[] = empadronados.map(emp => {
       const chargesEmp = charges.filter(c => c.empadronadoId === emp.id);
       const pagosEmp = pagos.filter(p => p.empadronadoId === emp.id);
-      const mesesPagados: Record<string, boolean> = {};
+      const mesesPagados: Record<string, boolean | 'anulado' | 'parcial'> = {};
       
       // Para cada mes del año, verificar si está pagado
       meses.forEach(mes => {
@@ -101,6 +105,9 @@ const Balances = () => {
         if (!charge) {
           // No hay cargo para este período, considerarlo como no pagado
           mesesPagados[periodo] = false;
+        } else if (charge.anulado || charge.estado === 'anulado') {
+          // Si el cargo está anulado, marcarlo como tal
+          mesesPagados[periodo] = 'anulado';
         } else {
           // Verificar si hay pagos para este cargo
           const pagosDelCargo = pagosEmp.filter(p => p.chargeId === charge.id);
@@ -110,10 +117,17 @@ const Balances = () => {
             .filter(p => p.estado === 'aprobado' || p.estado === 'pendiente')
             .reduce((sum, p) => sum + p.monto, 0);
           
-          // Está pagado si:
-          // 1. El saldo del cargo es 0 (completamente pagado y aprobado), O
-          // 2. Hay pagos pendientes/aprobados que cubren el monto original
-          mesesPagados[periodo] = charge.saldo === 0 || totalPagado >= charge.montoOriginal;
+          // Verificar estados:
+          // 1. Completamente pagado: saldo es 0 o pagos cubren monto original
+          // 2. Pago parcial: hay pagos pero no cubren el monto completo
+          // 3. No pagado: sin pagos
+          if (charge.saldo === 0 || totalPagado >= charge.montoOriginal) {
+            mesesPagados[periodo] = true;
+          } else if (totalPagado > 0 && totalPagado < charge.montoOriginal) {
+            mesesPagados[periodo] = 'parcial';
+          } else {
+            mesesPagados[periodo] = false;
+          }
         }
       });
 
@@ -122,32 +136,43 @@ const Balances = () => {
       const añoActual = new Date().getFullYear();
       
       let mesesDeuda = 0;
+      let mesesPosibles = 0;
       meses.forEach((mes, idx) => {
         const numMes = idx + 1;
         const periodo = `${añoSeleccionado}${mes.num}`;
         
         // Solo contar si el mes ya pasó o es el actual (en el año seleccionado)
         if (añoSeleccionado < añoActual || (añoSeleccionado === añoActual && numMes <= mesActual)) {
-          if (!mesesPagados[periodo]) {
-            mesesDeuda++;
+          // Los meses anulados no cuentan como deuda ni como mes posible
+          if (mesesPagados[periodo] !== 'anulado') {
+            mesesPosibles++;
+            if (!mesesPagados[periodo]) {
+              mesesDeuda++;
+            }
           }
         }
       });
 
-      // Clasificación: 0=Al día, 1=Atrasado, 2=Moroso, 3+=Deudor
-      const esAlDia = mesesDeuda === 0;
-      const esAtrasado = mesesDeuda === 1;
-      const esMoroso = mesesDeuda === 2;
-      const esDeudor = mesesDeuda >= 3;
+      // Clasificación: Incumplido tiene prioridad si no ha pagado nada
+      const noHaPagadoNada = mesesPosibles > 0 && mesesDeuda === mesesPosibles;
+      const esIncumplido = noHaPagadoNada;
+      const esExcelente = !esIncumplido && mesesDeuda === 0;
+      const esBueno = !esIncumplido && mesesDeuda === 1;
+      const esProgreso = !esIncumplido && mesesDeuda === 2;
+      const esAtrasado = !esIncumplido && mesesDeuda === 3;
+      const esCritico = !esIncumplido && mesesDeuda >= 4;
 
       return {
         empadronado: emp,
         mesesPagados,
         mesesDeuda,
-        esAlDia,
+        mesesPosibles,
+        esExcelente,
+        esBueno,
+        esProgreso,
         esAtrasado,
-        esMoroso,
-        esDeudor
+        esCritico,
+        esIncumplido
       };
     });
 
@@ -159,14 +184,18 @@ const Balances = () => {
     let resultado = filasBalance;
 
     // Filtro por estado
-    if (filtroEstado === "al-dia") {
-      resultado = resultado.filter(f => f.esAlDia);
-    } else if (filtroEstado === "atrasados") {
+    if (filtroEstado === "excelente") {
+      resultado = resultado.filter(f => f.esExcelente);
+    } else if (filtroEstado === "bueno") {
+      resultado = resultado.filter(f => f.esBueno);
+    } else if (filtroEstado === "progreso") {
+      resultado = resultado.filter(f => f.esProgreso);
+    } else if (filtroEstado === "atrasado") {
       resultado = resultado.filter(f => f.esAtrasado);
-    } else if (filtroEstado === "morosos") {
-      resultado = resultado.filter(f => f.esMoroso);
-    } else if (filtroEstado === "deudores") {
-      resultado = resultado.filter(f => f.esDeudor);
+    } else if (filtroEstado === "critico") {
+      resultado = resultado.filter(f => f.esCritico);
+    } else if (filtroEstado === "incumplido") {
+      resultado = resultado.filter(f => f.esIncumplido);
     }
 
     // Búsqueda (inteligente para números de padrón)
@@ -218,10 +247,12 @@ const Balances = () => {
   const estadisticas = useMemo(() => {
     return {
       total: filasBalance.length,
-      alDia: filasBalance.filter(f => f.esAlDia).length,
-      atrasados: filasBalance.filter(f => f.esAtrasado).length,
-      morosos: filasBalance.filter(f => f.esMoroso).length,
-      deudores: filasBalance.filter(f => f.esDeudor).length
+      excelente: filasBalance.filter(f => f.esExcelente).length,
+      bueno: filasBalance.filter(f => f.esBueno).length,
+      progreso: filasBalance.filter(f => f.esProgreso).length,
+      atrasado: filasBalance.filter(f => f.esAtrasado).length,
+      critico: filasBalance.filter(f => f.esCritico).length,
+      incumplido: filasBalance.filter(f => f.esIncumplido).length
     };
   }, [filasBalance]);
 
@@ -278,7 +309,7 @@ const Balances = () => {
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
           <Card>
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
@@ -291,49 +322,73 @@ const Balances = () => {
             </CardContent>
           </Card>
 
+          <Card className="border-emerald-300 bg-emerald-50/50">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-6 w-6 text-emerald-600" />
+                <div>
+                  <p className="text-xs text-emerald-700 font-semibold">Excelente</p>
+                  <p className="text-xl font-bold text-emerald-600">{estadisticas.excelente}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="border-green-200 bg-green-50/50">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-6 w-6 text-green-600" />
                 <div>
-                  <p className="text-xs text-green-700">Al Día</p>
-                  <p className="text-xl font-bold text-green-600">{estadisticas.alDia}</p>
+                  <p className="text-xs text-green-700">Bueno</p>
+                  <p className="text-xl font-bold text-green-600">{estadisticas.bueno}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-orange-200 bg-orange-50/50">
+          <Card className="border-blue-200 bg-blue-50/50">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className="h-6 w-6 text-orange-600" />
+                <AlertCircle className="h-6 w-6 text-blue-600" />
                 <div>
-                  <p className="text-xs text-orange-700">Atrasados</p>
-                  <p className="text-xl font-bold text-orange-600">{estadisticas.atrasados}</p>
+                  <p className="text-xs text-blue-700">Progreso</p>
+                  <p className="text-xl font-bold text-blue-600">{estadisticas.progreso}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-red-200 bg-red-50/50">
+          <Card className="border-yellow-200 bg-yellow-50/50">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
-                <XCircle className="h-6 w-6 text-red-600" />
+                <AlertCircle className="h-6 w-6 text-yellow-600" />
                 <div>
-                  <p className="text-xs text-red-700">Morosos</p>
-                  <p className="text-xl font-bold text-red-600">{estadisticas.morosos}</p>
+                  <p className="text-xs text-yellow-700">Atrasado</p>
+                  <p className="text-xl font-bold text-yellow-600">{estadisticas.atrasado}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-red-300 bg-red-100/50">
+          <Card className="border-orange-300 bg-orange-100/70">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2">
+                <XCircle className="h-6 w-6 text-orange-700" />
+                <div>
+                  <p className="text-xs text-orange-800 font-semibold">Crítico</p>
+                  <p className="text-xl font-bold text-orange-700">{estadisticas.critico}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-400 bg-red-200/70">
             <CardContent className="p-3">
               <div className="flex items-center gap-2">
                 <XCircle className="h-6 w-6 text-red-800" />
                 <div>
-                  <p className="text-xs text-red-800">Deudores</p>
-                  <p className="text-xl font-bold text-red-800">{estadisticas.deudores}</p>
+                  <p className="text-xs text-red-900 font-bold">Incumplido</p>
+                  <p className="text-xl font-bold text-red-800">{estadisticas.incumplido}</p>
                 </div>
               </div>
             </CardContent>
@@ -372,10 +427,12 @@ const Balances = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="al-dia">🟢 Al Día (0 meses)</SelectItem>
-                    <SelectItem value="atrasados">🟠 Atrasados (1 mes)</SelectItem>
-                    <SelectItem value="morosos">🔴 Morosos (2 meses)</SelectItem>
-                    <SelectItem value="deudores">🔴 Deudores (3+ meses)</SelectItem>
+                    <SelectItem value="excelente">⭐ Excelente (0 meses)</SelectItem>
+                    <SelectItem value="bueno">🟢 Bueno (1 mes)</SelectItem>
+                    <SelectItem value="progreso">🔵 Progreso (2 meses)</SelectItem>
+                    <SelectItem value="atrasado">🟡 Atrasado (3 meses)</SelectItem>
+                    <SelectItem value="critico">🟠 Crítico (4+ meses)</SelectItem>
+                    <SelectItem value="incumplido">🔴 Incumplido (sin pagos)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -400,18 +457,30 @@ const Balances = () => {
                 <span>Pagado</span>
               </div>
               <div className="flex items-center gap-1">
+                <CircleDot className="h-4 w-4 text-violet-600" />
+                <span>Parcial</span>
+              </div>
+              <div className="flex items-center gap-1">
                 <XCircle className="h-4 w-4 text-red-600" />
                 <span>No Pagado</span>
               </div>
+              <div className="flex items-center gap-1">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <span>Otros (Anulado)</span>
+              </div>
               <span className="text-muted-foreground">|</span>
-              <Badge className="bg-green-100 text-green-700 text-xs">Al Día</Badge>
-              <span>0 meses</span>
-              <Badge className="bg-orange-100 text-orange-700 text-xs">Atrasado</Badge>
-              <span>1 mes</span>
-              <Badge className="bg-red-100 text-red-700 text-xs">Moroso</Badge>
-              <span>2 meses</span>
-              <Badge className="bg-red-200 text-red-900 text-xs font-bold">Deudor</Badge>
-              <span>3+ meses</span>
+              <Badge className="bg-emerald-100 text-emerald-700 text-xs font-semibold">Excelente</Badge>
+              <span>0</span>
+              <Badge className="bg-green-100 text-green-700 text-xs">Bueno</Badge>
+              <span>1</span>
+              <Badge className="bg-blue-100 text-blue-700 text-xs">Progreso</Badge>
+              <span>2</span>
+              <Badge className="bg-yellow-100 text-yellow-700 text-xs">Atrasado</Badge>
+              <span>3</span>
+              <Badge className="bg-orange-200 text-orange-800 text-xs font-semibold">Crítico</Badge>
+              <span>4+</span>
+              <Badge className="bg-red-300 text-red-900 text-xs font-bold animate-pulse">Incumplido</Badge>
+              <span>0 pagos</span>
             </div>
           </CardContent>
         </Card>
@@ -480,14 +549,25 @@ const Balances = () => {
                           {/* Meses */}
                           {meses.map(mes => {
                             const periodo = `${añoSeleccionado}${mes.num}`;
-                            const pagado = fila.mesesPagados[periodo];
+                            const estadoMes = fila.mesesPagados[periodo];
+                            const esAnulado = estadoMes === 'anulado';
+                            const esParcial = estadoMes === 'parcial';
+                            const pagado = estadoMes === true;
                             
                             return (
                               <td 
                                 key={mes.num} 
-                                className={`border p-2 text-center ${pagado ? 'bg-green-50' : 'bg-red-50'}`}
+                                className={`border p-2 text-center ${
+                                  esAnulado ? 'bg-amber-50' : 
+                                  esParcial ? 'bg-violet-50' :
+                                  pagado ? 'bg-green-50' : 'bg-red-50'
+                                }`}
                               >
-                                {pagado ? (
+                                {esAnulado ? (
+                                  <AlertCircle className="h-4 w-4 text-amber-500 mx-auto" />
+                                ) : esParcial ? (
+                                  <CircleDot className="h-4 w-4 text-violet-600 mx-auto" />
+                                ) : pagado ? (
                                   <CheckCircle className="h-4 w-4 text-green-600 mx-auto" />
                                 ) : (
                                   <XCircle className="h-4 w-4 text-red-600 mx-auto" />
@@ -498,24 +578,34 @@ const Balances = () => {
 
                           {/* Estado */}
                           <td className="border p-2 text-center">
-                            {fila.esAlDia && (
+                            {fila.esExcelente && (
+                              <Badge className="bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                                Excelente
+                              </Badge>
+                            )}
+                            {fila.esBueno && (
                               <Badge className="bg-green-100 text-green-700 text-xs">
-                                Al Día
+                                Bueno
+                              </Badge>
+                            )}
+                            {fila.esProgreso && (
+                              <Badge className="bg-blue-100 text-blue-700 text-xs">
+                                Progreso
                               </Badge>
                             )}
                             {fila.esAtrasado && (
-                              <Badge className="bg-orange-100 text-orange-700 text-xs">
+                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">
                                 Atrasado
                               </Badge>
                             )}
-                            {fila.esMoroso && (
-                              <Badge className="bg-red-100 text-red-700 text-xs">
-                                Moroso
+                            {fila.esCritico && (
+                              <Badge className="bg-orange-200 text-orange-800 text-xs font-semibold">
+                                Crítico ({fila.mesesDeuda}m)
                               </Badge>
                             )}
-                            {fila.esDeudor && (
-                              <Badge className="bg-red-200 text-red-900 text-xs font-bold">
-                                Deudor ({fila.mesesDeuda}m)
+                            {fila.esIncumplido && (
+                              <Badge className="bg-red-300 text-red-900 text-xs font-bold animate-pulse">
+                                Incumplido
                               </Badge>
                             )}
                           </td>

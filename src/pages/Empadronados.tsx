@@ -18,18 +18,18 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
   Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye,
-  Download, KeyRound, Settings, Upload, Mail
+  Download, KeyRound, Settings, Upload, Mail, Lock
 } from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
 import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
 import { ActualizacionMasivaModal } from '@/components/empadronados/ActualizacionMasivaModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAuthz } from '@/contexts/AuthzContext';
 import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
 import { Module, Permission, PermissionLevel } from '@/types/auth';
 import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermisosModal';
 import { CorreosAccesoModal } from '@/components/empadronados/CorreosAccesoModal';
 import { EstadoDeudaBadge } from '@/components/empadronados/EstadoDeudaBadge';
+import { AccesosMasivosModal } from '@/components/empadronados/AccesosMasivosModal';
 
 // >>> XLSX: exportar / importar plantilla de DNI + fechaIngreso
 import {
@@ -47,9 +47,7 @@ const Empadronados: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEmpadronado, setSelectedEmpadronado] = useState<Empadronado | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
   const [deleteMotivo, setDeleteMotivo] = useState('');
-  const [deletePdf, setDeletePdf] = useState<File | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'habilitado' | 'deshabilitado'>('all');
   const [filterVivienda, setFilterVivienda] = useState<'all' | 'construida' | 'construccion' | 'terreno'>('all');
@@ -64,11 +62,11 @@ const Empadronados: React.FC = () => {
   const [editingPermissions, setEditingPermissions] = useState(false);
   const [actualizacionMasivaOpen, setActualizacionMasivaOpen] = useState(false);
   const [correosAccesoOpen, setCorreosAccesoOpen] = useState(false);
+  const [accesosMasivosOpen, setAccesosMasivosOpen] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { canDeleteWithoutAuth } = useAuthz();
 
   // XLSX: input de archivo
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -224,32 +222,16 @@ const Empadronados: React.FC = () => {
   };
 
   const handleDelete = async () => {
-    if (!selectedEmpadronado || !deleteMotivo.trim()) {
-      toast({
-        title: "Error",
-        description: "Debe especificar un motivo para la eliminación",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!canDeleteWithoutAuth && deletePassword !== 'admin123') {
-      toast({
-        title: "Error",
-        description: "Verifique la clave de presidencia",
-        variant: "destructive"
-      });
+    if (!selectedEmpadronado) {
       return;
     }
 
     try {
-      const success = await deleteEmpadronado(selectedEmpadronado.id, user?.uid || 'system', deleteMotivo);
+      const success = await deleteEmpadronado(selectedEmpadronado.id, user?.uid || 'system', deleteMotivo || 'Sin motivo especificado');
       if (success) {
         toast({ title: "Éxito", description: "Empadronado eliminado correctamente" });
         setShowDeleteDialog(false);
-        setDeletePassword('');
         setDeleteMotivo('');
-        setDeletePdf(null);
         setSelectedEmpadronado(null);
         loadData();
       } else {
@@ -371,6 +353,16 @@ const Empadronados: React.FC = () => {
             className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
           >
             <Mail className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
+            <span className="hidden sm:inline">Activos</span>
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setAccesosMasivosOpen(true)}
+            className="h-8 md:h-9 text-xs md:text-sm transition-all hover:scale-105"
+          >
+            <Lock className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden sm:inline">Accesos</span>
           </Button>
 
@@ -902,76 +894,17 @@ const Empadronados: React.FC = () => {
                         <Edit3 className="h-3 w-3 md:h-4 md:w-4" />
                       </Button>
 
-                      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedEmpadronado(empadronado);
-                              setShowDeleteDialog(true);
-                            }}
-                            className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
-                          >
-                            <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción eliminará permanentemente a {empadronado.nombre} {empadronado.apellidos} del padrón.
-                              {!canDeleteWithoutAuth && " Se requiere autorización de presidencia."}
-                              {canDeleteWithoutAuth && " Como Presidente, puede eliminar directamente."}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-
-                          <div className="space-y-4">
-                            {!canDeleteWithoutAuth && (
-                              <div>
-                                <Label htmlFor="delete-password">Clave de Presidencia</Label>
-                                <Input
-                                  id="delete-password"
-                                  type="password"
-                                  value={deletePassword}
-                                  onChange={(e) => setDeletePassword(e.target.value)}
-                                  placeholder="Ingrese la clave"
-                                />
-                              </div>
-                            )}
-
-                            <div>
-                              <Label htmlFor="delete-motivo">Motivo de Eliminación</Label>
-                              <Textarea
-                                id="delete-motivo"
-                                value={deleteMotivo}
-                                onChange={(e) => setDeleteMotivo(e.target.value)}
-                                placeholder="Describa el motivo de la eliminación"
-                              />
-                            </div>
-
-                            <div>
-                              <Label htmlFor="delete-pdf">Acta de Eliminación (PDF)</Label>
-                              <Input
-                                id="delete-pdf"
-                                type="file"
-                                accept=".pdf"
-                                onChange={(e) => setDeletePdf(e.target.files?.[0] || null)}
-                              />
-                            </div>
-                          </div>
-
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={handleDelete}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEmpadronado(empadronado);
+                          setShowDeleteDialog(true);
+                        }}
+                        className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
+                      >
+                        <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -1020,6 +953,49 @@ const Empadronados: React.FC = () => {
         open={correosAccesoOpen}
         onOpenChange={setCorreosAccesoOpen}
       />
+
+      {/* Modal de accesos masivos */}
+      <AccesosMasivosModal
+        open={accesosMasivosOpen}
+        onOpenChange={setAccesosMasivosOpen}
+        empadronados={empadronados}
+        onComplete={loadData}
+      />
+
+      {/* Dialog de confirmación de eliminación */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar Empadronado</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Está seguro que desea eliminar a {selectedEmpadronado?.nombre} {selectedEmpadronado?.apellidos} del padrón? Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="delete-motivo">Motivo de Eliminación (opcional)</Label>
+              <Textarea
+                id="delete-motivo"
+                value={deleteMotivo}
+                onChange={(e) => setDeleteMotivo(e.target.value)}
+                placeholder="Describa el motivo de la eliminación"
+                className="min-h-[60px]"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteMotivo('')}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

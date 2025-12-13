@@ -19,11 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet } from 'lucide-react';
+import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
-import { obtenerPagosV2, eliminarPagoV2, actualizarPagoV2 } from '@/services/cobranzas-v2';
+import { obtenerPagosV2, eliminarPagoV2, actualizarPagoV2, anularMultiplesChargesV2 } from '@/services/cobranzas-v2';
+import { AnularBoletasModal } from './AnularBoletasModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -72,6 +73,8 @@ export default function DetalleEmpadronadoModalV2({
     numeroOperacion: '',
     observaciones: ''
   });
+  const [chargesSeleccionados, setChargesSeleccionados] = useState<string[]>([]);
+  const [showAnularModal, setShowAnularModal] = useState(false);
 
   // Cargar pagos del empadronado cuando se abre el modal
   useEffect(() => {
@@ -114,6 +117,7 @@ export default function DetalleEmpadronadoModalV2({
       .filter(charge => {
         if (charge.empadronadoId !== empadronado.id) return false;
         if (charge.saldo <= 0) return false;
+        if (charge.anulado) return false; // Excluir anulados
         
         // Verificar si hay pagos pendientes/aprobados que cubran el cargo
         const pagosDelCargo = pagos.filter(p => 
@@ -160,6 +164,56 @@ export default function DetalleEmpadronadoModalV2({
     };
   }, [empadronado, charges, pagos, cargandoPagos]);
 
+  // Charges seleccionados para anular
+  const chargesParaAnular = useMemo(() => {
+    return charges.filter(c => chargesSeleccionados.includes(c.id));
+  }, [charges, chargesSeleccionados]);
+
+  const toggleChargeSeleccion = (chargeId: string) => {
+    setChargesSeleccionados(prev => 
+      prev.includes(chargeId) 
+        ? prev.filter(id => id !== chargeId)
+        : [...prev, chargeId]
+    );
+  };
+
+  const seleccionarTodosDeudas = () => {
+    const todosIds = [...deudaItems, ...deudaItemsFuturos].map(item => item.chargeId);
+    if (chargesSeleccionados.length === todosIds.length) {
+      setChargesSeleccionados([]);
+    } else {
+      setChargesSeleccionados(todosIds);
+    }
+  };
+
+  const handleAnulacionConfirmada = async (motivoAnulacion: string) => {
+    if (!empadronado) return;
+    
+    try {
+      await anularMultiplesChargesV2(
+        chargesSeleccionados, 
+        motivoAnulacion, 
+        empadronado.id,
+        `${empadronado.nombre} ${empadronado.apellidos}`
+      );
+      
+      toast({
+        title: "Boletas anuladas",
+        description: `Se anularon ${chargesSeleccionados.length} boleta(s) correctamente`,
+      });
+      
+      setChargesSeleccionados([]);
+    } catch (error) {
+      console.error("Error anulando boletas:", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron anular las boletas",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const generarLinkCompartir = () => {
     if (!empadronado) return '';
     const baseUrl = window.location.origin;
@@ -177,7 +231,16 @@ export default function DetalleEmpadronadoModalV2({
   };
 
   const handleRegistrarPago = async () => {
-    if (!nuevoPago.chargeId || !nuevoPago.monto || !nuevoPago.metodoPago) {
+    if (!nuevoPago.chargeId) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar las cuotas a pagar desde Estado de Cuenta",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!nuevoPago.monto || !nuevoPago.metodoPago) {
       toast({
         title: "Error",
         description: "Complete todos los campos obligatorios",
@@ -569,6 +632,72 @@ export default function DetalleEmpadronadoModalV2({
             {/* Estado de Cuenta */}
             <TabsContent value="estado-cuenta">
               <div className="space-y-4">
+                {/* Botón seleccionar todos y anular */}
+                {(deudaItems.length > 0 || deudaItemsFuturos.length > 0) && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-muted rounded-lg">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={seleccionarTodosDeudas}
+                    >
+                      {chargesSeleccionados.length === [...deudaItems, ...deudaItemsFuturos].length && chargesSeleccionados.length > 0 ? (
+                        <>
+                          <Square className="h-4 w-4 mr-1" />
+                          Quitar todas
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="h-4 w-4 mr-1" />
+                          Seleccionar todas
+                        </>
+                      )}
+                    </Button>
+                    
+                    {chargesSeleccionados.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary">
+                          {chargesSeleccionados.length} seleccionadas
+                        </Badge>
+                        <Badge variant="outline" className="font-bold text-primary">
+                          Total: {formatearMoneda(
+                            [...deudaItems, ...deudaItemsFuturos]
+                              .filter(item => chargesSeleccionados.includes(item.chargeId))
+                              .reduce((sum, item) => sum + item.saldo, 0)
+                          )}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          className="bg-primary hover:bg-primary/90"
+                          onClick={() => {
+                            const totalSeleccionado = [...deudaItems, ...deudaItemsFuturos]
+                              .filter(item => chargesSeleccionados.includes(item.chargeId))
+                              .reduce((sum, item) => sum + item.saldo, 0);
+                            setNuevoPago({
+                              chargeId: chargesSeleccionados.join(','),
+                              monto: totalSeleccionado.toString(),
+                              metodoPago: '',
+                              numeroOperacion: '',
+                              observaciones: `Pago conjunto de ${chargesSeleccionados.length} cuotas`
+                            });
+                            setActiveTab("registrar-pago");
+                          }}
+                        >
+                          <CreditCard className="h-4 w-4 mr-1" />
+                          Pagar Seleccionadas
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setShowAnularModal(true)}
+                        >
+                          <Ban className="h-4 w-4 mr-1" />
+                          Anular
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Deudas VENCIDAS */}
                 <Card className="border-red-200">
                   <CardHeader className="pb-2">
@@ -586,6 +715,10 @@ export default function DetalleEmpadronadoModalV2({
                       ) : (
                         deudaItems.map((item) => (
                           <div key={item.chargeId} className="flex items-center justify-between p-2 bg-red-50 rounded-lg gap-2">
+                            <Checkbox
+                              checked={chargesSeleccionados.includes(item.chargeId)}
+                              onCheckedChange={() => toggleChargeSeleccion(item.chargeId)}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm">{item.periodo}</div>
                               <div className="text-xs text-muted-foreground">
@@ -638,6 +771,10 @@ export default function DetalleEmpadronadoModalV2({
                       <div className="space-y-2">
                         {deudaItemsFuturos.map((item) => (
                           <div key={item.chargeId} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg gap-2">
+                            <Checkbox
+                              checked={chargesSeleccionados.includes(item.chargeId)}
+                              onCheckedChange={() => toggleChargeSeleccion(item.chargeId)}
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-sm">{item.periodo}</div>
                               <div className="text-xs text-muted-foreground">
@@ -945,34 +1082,52 @@ export default function DetalleEmpadronadoModalV2({
                   <CardTitle>Registrar Nuevo Pago</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="cargo">Período a Pagar</Label>
-                      <Select 
-                        value={nuevoPago.chargeId} 
-                        onValueChange={(value) => {
-                          const selectedCharge = deudaItems.find(item => item.chargeId === value);
-                          setNuevoPago(prev => ({ 
-                            ...prev, 
-                            chargeId: value,
-                            monto: selectedCharge ? selectedCharge.saldo.toString() : ''
-                          }));
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Seleccione un período" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deudaItems.map((item) => (
-                            <SelectItem key={item.chargeId} value={item.chargeId}>
-                              {item.periodo} - {formatearMoneda(item.saldo)}
-                              {item.esMoroso && ' (Moroso)'}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  {/* Resumen de cuotas seleccionadas */}
+                  {nuevoPago.chargeId && nuevoPago.chargeId.includes(',') ? (
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <Label className="text-sm font-medium text-primary">Cuotas Seleccionadas</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {nuevoPago.chargeId.split(',').map(chargeId => {
+                          const item = [...deudaItems, ...deudaItemsFuturos].find(i => i.chargeId === chargeId);
+                          return item ? (
+                            <Badge key={chargeId} variant="secondary" className="text-xs">
+                              {obtenerNombreMes(item.periodo)} - {formatearMoneda(item.saldo)}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
                     </div>
+                  ) : nuevoPago.chargeId ? (
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                      <Label className="text-sm font-medium text-primary">Cuota Seleccionada</Label>
+                      <div className="mt-2">
+                        {(() => {
+                          const item = [...deudaItems, ...deudaItemsFuturos].find(i => i.chargeId === nuevoPago.chargeId);
+                          return item ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {obtenerNombreMes(item.periodo)} - {formatearMoneda(item.saldo)}
+                            </Badge>
+                          ) : null;
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-muted border border-border rounded-lg text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Seleccione las cuotas a pagar desde la pestaña "Estado de Cuenta"
+                      </p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="mt-1"
+                        onClick={() => setActiveTab("estado-cuenta")}
+                      >
+                        Ir a Estado de Cuenta
+                      </Button>
+                    </div>
+                  )}
 
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="monto">Monto</Label>
                       <Input
@@ -1125,6 +1280,17 @@ export default function DetalleEmpadronadoModalV2({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Modal de anulación */}
+        <AnularBoletasModal
+          open={showAnularModal}
+          onOpenChange={setShowAnularModal}
+          chargesSeleccionados={chargesSeleccionados}
+          onAnulacionConfirmada={() => {
+            setChargesSeleccionados([]);
+            setShowAnularModal(false);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

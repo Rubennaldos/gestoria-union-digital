@@ -119,8 +119,8 @@ export const obtenerResumenDeuda = async (empadronadoId: string): Promise<Resume
   const pagos = await obtenerSeguimientoPagos(empadronadoId);
   const ahora = Date.now();
   
-  const pendientes = pagos.filter(p => p.estado === 'pendiente' || p.estado === 'moroso');
-  const vencidos = pagos.filter(p => p.estado === 'moroso' || (p.estado === 'pendiente' && p.fechaVencimiento < ahora));
+  const pendientes = pagos.filter(p => p.estado === 'pendiente' || p.estado === 'vencido');
+  const vencidos = pagos.filter(p => p.estado === 'vencido' || (p.estado === 'pendiente' && p.fechaVencimiento < ahora));
   const recientes = pagos.filter(p => p.estado === 'pagado').slice(0, 5);
   
   const totalPendiente = pendientes.reduce((sum, p) => sum + p.monto + (p.recargo || 0) - (p.descuento || 0), 0);
