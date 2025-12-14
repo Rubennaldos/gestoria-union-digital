@@ -1285,9 +1285,9 @@ export default function DetalleEmpadronadoModalV2({
         <AnularBoletasModal
           open={showAnularModal}
           onOpenChange={setShowAnularModal}
-          chargesSeleccionados={chargesSeleccionados}
-          onAnulacionConfirmada={() => {
-            setChargesSeleccionados([]);
+          chargesSeleccionados={chargesParaAnular}
+          onAnulacionConfirmada={async (motivoAnulacion: string) => {
+            await handleAnulacionConfirmada(motivoAnulacion);
             setShowAnularModal(false);
           }}
         />
