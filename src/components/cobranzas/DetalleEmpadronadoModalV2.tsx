@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -21,7 +23,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Copy, CreditCard, Calendar as CalendarIcon, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
@@ -37,7 +42,7 @@ interface DetalleEmpadronadoModalV2Props {
   onOpenChange: (open: boolean) => void;
   empadronado: Empadronado | null;
   charges: ChargeV2[];
-  onRegistrarPago: (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string, archivoComprobante?: string) => Promise<void>;
+  onRegistrarPago: (chargeId: string, monto: number, metodoPago: string, fechaPagoRegistrada: number, numeroOperacion?: string, observaciones?: string, archivoComprobante?: string) => Promise<void>;
 }
 
 interface DeudaItem {
@@ -69,6 +74,8 @@ export default function DetalleEmpadronadoModalV2({
   });
   const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
   const [subiendoArchivo, setSubiendoArchivo] = useState(false);
+  const [fechaPago, setFechaPago] = useState<Date | undefined>(new Date());
+  const [usarFechaActual, setUsarFechaActual] = useState<boolean>(true);
   const [pagosSeleccionados, setPagosSeleccionados] = useState<string[]>([]);
   const [pagoEditando, setPagoEditando] = useState<PagoV2 | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<string | null>(null);
@@ -288,10 +295,16 @@ export default function DetalleEmpadronadoModalV2({
         }
       }
 
+      // Determinar la fecha del pago: usar fecha actual si el checkbox está marcado, sino usar la fecha seleccionada
+      const fechaPagoRegistrada = usarFechaActual 
+        ? Date.now() 
+        : (fechaPago ? fechaPago.getTime() : Date.now());
+
       await onRegistrarPago(
         nuevoPago.chargeId,
         parseFloat(nuevoPago.monto),
         nuevoPago.metodoPago,
+        fechaPagoRegistrada,
         nuevoPago.numeroOperacion || undefined,
         nuevoPago.observaciones || undefined,
         archivoComprobanteURL
@@ -306,6 +319,8 @@ export default function DetalleEmpadronadoModalV2({
         observaciones: ''
       });
       setArchivoComprobante(null);
+      setFechaPago(new Date());
+      setUsarFechaActual(true);
 
       toast({
         title: "Pago registrado",
@@ -1241,6 +1256,65 @@ export default function DetalleEmpadronadoModalV2({
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  {/* Fecha de Pago */}
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="usar-fecha-actual"
+                        checked={usarFechaActual}
+                        onCheckedChange={(checked) => {
+                          setUsarFechaActual(checked as boolean);
+                          if (checked) {
+                            setFechaPago(new Date());
+                          }
+                        }}
+                      />
+                      <Label 
+                        htmlFor="usar-fecha-actual" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Usar fecha actual (predefinido)
+                      </Label>
+                    </div>
+
+                    {!usarFechaActual && (
+                      <div>
+                        <Label>Fecha de Pago</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !fechaPago && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {fechaPago ? (
+                                format(fechaPago, "dd/MM/yyyy", { locale: es })
+                              ) : (
+                                <span>Selecciona la fecha</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={fechaPago}
+                              onSelect={(date) => date && setFechaPago(date)}
+                              disabled={(date) => date > new Date()}
+                              initialFocus
+                              locale={es}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                     <div>
                       <Label htmlFor="operacion">Número de Operación (Opcional)</Label>

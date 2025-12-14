@@ -423,7 +423,7 @@ export default function CobranzasV2() {
   };
 
 
-  const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string, archivoComprobante?: string) => {
+  const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, fechaPagoRegistrada: number, numeroOperacion?: string, observaciones?: string, archivoComprobante?: string) => {
     try {
       // Manejar pago múltiple (chargeIds separados por coma)
       const chargeIds = chargeId.split(',').map(id => id.trim()).filter(id => id);
@@ -436,11 +436,11 @@ export default function CobranzasV2() {
         for (let i = 0; i < chargeIds.length; i++) {
           const cId = chargeIds[i];
           // Solo asociar el comprobante al primer cargo
-          await registrarPagoV2(cId, montoPorCargo, metodoPago, Date.now(), i === 0 ? archivoComprobante : undefined, numeroOperacion, observaciones);
+          await registrarPagoV2(cId, montoPorCargo, metodoPago, fechaPagoRegistrada, i === 0 ? archivoComprobante : undefined, numeroOperacion, observaciones);
         }
       } else {
         // Pago individual
-        await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), archivoComprobante, numeroOperacion, observaciones);
+        await registrarPagoV2(chargeId, monto, metodoPago, fechaPagoRegistrada, archivoComprobante, numeroOperacion, observaciones);
       }
       
       toast({
