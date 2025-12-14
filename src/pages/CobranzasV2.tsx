@@ -803,41 +803,41 @@ export default function CobranzasV2() {
 
         {/* Tabs principales - Mobile Optimized */}
         <Tabs defaultValue="asociados" className="space-y-3 md:space-y-4">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-0.5 md:p-1 gap-0.5 md:gap-1 bg-muted/50">
+          <TabsList className="flex w-full h-auto p-1 gap-1 bg-muted/60 rounded-xl overflow-x-auto">
             <TabsTrigger 
               value="asociados" 
-              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              className="flex-1 min-w-0 flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 text-[9px] md:text-sm py-2.5 px-2 md:px-4 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
             >
-              <Users className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
-              <span className="hidden md:inline">Asociados</span>
+              <Users className="h-4 w-4 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Asociados</span>
             </TabsTrigger>
             <TabsTrigger 
               value="pagos" 
-              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              className="flex-1 min-w-0 flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 text-[9px] md:text-sm py-2.5 px-2 md:px-4 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
             >
-              <CreditCard className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
-              <span className="hidden md:inline">Pagos</span>
+              <CreditCard className="h-4 w-4 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Pagos</span>
             </TabsTrigger>
             <TabsTrigger 
               value="bandeja" 
-              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              className="flex-1 min-w-0 flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 text-[9px] md:text-sm py-2.5 px-2 md:px-4 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
             >
-              <FileText className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
-              <span className="hidden md:inline">Bandeja</span>
+              <FileText className="h-4 w-4 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Bandeja</span>
             </TabsTrigger>
             <TabsTrigger 
               value="egresos" 
-              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              className="flex-1 min-w-0 flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 text-[9px] md:text-sm py-2.5 px-2 md:px-4 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
             >
-              <ArrowDownCircle className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
-              <span className="hidden md:inline">Egresos</span>
+              <ArrowDownCircle className="h-4 w-4 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Egresos</span>
             </TabsTrigger>
             <TabsTrigger 
               value="configuracion" 
-              className="text-[10px] md:text-sm py-2 md:py-2.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all"
+              className="flex-1 min-w-0 flex flex-col md:flex-row items-center justify-center gap-0.5 md:gap-2 text-[9px] md:text-sm py-2.5 px-2 md:px-4 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-200"
             >
-              <Settings className="h-3 w-3 md:h-4 md:w-4 md:mr-1.5" />
-              <span className="hidden md:inline">Config</span>
+              <Settings className="h-4 w-4 md:h-4 md:w-4 shrink-0" />
+              <span className="truncate">Config</span>
             </TabsTrigger>
           </TabsList>
 
