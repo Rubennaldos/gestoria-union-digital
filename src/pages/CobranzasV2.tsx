@@ -62,6 +62,7 @@ import DetalleEmpadronadoModalV2 from "@/components/cobranzas/DetalleEmpadronado
 import { RevisarPagoModal } from "@/components/cobranzas/RevisarPagoModal";
 import { EnvioWhatsAppMasivoModal } from "@/components/cobranzas/EnvioWhatsAppMasivoModal";
 import ImportarPagosMasivosModal from "@/components/cobranzas/ImportarPagosMasivosModal";
+import { migrarTodosComprobantesRTDBaStorage } from "@/services/migrarComprobantesRTDBaStorage";
 
 import { 
   ConfiguracionCobranzasV2, 
@@ -131,6 +132,50 @@ export default function CobranzasV2() {
   const [direccionOrden, setDireccionOrden] = useState<'asc' | 'desc'>('asc');
   const [filtroEstado, setFiltroEstado] = useState<'todos' | 'morosos' | 'al-dia' | 'con-deuda'>('todos');
 
+  // Migración automática de comprobantes (silenciosa, en segundo plano)
+  const verificarYMigrarComprobantes = async (pagos: PagoV2[]) => {
+    try {
+      // Verificar si hay comprobantes en RTDB que necesiten migración
+      const pagosConComprobanteRTDB = pagos.filter(p => 
+        p.archivoComprobante && 
+        (p.archivoComprobante.includes('cobranzas_v2/comprobantes') || 
+         p.archivoComprobante.includes('firebaseio.com')) &&
+        !p.archivoComprobante.startsWith('https://firebasestorage')
+      );
+
+      if (pagosConComprobanteRTDB.length === 0) {
+        // No hay comprobantes para migrar
+        return;
+      }
+
+      console.log(`🔄 Iniciando migración automática de ${pagosConComprobanteRTDB.length} comprobantes...`);
+      
+      // Ejecutar migración en segundo plano (sin bloquear UI)
+      const resultado = await migrarTodosComprobantesRTDBaStorage();
+      
+      if (resultado.migrados > 0) {
+        console.log(`✅ Migración automática completada: ${resultado.migrados} comprobantes migrados`);
+        
+        // Notificación silenciosa (solo si hay muchos migrados o errores)
+        if (resultado.migrados >= 5 || resultado.errores > 0) {
+          toast({
+            title: "Migración de comprobantes",
+            description: `Se migraron ${resultado.migrados} comprobantes a Storage${resultado.errores > 0 ? ` (${resultado.errores} errores)` : ''}`,
+            variant: resultado.errores > 0 ? "default" : "default"
+          });
+        }
+        
+        // Recargar datos para reflejar los cambios
+        setTimeout(() => {
+          cargarDatos();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Error en migración automática:', error);
+      // No mostrar error al usuario, solo log
+    }
+  };
+
   useEffect(() => {
     cargarDatosRapido();
   }, []);
@@ -169,6 +214,9 @@ export default function CobranzasV2() {
           recargarDatos();
         }
       }).catch(err => console.error("Error en verificación automática:", err));
+
+      // Migración automática de comprobantes en segundo plano
+      verificarYMigrarComprobantes(pagosData);
       
     } catch (error) {
       console.error("Error cargando datos V2:", error);
@@ -375,21 +423,24 @@ export default function CobranzasV2() {
   };
 
 
-  const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => {
+  const registrarPagoModal = async (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string, archivoComprobante?: string) => {
     try {
       // Manejar pago múltiple (chargeIds separados por coma)
       const chargeIds = chargeId.split(',').map(id => id.trim()).filter(id => id);
       
       if (chargeIds.length > 1) {
         // Pago conjunto: distribuir el monto entre los cargos
+        // Nota: El comprobante solo se asocia al primer cargo en pagos múltiples
         const montoPorCargo = monto / chargeIds.length;
         
-        for (const cId of chargeIds) {
-          await registrarPagoV2(cId, montoPorCargo, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+        for (let i = 0; i < chargeIds.length; i++) {
+          const cId = chargeIds[i];
+          // Solo asociar el comprobante al primer cargo
+          await registrarPagoV2(cId, montoPorCargo, metodoPago, Date.now(), i === 0 ? archivoComprobante : undefined, numeroOperacion, observaciones);
         }
       } else {
         // Pago individual
-        await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), undefined, numeroOperacion, observaciones);
+        await registrarPagoV2(chargeId, monto, metodoPago, Date.now(), archivoComprobante, numeroOperacion, observaciones);
       }
       
       toast({
@@ -1893,6 +1944,7 @@ export default function CobranzasV2() {
                 </CardContent>
               </Card>
             )}
+
           </TabsContent>
         </Tabs>
       </main>

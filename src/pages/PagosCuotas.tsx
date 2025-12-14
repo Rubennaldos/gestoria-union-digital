@@ -1011,9 +1011,48 @@ const PagosCuotas = () => {
                               variant="outline"
                               size="sm"
                               className="shrink-0 h-8 text-xs"
-                              onClick={() => {
-                                setComprobanteUrl(pago.archivoComprobante || null);
-                                setShowComprobanteModal(true);
+                              onClick={async () => {
+                                try {
+                                  // Si es una ruta de RTDB (legacy), cargar los datos
+                                  if (pago.archivoComprobante?.includes('cobranzas_v2/comprobantes') && 
+                                      (pago.archivoComprobante.includes('firebaseio.com') || !pago.archivoComprobante.startsWith('http'))) {
+                                    const { ref, get } = await import("firebase/database");
+                                    const { db } = await import("@/config/firebase");
+                                    
+                                    let path = pago.archivoComprobante;
+                                    if (path.includes('firebaseio.com')) {
+                                      const match = path.match(/cobranzas_v2\/comprobantes\/[^.]+/);
+                                      if (match) {
+                                        path = match[0];
+                                      }
+                                    }
+                                    
+                                    const comprobanteRef = ref(db, path);
+                                    const snapshot = await get(comprobanteRef);
+                                    
+                                    if (snapshot.exists()) {
+                                      const data = snapshot.val();
+                                      setComprobanteUrl(data.data); // base64 data URL
+                                    } else {
+                                      toast({
+                                        title: "Error",
+                                        description: "No se pudo cargar el comprobante",
+                                        variant: "destructive"
+                                      });
+                                    }
+                                  } else {
+                                    // Es una URL de Storage (nuevo formato)
+                                    setComprobanteUrl(pago.archivoComprobante);
+                                  }
+                                  setShowComprobanteModal(true);
+                                } catch (error) {
+                                  console.error('Error cargando comprobante:', error);
+                                  toast({
+                                    title: "Error",
+                                    description: "No se pudo cargar el comprobante",
+                                    variant: "destructive"
+                                  });
+                                }
                               }}
                             >
                               <Download className="h-3 w-3 mr-1" />

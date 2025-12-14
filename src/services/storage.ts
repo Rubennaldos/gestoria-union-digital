@@ -20,8 +20,8 @@ async function convertirArchivoABase64(file: File): Promise<string> {
 }
 
 /**
- * Guarda un comprobante de pago en Firebase RTDB (como base64)
- * Alternativa a Firebase Storage para evitar problemas de CORS
+ * Guarda un comprobante de pago en Firebase Storage
+ * Usa la misma ubicación para módulo "Mis Cuotas" y "cobranzas-v2"
  */
 export async function subirComprobanteCobranza(
   empadronadoId: string,
@@ -35,27 +35,32 @@ export async function subirComprobanteCobranza(
       throw new Error('Solo se permiten archivos JPG, PNG o PDF');
     }
 
-    // Validar tamaño (max 2MB para RTDB)
-    const maxSize = 2 * 1024 * 1024;
+    // Validar tamaño (max 5MB para Storage)
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      throw new Error('El archivo no debe superar los 2MB');
+      throw new Error('El archivo no debe superar los 5MB');
     }
 
-    // Convertir a base64
-    const base64Data = await convertirArchivoABase64(file);
+    // Importar función de Storage
+    const { uploadFileAndGetURL } = await import('@/services/FileStorageService');
     
-    // Guardar en RTDB
-    const comprobantesRef = ref(db, `cobranzas_v2/comprobantes/${empadronadoId}/${periodo}_${Date.now()}`);
-    await set(comprobantesRef, {
-      data: base64Data,
-      tipo: file.type,
-      nombre: file.name,
-      tamaño: file.size,
-      fechaSubida: Date.now()
-    });
+    // Crear nombre de archivo único: empadronadoId_periodo_timestamp.extensión
+    const extension = file.name.split('.').pop() || 'jpg';
+    const fileName = `${empadronadoId}_${periodo}_${Date.now()}.${extension}`;
     
-    // Retornar la ruta en RTDB como "URL"
-    return comprobantesRef.toString();
+    // Subir a Storage en la carpeta comprobantes-pagos
+    // Estructura: comprobantes-pagos/{empadronadoId}/{fileName}
+    const folderPath = `comprobantes-pagos/${empadronadoId}`;
+    const fileWithPath = new File([file], fileName, { type: file.type });
+    
+    const url = await uploadFileAndGetURL(fileWithPath, folderPath);
+    
+    if (!url) {
+      throw new Error('No se pudo obtener la URL del archivo subido');
+    }
+    
+    console.log('✅ Comprobante subido a Storage:', url);
+    return url;
   } catch (error) {
     console.error('Error subiendo comprobante:', error);
     throw error;

@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ref, get } from "firebase/database";
+import { db } from "@/config/firebase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,12 +21,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square } from 'lucide-react';
+import { Copy, CreditCard, Calendar, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
 import { obtenerPagosV2, eliminarPagoV2, actualizarPagoV2, anularMultiplesChargesV2 } from '@/services/cobranzas-v2';
 import { AnularBoletasModal } from './AnularBoletasModal';
+import { subirComprobanteCobranza } from '@/services/storage';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -34,7 +37,7 @@ interface DetalleEmpadronadoModalV2Props {
   onOpenChange: (open: boolean) => void;
   empadronado: Empadronado | null;
   charges: ChargeV2[];
-  onRegistrarPago: (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string) => Promise<void>;
+  onRegistrarPago: (chargeId: string, monto: number, metodoPago: string, numeroOperacion?: string, observaciones?: string, archivoComprobante?: string) => Promise<void>;
 }
 
 interface DeudaItem {
@@ -64,6 +67,8 @@ export default function DetalleEmpadronadoModalV2({
     numeroOperacion: '',
     observaciones: ''
   });
+  const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
+  const [subiendoArchivo, setSubiendoArchivo] = useState(false);
   const [pagosSeleccionados, setPagosSeleccionados] = useState<string[]>([]);
   const [pagoEditando, setPagoEditando] = useState<PagoV2 | null>(null);
   const [pagoAEliminar, setPagoAEliminar] = useState<string | null>(null);
@@ -250,12 +255,46 @@ export default function DetalleEmpadronadoModalV2({
     }
 
     try {
+      let archivoComprobanteURL: string | undefined = undefined;
+
+      // Subir archivo si existe (usando la misma función que el portal del asociado)
+      if (archivoComprobante && empadronado) {
+        setSubiendoArchivo(true);
+        try {
+          // Obtener el período del primer cargo seleccionado
+          const chargeIds = nuevoPago.chargeId.split(',').map(id => id.trim()).filter(id => id);
+          const primerChargeId = chargeIds[0];
+          const charge = charges.find(c => c.id === primerChargeId);
+          
+          if (charge) {
+            archivoComprobanteURL = await subirComprobanteCobranza(
+              empadronado.id,
+              charge.periodo,
+              archivoComprobante
+            );
+            console.log('✅ Comprobante subido:', archivoComprobanteURL);
+          } else {
+            throw new Error("No se encontró el cargo para obtener el período");
+          }
+        } catch (error) {
+          console.error("Error subiendo comprobante:", error);
+          toast({
+            title: "Advertencia",
+            description: "No se pudo subir el comprobante, pero el pago se registrará sin él",
+            variant: "default"
+          });
+        } finally {
+          setSubiendoArchivo(false);
+        }
+      }
+
       await onRegistrarPago(
         nuevoPago.chargeId,
         parseFloat(nuevoPago.monto),
         nuevoPago.metodoPago,
         nuevoPago.numeroOperacion || undefined,
-        nuevoPago.observaciones || undefined
+        nuevoPago.observaciones || undefined,
+        archivoComprobanteURL
       );
 
       // Limpiar form
@@ -266,6 +305,7 @@ export default function DetalleEmpadronadoModalV2({
         numeroOperacion: '',
         observaciones: ''
       });
+      setArchivoComprobante(null);
 
       toast({
         title: "Pago registrado",
@@ -1055,7 +1095,51 @@ export default function DetalleEmpadronadoModalV2({
                                           size="sm"
                                           variant="outline"
                                           className="w-full"
-                                          onClick={() => window.open(pago.archivoComprobante, '_blank')}
+                                          onClick={async () => {
+                                            try {
+                                              // Si es una ruta de RTDB (legacy), cargar los datos y migrar
+                                              if (pago.archivoComprobante?.includes('cobranzas_v2/comprobantes') && 
+                                                  (pago.archivoComprobante.includes('firebaseio.com') || !pago.archivoComprobante.startsWith('http'))) {
+                                                let path = pago.archivoComprobante;
+                                                
+                                                // Si es una URL completa, extraer solo la ruta
+                                                if (path.includes('firebaseio.com')) {
+                                                  const match = path.match(/cobranzas_v2\/comprobantes\/[^.]+/);
+                                                  if (match) {
+                                                    path = match[0];
+                                                  }
+                                                }
+                                                
+                                                const comprobanteRef = ref(db, path);
+                                                const snapshot = await get(comprobanteRef);
+                                                
+                                                if (snapshot.exists()) {
+                                                  const data = snapshot.val();
+                                                  // Crear un enlace de descarga desde base64
+                                                  const link = document.createElement('a');
+                                                  link.href = data.data; // base64 data URL
+                                                  link.download = data.nombre || 'comprobante';
+                                                  link.click();
+                                                } else {
+                                                  toast({
+                                                    title: "Error",
+                                                    description: "No se pudo cargar el comprobante",
+                                                    variant: "destructive"
+                                                  });
+                                                }
+                                              } else {
+                                                // Es una URL de Storage (nuevo formato) o URL directa
+                                                window.open(pago.archivoComprobante, '_blank');
+                                              }
+                                            } catch (error) {
+                                              console.error('Error abriendo comprobante:', error);
+                                              toast({
+                                                title: "Error",
+                                                description: "No se pudo abrir el comprobante",
+                                                variant: "destructive"
+                                              });
+                                            }
+                                          }}
                                         >
                                           <Download className="h-4 w-4 mr-2" />
                                           Descargar Comprobante
@@ -1180,9 +1264,86 @@ export default function DetalleEmpadronadoModalV2({
                     />
                   </div>
 
-                  <Button onClick={handleRegistrarPago} className="w-full">
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Registrar Pago
+                  <div>
+                    <Label htmlFor="comprobante">Comprobante de Pago (Opcional)</Label>
+                    <div className="mt-2">
+                      {archivoComprobante ? (
+                        <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50">
+                          <ImageIcon className="h-5 w-5 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{archivoComprobante.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(archivoComprobante.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setArchivoComprobante(null)}
+                            className="h-8 w-8 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center w-full">
+                          <label
+                            htmlFor="comprobante"
+                            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted transition-colors"
+                          >
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
+                              <p className="mb-2 text-sm text-muted-foreground">
+                                <span className="font-semibold">Haz clic para subir</span> o arrastra y suelta
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                PNG, JPG, PDF (MAX. 5MB)
+                              </p>
+                            </div>
+                            <input
+                              id="comprobante"
+                              type="file"
+                              className="hidden"
+                              accept="image/*,.pdf"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  // Validar tamaño (5MB)
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    toast({
+                                      title: "Error",
+                                      description: "El archivo no debe superar los 5MB",
+                                      variant: "destructive"
+                                    });
+                                    return;
+                                  }
+                                  setArchivoComprobante(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button 
+                    onClick={handleRegistrarPago} 
+                    className="w-full"
+                    disabled={subiendoArchivo}
+                  >
+                    {subiendoArchivo ? (
+                      <>
+                        <Clock className="h-4 w-4 mr-2 animate-spin" />
+                        Subiendo comprobante...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Registrar Pago
+                      </>
+                    )}
                   </Button>
                 </CardContent>
               </Card>

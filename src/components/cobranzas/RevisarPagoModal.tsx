@@ -43,8 +43,10 @@ export const RevisarPagoModal = ({
         return;
       }
 
-      // Si es una URL de RTDB (contiene firebaseio.com o empieza con https://)
-      if (pago.archivoComprobante.includes('firebaseio.com') || pago.archivoComprobante.includes('cobranzas_v2/comprobantes')) {
+      // Si es una URL de RTDB (legacy - para compatibilidad con comprobantes antiguos)
+      if ((pago.archivoComprobante.includes('firebaseio.com') || 
+           pago.archivoComprobante.includes('cobranzas_v2/comprobantes')) &&
+          !pago.archivoComprobante.startsWith('https://firebasestorage')) {
         setLoadingComprobante(true);
         try {
           // Extraer la ruta del comprobante desde la URL
@@ -75,7 +77,7 @@ export const RevisarPagoModal = ({
           setLoadingComprobante(false);
         }
       } else {
-        // Es una URL directa (Firebase Storage u otra)
+        // Es una URL de Storage (nuevo formato) - no necesita carga especial
         setComprobanteData(null);
       }
     };
