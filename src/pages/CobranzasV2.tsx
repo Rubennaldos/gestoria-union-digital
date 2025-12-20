@@ -938,6 +938,69 @@ export default function CobranzasV2() {
               </Button>
 
               <Button 
+                onClick={async () => {
+                  try {
+                    setProcesando(true);
+                    
+                    // Importar XLSX
+                    const XLSX = await import('xlsx');
+                    
+                    // Crear plantilla con TODOS los empadronados (celdas vacías)
+                    const plantilla = empadronados
+                      .filter(e => e.habilitado)
+                      .sort((a, b) => {
+                        const numA = parseInt(a.numeroPadron?.replace(/\D/g, '') || '0');
+                        const numB = parseInt(b.numeroPadron?.replace(/\D/g, '') || '0');
+                        return numA - numB;
+                      })
+                      .map(emp => ({
+                        Padron: emp.numeroPadron,
+                        Enero: '',
+                        Febrero: '',
+                        Marzo: '',
+                        Abril: '',
+                        Mayo: '',
+                        Junio: '',
+                        Julio: '',
+                        Agosto: '',
+                        Septiembre: '',
+                        Octubre: '',
+                        Noviembre: '',
+                        Diciembre: ''
+                      }));
+                    
+                    const ws = XLSX.utils.json_to_sheet(plantilla);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla Pagos');
+                    
+                    const currentYear = new Date().getFullYear();
+                    XLSX.writeFile(wb, `plantilla_importacion_${currentYear}.xlsx`);
+                    
+                    toast({
+                      title: "✅ Plantilla descargada",
+                      description: `Plantilla con ${plantilla.length} empadronados. Llena solo las celdas donde se pagó.`
+                    });
+                  } catch (error) {
+                    console.error('Error:', error);
+                    toast({
+                      title: "Error",
+                      description: "Error al generar plantilla",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    setProcesando(false);
+                  }
+                }}
+                disabled={procesando}
+                variant="outline"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
+              >
+                <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">Plantilla Vacía</span>
+              </Button>
+
+              <Button 
                 onClick={() => setShowImportarModal(true)}
                 disabled={procesando}
                 variant="default"
