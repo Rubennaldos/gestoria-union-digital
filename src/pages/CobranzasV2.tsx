@@ -836,40 +836,96 @@ export default function CobranzasV2() {
               <Button 
                 onClick={async () => {
                   try {
-                    const reporte = await obtenerReporteDeudores();
+                    setProcesando(true);
                     
-                    if (reporte.length === 0) {
+                    // Importar XLSX dinámicamente
+                    const XLSX = await import('xlsx');
+                    
+                    // Obtener el año actual
+                    const currentYear = new Date().getFullYear();
+                    
+                    // Preparar estructura de datos: { empadronadoId: { Padron: '...', Enero: ..., Febrero: ... } }
+                    const dataPorEmpadronado = new Map<string, any>();
+                    
+                    // Inicializar con TODOS los empadronados habilitados
+                    empadronados.forEach(emp => {
+                      dataPorEmpadronado.set(emp.id, {
+                        Padron: emp.numeroPadron,
+                        Enero: '',
+                        Febrero: '',
+                        Marzo: '',
+                        Abril: '',
+                        Mayo: '',
+                        Junio: '',
+                        Julio: '',
+                        Agosto: '',
+                        Septiembre: '',
+                        Octubre: '',
+                        Noviembre: '',
+                        Diciembre: ''
+                      });
+                    });
+                    
+                    // Procesar todos los charges del año actual
+                    charges.forEach(charge => {
+                      // Filtrar solo charges del año actual
+                      if (!charge.periodo.startsWith(currentYear.toString())) return;
+                      
+                      // Obtener el mes del periodo (formato: YYYYMM)
+                      const mes = charge.periodo.substring(4, 6);
+                      const nombreMes = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][parseInt(mes)];
+                      
+                      // Obtener o crear el registro del empadronado
+                      const registro = dataPorEmpadronado.get(charge.empadronadoId);
+                      if (!registro) return; // Si no existe el empadronado, saltar
+                      
+                      // Calcular cuánto pagó (montoOriginal - saldo)
+                      const montoPagado = charge.montoOriginal - charge.saldo;
+                      
+                      // Solo agregar el monto si pagó algo
+                      if (montoPagado > 0) {
+                        registro[nombreMes] = montoPagado;
+                      }
+                    });
+                    
+                    // Convertir a array y ordenar por padrón
+                    const datosExportar = Array.from(dataPorEmpadronado.values())
+                      .sort((a, b) => {
+                        const padronA = a.Padron.replace(/\D/g, '');
+                        const padronB = b.Padron.replace(/\D/g, '');
+                        return parseInt(padronA) - parseInt(padronB);
+                      });
+                    
+                    if (datosExportar.length === 0) {
                       toast({
-                        title: "Sin deudores",
-                        description: "No hay empadronados con deudas pendientes"
+                        title: "Sin datos",
+                        description: "No hay datos para exportar"
                       });
                       return;
                     }
-
-                    // Crear CSV del reporte
-                    const csvHeaders = "Nombre,Apellidos,Padron,Deuda Total,Periodos Vencidos,Estado\n";
-                    const csvData = reporte.map(item => 
-                      `"${item.nombre}","${item.apellidos}","${item.numeroPadron}","${item.deudaTotal.toFixed(2)}","${item.periodosVencidos.join(', ')}","${item.esMoroso ? 'Moroso' : 'Pendiente'}"`
-                    ).join('\n');
-
-                    const blob = new Blob([csvHeaders + csvData], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `reporte_deudores_${new Date().toISOString().split('T')[0]}.csv`;
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-
+                    
+                    // Crear el libro de Excel
+                    const ws = XLSX.utils.json_to_sheet(datosExportar);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, `Pagos ${currentYear}`);
+                    
+                    // Descargar el archivo
+                    XLSX.writeFile(wb, `pagos_${currentYear}_${new Date().toISOString().split('T')[0]}.xlsx`);
+                    
                     toast({
-                      title: "Reporte generado",
-                      description: `Se encontraron ${reporte.length} deudores`
+                      title: "✅ Excel exportado",
+                      description: `Se exportaron ${datosExportar.length} empadronados con sus pagos de ${currentYear}`
                     });
                   } catch (error) {
+                    console.error('Error exportando:', error);
                     toast({
                       title: "Error",
-                      description: "Error generando el reporte",
+                      description: "Error generando el Excel",
                       variant: "destructive"
                     });
+                  } finally {
+                    setProcesando(false);
                   }
                 }}
                 disabled={procesando}
