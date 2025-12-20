@@ -1011,7 +1011,8 @@ export default function CobranzasV2() {
                 <span className="text-xs md:text-sm">Importar Excel</span>
               </Button>
 
-              <Button 
+              {/* Botón de Reset Pagos - OCULTO */}
+              {/* <Button 
                 onClick={resetearTodosPagos}
                 disabled={procesando || reseteandoPagos}
                 variant="destructive"
@@ -1022,7 +1023,7 @@ export default function CobranzasV2() {
                 <span className="text-xs md:text-sm">
                   {reseteandoPagos ? 'Reseteando...' : 'Reset Pagos'}
                 </span>
-              </Button>
+              </Button> */}
             </div>
           </CardContent>
         </Card>
