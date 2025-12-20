@@ -431,6 +431,10 @@ export async function procesarImportacionPagos(
         }
         
         try {
+          // Guardar el saldo ANTES del pago para el reporte y validaciones
+          const saldoAntes = cargo.saldo;
+          const montoPagadoAntes = cargo.montoPagado;
+          
           // Registrar el pago
           const fechaPago = new Date(`${año}-${numeroMes}-01`).getTime();
           
@@ -447,13 +451,34 @@ export async function procesarImportacionPagos(
           // Aprobar automáticamente el pago importado
           try {
             await aprobarPagoV2(pago.id, 'Aprobado automáticamente por importación masiva');
+            
+            // IMPORTANTE: Actualizar el cargo en la lista local después de aprobar el pago
+            // Esto asegura que los siguientes pagos usen el saldo correcto
+            const nuevoSaldo = Math.max(0, saldoAntes - monto);
+            const nuevoMontoPagado = montoPagadoAntes + monto;
+            
+            // Actualizar el cargo en la lista local
+            const index = charges.findIndex(c => c.id === cargo.id);
+            if (index >= 0) {
+              charges[index] = {
+                ...cargo,
+                saldo: nuevoSaldo,
+                montoPagado: nuevoMontoPagado,
+                estado: nuevoSaldo === 0 ? 'pagado' : 'pendiente'
+              };
+              // Actualizar también la referencia local
+              cargo = charges[index];
+            }
           } catch (approveError) {
             // Si falla la aprobación, el pago queda pendiente (no es crítico)
             console.warn(`No se pudo aprobar automáticamente el pago ${pago.id}`);
           }
           
-          // Verificar si es pago total o parcial
-          if (monto >= cargo.saldo) {
+          // Calcular el saldo restante usando el saldo ANTES del pago
+          const saldoRestante = Math.max(0, saldoAntes - monto);
+          
+          // Verificar si es pago total o parcial (usando saldo ANTES del pago)
+          if (monto >= saldoAntes) {
             // Pago total
             resultado.exitos.push({
               numeroPadron,
@@ -472,7 +497,7 @@ export async function procesarImportacionPagos(
               mes: nombreMes,
               montoCargo: cargo.montoOriginal,
               montoPagado: monto,
-              saldoRestante: cargo.saldo - monto,
+              saldoRestante: saldoRestante,
               cargoId: cargo.id,
               pagoId: pago.id
             });

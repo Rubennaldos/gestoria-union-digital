@@ -21,6 +21,7 @@ import {
   MessageCircle,
   Trash2,
   XCircle,
+  RotateCcw,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -107,6 +108,9 @@ export default function CobranzasV2() {
   
   // Modal de importación masiva
   const [showImportarModal, setShowImportarModal] = useState(false);
+  
+  // Estado para reset de pagos
+  const [reseteandoPagos, setReseteandoPagos] = useState(false);
   
   // Paginación de pagos pendientes
   const [paginaPagosPendientes, setPaginaPagosPendientes] = useState(1);
@@ -246,6 +250,96 @@ export default function CobranzasV2() {
   // Función para recargar manualmente
   const cargarDatos = async () => {
     await cargarDatosRapido();
+  };
+
+  // Función para resetear todos los pagos
+  const resetearTodosPagos = async () => {
+    // Confirmar acción
+    const confirmacion = window.confirm(
+      '⚠️ ADVERTENCIA: Esto eliminará TODOS los pagos y reseteará TODOS los charges.\n\n' +
+      'Todos los empadronados quedarán debiendo todos los meses.\n\n' +
+      'La configuración NO se eliminará.\n\n' +
+      '¿Estás SEGURO de que quieres continuar?'
+    );
+    
+    if (!confirmacion) return;
+    
+    // Segunda confirmación
+    const confirmacionFinal = window.confirm(
+      '⚠️ ÚLTIMA CONFIRMACIÓN\n\n' +
+      'Esta acción NO se puede deshacer.\n\n' +
+      '¿Confirmas que quieres resetear todos los pagos?'
+    );
+    
+    if (!confirmacionFinal) return;
+    
+    try {
+      setReseteandoPagos(true);
+      
+      toast({
+        title: "🔄 Iniciando reset...",
+        description: "Esto puede tardar unos momentos"
+      });
+      
+      // Importar Firebase Database
+      const { ref, remove, get, update } = await import('firebase/database');
+      const { db } = await import('@/config/firebase');
+      
+      const BASE_PATH = 'cobranzas_v2';
+      
+      // 1. Eliminar todos los pagos
+      await remove(ref(db, `${BASE_PATH}/pagos`));
+      
+      // 2. Eliminar todos los índices de pagos
+      await remove(ref(db, `${BASE_PATH}/pagos_index`));
+      
+      // 3. Resetear todos los charges
+      const chargesSnap = await get(ref(db, `${BASE_PATH}/charges`));
+      
+      if (chargesSnap.exists()) {
+        const allCharges = chargesSnap.val();
+        const currentTime = Date.now();
+        let count = 0;
+        
+        for (const periodo in allCharges) {
+          for (const empId in allCharges[periodo]) {
+            for (const chargeId in allCharges[periodo][empId]) {
+              const charge = allCharges[periodo][empId][chargeId];
+              
+              const estaVencido = currentTime > charge.fechaVencimiento;
+              
+              await update(ref(db, `${BASE_PATH}/charges/${periodo}/${empId}/${chargeId}`), {
+                saldo: charge.montoOriginal,
+                montoPagado: 0,
+                estado: estaVencido ? 'moroso' : 'pendiente',
+                esMoroso: estaVencido,
+                montoMorosidad: 0
+              });
+              
+              count++;
+            }
+          }
+        }
+        
+        toast({
+          title: "✅ Reset completado",
+          description: `${count} charges reseteados. Todos los empadronados ahora deben todos los meses.`
+        });
+      }
+      
+      // Recargar datos
+      await cargarDatos();
+      
+    } catch (error) {
+      console.error('Error durante el reset:', error);
+      toast({
+        title: "❌ Error",
+        description: "Ocurrió un error durante el reset. Revisa la consola.",
+        variant: "destructive"
+      });
+    } finally {
+      setReseteandoPagos(false);
+    }
   };
 
   const actualizarConfig = async () => {
@@ -796,6 +890,19 @@ export default function CobranzasV2() {
               >
                 <FileText className="h-3.5 w-3.5 md:h-4 md:w-4" />
                 <span className="text-xs md:text-sm">Importar Excel</span>
+              </Button>
+
+              <Button 
+                onClick={resetearTodosPagos}
+                disabled={procesando || reseteandoPagos}
+                variant="destructive"
+                size="sm"
+                className="justify-start gap-2 h-auto py-2.5 px-3 hover:scale-105 transition-transform"
+              >
+                <RotateCcw className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                <span className="text-xs md:text-sm">
+                  {reseteandoPagos ? 'Reseteando...' : 'Reset Pagos'}
+                </span>
               </Button>
             </div>
           </CardContent>

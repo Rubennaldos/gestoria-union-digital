@@ -265,10 +265,29 @@ export default function ImportarPagosMasivosModal({ open, onOpenChange, onImport
               {/* Formato esperado */}
               <Alert>
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Formato esperado:</strong> El Excel debe tener las columnas: Padron, Enero, Febrero, Marzo, etc.
-                  <br />
-                  Los montos deben ser números (ej: 50, 50.00). Las celdas vacías se consideran meses no pagados.
+                <AlertDescription className="space-y-2">
+                  <div>
+                    <strong>📋 Formato Requerido:</strong>
+                  </div>
+                  <div className="text-sm">
+                    <strong>Columnas obligatorias:</strong>
+                    <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                      <li><strong>Padron</strong> (o variantes: Padrón, Nro, Numero, etc.)</li>
+                      <li><strong>Meses:</strong> Enero, Febrero, Marzo, Abril, Mayo, Junio, Julio, Agosto, Septiembre, Octubre, Noviembre, Diciembre</li>
+                    </ul>
+                  </div>
+                  <div className="text-sm">
+                    <strong>⚠️ Importante:</strong>
+                    <ul className="list-disc list-inside ml-2 mt-1 space-y-1">
+                      <li>Los montos deben ser <strong>números puros</strong>: 50, 50.00, 20.5 (NO uses S/ 50 o $50)</li>
+                      <li>Las celdas vacías = no pagó ese mes (se ignoran, no es error)</li>
+                      <li>Todas las filas deben tener un número de padrón válido</li>
+                      <li>Los nombres de columnas deben coincidir exactamente (Enero, Febrero, etc.)</li>
+                    </ul>
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-2">
+                    💡 Ver la guía completa en: <code>FORMATO_EXCEL_PAGOS.md</code>
+                  </div>
                 </AlertDescription>
               </Alert>
 
