@@ -354,6 +354,35 @@ export async function verificarYGenerarCargosAutomaticos(): Promise<{
         
         await markPeriodGenerated(currentPeriod, 'sistema_automatico');
       }
+
+      // --- GENERAR MES SIGUIENTE (PROACTIVO) ---
+      // Si estamos en la última semana del mes (día 24 en adelante), 
+      // generamos proactivamente el siguiente mes para que aparezca en "Próximos"
+      const nextDate = new Date();
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      const nextPeriod = formatPeriod(nextDate);
+      const isNextGenerated = await isPeriodGenerated(nextPeriod);
+
+      if (!isNextGenerated && currentDate.getDate() >= 24) {
+        console.log(`🚀 Generación proactiva del período siguiente: ${nextPeriod}`);
+        const [config, empadronados] = await Promise.all([
+          obtenerConfiguracionV2(),
+          getEmpadronados()
+        ]);
+        const empadronadosActivos = empadronados.filter(e => e.habilitado);
+        
+        const batchSize = 50;
+        for (let i = 0; i < empadronadosActivos.length; i += batchSize) {
+          const batch = empadronadosActivos.slice(i, i + batchSize);
+          const promises = batch.map(emp => 
+            generarCargoMensualOptimizado(emp, nextPeriod, config)
+          );
+          const results = await Promise.all(promises);
+          cargosGenerados += results.filter(r => r !== null).length;
+        }
+        
+        await markPeriodGenerated(nextPeriod, 'sistema_automatico_proactivo');
+      }
     }
     
     let mensaje = '';

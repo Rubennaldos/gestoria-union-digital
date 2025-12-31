@@ -43,7 +43,7 @@ const Balances = () => {
   const [loading, setLoading] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<"todos" | "excelente" | "bueno" | "progreso" | "atrasado" | "critico" | "incumplido">("todos");
-  const [añoSeleccionado, setAñoSeleccionado] = useState(2025);
+  const [añoSeleccionado, setAñoSeleccionado] = useState(new Date().getFullYear());
 
   // Cargar datos iniciales
   useEffect(() => {

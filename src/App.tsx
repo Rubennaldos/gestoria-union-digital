@@ -47,6 +47,7 @@ import Modulos from "./pages/Modulos";
 import RecuperarContrasena from "./pages/RecuperarContrasena";
 import Comunicaciones from "./pages/Comunicaciones";
 import Auditoria from "./pages/Auditoria";
+import ResetPagos from "./pages/ResetPagos";
 
 const queryClient = new QueryClient();
 
@@ -362,6 +363,16 @@ const App: React.FC = () => {
                 element={
                   <ProtectedRoute>
                     <Auditoria />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Reset de Pagos - Solo presidencia */}
+              <Route
+                path="/reset-pagos"
+                element={
+                  <ProtectedRoute requireRole="presidencia">
+                    <ResetPagos />
                   </ProtectedRoute>
                 }
               />
