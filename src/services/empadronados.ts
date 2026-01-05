@@ -171,7 +171,7 @@ export const backfillChargesForAllEmpadronados = async (
 
   for (const empId of Object.keys(data)) {
     const emp = data[empId];
-    if (emp?.habilitado === false) continue;
+    if (emp?.habilitado === false || emp?.anulado === true) continue; // Excluir anulados
     total += await ensureChargesForNewMember(empId, undefined, authorUid);
   }
 
@@ -198,7 +198,7 @@ export const ensureCurrentMonthChargesForAll = async (
 
   for (const empId of Object.keys(data)) {
     const emp = data[empId];
-    if (emp?.habilitado === false) continue;
+    if (emp?.habilitado === false || emp?.anulado === true) continue; // Excluir anulados
     const ok = await ensureChargeForMemberPeriod(
       { id: empId, numeroPadron: emp.numeroPadron },
       period,
@@ -298,7 +298,7 @@ export const reconcilePagosForAll = async (
 
   for (const empId of Object.keys(allEmp)) {
     const emp = allEmp[empId];
-    if (emp?.habilitado === false) continue;
+    if (emp?.habilitado === false || emp?.anulado === true) continue; // Excluir anulados
     totalEmp++;
 
     const first = await firstChargePeriodForEmp(emp);
@@ -628,5 +628,42 @@ export const obtenerEmpadronadoPorAuthUid = async (
   } catch (error) {
     console.error("Error getting empadronado by authUid:", error);
     return null;
+  }
+};
+
+/**
+ * Anula un padrón (lo marca como "fantasma")
+ * No lo elimina, pero lo excluye de cargos y balances
+ */
+export const anularPadron = async (
+  id: string,
+  actorUid: string,
+  motivo: string
+): Promise<boolean> => {
+  try {
+    const oldData = await getEmpadronado(id);
+    if (!oldData) return false;
+
+    await update(ref(db, `${EMPADRONADOS_PATH}/${id}`), {
+      anulado: true,
+      habilitado: false,
+      updatedAt: Date.now(),
+      modificadoPor: actorUid,
+      observaciones: `${oldData.observaciones ? oldData.observaciones + ' | ' : ''}ANULADO: ${motivo}`
+    });
+
+    await writeAuditLog({
+      actorUid,
+      targetUid: id,
+      accion: "anular_padron",
+      moduloId: "empadronados",
+      old: oldData,
+      new: { motivo },
+    });
+
+    return true;
+  } catch (error) {
+    console.error("Error anulando padrón:", error);
+    return false;
   }
 };

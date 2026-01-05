@@ -24,6 +24,7 @@ export interface Empadronado {
   miembrosFamilia?: FamilyMember[];
   vehiculos?: Vehicle[];
   habilitado: boolean;
+  anulado?: boolean; // Padrón anulado (fantasma) - no genera cargos ni aparece en balances
   telefonos?: PhoneNumber[];
   fechaIngreso: number; // timestamp
   manzana?: string;

@@ -48,3 +48,6 @@ La **primera fila** de tu Excel debe contener los nombres de las columnas. El si
 ---
 *Última actualización: Diciembre 2025*
 
+
+
+

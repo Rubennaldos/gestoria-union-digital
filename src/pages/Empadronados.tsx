@@ -18,10 +18,10 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import {
   Users, UserPlus, Search, Edit3, Trash2, Home, Construction, MapPin, Eye,
-  Download, KeyRound, Settings, Upload, Mail, Lock
+  Download, KeyRound, Settings, Upload, Mail, Lock, XCircle
 } from 'lucide-react';
 import { Empadronado, EmpadronadosStats } from '@/types/empadronados';
-import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado } from '@/services/empadronados';
+import { getEmpadronados, getEmpadronadosStats, deleteEmpadronado, anularPadron } from '@/services/empadronados';
 import { ActualizacionMasivaModal } from '@/components/empadronados/ActualizacionMasivaModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { listModules, getUserPermissions, setUserPermissions as savePermissionsToRTDB } from '@/services/rtdb';
@@ -30,6 +30,7 @@ import { GestionarPermisosModal } from '@/components/empadronados/GestionarPermi
 import { CorreosAccesoModal } from '@/components/empadronados/CorreosAccesoModal';
 import { EstadoDeudaBadge } from '@/components/empadronados/EstadoDeudaBadge';
 import { AccesosMasivosModal } from '@/components/empadronados/AccesosMasivosModal';
+import { FormularioRegistroA4 } from '@/components/empadronados/FormularioRegistroA4';
 
 // >>> XLSX: exportar / importar plantilla de DNI + fechaIngreso
 import {
@@ -48,6 +49,8 @@ const Empadronados: React.FC = () => {
   const [selectedEmpadronado, setSelectedEmpadronado] = useState<Empadronado | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteMotivo, setDeleteMotivo] = useState('');
+  const [showAnularDialog, setShowAnularDialog] = useState(false);
+  const [anularMotivo, setAnularMotivo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'habilitado' | 'deshabilitado'>('all');
   const [filterVivienda, setFilterVivienda] = useState<'all' | 'construida' | 'construccion' | 'terreno'>('all');
@@ -246,6 +249,31 @@ const Empadronados: React.FC = () => {
     }
   };
 
+  const handleAnular = async () => {
+    if (!selectedEmpadronado) {
+      return;
+    }
+
+    try {
+      const success = await anularPadron(selectedEmpadronado.id, user?.uid || 'system', anularMotivo || 'Sin motivo especificado');
+      if (success) {
+        toast({ title: "Éxito", description: "Padrón anulado correctamente. Ahora es un registro fantasma." });
+        setShowAnularDialog(false);
+        setAnularMotivo('');
+        setSelectedEmpadronado(null);
+        loadData();
+      } else {
+        throw new Error('Error al anular');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo anular el padrón",
+        variant: "destructive"
+      });
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('es-PE');
   };
@@ -386,6 +414,8 @@ const Empadronados: React.FC = () => {
             <Upload className="h-3 w-3 md:h-4 md:w-4 md:mr-2" />
             <span className="hidden sm:inline">{importing ? 'Importando…' : 'Importar'}</span>
           </Button>
+
+          <FormularioRegistroA4 />
           
           <input
             ref={fileRef}
@@ -611,11 +641,18 @@ const Empadronados: React.FC = () => {
                 {filteredEmpadronados.map((empadronado, idx) => (
                   <TableRow 
                     key={empadronado.id}
-                    className="hover:bg-muted/50 transition-colors animate-fade-in"
+                    className={`hover:bg-muted/50 transition-colors animate-fade-in ${empadronado.anulado ? 'opacity-50 bg-red-50/30' : ''}`}
                     style={{ animationDelay: `${idx * 0.02}s` }}
                   >
                     <TableCell className="font-medium text-xs md:text-sm py-2 md:py-4">
-                      {empadronado.numeroPadron}
+                      <div className="flex items-center gap-2">
+                        {empadronado.numeroPadron}
+                        {empadronado.anulado && (
+                          <Badge variant="destructive" className="text-[9px] md:text-xs">
+                            ANULADO
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="py-2 md:py-4">
                       <div>
@@ -899,6 +936,19 @@ const Empadronados: React.FC = () => {
                         size="sm"
                         onClick={() => {
                           setSelectedEmpadronado(empadronado);
+                          setShowAnularDialog(true);
+                        }}
+                        className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110 text-orange-600 hover:text-orange-700"
+                        title="Anular Padrón"
+                      >
+                        <XCircle className="h-3 w-3 md:h-4 md:w-4" />
+                      </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedEmpadronado(empadronado);
                           setShowDeleteDialog(true);
                         }}
                         className="h-7 w-7 md:h-9 md:w-9 p-0 transition-all hover:scale-110"
@@ -992,6 +1042,43 @@ const Empadronados: React.FC = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Dialog de confirmación de anulación */}
+      <AlertDialog open={showAnularDialog} onOpenChange={setShowAnularDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Anular Padrón</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Está seguro que desea anular el padrón de {selectedEmpadronado?.nombre} {selectedEmpadronado?.apellidos}? 
+              Este padrón se volverá un "fantasma" (no generará cargos ni aparecerá en balances), pero NO se eliminará del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="anular-motivo">Motivo de Anulación (requerido)</Label>
+              <Textarea
+                id="anular-motivo"
+                value={anularMotivo}
+                onChange={(e) => setAnularMotivo(e.target.value)}
+                placeholder="Describa el motivo de la anulación (ej: Duplicado, Error de registro, etc.)"
+                className="min-h-[60px]"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setAnularMotivo('')}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAnular}
+              className="bg-orange-600 text-white hover:bg-orange-700"
+              disabled={!anularMotivo.trim()}
+            >
+              Anular Padrón
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
