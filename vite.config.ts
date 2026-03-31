@@ -9,12 +9,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig(({ mode }) => ({
-  // Base solo para producción (GitHub Pages), no para desarrollo
-  base: mode === 'production' ? '/gestoria-union-digital/' : '/',
+  base: '/',
   server: { host: "::", port: 8080 },
   build: { outDir: "dist", emptyOutDir: true, sourcemap: true },
   plugins: [react(), mode === "development" ? componentTagger() : null].filter(
     Boolean
   ),
   resolve: { alias: { "@": resolve(__dirname, "src") } },
+  optimizeDeps: {
+    include: ['@supabase/supabase-js'],
+  },
 }));
