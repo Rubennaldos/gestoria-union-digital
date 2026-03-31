@@ -72,13 +72,12 @@ async function readEmpadronadoSnapshot(empadronadoId: string): Promise<{
   solicitadoPorPadron: string | null;
 }> {
   try {
-    const empSnap = await get(ref(db, `empadronados/${empadronadoId}`));
-    if (!empSnap.exists())
-      return { solicitadoPorNombre: null, solicitadoPorPadron: null };
-    const emp: any = empSnap.val();
+    const { getEmpadronado } = await import("@/services/empadronados");
+    const emp = await getEmpadronado(empadronadoId);
+    if (!emp) return { solicitadoPorNombre: null, solicitadoPorPadron: null };
     const solicitadoPorNombre =
-      [emp?.nombre, emp?.apellidos].filter(Boolean).join(" ").trim() || null;
-    const solicitadoPorPadron = emp?.numeroPadron
+      [emp.nombre, emp.apellidos].filter(Boolean).join(" ").trim() || null;
+    const solicitadoPorPadron = emp.numeroPadron
       ? String(emp.numeroPadron)
       : null;
     return { solicitadoPorNombre, solicitadoPorPadron };

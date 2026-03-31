@@ -1,4 +1,4 @@
-import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users, LogOut, Settings } from "lucide-react";
+import { Home, Calendar, DollarSign, Shield, MoreHorizontal, Users, LogOut, Settings, UserCircle } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { signOutUser } from "@/services/auth";
@@ -80,7 +80,7 @@ export const BottomNavigation = () => {
 export const TopNavigation = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, empadronado } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -115,6 +115,21 @@ export const TopNavigation = () => {
             <span className="text-sm text-muted-foreground">Usuario:</span>
             <span className="text-sm font-medium">{profile?.displayName || "Usuario"}</span>
           </div>
+
+          {/* Botón "Mi Perfil de Socio" — visible solo si el admin tiene empadronado vinculado */}
+          {empadronado && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/portal-asociado')}
+              className="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+              title="Ver mi perfil de socio"
+            >
+              <UserCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline text-xs sm:text-sm">👤 Mi Perfil</span>
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"

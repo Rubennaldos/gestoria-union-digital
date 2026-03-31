@@ -1,5 +1,5 @@
 import { 
-  Users, FileText, Calendar, DollarSign, Shield, MessageSquare,
+  FileText, Calendar, Shield, MessageSquare,
   Trophy, Heart, GraduationCap, Vote, Package, BarChart3,
   UserCheck, Search, Gavel, Building, UserCircle, CreditCard, Settings,
   Briefcase, PartyPopper, FileBarChart
@@ -10,15 +10,16 @@ import { ModuleCircle } from "@/components/ui/module-circle";
 import { QuickAccessSection } from "@/components/dashboard/QuickAccessSection";
 import { SolicitudesPendientesWidget } from "@/components/dashboard/SolicitudesPendientesWidget";
 import { PagosPendientesWidget } from "@/components/dashboard/PagosPendientesWidget";
-import { useAuthz } from "@/contexts/AuthzContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
-import { listModules } from "@/services/rtdb";
+import { useMemo } from "react";
 import { Module } from "@/types/auth";
 import { useModulePreferences } from "@/hooks/useModulePreferences";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
+
+/** Roles con acceso completo al panel (ven todos los módulos si no tienen permisos explícitos) */
+const ADMIN_ROLES = ['presidencia', 'administrador', 'super_admin', 'admin'];
 
 // Mapa de iconos para los módulos
 const moduleIcons: Record<string, any> = {
@@ -80,42 +81,112 @@ const moduleColors: Record<string, "primary" | "warning" | "success" | "secondar
   admin_balances: "warning"
 };
 
+// Mapa de nombres legibles para cada módulo (antes venía de Firebase)
+const moduleNames: Record<string, string> = {
+  padron:           "Padrón de Socios",
+  actas:            "Actas",
+  sesiones:         "Sesiones",
+  "cobranzas-v2":   "Cobranzas V2",
+  cobranzas:        "Cobranzas V2",   // alias legacy → apunta al módulo V2
+  sanciones:        "Sanciones",
+  seguridad:        "Seguridad",
+  comunicaciones:   "Comunicaciones",
+  deportes:         "Deportes",
+  salud:            "Salud",
+  educacion:        "Educación",
+  electoral:        "Electoral",
+  patrimonio:       "Patrimonio",
+  "plan-anual":     "Plan Anual",
+  auditoria:        "Auditoría",
+  obras:            "Obras",
+  "portal-asociado":"Portal del Socio",
+  acceso:           "Control de Acceso",
+  pagosCuotas:      "Pagos de Cuotas",
+  admin_seguridad:  "Admin. Seguridad",
+  finanzas:         "Finanzas",
+  planilla:         "Planilla",
+  eventos:          "Eventos",
+  admin_eventos:    "Admin. Eventos",
+  admin_deportes:   "Admin. Deportes",
+  balances:         "Balances",
+  admin_balances:   "Admin. Balances",
+};
+
 // Mapa de rutas para los módulos
 const moduleRoutes: Record<string, string> = {
-  padron: "/padron",
-  actas: "/actas",
-  sesiones: "/sesiones",
-  "cobranzas-v2": "/cobranzas-v2",
-  sanciones: "/sanciones",
-  seguridad: "/seguridad",
-  comunicaciones: "/comunicaciones",
-  deportes: "/deportes",
-  salud: "/salud",
-  educacion: "/educacion",
-  electoral: "/electoral",
-  patrimonio: "/patrimonio",
-  "plan-anual": "/plan-anual",
-  auditoria: "/auditoria",
-  obras: "/obras",
-  "portal-asociado": "/portal-asociado",
-  acceso: "/acceso",
-  pagosCuotas: "/pagos-cuotas",
-  admin_seguridad: "/admin-seguridad",
-  finanzas: "/finanzas",
-  planilla: "/planilla",
-  eventos: "/eventos",
-  admin_eventos: "/admin-eventos",
-  admin_deportes: "/admin-deportes",
-  balances: "/balances",
-  admin_balances: "/admin-balances"
+  padron:           "/padron",
+  actas:            "/actas",
+  sesiones:         "/sesiones",
+  "cobranzas-v2":   "/cobranzas-v2",
+  cobranzas:        "/cobranzas-v2",  // alias legacy → redirige a V2
+  sanciones:        "/sanciones",
+  seguridad:        "/seguridad",
+  comunicaciones:   "/comunicaciones",
+  deportes:         "/deportes",
+  salud:            "/salud",
+  educacion:        "/educacion",
+  electoral:        "/electoral",
+  patrimonio:       "/patrimonio",
+  "plan-anual":     "/plan-anual",
+  auditoria:        "/auditoria",
+  obras:            "/obras",
+  "portal-asociado":"/portal-asociado",
+  acceso:           "/acceso",
+  pagosCuotas:      "/pagos-cuotas",
+  admin_seguridad:  "/admin-seguridad",
+  finanzas:         "/finanzas",
+  planilla:         "/planilla",
+  eventos:          "/eventos",
+  admin_eventos:    "/admin-eventos",
+  admin_deportes:   "/admin-deportes",
+  balances:         "/balances",
+  admin_balances:   "/admin-balances",
 };
 
 const Index = () => {
-  const { can, loading: authLoading } = useAuthz();
-  const { user, profile, empadronado } = useAuth();
-  const [modules, setModules] = useState<Module[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, profile, empadronado, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
+
+  /**
+   * Construye la lista de módulos directamente desde profile.modules (Supabase).
+   * No llama a Firebase RTDB en ningún momento.
+   *
+   * Lógica:
+   *  - Si el perfil tiene módulos explícitos → se usan esos.
+   *  - Si el rol es admin/presidencia y no tiene módulos explícitos → se muestran
+   *    todos los módulos conocidos (acceso completo).
+   */
+  const modules = useMemo((): Module[] => {
+    if (!profile) return [];
+
+    const roleId = (profile.roleId ?? '').toLowerCase();
+    const isFullAdmin =
+      ADMIN_ROLES.includes(roleId) ||
+      (user?.email ?? '').toLowerCase() === 'presidencia@jpusap.com';
+
+    // IDs con permiso explícito en Supabase profiles.modules
+    const explicitIds = Object.entries(profile.modules ?? {})
+      .filter(([, v]) => v && v !== 'none' && v !== false)
+      .map(([id]) => id);
+
+    // Admins sin módulos explícitos → todos los módulos del sistema
+    const ids =
+      isFullAdmin && explicitIds.length === 0
+        ? Object.keys(moduleNames)
+        : explicitIds;
+
+    // Deduplicar: si el perfil tiene tanto 'cobranzas' como 'cobranzas-v2', 
+    // mantener solo 'cobranzas-v2'. El alias 'cobranzas' ya apunta a la misma ruta.
+    const dedupIds = ids.filter((id, _, arr) =>
+      !(id === 'cobranzas' && arr.includes('cobranzas-v2'))
+    );
+
+    return dedupIds.map((id, idx) => ({
+      id,
+      nombre: moduleNames[id] ?? id,
+      orden:  idx,
+    }));
+  }, [profile, user?.email]);
 
   const {
     favorites,
@@ -124,62 +195,28 @@ const Index = () => {
     getOrderedModules,
   } = useModulePreferences(modules);
 
-  useEffect(() => {
-    const loadModules = async () => {
-      try {
-        const allModules = await listModules();
-        // Seguridad: asegurar que allModules sea un array antes de filtrar
-        if (!allModules || !Array.isArray(allModules)) {
-          console.warn('listModules returned non-array:', allModules);
-          setModules([]);
-          return;
-        }
-
-        // Filtrar módulos según permisos del usuario (todos los módulos requieren permiso explícito)
-        const accessibleModules = allModules.filter((module) => {
-          if (!module) return false;
-          return can(module.id, "read");
-        });
-
-        setModules(accessibleModules);
-      } catch (error) {
-        console.error("Error loading modules:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (!authLoading) {
-      loadModules();
-    }
-  }, [can, authLoading]);
-
   const orderedModules = getOrderedModules();
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (over && active.id !== over.id) {
       const oldIndex = orderedModules.findIndex((m) => m.id === active.id);
       const newIndex = orderedModules.findIndex((m) => m.id === over.id);
-
       const newOrder = [...orderedModules];
       const [removed] = newOrder.splice(oldIndex, 1);
       newOrder.splice(newIndex, 0, removed);
-
       updateOrder(newOrder.map((m) => m.id));
     }
   };
 
   const handleFavoriteReorder = (newFavoriteOrder: string[]) => {
-    // Actualizar el orden de favoritos
     const nonFavorites = orderedModules
       .filter((m) => !newFavoriteOrder.includes(m.id))
       .map((m) => m.id);
     updateOrder([...newFavoriteOrder, ...nonFavorites]);
   };
 
-  if (loading || authLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 md:pb-0">
         <TopNavigation />

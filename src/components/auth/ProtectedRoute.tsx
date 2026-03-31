@@ -6,6 +6,15 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type Role = string;
 
+/**
+ * Roles que tienen acceso al panel de administración (/inicio y módulos admin).
+ * Cualquier roleId que NO esté en esta lista se considera "socio puro".
+ */
+const ADMIN_ROLES = new Set([
+  'presidencia', 'administrador', 'super_admin', 'admin',
+  'secretaria', 'tesoreria', 'vocal', 'seguridad', 'coordinador',
+]);
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
   /**
@@ -14,6 +23,11 @@ interface ProtectedRouteProps {
    * Si se omite, sólo se exige estar autenticado.
    */
   requireRole?: Role | Role[];
+  /**
+   * Si es true, sólo usuarios con rol admin pueden entrar.
+   * Los socios (rol no admin) son redirigidos a /portal-asociado.
+   */
+  soloAdmin?: boolean;
 }
 
 const normalize = (v?: string | null) => (v || '').trim().toLowerCase();
@@ -25,13 +39,17 @@ const userIsSuperAdmin = (email?: string | null, roleId?: string | null | undefi
 };
 
 const hasRequiredRole = (userRole?: Role | null, required?: Role | Role[] | undefined) => {
-  if (!required) return true; // no role required -> OK
+  if (!required) return true;
   const requiredArr = Array.isArray(required) ? required : [required];
   return requiredArr.map(normalize).includes(normalize(userRole || ''));
 };
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireRole }) => {
-  const { user, loading } = useAuth();
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  children,
+  requireRole,
+  soloAdmin = false,
+}) => {
+  const { user, loading, profileLoaded } = useAuth();
   const location = useLocation();
 
   // 1) Mientras se resuelve la sesión
@@ -56,18 +74,22 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
     return <>{children}</>;
   }
 
-  // 4) Si se requiere rol específico:
-  //    - Si el perfil aún no está (p.ej. primera vez), permitimos pasar
-  //      cuando NO se pidió rol. Si SÍ se pidió rol y no hay perfil,
-  //      reenviamos a /inicio.
+  // 4) soloAdmin: esperar que el perfil cargue y luego verificar rol
+  if (soloAdmin && profileLoaded) {
+    const roleId = normalize(user.profile?.roleId);
+    if (!ADMIN_ROLES.has(roleId)) {
+      return <Navigate to="/portal-asociado" replace />;
+    }
+  }
+
+  // 5) Si se requiere rol específico
   if (requireRole) {
     const ok = hasRequiredRole(user.profile?.roleId, requireRole);
     if (!ok) {
-      // Sin permiso -> mandamos a /inicio (o una página 403 si la tienes)
       return <Navigate to="/inicio" replace />;
     }
   }
 
-  // 5) Autenticado (y con rol correcto si se pidió)
+  // 6) Autenticado (y con rol correcto si se pidió)
   return <>{children}</>;
 };

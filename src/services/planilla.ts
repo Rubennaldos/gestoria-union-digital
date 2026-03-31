@@ -6,10 +6,9 @@ import {
   UpdatePersonalPlanillaForm,
   PlanillaStats,
 } from "@/types/planilla";
-import { Empadronado } from "@/types/empadronados";
+import { getEmpadronado } from "@/services/empadronados";
 
 const PLANILLA_PATH = "planilla";
-const EMPADRONADOS_PATH = "empadronados";
 
 /**
  * Crear un nuevo registro en planilla
@@ -19,15 +18,11 @@ export async function createPersonalPlanilla(
   userId: string
 ): Promise<{ id: string; personal: PersonalPlanilla }> {
   try {
-    // Obtener datos del empadronado
-    const empadronadoRef = ref(db, `${EMPADRONADOS_PATH}/${data.empadronadoId}`);
-    const empadronadoSnap = await get(empadronadoRef);
-    
-    if (!empadronadoSnap.exists()) {
+    // Obtener datos del empadronado desde Supabase
+    const empadronado = await getEmpadronado(data.empadronadoId);
+    if (!empadronado) {
       throw new Error("Empadronado no encontrado");
     }
-    
-    const empadronado = empadronadoSnap.val() as Empadronado;
     
     const planillaRef = ref(db, PLANILLA_PATH);
     const newRef = push(planillaRef);

@@ -1,4 +1,12 @@
 // src/services/empadronados.ts
+//
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │  EMPADRONADOS CRUD  →  Supabase (PostgreSQL)                            │
+// │  Cobranzas (charges / periods / pagos)  →  Firebase RTDB               │
+// │  Los helpers de cobranzas siguen en RTDB hasta su migración completa.   │
+// └─────────────────────────────────────────────────────────────────────────┘
+
+// ─── Firebase imports (solo para cobranzas) ──────────────────────────────────
 import {
   ref,
   push,
@@ -7,11 +15,13 @@ import {
   remove,
   get,
   runTransaction,
-  query,
-  orderByChild,
-  equalTo,
 } from "firebase/database";
 import { db } from "@/config/firebase";
+
+// ─── Supabase (empadronados CRUD) ────────────────────────────────────────────
+import { supabase } from "@/lib/supabase";
+
+// ─── Tipos y auditoría ────────────────────────────────────────────────────────
 import {
   Empadronado,
   CreateEmpadronadoForm,
@@ -20,17 +30,140 @@ import {
 } from "@/types/empadronados";
 import { writeAuditLog } from "./rtdb";
 
-const EMPADRONADOS_PATH = "empadronados";
-const CHARGES_PATH = "cobranzas/charges";
-const PERIODS_LOCK_PATH = "cobranzas/periods";
+// =============================================================================
+// 1. HELPERS DE FECHA
+// =============================================================================
 
-/* ──────────────────────────────────────────────────────────────
-   Helpers de periodos / fechas
-   ────────────────────────────────────────────────────────────── */
+/** "DD/MM/YYYY" → "YYYY-MM-DD"  (para columna `date` de PostgreSQL) */
+const ddmmyyyyToISO = (s?: string | null): string | null => {
+  if (!s) return null;
+  const m = s.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // Aceptar también formato ISO ya correcto
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) return s.trim();
+  return null;
+};
+
+/** "YYYY-MM-DD" → "DD/MM/YYYY"  (para la interfaz Empadronado del frontend) */
+const isoToDDMMYYYY = (s?: string | null): string => {
+  if (!s) return "";
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : s;
+};
+
+// =============================================================================
+// 2. TIPO DE FILA DE SUPABASE (snake_case)
+// =============================================================================
+
+/** Refleja exactamente las columnas de public.empadronados */
+type SupabaseRow = {
+  id: string;
+  numero_padron: string;
+  nombre: string;
+  apellidos: string;
+  dni: string;
+  familia: string;
+  miembros_familia: unknown[];
+  vehiculos: unknown[];
+  telefonos: unknown[];
+  habilitado: boolean;
+  anulado: boolean;
+  observaciones: string | null;
+  fecha_ingreso: string | null;
+  manzana: string | null;
+  lote: string | null;
+  etapa: string | null;
+  genero: string;
+  vive: boolean;
+  estado_vivienda: string;
+  cumpleanos: string | null;
+  created_at: string;
+  updated_at: string;
+  creado_por: string | null;
+  modificado_por: string | null;
+  auth_uid: string | null;
+  email_acceso: string | null;
+};
+
+// =============================================================================
+// 3. MAPPERS  DB ↔ DOMINIO
+// =============================================================================
+
+/** Fila de Supabase (snake_case) → Empadronado (camelCase) */
+const fromRow = (row: SupabaseRow): Empadronado => ({
+  id:              row.id,
+  numeroPadron:    row.numero_padron,
+  nombre:          row.nombre,
+  apellidos:       row.apellidos,
+  dni:             row.dni,
+  familia:         row.familia,
+  miembrosFamilia: (row.miembros_familia as any[]) ?? [],
+  vehiculos:       (row.vehiculos as any[]) ?? [],
+  telefonos:       (row.telefonos as any[]) ?? [],
+  habilitado:      row.habilitado,
+  anulado:         row.anulado ?? false,
+  observaciones:   row.observaciones ?? undefined,
+  fechaIngreso:    row.fecha_ingreso ? new Date(row.fecha_ingreso).getTime() : 0,
+  manzana:         row.manzana ?? undefined,
+  lote:            row.lote ?? undefined,
+  etapa:           row.etapa ?? undefined,
+  genero:          row.genero as "masculino" | "femenino",
+  vive:            row.vive,
+  estadoVivienda:  row.estado_vivienda as "construida" | "construccion" | "terreno",
+  cumpleanos:      isoToDDMMYYYY(row.cumpleanos),
+  createdAt:       new Date(row.created_at).getTime(),
+  updatedAt:       new Date(row.updated_at).getTime(),
+  creadoPor:       row.creado_por ?? "",
+  modificadoPor:   row.modificado_por ?? undefined,
+  authUid:         row.auth_uid ?? undefined,
+  emailAcceso:     row.email_acceso ?? undefined,
+});
+
+/** Formulario camelCase → objeto parcial snake_case para Supabase */
+const toRow = (
+  data: CreateEmpadronadoForm | UpdateEmpadronadoForm
+): Record<string, unknown> => {
+  const row: Record<string, unknown> = {};
+
+  if (data.numeroPadron  !== undefined) row.numero_padron    = data.numeroPadron;
+  if (data.nombre        !== undefined) row.nombre           = data.nombre;
+  if (data.apellidos     !== undefined) row.apellidos        = data.apellidos;
+  if (data.dni           !== undefined) row.dni              = data.dni;
+  if (data.familia       !== undefined) row.familia          = data.familia;
+  if (data.habilitado    !== undefined) row.habilitado       = data.habilitado;
+  if (data.observaciones !== undefined) row.observaciones    = data.observaciones ?? null;
+  if (data.manzana       !== undefined) row.manzana          = data.manzana ?? null;
+  if (data.lote          !== undefined) row.lote             = data.lote ?? null;
+  if (data.etapa         !== undefined) row.etapa            = data.etapa ?? null;
+  if (data.genero        !== undefined) row.genero           = data.genero;
+  if (data.vive          !== undefined) row.vive             = data.vive;
+  if (data.estadoVivienda !== undefined) row.estado_vivienda = data.estadoVivienda;
+
+  if (data.miembrosFamilia !== undefined) row.miembros_familia = data.miembrosFamilia ?? [];
+  if (data.vehiculos       !== undefined) row.vehiculos        = data.vehiculos ?? [];
+  if (data.telefonos       !== undefined) row.telefonos        = data.telefonos ?? [];
+
+  if (data.fechaIngreso !== undefined) {
+    row.fecha_ingreso = data.fechaIngreso
+      ? new Date(data.fechaIngreso).toISOString()
+      : null;
+  }
+
+  if (data.cumpleanos !== undefined) {
+    row.cumpleanos = ddmmyyyyToISO(data.cumpleanos);
+  }
+
+  return row;
+};
+
+// =============================================================================
+// 4. HELPERS DE PERÍODOS / COBRANZAS  (solo usados internamente)
+// =============================================================================
+
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const periodKeyFromDate = (d: Date) =>
-  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; // "YYYY-MM"
-const compact = (period: string) => period.replace("-", ""); // "YYYY-MM" -> "YYYYMM"
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+const compact = (period: string) => period.replace("-", "");
 const addMonths = (period: string, n: number) => {
   const [y, m] = period.split("-").map(Number);
   const base = new Date(y, m - 1 + n, 1);
@@ -43,52 +176,50 @@ const monthsBetween = (from: string, to: string) => {
 };
 const ymd = (y: number, m: number, d: number) => new Date(y, m - 1, d);
 
-/** Política global: el sistema arranca 15/01/2025 */
 const POLICY_START = ymd(2025, 1, 15);
+const CHARGES_PATH = "cobranzas/charges";
+const PERIODS_LOCK_PATH = "cobranzas/periods";
 
-/* ──────────────────────────────────────────────────────────────
-   Config de cobranzas
-   ────────────────────────────────────────────────────────────── */
+// =============================================================================
+// 5. CONFIG DE COBRANZAS  (sigue en Firebase hasta migrar cobranzas)
+// =============================================================================
+
 export type CobranzasConfig = {
-  montoMensual: number; // S/
-  diaVencimiento: number; // p.ej. 15
-  diaCierreMes: number; // p.ej. 14 (1–14 entra; 15+ siguiente mes)
+  montoMensual: number;
+  diaVencimiento: number;
+  diaCierreMes: number;
 };
 
 export const getCobranzasConfig = async (): Promise<CobranzasConfig> => {
   const snap = await get(ref(db, "cobranzas/configuracion"));
   const cfg = (snap.exists() ? snap.val() : {}) as any;
   return {
-    montoMensual: Number(cfg?.montoMensual ?? 50),
+    montoMensual:   Number(cfg?.montoMensual ?? 50),
     diaVencimiento: Number(cfg?.diaVencimiento ?? 15),
-    diaCierreMes: Number(cfg?.diaCierre ?? 14), // en RTDB el campo es "diaCierre"
+    diaCierreMes:   Number(cfg?.diaCierre ?? 14),
   };
 };
 
-/** Calcula el primer "YYYY-MM" a cobrar respetando política y día de cierre. */
+/** Primer "YYYY-MM" a cobrar según política y fecha de ingreso */
 const firstChargePeriodForEmp = async (emp: Empadronado): Promise<string> => {
   const { diaCierreMes } = await getCobranzasConfig();
   const ingresoDate = new Date(emp.fechaIngreso || 0);
 
-  // Si no tiene fecha o ingresó antes de la política -> enero 2025
   if (!emp.fechaIngreso || ingresoDate < POLICY_START) return "2025-01";
 
   const y = ingresoDate.getFullYear();
   const m = ingresoDate.getMonth() + 1;
   const d = ingresoDate.getDate();
 
-  // Hasta el día de cierre: cobra ese mismo mes; después: mes siguiente
-  if (d <= diaCierreMes) {
-    return `${y}-${pad2(m)}`;
-  } else {
-    const next = new Date(y, m - 1 + 1, 1);
-    return `${next.getFullYear()}-${pad2(next.getMonth() + 1)}`;
-  }
+  if (d <= diaCierreMes) return `${y}-${pad2(m)}`;
+  const next = new Date(y, m, 1);
+  return `${next.getFullYear()}-${pad2(next.getMonth() + 1)}`;
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Alta de CHARGES mensuales (no quincenas)
-   ────────────────────────────────────────────────────────────── */
+// =============================================================================
+// 6. GENERACIÓN DE CHARGES (escribe en Firebase RTDB)
+// =============================================================================
+
 const ensureChargeForMemberPeriod = async (
   emp: Pick<Empadronado, "id" | "numeroPadron">,
   period: string,
@@ -105,7 +236,6 @@ const ensureChargeForMemberPeriod = async (
   const snap = await get(ref(db, node));
   if (snap.exists()) {
     const vals = snap.val();
-    // Si ya hay un cargo "mensual" (sin quincena) para ese mes, no crear otro
     const alreadyMonthly = Object.values<any>(vals).some((c) => !("quincena" in c));
     if (alreadyMonthly) return false;
   }
@@ -113,17 +243,17 @@ const ensureChargeForMemberPeriod = async (
   const chargeRef = push(ref(db, node));
   await set(chargeRef, {
     empadronadoId: emp.id,
-    numeroPadron: emp.numeroPadron || "",
-    periodo: period,
-    vencimiento: fechaVenc,
-    montoBase: montoMensual,
-    descuentos: [],
-    recargos: [],
-    total: montoMensual,
-    saldo: montoMensual,
-    estado: "pendiente",
+    numeroPadron:  emp.numeroPadron || "",
+    periodo:       period,
+    vencimiento:   fechaVenc,
+    montoBase:     montoMensual,
+    descuentos:    [],
+    recargos:      [],
+    total:         montoMensual,
+    saldo:         montoMensual,
+    estado:        "pendiente",
     timestamps: {
-      creado: new Date().toISOString(),
+      creado:      new Date().toISOString(),
       actualizado: new Date().toISOString(),
     },
   });
@@ -131,23 +261,23 @@ const ensureChargeForMemberPeriod = async (
   return true;
 };
 
-/** Genera cuotas desde el primer periodo válido del empadronado hasta el mes actual. */
+/** Genera cuotas desde el primer período válido hasta el mes actual */
 export const ensureChargesForNewMember = async (
   empId: string,
   _ignored?: string,
   authorUid: string = "system"
 ): Promise<number> => {
-  const empSnap = await get(ref(db, `${EMPADRONADOS_PATH}/${empId}`));
-  if (!empSnap.exists()) return 0;
-  const emp = empSnap.val() as Empadronado;
+  // Lee el empadronado desde Supabase (ya migrado)
+  const emp = await getEmpadronado(empId);
+  if (!emp) return 0;
 
   const first = await firstChargePeriodForEmp(emp);
-  const last = periodKeyFromDate(new Date());
-  const diff = monthsBetween(first, last);
+  const last  = periodKeyFromDate(new Date());
+  const diff  = monthsBetween(first, last);
 
   let created = 0;
   for (let i = 0; i <= diff; i++) {
-    const p = addMonths(first, i);
+    const p  = addMonths(first, i);
     const ok = await ensureChargeForMemberPeriod(
       { id: empId, numeroPadron: emp.numeroPadron },
       p,
@@ -158,49 +288,40 @@ export const ensureChargesForNewMember = async (
   return created;
 };
 
-/** Backfill para TODOS (respeta las reglas nuevas) */
+/** Backfill de charges para todos los empadronados activos */
 export const backfillChargesForAllEmpadronados = async (
   _ignored?: string,
   authorUid: string = "system"
 ): Promise<number> => {
-  const snap = await get(ref(db, EMPADRONADOS_PATH));
-  if (!snap.exists()) return 0;
-
-  const data = snap.val() as Record<string, Empadronado>;
+  const empadronados = await getEmpadronados();
   let total = 0;
 
-  for (const empId of Object.keys(data)) {
-    const emp = data[empId];
-    if (emp?.habilitado === false || emp?.anulado === true) continue; // Excluir anulados
-    total += await ensureChargesForNewMember(empId, undefined, authorUid);
+  for (const emp of empadronados) {
+    if (emp.habilitado === false || emp.anulado === true) continue;
+    total += await ensureChargesForNewMember(emp.id, undefined, authorUid);
   }
 
   return total;
 };
 
-/** Genera SOLO la cuota del mes actual para todos (sin duplicar) */
+/** Genera solo la cuota del mes actual para todos (sin duplicar) */
 export const ensureCurrentMonthChargesForAll = async (
   authorUid: string = "system"
 ): Promise<number> => {
-  const period = periodKeyFromDate(new Date());
-  const yyyymm = compact(period);
+  const period    = periodKeyFromDate(new Date());
+  const yyyymm    = compact(period);
   const periodLock = ref(db, `${PERIODS_LOCK_PATH}/${yyyymm}/generated`);
 
-  // lock por período para evitar generación concurrente
   const tx = await runTransaction(periodLock, (cur) => (cur ? cur : { at: Date.now() }));
   if (!tx.committed) return 0;
 
-  const snap = await get(ref(db, EMPADRONADOS_PATH));
-  if (!snap.exists()) return 0;
-
-  const data = snap.val() as Record<string, Empadronado>;
+  const empadronados = await getEmpadronados();
   let created = 0;
 
-  for (const empId of Object.keys(data)) {
-    const emp = data[empId];
-    if (emp?.habilitado === false || emp?.anulado === true) continue; // Excluir anulados
+  for (const emp of empadronados) {
+    if (emp.habilitado === false || emp.anulado === true) continue;
     const ok = await ensureChargeForMemberPeriod(
-      { id: empId, numeroPadron: emp.numeroPadron },
+      { id: emp.id, numeroPadron: emp.numeroPadron },
       period,
       authorUid
     );
@@ -209,25 +330,10 @@ export const ensureCurrentMonthChargesForAll = async (
   return created;
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Utils
-   ────────────────────────────────────────────────────────────── */
-const removeUndefined = (obj: any): any => {
-  if (Array.isArray(obj)) return obj.map(removeUndefined).filter((item) => item !== undefined);
-  if (obj !== null && typeof obj === "object") {
-    const cleanObj: any = {};
-    Object.keys(obj).forEach((key) => {
-      const value = removeUndefined(obj[key]);
-      if (value !== undefined) cleanObj[key] = value;
-    });
-    return cleanObj;
-  }
-  return obj;
-};
+// =============================================================================
+// 7. HERRAMIENTAS LEGACY  (cobranzas/pagos — siguen en Firebase)
+// =============================================================================
 
-/* ──────────────────────────────────────────────────────────────
-   Herramientas sobre /cobranzas/pagos (legacy) para limpieza
-   ────────────────────────────────────────────────────────────── */
 export const dedupePagosForAll = async (): Promise<{ kept: number; removed: number }> => {
   const pagosSnap = await get(ref(db, "cobranzas/pagos"));
   if (!pagosSnap.exists()) return { kept: 0, removed: 0 };
@@ -241,7 +347,6 @@ export const dedupePagosForAll = async (): Promise<{ kept: number; removed: numb
   let kept = 0;
   let removed = 0;
 
-  // resetear índice
   await remove(ref(db, "cobranzas/pagos_index"));
 
   for (const [pagoId, p] of Object.entries(all)) {
@@ -249,9 +354,10 @@ export const dedupePagosForAll = async (): Promise<{ kept: number; removed: numb
     if (!seen.has(key)) {
       seen.set(key, pagoId);
       kept++;
-      await set(ref(db, `cobranzas/pagos_index/${p.empadronadoId}/${p.año}${pad2(p.mes)}`), {
-        createdAt: Date.now(),
-      });
+      await set(
+        ref(db, `cobranzas/pagos_index/${p.empadronadoId}/${p.año}${pad2(p.mes)}`),
+        { createdAt: Date.now() }
+      );
     } else {
       await remove(ref(db, `cobranzas/pagos/${pagoId}`));
       removed++;
@@ -268,17 +374,14 @@ export const reconcilePagosForAll = async (
   removedDuplicates: number;
   createdMissing: number;
 }> => {
-  const empSnap = await get(ref(db, EMPADRONADOS_PATH));
-  if (!empSnap.exists()) {
+  const empadronados = await getEmpadronados();
+  if (!empadronados.length) {
     return { totalEmp: 0, removedOutOfRange: 0, removedDuplicates: 0, createdMissing: 0 };
   }
-
-  const allEmp = empSnap.val() as Record<string, Empadronado>;
 
   const pagosSnap = await get(ref(db, "cobranzas/pagos"));
   const allPagos: Record<string, any> = pagosSnap.exists() ? pagosSnap.val() : {};
 
-  // agrupar pagos por empId
   const byEmp = new Map<string, Array<{ id: string; año: number; mes: number }>>();
   for (const [pagoId, p] of Object.entries(allPagos)) {
     const empId = (p as any).empadronadoId;
@@ -288,27 +391,24 @@ export const reconcilePagosForAll = async (
   }
 
   const last = periodKeyFromDate(new Date());
-
   let removedOutOfRange = 0;
   let removedDuplicates = 0;
-  let createdMissing = 0;
-  let totalEmp = 0;
+  let createdMissing    = 0;
+  let totalEmp          = 0;
 
   await remove(ref(db, "cobranzas/pagos_index"));
 
-  for (const empId of Object.keys(allEmp)) {
-    const emp = allEmp[empId];
-    if (emp?.habilitado === false || emp?.anulado === true) continue; // Excluir anulados
+  for (const emp of empadronados) {
+    if (emp.habilitado === false || emp.anulado === true) continue;
     totalEmp++;
 
     const first = await firstChargePeriodForEmp(emp);
-
-    const diff = monthsBetween(first, last);
+    const diff  = monthsBetween(first, last);
     const validPeriods = new Set<string>();
     for (let i = 0; i <= diff; i++) validPeriods.add(addMonths(first, i));
 
-    const pagos = byEmp.get(empId) ?? [];
-    const seen = new Set<string>(); // YYYY-MM
+    const pagos = byEmp.get(emp.id) ?? [];
+    const seen  = new Set<string>();
 
     for (const p of pagos) {
       const period = `${p.año}-${pad2(p.mes)}`;
@@ -323,7 +423,7 @@ export const reconcilePagosForAll = async (
         continue;
       }
       seen.add(period);
-      await set(ref(db, `cobranzas/pagos_index/${empId}/${compact(period)}`), {
+      await set(ref(db, `cobranzas/pagos_index/${emp.id}/${compact(period)}`), {
         createdAt: Date.now(),
       });
     }
@@ -331,7 +431,7 @@ export const reconcilePagosForAll = async (
     for (const period of validPeriods) {
       if (!seen.has(period)) {
         const ok = await ensureChargeForMemberPeriod(
-          { id: empId, numeroPadron: emp.numeroPadron },
+          { id: emp.id, numeroPadron: emp.numeroPadron },
           period,
           authorUid
         );
@@ -343,32 +443,36 @@ export const reconcilePagosForAll = async (
   return { totalEmp, removedOutOfRange, removedDuplicates, createdMissing };
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Vinculación con usuarios
-   ────────────────────────────────────────────────────────────── */
+// =============================================================================
+// 8. VINCULACIÓN CON AUTH  →  Supabase
+// =============================================================================
+
 export const linkAuthToEmpadronado = async (
   empadronadoId: string,
   uid: string,
   email: string
 ) => {
-  await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
-    authUid: uid,
-    emailAcceso: email,
-    updatedAt: Date.now(),
-  });
+  const { error } = await supabase
+    .from("empadronados")
+    .update({ auth_uid: uid, email_acceso: email })
+    .eq("id", empadronadoId);
+
+  if (error) throw error;
 };
 
 export const unlinkAuthFromEmpadronado = async (empadronadoId: string) => {
-  await update(ref(db, `${EMPADRONADOS_PATH}/${empadronadoId}`), {
-    authUid: null,
-    emailAcceso: null,
-    updatedAt: Date.now(),
-  });
+  const { error } = await supabase
+    .from("empadronados")
+    .update({ auth_uid: null, email_acceso: null })
+    .eq("id", empadronadoId);
+
+  if (error) throw error;
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Búsqueda directa
-   ────────────────────────────────────────────────────────────── */
+// =============================================================================
+// 9. BÚSQUEDA DIRECTA  →  Supabase
+// =============================================================================
+
 export const findEmpadronadoByDniOrPadron = async (
   term: string
 ): Promise<Empadronado | null> => {
@@ -376,56 +480,63 @@ export const findEmpadronadoByDniOrPadron = async (
   if (!t) return null;
 
   // 1) Por número de padrón
-  const q1 = query(ref(db, EMPADRONADOS_PATH), orderByChild("numeroPadron"), equalTo(t));
-  let snap = await get(q1);
-  if (snap.exists()) {
-    const v = snap.val();
-    return (Object.values(v)[0] as Empadronado) ?? null;
-  }
+  const { data: byPadron } = await supabase
+    .from("empadronados")
+    .select("*")
+    .eq("numero_padron", t)
+    .maybeSingle();
+
+  if (byPadron) return fromRow(byPadron as SupabaseRow);
 
   // 2) Por DNI
-  const q2 = query(ref(db, EMPADRONADOS_PATH), orderByChild("dni"), equalTo(t));
-  snap = await get(q2);
-  if (snap.exists()) {
-    const v = snap.val();
-    return (Object.values(v)[0] as Empadronado) ?? null;
-  }
+  const { data: byDni } = await supabase
+    .from("empadronados")
+    .select("*")
+    .eq("dni", t)
+    .maybeSingle();
 
-  return null;
+  return byDni ? fromRow(byDni as SupabaseRow) : null;
 };
 
-/* ──────────────────────────────────────────────────────────────
-   CRUD Empadronados
-   ────────────────────────────────────────────────────────────── */
+// =============================================================================
+// 10. CRUD  →  Supabase
+// =============================================================================
+
 export const createEmpadronado = async (
   data: CreateEmpadronadoForm,
   actorUid: string
 ): Promise<string | null> => {
   try {
-    const empadronadoRef = push(ref(db, EMPADRONADOS_PATH));
-    const id = empadronadoRef.key!;
-
-    const empadronado: Empadronado = {
-      ...data,
-      id,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      creadoPor: actorUid,
+    const row = {
+      ...toRow(data),
+      // creado_por/modificado_por son UUID FK a auth.users;
+      // se asignan solo si actorUid es un UUID válido de Supabase Auth.
     };
 
-    await set(empadronadoRef, removeUndefined(empadronado));
+    const { data: inserted, error } = await supabase
+      .from("empadronados")
+      .insert([row])
+      .select()
+      .single();
 
-    // Generar sus charges (desde su primer período válido)
-    await ensureChargesForNewMember(id, undefined, actorUid);
+    if (error || !inserted) {
+      console.error("Error creating empadronado:", error);
+      return null;
+    }
+
+    const newId = (inserted as SupabaseRow).id;
+
+    // Genera charges mensuales en Firebase (cobranzas aún no migradas)
+    await ensureChargesForNewMember(newId, undefined, actorUid);
 
     await writeAuditLog({
       actorUid,
       accion: "crear_empadronado",
       moduloId: "empadronados",
-      new: empadronado,
+      new: { id: newId, numeroPadron: data.numeroPadron },
     });
 
-    return id;
+    return newId;
   } catch (error) {
     console.error("Error creating empadronado:", error);
     return null;
@@ -434,10 +545,17 @@ export const createEmpadronado = async (
 
 export const getEmpadronados = async (): Promise<Empadronado[]> => {
   try {
-    const snapshot = await get(ref(db, EMPADRONADOS_PATH));
-    if (!snapshot.exists()) return [];
-    const data = snapshot.val();
-    return Object.values(data) as Empadronado[];
+    const { data, error } = await supabase
+      .from("empadronados")
+      .select("*")
+      .order("numero_padron", { ascending: true });
+
+    if (error) {
+      console.error("Error getting empadronados:", error);
+      return [];
+    }
+
+    return (data as SupabaseRow[]).map(fromRow);
   } catch (error) {
     console.error("Error getting empadronados:", error);
     return [];
@@ -446,15 +564,25 @@ export const getEmpadronados = async (): Promise<Empadronado[]> => {
 
 export const getEmpadronado = async (id: string): Promise<Empadronado | null> => {
   try {
-    const snapshot = await get(ref(db, `${EMPADRONADOS_PATH}/${id}`));
-    return snapshot.exists() ? (snapshot.val() as Empadronado) : null;
+    const { data, error } = await supabase
+      .from("empadronados")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error getting empadronado:", error);
+      return null;
+    }
+
+    return data ? fromRow(data as SupabaseRow) : null;
   } catch (error) {
     console.error("Error getting empadronado:", error);
     return null;
   }
 };
 
-// Alias
+// Alias mantenido para compatibilidad con componentes existentes
 export const getEmpadronadoById = getEmpadronado;
 
 export const updateEmpadronado = async (
@@ -466,29 +594,31 @@ export const updateEmpadronado = async (
     const oldData = await getEmpadronado(id);
     if (!oldData) return false;
 
-    // Crear copia de updates sin campos de documentos base64
-    const { 
-      documentoDniFrontal, 
-      documentoDniReverso, 
-      documentoReciboLuz, 
-      ...cleanUpdates 
+    // Excluir campos de documentos base64 (no se guardan en Supabase por tamaño)
+    const {
+      documentoDniFrontal,
+      documentoDniReverso,
+      documentoReciboLuz,
+      ...cleanUpdates
     } = updates as any;
 
-    const updateData = removeUndefined({
-      ...cleanUpdates,
-      updatedAt: Date.now(),
-      modificadoPor: actorUid,
-    });
+    const row = toRow(cleanUpdates);
+    if (Object.keys(row).length === 0) return true;
 
-    await update(ref(db, `${EMPADRONADOS_PATH}/${id}`), updateData);
+    const { error } = await supabase
+      .from("empadronados")
+      .update(row)
+      .eq("id", id);
 
-    // Solo registrar los campos que cambiaron (sin documentos base64)
-    const changedFields: Record<string, any> = {};
-    Object.keys(updateData).forEach(key => {
-      // Excluir campos de documentos que pueden ser muy grandes
-      if (!key.startsWith('documento') && key !== 'updatedAt' && key !== 'modificadoPor') {
-        changedFields[key] = updateData[key];
-      }
+    if (error) {
+      console.error("Error updating empadronado:", error);
+      return false;
+    }
+
+    // Log de auditoría (solo campos que cambiaron, sin documentos)
+    const logFields: Record<string, any> = {};
+    Object.keys(row).forEach((k) => {
+      if (!k.startsWith("documento")) logFields[k] = row[k];
     });
 
     await writeAuditLog({
@@ -496,8 +626,12 @@ export const updateEmpadronado = async (
       targetUid: id,
       accion: "actualizar_empadronado",
       moduloId: "empadronados",
-      old: { id: oldData.id, numeroPadron: oldData.numeroPadron, nombre: oldData.nombre },
-      new: changedFields,
+      old: {
+        id: oldData.id,
+        numeroPadron: oldData.numeroPadron,
+        nombre: oldData.nombre,
+      },
+      new: logFields,
     });
 
     return true;
@@ -516,7 +650,15 @@ export const deleteEmpadronado = async (
     const oldData = await getEmpadronado(id);
     if (!oldData) return false;
 
-    await remove(ref(db, `${EMPADRONADOS_PATH}/${id}`));
+    const { error } = await supabase
+      .from("empadronados")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error deleting empadronado:", error);
+      return false;
+    }
 
     await writeAuditLog({
       actorUid,
@@ -536,27 +678,44 @@ export const deleteEmpadronado = async (
 
 export const searchEmpadronados = async (searchTerm: string): Promise<Empadronado[]> => {
   try {
-    const empadronados = await getEmpadronados();
-    const term = (searchTerm || "").toLowerCase();
+    const term = (searchTerm || "").trim().toLowerCase();
+    if (!term) return getEmpadronados();
 
-    return empadronados.filter((e: any) => {
-      const hayMiembros = Array.isArray(e?.miembrosFamilia);
-      const matchMiembros =
-        hayMiembros &&
+    // Búsqueda server-side por campos de texto indexables
+    const { data, error } = await supabase
+      .from("empadronados")
+      .select("*")
+      .or(
+        `nombre.ilike.%${term}%,` +
+        `apellidos.ilike.%${term}%,` +
+        `numero_padron.ilike.%${term}%,` +
+        `dni.ilike.%${term}%`
+      )
+      .order("numero_padron", { ascending: true });
+
+    if (error) {
+      console.error("Error searching empadronados:", error);
+      return [];
+    }
+
+    const results = (data as SupabaseRow[]).map(fromRow);
+
+    // Búsqueda adicional en miembros_familia (campo JSONB — no indexado en ilike)
+    const hayMiembros = results.length === 0;
+    if (hayMiembros) {
+      // Fallback: traer todos y filtrar en cliente (solo si no hubo resultados de texto)
+      const todos = await getEmpadronados();
+      return todos.filter((e) =>
+        Array.isArray(e.miembrosFamilia) &&
         e.miembrosFamilia.some(
           (m: any) =>
             String(m?.nombre || "").toLowerCase().includes(term) ||
             String(m?.apellidos || "").toLowerCase().includes(term)
-        );
-
-      return (
-        String(e.nombre || "").toLowerCase().includes(term) ||
-        String(e.apellidos || "").toLowerCase().includes(term) ||
-        String(e.numeroPadron || "").toLowerCase().includes(term) ||
-        String(e.dni || "").toLowerCase().includes(term) ||
-        !!matchMiembros
+        )
       );
-    });
+    }
+
+    return results;
   } catch (error) {
     console.error("Error searching empadronados:", error);
     return [];
@@ -566,27 +725,20 @@ export const searchEmpadronados = async (searchTerm: string): Promise<Empadronad
 export const getEmpadronadosStats = async (): Promise<EmpadronadosStats> => {
   try {
     const empadronados = await getEmpadronados();
-
     return {
-      total: empadronados.length,
-      viven: empadronados.filter((e: any) => !!e.vive).length,
-      construida: empadronados.filter((e: any) => e.estadoVivienda === "construida").length,
-      construccion: empadronados.filter((e: any) => e.estadoVivienda === "construccion").length,
-      terreno: empadronados.filter((e: any) => e.estadoVivienda === "terreno").length,
-      masculinos: empadronados.filter((e: any) => e.genero === "masculino").length,
-      femeninos: empadronados.filter((e: any) => e.genero === "femenino").length,
-      habilitados: empadronados.filter((e: any) => !!e.habilitado).length,
+      total:       empadronados.length,
+      viven:       empadronados.filter((e) => !!e.vive).length,
+      construida:  empadronados.filter((e) => e.estadoVivienda === "construida").length,
+      construccion: empadronados.filter((e) => e.estadoVivienda === "construccion").length,
+      terreno:     empadronados.filter((e) => e.estadoVivienda === "terreno").length,
+      masculinos:  empadronados.filter((e) => e.genero === "masculino").length,
+      femeninos:   empadronados.filter((e) => e.genero === "femenino").length,
+      habilitados: empadronados.filter((e) => !!e.habilitado).length,
     };
   } catch {
     return {
-      total: 0,
-      viven: 0,
-      construida: 0,
-      construccion: 0,
-      terreno: 0,
-      masculinos: 0,
-      femeninos: 0,
-      habilitados: 0,
+      total: 0, viven: 0, construida: 0, construccion: 0,
+      terreno: 0, masculinos: 0, femeninos: 0, habilitados: 0,
     };
   }
 };
@@ -596,45 +748,45 @@ export const isNumeroPadronUnique = async (
   excludeId?: string
 ): Promise<boolean> => {
   try {
-    const empadronados = await getEmpadronados();
-    return !empadronados.some((e) => e.numeroPadron === numeroPadron && e.id !== excludeId);
+    let query = supabase
+      .from("empadronados")
+      .select("id")
+      .eq("numero_padron", numeroPadron);
+
+    if (excludeId) query = query.neq("id", excludeId);
+
+    const { data, error } = await query;
+    if (error) return false;
+    return !data || data.length === 0;
   } catch (error) {
     console.error("Error checking numero padron:", error);
     return false;
   }
 };
 
-
 export const obtenerEmpadronadoPorAuthUid = async (
   authUid: string
 ): Promise<Empadronado | null> => {
   try {
-    const empadronadosRef = ref(db, EMPADRONADOS_PATH);
-    const empadronadosQuery = query(
-      empadronadosRef,
-      orderByChild("authUid"),
-      equalTo(authUid)
-    );
-    const snapshot = await get(empadronadosQuery);
+    const { data, error } = await supabase
+      .from("empadronados")
+      .select("*")
+      .eq("auth_uid", authUid)
+      .maybeSingle();
 
-    if (!snapshot.exists()) return null;
+    if (error) {
+      console.error("Error getting empadronado by authUid:", error);
+      return null;
+    }
 
-    let empadronado: Empadronado | null = null;
-    snapshot.forEach((child) => {
-      empadronado = { id: child.key!, ...(child.val() as Empadronado) };
-    });
-
-    return empadronado;
+    return data ? fromRow(data as SupabaseRow) : null;
   } catch (error) {
     console.error("Error getting empadronado by authUid:", error);
     return null;
   }
 };
 
-/**
- * Anula un padrón (lo marca como "fantasma")
- * No lo elimina, pero lo excluye de cargos y balances
- */
+/** Anula un padrón (marca como "fantasma") — no lo elimina */
 export const anularPadron = async (
   id: string,
   actorUid: string,
@@ -644,13 +796,23 @@ export const anularPadron = async (
     const oldData = await getEmpadronado(id);
     if (!oldData) return false;
 
-    await update(ref(db, `${EMPADRONADOS_PATH}/${id}`), {
-      anulado: true,
-      habilitado: false,
-      updatedAt: Date.now(),
-      modificadoPor: actorUid,
-      observaciones: `${oldData.observaciones ? oldData.observaciones + ' | ' : ''}ANULADO: ${motivo}`
-    });
+    const nuevaObs = oldData.observaciones
+      ? `${oldData.observaciones} | ANULADO: ${motivo}`
+      : `ANULADO: ${motivo}`;
+
+    const { error } = await supabase
+      .from("empadronados")
+      .update({
+        anulado:      true,
+        habilitado:   false,
+        observaciones: nuevaObs,
+      })
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error anulando padrón:", error);
+      return false;
+    }
 
     await writeAuditLog({
       actorUid,

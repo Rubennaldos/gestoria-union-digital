@@ -7,45 +7,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { BootstrapAdmin } from '@/components/auth/BootstrapAdmin';
 import { signInWithEmailOrUsername } from '@/services/auth';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { Mail, Lock, Loader2 } from 'lucide-react';
+import { Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import securityGuardImage from '@/assets/security-guard-stop.png';
 import logoUrbanizacion from '@/assets/logo-urbanizacion.png';
-
-// 🔸 Leemos el flag directo del servicio RTDB
-import { isBootstrapInitialized } from '@/services/rtdb';
-// Para el fallback a admin existente
-import { ref, get } from 'firebase/database';
-import { db } from '@/config/firebase';
 
 interface LoginForm {
   identifier: string;
   password: string;
 }
 
-const normalize = (v?: string | null) => (v || '').trim().toLowerCase();
-const isSuperAdmin = (email?: string | null, roleId?: string | null | undefined) =>
-  normalize(email) === 'presidencia@jpusap.com' || normalize(roleId || '') === 'super_admin';
-
-// Fallback: si no hay flag, pero ya existe un admin en /users
-const hasAnyAdminInDb = async () => {
-  const snap = await get(ref(db, 'users'));
-  if (!snap.exists()) return false;
-  const users = Object.values(snap.val() as Record<string, any>);
-  return users.some(
-    (u: any) =>
-      (u?.roleId === 'super_admin' || u?.roleId === 'presidencia') && u?.activo === true
-  );
-};
+/**
+ * Todos los usuarios ingresan primero al portal del socio.
+ * Los admins con empadronado vinculado ven el portal + botón "Gestión Admin".
+ * Los admins sin empadronado ven "Cuenta no vinculada" + botón para ir a /inicio.
+ */
+const resolveDestination = (): string => '/portal-asociado';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bootstrapComplete, setBootstrapComplete] = useState<boolean | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -54,45 +39,18 @@ export default function Login() {
 
   const form = useForm<LoginForm>({ defaultValues: { identifier: '', password: '' } });
 
-  // Si ya está logueado, redirigimos a donde quería ir o /inicio
+  // Redirigir cuando hay sesión activa y el perfil ya cargó
   useEffect(() => {
-    console.log('🔍 Login: useEffect - user:', user?.email, 'profile:', profile?.roleId);
     if (!user) return;
-    
-    // Esperar un momento para asegurar que no hay errores pendientes
-    const timer = setTimeout(() => {
-      const from = (location.state as any)?.from?.pathname || '/inicio';
-      console.log('➡️ Login: Redirecting to:', from);
-      navigate(from, { replace: true });
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [user, location.state, navigate, profile]);
+    // Esperar a que el perfil cargue para saber la ruta correcta
+    if (profile === undefined) return;
 
-  // Verificar bootstrap + fallback a admin ya existente
-  useEffect(() => {
-    const checkBootstrap = async () => {
-      try {
-        const initialized = await isBootstrapInitialized();
-        if (initialized) {
-          setBootstrapComplete(true);
-          return;
-        }
-        // Fallback: si no hay flag pero ya hay admin en /users
-        if (await hasAnyAdminInDb()) {
-          setBootstrapComplete(true);
-          return;
-        }
-        // Si no hay nada, mostrar BootstrapAdmin
-        setBootstrapComplete(false);
-      } catch (err) {
-        console.error('❌ Error checking bootstrap:', err);
-        // En error, mejor dejar entrar al login normal para no bloquear
-        setBootstrapComplete(true);
-      }
-    };
-    checkBootstrap();
-  }, []);
+    const timer = setTimeout(() => {
+      navigate(resolveDestination(), { replace: true });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [user, profile, location.state, navigate]);
 
   const onSubmit = async (data: LoginForm) => {
     console.log('🔐 Login: Attempting login with:', data.identifier);
@@ -138,32 +96,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  const handleBootstrapComplete = () => {
-    // BootstrapAdmin nos avisa que ya terminó (dejó el flag en true)
-    setBootstrapComplete(true);
-    toast({
-      title: 'Sistema inicializado',
-      description: 'Ahora puedes iniciar sesión con la cuenta de Presidencia.',
-    });
-  };
-
-  // Muestra BootstrapAdmin si NO está inicializado
-  if (bootstrapComplete === false) {
-    return <BootstrapAdmin onComplete={handleBootstrapComplete} />;
-  }
-
-  // Loader mientras verificamos
-  if (bootstrapComplete === null) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Iniciando sistema...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Login normal
   return (
@@ -255,12 +187,23 @@ export default function Login() {
                         <div className="relative">
                           <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                           <Input
-                            className="pl-10 h-11 border-slate-200 focus:border-blue-500"
-                            type="password"
+                            className="pl-10 pr-10 h-11 border-slate-200 focus:border-blue-500"
+                            type={showPassword ? 'text' : 'password'}
                             placeholder="••••••••"
                             autoComplete="current-password"
                             {...field}
                           />
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() => setShowPassword(v => !v)}
+                            className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 transition-colors"
+                            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                          >
+                            {showPassword
+                              ? <EyeOff className="w-4 h-4" />
+                              : <Eye    className="w-4 h-4" />}
+                          </button>
                         </div>
                       </FormControl>
                       <FormMessage />

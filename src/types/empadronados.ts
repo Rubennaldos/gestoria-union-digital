@@ -14,7 +14,42 @@ export interface Vehicle {
   tipo: 'vehiculo' | 'moto';
 }
 
+/**
+ * Tipo de fila devuelta por Supabase (snake_case).
+ * Usado internamente en empadronados.ts para el mapeo DB ↔ dominio.
+ * Los componentes de React usan siempre `Empadronado` (camelCase).
+ */
+export interface EmpadronadoRow {
+  id: string;                    // UUID generado por PostgreSQL
+  numero_padron: string;
+  nombre: string;
+  apellidos: string;
+  dni: string;
+  familia: string;
+  miembros_familia: unknown[];
+  vehiculos: unknown[];
+  telefonos: unknown[];
+  habilitado: boolean;
+  anulado: boolean;
+  observaciones: string | null;
+  fecha_ingreso: string | null;  // ISO timestamptz
+  manzana: string | null;
+  lote: string | null;
+  etapa: string | null;
+  genero: string;
+  vive: boolean;
+  estado_vivienda: string;
+  cumpleanos: string | null;     // YYYY-MM-DD (columna date de PG)
+  created_at: string;
+  updated_at: string;
+  creado_por: string | null;
+  modificado_por: string | null;
+  auth_uid: string | null;
+  email_acceso: string | null;
+}
+
 export interface Empadronado {
+  /** UUID de Supabase (antes era la push-key de Firebase RTDB) */
   id: string;
   numeroPadron: string;
   nombre: string;
@@ -40,9 +75,9 @@ export interface Empadronado {
   creadoPor: string; // uid del usuario que lo creó
   modificadoPor?: string; // uid del último usuario que lo modificó
   
-  /** Vínculo con cuenta del sistema */
-  authUid?: string;        // UID de Firebase Auth si tiene cuenta
-  emailAcceso?: string;    // email con el que accede
+  /** Vínculo con cuenta del sistema (Supabase Auth) */
+  authUid?: string;        // UUID de Supabase Auth (columna auth_uid en DB)
+  emailAcceso?: string;    // email con el que accede (columna email_acceso en DB)
 }
 
 export interface CreateEmpadronadoForm {

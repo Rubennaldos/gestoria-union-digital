@@ -47,34 +47,43 @@ export const obtenerTodosMensajes = async (): Promise<MensajeMasivo[]> => {
 };
 
 /**
- * Obtener mensajes activos para mostrar en el portal
+ * Obtener mensajes activos para mostrar en el portal.
+ * Lee desde public.mensajes_masivos (Supabase) — no requiere Firebase Auth.
  */
 export const obtenerMensajesActivos = async (): Promise<MensajeMasivo[]> => {
-  const mensajesRef = ref(db, MENSAJES_PATH);
-  const snapshot = await get(mensajesRef);
-  
-  if (!snapshot.exists()) return [];
-  
-  const mensajes: MensajeMasivo[] = [];
-  const ahora = Date.now();
-  
-  snapshot.forEach((child) => {
-    const mensaje = child.val();
-    if (mensaje.activo) {
-      // Verificar si está dentro del rango de fechas
-      const dentroDeRango = (!mensaje.fechaInicio || mensaje.fechaInicio <= ahora) &&
-                           (!mensaje.fechaFin || mensaje.fechaFin >= ahora);
-      
-      if (dentroDeRango) {
-        mensajes.push({
-          id: child.key!,
-          ...mensaje
-        });
-      }
-    }
-  });
-  
-  return mensajes.sort((a, b) => b.fechaCreacion - a.fechaCreacion);
+  const { supabase } = await import('@/lib/supabase');
+  const ahora = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('mensajes_masivos')
+    .select('*')
+    .eq('activo', true)
+    .or(`fecha_inicio.is.null,fecha_inicio.lte.${ahora}`)
+    .or(`fecha_fin.is.null,fecha_fin.gte.${ahora}`)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    // Si la tabla no tiene filas o hay error de permisos, devolver vacío silenciosamente
+    console.warn('[comunicaciones] obtenerMensajesActivos:', error.message);
+    return [];
+  }
+
+  return (data ?? []).map(r => ({
+    id:           String(r.id),
+    titulo:       String(r.titulo),
+    descripcion:  String(r.descripcion),
+    imagen:       r.imagen ?? undefined,
+    link:         r.link ?? undefined,
+    estiloTexto:  (r.estilo_texto as MensajeMasivo['estiloTexto']) ?? {
+      fuente: 'Inter', tamano: 16, color: '#000000',
+      negrita: false, cursiva: false, alineacion: 'left',
+    },
+    activo:       Boolean(r.activo),
+    fechaCreacion: r.created_at ? new Date(r.created_at).getTime() : Date.now(),
+    fechaInicio:  r.fecha_inicio ? new Date(r.fecha_inicio).getTime() : undefined,
+    fechaFin:     r.fecha_fin    ? new Date(r.fecha_fin).getTime()    : undefined,
+    creadoPor:    String(r.creado_por),
+  }));
 };
 
 /**

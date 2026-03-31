@@ -17,8 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { findUserByIdentifier, designarUsuarioAEmpadronado, createUserProfile, listRoles } from '@/services/rtdb';
 import { Empadronado } from '@/types/empadronados';
 import { Role } from '@/types/auth';
-import { auth } from '@/config/firebase';
-import { fetchSignInMethodsForEmail } from 'firebase/auth';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 
 interface VincularCuentaModalProps {
   open: boolean;
@@ -83,25 +82,30 @@ export function VincularCuentaModal({
         return;
       }
 
-      // Si no está en RTDB pero el identifier es un email, buscar en Firebase Auth
+      // Si no está en RTDB pero el identifier es un email, buscar en Supabase profiles
       if (identifier.trim().includes('@')) {
         try {
-          const methods = await fetchSignInMethodsForEmail(auth, identifier.trim());
-          if (methods && methods.length > 0) {
-            // La cuenta existe en Auth pero no en RTDB
-            setSearchResult({ 
-              email: identifier.trim(),
-              isAuthOnly: true 
+          const { data: profileRow } = await supabase
+            .from('profiles')
+            .select('id, email')
+            .eq('email', identifier.trim().toLowerCase())
+            .maybeSingle();
+
+          if (profileRow) {
+            setSearchResult({
+              email: profileRow.email,
+              uid: profileRow.id,
+              isAuthOnly: true,
             });
             setAuthOnlyAccount(true);
             toast({
-              title: 'Cuenta encontrada en Firebase Auth',
-              description: 'Esta cuenta existe pero no tiene perfil. Puedes importarla.',
+              title: 'Cuenta encontrada en Supabase',
+              description: 'Esta cuenta existe pero no tiene perfil en RTDB. Puedes vincularla.',
             });
             return;
           }
         } catch (authError) {
-          console.error('Error checking Firebase Auth:', authError);
+          console.error('Error checking Supabase profiles:', authError);
         }
       }
 

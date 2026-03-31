@@ -83,11 +83,11 @@ const App: React.FC = () => {
               <Route path="/recuperar-contrasena" element={<RecuperarContrasena />} />
               <Route path="/bootstrap" element={<AdminCreator />} />
 
-              {/* Inicio protegido */}
+              {/* Inicio protegido — solo para roles admin; socios van a /portal-asociado */}
               <Route
                 path="/inicio"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute soloAdmin>
                     <Index />
                   </ProtectedRoute>
                 }

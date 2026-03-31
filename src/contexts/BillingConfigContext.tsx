@@ -1,17 +1,19 @@
+// src/contexts/BillingConfigContext.tsx
+// Lee la configuración de cobranzas desde Supabase (tabla cobranzas_configuracion).
+// Sin ninguna referencia a Firebase RTDB.
+
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
-import { db } from "@/config/firebase";
-import { onValue, ref } from "firebase/database";
 import { useAuth } from "@/contexts/AuthContext";
+import { obtenerConfiguracionV2 } from "@/services/cobranzas-v2";
 
 export type BillingConfig = {
-  // Normalizado para el motor de deuda:
-  montoBase: number;          // S/ por MES (de "montoMensual" en DB)
-  cierreDia: number;          // día de cierre del mes (de "diaCierre")
-  vencimientoDia: number;     // día de vencimiento visual (de "diaVencimiento")
-  prontoPagoDias: number;     // días (de "diasProntoPago")
-  recargoMoraPct: number;     // % (de "porcentajeMorosidad")
-  recargoSancionPct: number;  // % (de "porcentajeSancion")
-  fechaCorteISO: string;      // "YYYY-MM-DD" (si no existe en DB, 2025-01-15)
+  montoBase: number;          // S/ por MES (monto_mensual en DB)
+  cierreDia: number;          // día de cierre del mes
+  vencimientoDia: number;     // día de vencimiento visual
+  prontoPagoDias: number;     // días de pronto pago
+  recargoMoraPct: number;     // % morosidad
+  recargoSancionPct: number;  // % sanción (no existe en DB, se usa 0)
+  fechaCorteISO: string;      // "YYYY-MM-DD" de corte
 
   // Extras opcionales
   sede?: string;
@@ -21,65 +23,58 @@ export type BillingConfig = {
 };
 
 const DEFAULT_CFG: BillingConfig = {
-  montoBase: 50, // S/50 por mes
-  cierreDia: 14,
-  vencimientoDia: 15,
-  prontoPagoDias: 3,
-  recargoMoraPct: 0,
+  montoBase:        50,
+  cierreDia:        14,
+  vencimientoDia:   15,
+  prontoPagoDias:   3,
+  recargoMoraPct:   0,
   recargoSancionPct: 0,
-  fechaCorteISO: "2025-01-15",
+  fechaCorteISO:    "2025-01-15",
 };
 
 const Ctx = createContext<BillingConfig>(DEFAULT_CFG);
 
 export function BillingConfigProvider({ children }: { children: ReactNode }) {
   const [cfg, setCfg] = useState<BillingConfig>(DEFAULT_CFG);
-  const { user, loading, profileLoaded } = useAuth();
+  const { user, profileLoaded } = useAuth();
 
   useEffect(() => {
-    // Wait until profile has been loaded (initial fetch completed)
+    // Esperar que el perfil cargue antes de consultar
     if (!profileLoaded) return;
 
-    // If there's no authenticated user, don't subscribe to protected config (keep default)
+    // Sin usuario autenticado → usar configuración por defecto
     if (!user?.uid) {
       setCfg(DEFAULT_CFG);
       return;
     }
 
-    // ✅ Actualizado para usar cobranzas_v2 (sistema nuevo)
-    const r = ref(db, "cobranzas_v2/configuracion");
-    const unsub = onValue(
-      r,
-      (snap) => {
-        const raw = (snap.val() ?? {}) as any;
+    let cancelled = false;
 
-        // Mapeo de tus claves en español -> claves normalizadas
-        // montoBase es MENSUAL, se toma directamente de la configuración
-        const parsed: BillingConfig = {
-          montoBase: toNum(raw.montoMensual, DEFAULT_CFG.montoBase),
-          cierreDia: toNum(raw.diaCierre, DEFAULT_CFG.cierreDia),
-          vencimientoDia: toNum(raw.diaVencimiento, DEFAULT_CFG.vencimientoDia),
-          prontoPagoDias: toNum(raw.diasProntoPago, DEFAULT_CFG.prontoPagoDias),
-          recargoMoraPct: toNum(raw.porcentajeMorosidad, DEFAULT_CFG.recargoMoraPct),
-          recargoSancionPct: toNum(raw.porcentajeSancion, DEFAULT_CFG.recargoSancionPct),
-          fechaCorteISO: toStr(raw.fechaCorteISO, DEFAULT_CFG.fechaCorteISO),
-
-          // extras
-          sede: toStr(raw.sede, undefined),
-          serieComprobantes: toStr(raw.serieComprobantes, undefined),
-          numeroComprobanteActual: toNum(raw.numeroComprobanteActual, undefined),
-          porcentajeProntoPago: toNum(raw.porcentajeProntoPago, undefined),
-        };
-
-        setCfg(parsed);
-      },
-      (err) => {
-        console.error("Error leyendo cobranzas_v2/configuracion:", err);
+    obtenerConfiguracionV2()
+      .then((raw) => {
+        if (cancelled) return;
+        setCfg({
+          montoBase:               raw.montoMensual,
+          cierreDia:               raw.diaCierre,
+          vencimientoDia:          raw.diaVencimiento,
+          prontoPagoDias:          raw.diasProntoPago,
+          recargoMoraPct:          raw.porcentajeMorosidad,
+          recargoSancionPct:       0,               // campo no existe en Supabase
+          fechaCorteISO:           DEFAULT_CFG.fechaCorteISO,
+          sede:                    raw.sede,
+          serieComprobantes:       raw.serieComprobantes,
+          numeroComprobanteActual: raw.numeroComprobanteActual,
+          porcentajeProntoPago:    raw.porcentajeProntoPago,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn("[BillingConfig] Error leyendo configuración desde Supabase:", err?.message);
         setCfg(DEFAULT_CFG);
-      }
-    );
-    return () => unsub();
-  }, [loading, user?.uid]);
+      });
+
+    return () => { cancelled = true; };
+  }, [profileLoaded, user?.uid]);
 
   const value = useMemo(() => cfg, [cfg]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -87,13 +82,4 @@ export function BillingConfigProvider({ children }: { children: ReactNode }) {
 
 export function useBillingConfig() {
   return useContext(Ctx);
-}
-
-// Helpers robustos
-function toNum(v: any, fallback: any) {
-  const n = typeof v === "string" ? Number(v) : v;
-  return Number.isFinite(n) ? n : fallback;
-}
-function toStr<T = string>(v: any, fallback: T) {
-  return typeof v === "string" && v.trim() ? (v as T) : fallback;
 }

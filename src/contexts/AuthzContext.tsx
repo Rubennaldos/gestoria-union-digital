@@ -1,7 +1,10 @@
+// src/contexts/AuthzContext.tsx
+// Permisos obtenidos desde public.profiles (Supabase) — sin Firebase RTDB.
+// El campo `modules` del perfil contiene el mapa { [moduleId]: PermissionLevel }.
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { EffectivePermissions, PermissionLevel, Delegation } from '@/types/auth';
-import { getEffectivePermissions, getActiveDelegation, onPermissions } from '@/services/rtdb';
 
 interface AuthzContextType {
   permissions: EffectivePermissions;
@@ -48,75 +51,52 @@ const PERMISSION_HIERARCHY: Record<PermissionLevel, number> = {
 export const AuthzProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, profile } = useAuth();
   const [permissions, setPermissions] = useState<EffectivePermissions>({});
-  const [delegation, setDelegation] = useState<Delegation | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isPresidencia = profile?.roleId === 'presidencia';
+  const isPresidencia   = profile?.roleId === 'presidencia';
   const isAdministrador = profile?.roleId === 'administrador';
-  const isPresidente = profile?.roleId === 'presidencia'; // Presidente es el admin general
+  const isPresidente    = profile?.roleId === 'presidencia';
 
-  const loadPermissions = async () => {
+  // Los permisos vienen directamente del campo `modules` del perfil ya cargado.
+  // No se realiza ninguna llamada adicional a Firebase RTDB.
+  useEffect(() => {
     if (!user?.uid) {
       setPermissions({});
-      setDelegation(null);
       setLoading(false);
       return;
     }
 
-    try {
-      const [effectivePerms, activeDelegation] = await Promise.all([
-        getEffectivePermissions(user.uid),
-        getActiveDelegation(user.uid)
-      ]);
+    // Si el perfil aún no cargó, esperar
+    if (profile === undefined) return;
 
-      setPermissions(effectivePerms);
-      setDelegation(activeDelegation);
-    } catch (error) {
-      console.error('Error loading permissions:', error);
-      setPermissions({});
-      setDelegation(null);
-    } finally {
-      setLoading(false);
-    }
+    const mods = (profile?.modules ?? {}) as Record<string, string>;
+    setPermissions(mods as EffectivePermissions);
+    setLoading(false);
+  }, [user?.uid, profile]);
+
+  const refresh = async () => {
+    // Los permisos se actualizan automáticamente cuando AuthContext recarga el perfil.
+    // Esta función existe para compatibilidad con código que la llame.
   };
 
-  useEffect(() => {
-    loadPermissions();
-  }, [user?.uid]);
-
-  // Suscribirse a cambios en permisos
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const unsubscribePermissions = onPermissions(user.uid, () => {
-      loadPermissions();
-    });
-
-    return unsubscribePermissions;
-  }, [user?.uid]);
-
   const can = (moduleId: string, requiredLevel: PermissionLevel): boolean => {
-    // Presidente (presidencia) tiene acceso total a todo como administrador general
     if (isPresidente || isAdministrador) return true;
 
     const userLevel = permissions[moduleId] || 'none';
-    const userLevelValue = PERMISSION_HIERARCHY[userLevel];
-    const requiredLevelValue = PERMISSION_HIERARCHY[requiredLevel];
-
-    return userLevelValue >= requiredLevelValue;
+    return PERMISSION_HIERARCHY[userLevel] >= PERMISSION_HIERARCHY[requiredLevel];
   };
 
   const value: AuthzContextType = {
     permissions,
-    delegation,
+    delegation: null,
     loading,
     can,
     isPresidencia,
     isAdministrador,
     isPresidente,
-    canDeleteWithoutAuth: isPresidente, // Solo el Presidente puede eliminar sin autorización
-    canChangeRoles: isPresidente, // Solo el Presidente puede cambiar roles
-    refresh: loadPermissions
+    canDeleteWithoutAuth: isPresidente,
+    canChangeRoles: isPresidente,
+    refresh
   };
 
   return (

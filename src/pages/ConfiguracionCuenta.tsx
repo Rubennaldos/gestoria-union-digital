@@ -10,8 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Save, Eye, EyeOff, Shield, User, Lock, HelpCircle, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { auth } from "@/config/firebase";
+import { supabase } from "@/lib/supabase";
 import { updateUserProfile, getUserProfile } from "@/services/rtdb";
 import { obtenerEmpadronadoPorAuthUid, updateEmpadronado } from "@/services/empadronados";
 import { Empadronado, FamilyMember, Vehicle, PhoneNumber } from "@/types/empadronados";
@@ -278,79 +277,57 @@ const ConfiguracionCuenta: React.FC = () => {
   };
 
   const handleChangePassword = async () => {
-    if (!auth.currentUser || !user?.email) {
-      toast({
-        title: "Error",
-        description: "No hay sesión activa",
-        variant: "destructive",
-      });
+    if (!user?.email) {
+      toast({ title: "Error", description: "No hay sesión activa", variant: "destructive" });
       return;
     }
 
-    // Validaciones
     if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Todos los campos son obligatorios",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Todos los campos son obligatorios", variant: "destructive" });
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
-      toast({
-        title: "Error",
-        description: "La nueva contraseña debe tener al menos 6 caracteres",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "La nueva contraseña debe tener al menos 6 caracteres", variant: "destructive" });
       return;
     }
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Las contraseñas no coinciden",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Las contraseñas no coinciden", variant: "destructive" });
       return;
     }
 
     setChangingPassword(true);
     try {
-      // Reautenticar usuario
-      const credential = EmailAuthProvider.credential(
-        user.email,
-        passwordData.currentPassword
-      );
-      await reauthenticateWithCredential(auth.currentUser, credential);
+      // Re-autenticar verificando la contraseña actual
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: passwordData.currentPassword,
+      });
 
-      // Cambiar contraseña
-      await updatePassword(auth.currentUser, passwordData.newPassword);
+      if (signInErr) {
+        toast({ title: "Error", description: "La contraseña actual es incorrecta", variant: "destructive" });
+        return;
+      }
+
+      // Cambiar la contraseña
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+
+      if (updateErr) throw updateErr;
 
       toast({
         title: "Contraseña actualizada",
         description: "Tu contraseña se ha cambiado correctamente",
       });
 
-      // Limpiar formulario
-      setPasswordData({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
-      });
+      setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (error: any) {
       console.error("Error cambiando contraseña:", error);
-      let errorMessage = "No se pudo cambiar la contraseña";
-      
-      if (error.code === "auth/wrong-password") {
-        errorMessage = "La contraseña actual es incorrecta";
-      } else if (error.code === "auth/weak-password") {
-        errorMessage = "La nueva contraseña es muy débil";
-      }
-
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error?.message || "No se pudo cambiar la contraseña",
         variant: "destructive",
       });
     } finally {
