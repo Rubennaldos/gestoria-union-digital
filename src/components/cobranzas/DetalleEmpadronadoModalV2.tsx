@@ -1,7 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ref, get } from "firebase/database";
-import { db } from "@/config/firebase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,14 +21,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Copy, CreditCard, Calendar as CalendarIcon, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Copy, CreditCard, Calendar as CalendarIcon, DollarSign, Download, FileText, CheckCircle, Clock, XCircle, AlertCircle, Trash2, Edit, FileSpreadsheet, Ban, CheckSquare, Square, Upload, X, Image as ImageIcon, Zap, Loader2 } from 'lucide-react';
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import type { Empadronado } from '@/types/empadronados';
 import type { ChargeV2, PagoV2 } from '@/types/cobranzas-v2';
-import { obtenerPagosV2, eliminarPagoV2, actualizarPagoV2, anularMultiplesChargesV2 } from '@/services/cobranzas-v2';
+import { obtenerPagosV2, eliminarPagoV2, actualizarPagoV2, anularMultiplesChargesV2, registrarPagoV2 } from '@/services/cobranzas-v2';
 import { AnularBoletasModal } from './AnularBoletasModal';
 import { subirComprobanteCobranza } from '@/services/storage';
 import jsPDF from 'jspdf';
@@ -88,6 +86,11 @@ export default function DetalleEmpadronadoModalV2({
   const [chargesSeleccionados, setChargesSeleccionados] = useState<string[]>([]);
   const [showAnularModal, setShowAnularModal] = useState(false);
 
+  // ── Regularización Express ────────────────────────────────────────────────
+  const [pagoExpressConfirmar, setPagoExpressConfirmar] = useState<{ chargeId: string; periodo: string; saldo: number } | null>(null);
+  const [procesandoExpress, setProcesandoExpress] = useState<string | null>(null); // chargeId en proceso
+  const [liquidandoTodo, setLiquidandoTodo] = useState(false);
+
   // Cargar pagos del empadronado cuando se abre el modal
   useEffect(() => {
     if (open && empadronado) {
@@ -118,63 +121,38 @@ export default function DetalleEmpadronadoModalV2({
     }
   };
 
-  // Calcular deuda total y items (solo VENCIDOS, considerando pagos)
+  // ── Fuente única de verdad: charge.saldo (actualizado atómicamente por el RPC) ──
+  // No se necesita cruzar con la tabla de pagos; el saldo ya refleja todos los pagos
+  // aprobados. Los vencidos son aquellos cuyo fecha_vencimiento ya pasó.
   const { deudaTotal, deudaItems, deudaFutura, deudaItemsFuturos } = useMemo(() => {
-    // Esperar a que se carguen los pagos para calcular correctamente
-    if (!empadronado || cargandoPagos) return { deudaTotal: 0, deudaItems: [], deudaFutura: 0, deudaItemsFuturos: [] };
+    if (!empadronado) return { deudaTotal: 0, deudaItems: [], deudaFutura: 0, deudaItemsFuturos: [] };
 
     const ahora = Date.now();
-    
+
     const allItems = charges
-      .filter(charge => {
-        if (charge.empadronadoId !== empadronado.id) return false;
-        if (charge.saldo <= 0) return false;
-        if (charge.anulado) return false; // Excluir anulados
-        
-        // Verificar si hay pagos pendientes/aprobados que cubran el cargo
-        const pagosDelCargo = pagos.filter(p => 
-          p.chargeId === charge.id && 
-          (p.estado === 'aprobado' || p.estado === 'pendiente')
-        );
-        const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
-        
-        return totalPagado < charge.montoOriginal;
-      })
-      .map(charge => {
-        const pagosDelCargo = pagos.filter(p => 
-          p.chargeId === charge.id && 
-          (p.estado === 'aprobado' || p.estado === 'pendiente')
-        );
-        const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
-        const saldoReal = Math.max(0, charge.montoOriginal - totalPagado);
-        
-        return {
-          chargeId: charge.id,
-          periodo: charge.periodo,
-          saldo: saldoReal,
-          estado: charge.estado,
-          fechaVencimiento: charge.fechaVencimiento,
-          esMoroso: charge.esMoroso,
-          montoMorosidad: charge.montoMorosidad,
-          esVencido: ahora > charge.fechaVencimiento
-        };
-      })
+      .filter(c => c.empadronadoId === empadronado.id && c.saldo > 0 && !c.anulado)
+      .map(c => ({
+        chargeId:        c.id,
+        periodo:         c.periodo,
+        saldo:           c.saldo,
+        estado:          c.estado,
+        fechaVencimiento: c.fechaVencimiento,
+        esMoroso:        c.esMoroso,
+        montoMorosidad:  c.montoMorosidad,
+        esVencido:       ahora > c.fechaVencimiento,
+      }))
       .sort((a, b) => a.periodo.localeCompare(b.periodo));
 
-    // Separar vencidos de futuros
-    const vencidos = allItems.filter(item => item.esVencido);
-    const futuros = allItems.filter(item => !item.esVencido);
-    
-    const totalVencido = vencidos.reduce((sum, item) => sum + item.saldo, 0);
-    const totalFuturo = futuros.reduce((sum, item) => sum + item.saldo, 0);
+    const vencidos = allItems.filter(i => i.esVencido);
+    const futuros  = allItems.filter(i => !i.esVencido);
 
-    return { 
-      deudaTotal: totalVencido, 
-      deudaItems: vencidos,
-      deudaFutura: totalFuturo,
-      deudaItemsFuturos: futuros
+    return {
+      deudaTotal:          vencidos.reduce((s, i) => s + i.saldo, 0),
+      deudaItems:          vencidos,
+      deudaFutura:         futuros.reduce((s, i) => s + i.saldo, 0),
+      deudaItemsFuturos:   futuros,
     };
-  }, [empadronado, charges, pagos, cargandoPagos]);
+  }, [empadronado, charges]);
 
   // Charges seleccionados para anular
   const chargesParaAnular = useMemo(() => {
@@ -224,6 +202,64 @@ export default function DetalleEmpadronadoModalV2({
       });
       throw error;
     }
+  };
+
+  const ejecutarPagoExpress = async (chargeId: string, periodo: string, saldo: number) => {
+    if (!empadronado) return;
+    setProcesandoExpress(chargeId);
+    try {
+      const numeroOp = `REG-${periodo}-${empadronado.numeroPadron}`;
+      await registrarPagoV2(
+        chargeId,
+        saldo,
+        'Regularización Administrativa',
+        Date.now(),
+        undefined,
+        numeroOp,
+        'Regularización express administrativa'
+      );
+      toast({ title: '✅ Pago express registrado', description: `Cuota ${periodo} liquidada correctamente` });
+      cargarPagosEmpadronado();
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Error inesperado';
+      toast({ title: 'Error en pago express', description: msg, variant: 'destructive' });
+    } finally {
+      setProcesandoExpress(null);
+      setPagoExpressConfirmar(null);
+    }
+  };
+
+  const liquidarTodaDeudaVencida = async () => {
+    if (!empadronado || deudaItems.length === 0) return;
+    setLiquidandoTodo(true);
+    let exitosos = 0;
+    let fallidos = 0;
+    for (const item of deudaItems) {
+      try {
+        const numeroOp = `REG-${item.periodo}-${empadronado.numeroPadron}`;
+        await registrarPagoV2(
+          item.chargeId,
+          item.saldo,
+          'Regularización Administrativa',
+          Date.now(),
+          undefined,
+          numeroOp,
+          'Regularización express administrativa'
+        );
+        exitosos++;
+      } catch {
+        fallidos++;
+      }
+    }
+    setLiquidandoTodo(false);
+    toast({
+      title: exitosos > 0 ? '✅ Liquidación completada' : 'Error en liquidación',
+      description: fallidos === 0
+        ? `${exitosos} cuota(s) liquidadas correctamente`
+        : `${exitosos} exitosas, ${fallidos} fallidas`,
+      variant: fallidos > 0 ? 'destructive' : 'default',
+    });
+    cargarPagosEmpadronado();
   };
 
   const generarLinkCompartir = () => {
@@ -627,40 +663,57 @@ export default function DetalleEmpadronadoModalV2({
           {/* Resumen de deuda */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between">
-                Resumen de Deuda Vencida
-                {cargandoPagos ? (
-                  <span className="text-muted-foreground text-sm">Calculando...</span>
-                ) : (
+              <CardTitle className="text-lg flex items-center justify-between flex-wrap gap-2">
+                <span>Resumen de Deuda Vencida</span>
+                <div className="flex items-center gap-3 flex-wrap">
+                  {deudaItems.length > 0 && (
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white font-bold shadow-md"
+                      disabled={liquidandoTodo}
+                      onClick={liquidarTodaDeudaVencida}
+                    >
+                      {liquidandoTodo
+                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Liquidando…</>
+                        : <><Zap className="h-4 w-4 mr-2" />⚡ Liquidar Deuda Vencida ({deudaItems.length})</>
+                      }
+                    </Button>
+                  )}
                   <span className={`text-2xl font-bold ${deudaTotal > 0 ? 'text-destructive' : 'text-green-600'}`}>
                     {formatearMoneda(deudaTotal)}
                   </span>
-                )}
+                </div>
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              {cargandoPagos ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  Cargando información de pagos...
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-2 bg-red-50 rounded-lg">
+                  <Label className="text-xs font-medium text-red-700">Meses vencidos</Label>
+                  <p className="text-lg font-bold text-red-600">{deudaItems.length}</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-2 bg-red-50 rounded-lg">
-                    <Label className="text-xs font-medium text-red-700">Meses vencidos</Label>
-                    <p className="text-lg font-bold text-red-600">{deudaItems.length}</p>
-                  </div>
-                  <div className="p-2 bg-orange-50 rounded-lg">
-                    <Label className="text-xs font-medium text-orange-700">Morosos</Label>
-                    <p className="text-lg font-bold text-orange-600">{deudaItems.filter(item => item.esMoroso).length}</p>
-                  </div>
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <Label className="text-xs font-medium text-blue-700">Próximos</Label>
-                    <p className="text-lg font-bold text-blue-600">{deudaItemsFuturos.length}</p>
-                  </div>
-                  <div className="p-2 bg-gray-50 rounded-lg">
-                    <Label className="text-xs font-medium text-gray-700">Deuda futura</Label>
-                    <p className="text-sm font-bold text-gray-600">{formatearMoneda(deudaFutura)}</p>
-                  </div>
+                <div className="p-2 bg-orange-50 rounded-lg">
+                  <Label className="text-xs font-medium text-orange-700">Morosos</Label>
+                  <p className="text-lg font-bold text-orange-600">{deudaItems.filter(item => item.esMoroso).length}</p>
+                </div>
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Label className="text-xs font-medium text-blue-700">Próximos</Label>
+                  <p className="text-lg font-bold text-blue-600">{deudaItemsFuturos.length}</p>
+                </div>
+                <div className="p-2 bg-gray-50 rounded-lg">
+                  <Label className="text-xs font-medium text-gray-700">Deuda futura</Label>
+                  <p className="text-sm font-bold text-gray-600">{formatearMoneda(deudaFutura)}</p>
+                </div>
+              </div>
+
+              {/* Gran Total = lo que ve el socio en su Portal */}
+              {deudaFutura > 0 && (
+                <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm">
+                  <span className="text-amber-800 font-medium">
+                    💡 Gran Total (Vencido + Próximos) — igual al Portal del Socio
+                  </span>
+                  <span className="font-bold text-amber-900 text-base">
+                    {formatearMoneda(deudaTotal + deudaFutura)}
+                  </span>
                 </div>
               )}
             </CardContent>
@@ -788,7 +841,22 @@ export default function DetalleEmpadronadoModalV2({
                                   {item.esMoroso ? 'Moroso' : 'Vencido'}
                                 </Badge>
                               </div>
-                              
+
+                              {/* Botón express ⚡ */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-green-500 text-green-700 hover:bg-green-50 px-2"
+                                title="Pago Express (sin comprobante)"
+                                disabled={procesandoExpress === item.chargeId || liquidandoTodo}
+                                onClick={() => setPagoExpressConfirmar({ chargeId: item.chargeId, periodo: item.periodo, saldo: item.saldo })}
+                              >
+                                {procesandoExpress === item.chargeId
+                                  ? <Loader2 className="h-3 w-3 animate-spin" />
+                                  : <Zap className="h-3 w-3" />
+                                }
+                              </Button>
+
                               <Button 
                                 size="sm" 
                                 onClick={() => {
@@ -1110,49 +1178,9 @@ export default function DetalleEmpadronadoModalV2({
                                           size="sm"
                                           variant="outline"
                                           className="w-full"
-                                          onClick={async () => {
-                                            try {
-                                              // Si es una ruta de RTDB (legacy), cargar los datos y migrar
-                                              if (pago.archivoComprobante?.includes('cobranzas_v2/comprobantes') && 
-                                                  (pago.archivoComprobante.includes('firebaseio.com') || !pago.archivoComprobante.startsWith('http'))) {
-                                                let path = pago.archivoComprobante;
-                                                
-                                                // Si es una URL completa, extraer solo la ruta
-                                                if (path.includes('firebaseio.com')) {
-                                                  const match = path.match(/cobranzas_v2\/comprobantes\/[^.]+/);
-                                                  if (match) {
-                                                    path = match[0];
-                                                  }
-                                                }
-                                                
-                                                const comprobanteRef = ref(db, path);
-                                                const snapshot = await get(comprobanteRef);
-                                                
-                                                if (snapshot.exists()) {
-                                                  const data = snapshot.val();
-                                                  // Crear un enlace de descarga desde base64
-                                                  const link = document.createElement('a');
-                                                  link.href = data.data; // base64 data URL
-                                                  link.download = data.nombre || 'comprobante';
-                                                  link.click();
-                                                } else {
-                                                  toast({
-                                                    title: "Error",
-                                                    description: "No se pudo cargar el comprobante",
-                                                    variant: "destructive"
-                                                  });
-                                                }
-                                              } else {
-                                                // Es una URL de Storage (nuevo formato) o URL directa
-                                                window.open(pago.archivoComprobante, '_blank');
-                                              }
-                                            } catch (error) {
-                                              console.error('Error abriendo comprobante:', error);
-                                              toast({
-                                                title: "Error",
-                                                description: "No se pudo abrir el comprobante",
-                                                variant: "destructive"
-                                              });
+                                          onClick={() => {
+                                            if (pago.archivoComprobante) {
+                                              window.open(pago.archivoComprobante, '_blank');
                                             }
                                           }}
                                         >
@@ -1511,6 +1539,36 @@ export default function DetalleEmpadronadoModalV2({
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* AlertDialog de confirmación Pago Express ⚡ */}
+        <AlertDialog open={!!pagoExpressConfirmar} onOpenChange={(open) => !open && setPagoExpressConfirmar(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-green-600" />
+                ¿Confirmar Pago Express?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <span>Se registrará el pago de la cuota <strong>{pagoExpressConfirmar?.periodo}</strong> por <strong>{pagoExpressConfirmar ? formatearMoneda(pagoExpressConfirmar.saldo) : ''}</strong> usando:</span>
+                <ul className="mt-2 text-sm list-disc list-inside space-y-1">
+                  <li>Método: <strong>Regularización Administrativa</strong></li>
+                  <li>N° Operación: <strong>REG-{pagoExpressConfirmar?.periodo}-{empadronado?.numeroPadron}</strong></li>
+                  <li>Sin comprobante de pago</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => pagoExpressConfirmar && ejecutarPagoExpress(pagoExpressConfirmar.chargeId, pagoExpressConfirmar.periodo, pagoExpressConfirmar.saldo)}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Confirmar Pago Express
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
