@@ -22,6 +22,7 @@ import {
   Trash2,
   XCircle,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
 
 import { TopNavigation, BottomNavigation } from "@/components/layout/Navigation";
@@ -46,6 +47,7 @@ import {
   obtenerEgresosV2,
   obtenerChargesV2,
   obtenerChargesPorEmpadronadoV2,
+  obtenerDeudaVencidaMap,
   crearEgresoV2,
   registrarPagoV2,
   aprobarPagoV2,
@@ -85,6 +87,14 @@ export default function CobranzasV2() {
   const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [egresos, setEgresos] = useState<EgresoV2[]>([]);
   const [charges, setCharges] = useState<ChargeV2[]>([]);
+
+  /**
+   * deudaMap — fuente única de verdad para la lista admin.
+   * Se obtiene con obtenerDeudaVencidaMap() → RPC `calcular_deuda_vencida_map`
+   * que ejecuta SUM(saldo) + COUNT(*) GROUP BY empadronado_id en el servidor.
+   * Devuelve ~456 filas (una por socio), inmune al límite de PostgREST.
+   */
+  const [deudaMap, setDeudaMap] = useState<Map<string, { totalDeuda: number; mesesVencidos: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [procesando, setProcesando] = useState(false);
 
@@ -129,6 +139,7 @@ export default function CobranzasV2() {
   const [empadronadoSeleccionado, setEmpadronadoSeleccionado] = useState<Empadronado | null>(null);
   const [chargesEmpadronado, setChargesEmpadronado] = useState<ChargeV2[]>([]);
   const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
+  const [cargandoDetalleId, setCargandoDetalleId] = useState<string | null>(null);
 
   // Estados de filtros y búsqueda
   const [busquedaTexto, setBusquedaTexto] = useState('');
@@ -190,13 +201,14 @@ export default function CobranzasV2() {
       setLoading(true);
       
       // Cargar datos inmediatamente
-      const [configData, statsData, empadronadosData, pagosData, egresosData, chargesData] = await Promise.all([
+      const [configData, statsData, empadronadosData, pagosData, egresosData, chargesData, deudaMapData] = await Promise.all([
         obtenerConfiguracionV2(),
         generarEstadisticasV2(),
         getEmpadronados(),
         obtenerPagosV2(),
         obtenerEgresosV2(),
-        obtenerChargesV2()
+        obtenerChargesV2(),
+        obtenerDeudaVencidaMap(),   // query liviana: solo 2 cols, 2 peticiones paralelas
       ]);
 
       setConfiguracion(configData);
@@ -205,6 +217,7 @@ export default function CobranzasV2() {
       setPagos(pagosData);
       setEgresos(egresosData);
       setCharges(chargesData);
+      setDeudaMap(deudaMapData);
       setLoading(false);
       
       // Verificación automática en SEGUNDO PLANO (no bloquea la UI)
@@ -236,12 +249,14 @@ export default function CobranzasV2() {
   // Recarga silenciosa de datos
   const recargarDatos = async () => {
     try {
-      const [statsData, chargesData] = await Promise.all([
+      const [statsData, chargesData, deudaMapData] = await Promise.all([
         generarEstadisticasV2(),
-        obtenerChargesV2()
+        obtenerChargesV2(),
+        obtenerDeudaVencidaMap(),
       ]);
       setEstadisticas(statsData);
       setCharges(chargesData);
+      setDeudaMap(deudaMapData);
     } catch (error) {
       console.error("Error recargando datos:", error);
     }
@@ -281,51 +296,46 @@ export default function CobranzasV2() {
         description: "Esto puede tardar unos momentos"
       });
       
-      // Importar Firebase Database
-      const { ref, remove, get, update } = await import('firebase/database');
-      const { db } = await import('@/config/firebase');
-      
-      const BASE_PATH = 'cobranzas_v2';
-      
+      // Reset en Supabase: eliminar pagos y restaurar saldo en charges
+      const { supabase } = await import('@/lib/supabase');
+
       // 1. Eliminar todos los pagos
-      await remove(ref(db, `${BASE_PATH}/pagos`));
-      
-      // 2. Eliminar todos los índices de pagos
-      await remove(ref(db, `${BASE_PATH}/pagos_index`));
-      
-      // 3. Resetear todos los charges
-      const chargesSnap = await get(ref(db, `${BASE_PATH}/charges`));
-      
-      if (chargesSnap.exists()) {
-        const allCharges = chargesSnap.val();
-        const currentTime = Date.now();
-        let count = 0;
-        
-        for (const periodo in allCharges) {
-          for (const empId in allCharges[periodo]) {
-            for (const chargeId in allCharges[periodo][empId]) {
-              const charge = allCharges[periodo][empId][chargeId];
-              
-              const estaVencido = currentTime > charge.fechaVencimiento;
-              
-              await update(ref(db, `${BASE_PATH}/charges/${periodo}/${empId}/${chargeId}`), {
-                saldo: charge.montoOriginal,
-                montoPagado: 0,
-                estado: estaVencido ? 'moroso' : 'pendiente',
-                esMoroso: estaVencido,
-                montoMorosidad: 0
-              });
-              
-              count++;
-            }
-          }
-        }
-        
-        toast({
-          title: "✅ Reset completado",
-          description: `${count} charges reseteados. Todos los empadronados ahora deben todos los meses.`
-        });
+      const { error: delPagosErr } = await supabase
+        .from('cobranzas_pagos')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // elimina todo
+
+      if (delPagosErr) throw delPagosErr;
+
+      // 2. Resetear saldo en todos los charges no anulados
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: allCharges, error: chargesErr } = await supabase
+        .from('cobranzas_charges')
+        .select('id, monto_original, fecha_vencimiento')
+        .eq('anulado', false);
+
+      if (chargesErr) throw chargesErr;
+
+      let count = 0;
+      for (const c of allCharges ?? []) {
+        const estaVencido = c.fecha_vencimiento < today;
+        await supabase
+          .from('cobranzas_charges')
+          .update({
+            saldo:       c.monto_original,
+            monto_pagado: 0,
+            estado:       estaVencido ? 'moroso' : 'pendiente',
+            es_moroso:    estaVencido,
+            monto_morosidad: 0,
+          })
+          .eq('id', c.id);
+        count++;
       }
+
+      toast({
+        title: "✅ Reset completado",
+        description: `${count} charges reseteados. Todos los empadronados ahora deben todos los meses.`
+      });
       
       // Recargar datos
       await cargarDatos();
@@ -380,48 +390,13 @@ export default function CobranzasV2() {
     }
   };
 
-  // Verificar si un cargo está cubierto (considerando pagos pendientes y aprobados)
-  // Esto es consistente con la lógica de Balances.tsx
-  const estaCargoCubierto = (charge: ChargeV2): boolean => {
-    // Si el saldo es 0, ya está pagado
-    if (charge.saldo <= 0) return true;
-    
-    // Buscar pagos para este cargo que estén pendientes o aprobados
-    const pagosDelCargo = pagos.filter(p => 
-      p.chargeId === charge.id && 
-      (p.estado === 'aprobado' || p.estado === 'pendiente')
-    );
-    
-    // Sumar los montos de los pagos
-    const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
-    
-    // Está cubierto si los pagos cubren el monto original
-    return totalPagado >= charge.montoOriginal;
-  };
+  /** Deuda VENCIDA de un empadronado — viene del RPC del servidor */
+  const calcularDeudaEmpadronado = (empId: string): number =>
+    deudaMap.get(empId)?.totalDeuda ?? 0;
 
-  // Calcular deuda real: SOLO cargos vencidos que NO están cubiertos por pagos
-  const calcularDeudaEmpadronado = (empId: string): number => {
-    const ahora = Date.now();
-    return charges
-      .filter(c => c.empadronadoId === empId && ahora > c.fechaVencimiento && !estaCargoCubierto(c))
-      .reduce((total, charge) => {
-        // Calcular deuda real: monto original menos pagos pendientes/aprobados
-        const pagosDelCargo = pagos.filter(p => 
-          p.chargeId === charge.id && 
-          (p.estado === 'aprobado' || p.estado === 'pendiente')
-        );
-        const totalPagado = pagosDelCargo.reduce((sum, p) => sum + p.monto, 0);
-        return total + Math.max(0, charge.montoOriginal - totalPagado);
-      }, 0);
-  };
-
-  // Contar meses de deuda vencida (que no están cubiertos por pagos)
-  const contarMesesDeuda = (empId: string): number => {
-    const ahora = Date.now();
-    return charges
-      .filter(c => c.empadronadoId === empId && ahora > c.fechaVencimiento && !estaCargoCubierto(c))
-      .length;
-  };
+  /** Meses vencidos — viene del mismo RPC (COUNT del servidor) */
+  const contarMesesDeuda = (empId: string): number =>
+    deudaMap.get(empId)?.mesesVencidos ?? 0;
 
   // Clasificación por meses de deuda:
   // 0 = Al día, 1 = Atrasado, 2 = Moroso, 3+ = Deudor
@@ -443,6 +418,8 @@ export default function CobranzasV2() {
   };
 
   const verDetallesEmpadronado = async (empId: string) => {
+    if (cargandoDetalleId) return; // evita doble clic
+    setCargandoDetalleId(empId);
     try {
       const chargesEmp = await obtenerChargesPorEmpadronadoV2(empId);
       const empadronado = empadronados.find(e => e.id === empId);
@@ -452,11 +429,16 @@ export default function CobranzasV2() {
         setModalDetalleAbierto(true);
       }
     } catch (error) {
+      const sinConexion = !navigator.onLine;
       toast({
-        title: "Error",
-        description: "No se pudieron cargar los detalles",
+        title: sinConexion ? "Sin conexión" : "Error",
+        description: sinConexion
+          ? "Verifica tu internet e intenta de nuevo."
+          : "No se pudieron cargar los detalles del asociado",
         variant: "destructive"
       });
+    } finally {
+      setCargandoDetalleId(null);
     }
   };
 
@@ -545,13 +527,13 @@ export default function CobranzasV2() {
       });
       
       // Recargar datos
-      await cargarDatos();
-      
-      // Actualizar charges del empadronado seleccionado
-      if (empadronadoSeleccionado) {
-        const chargesEmp = await obtenerChargesPorEmpadronadoV2(empadronadoSeleccionado.id);
-        setChargesEmpadronado(chargesEmp);
-      }
+      // Recargar el mapa de deuda y las estadísticas (sin bloquear el modal)
+      await Promise.all([
+        cargarDatos(),
+        ...(empadronadoSeleccionado
+          ? [obtenerChargesPorEmpadronadoV2(empadronadoSeleccionado.id).then(setChargesEmpadronado)]
+          : []),
+      ]);
     } catch (error) {
       toast({
         title: "Error",
@@ -1247,9 +1229,11 @@ export default function CobranzasV2() {
                             }}
                           />
                           
-                          <div className="flex-1">
-                            <div className="font-medium">{emp.nombre} {emp.apellidos}</div>
-                            <div className="text-sm text-muted-foreground">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate" title={`${emp.nombre} ${emp.apellidos}`}>
+                              {emp.nombre} {emp.apellidos}
+                            </div>
+                            <div className="text-sm text-muted-foreground truncate">
                               Padrón: {emp.numeroPadron} | DNI: {emp.dni}
                             </div>
                           </div>
@@ -1268,9 +1252,13 @@ export default function CobranzasV2() {
                             <Button 
                               size="sm" 
                               variant="outline"
+                              disabled={!!cargandoDetalleId}
                               onClick={() => verDetallesEmpadronado(emp.id)}
                             >
-                              Ver Detalles
+                              {cargandoDetalleId === emp.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : 'Ver Detalles'
+                              }
                             </Button>
                           </div>
                         </div>

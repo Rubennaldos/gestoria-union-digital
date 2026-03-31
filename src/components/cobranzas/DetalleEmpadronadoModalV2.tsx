@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,13 @@ export default function DetalleEmpadronadoModalV2({
   charges,
   onRegistrarPago 
 }: DetalleEmpadronadoModalV2Props) {
+  // Ref para evitar actualizaciones de estado en componente desmontado
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
   const [activeTab, setActiveTab] = useState("estado-cuenta");
   const [pagos, setPagos] = useState<PagoV2[]>([]);
   const [cargandoPagos, setCargandoPagos] = useState(false);
@@ -204,9 +211,24 @@ export default function DetalleEmpadronadoModalV2({
     }
   };
 
-  const ejecutarPagoExpress = async (chargeId: string, periodo: string, saldo: number) => {
-    if (!empadronado) return;
-    setProcesandoExpress(chargeId);
+  /** Convierte cualquier error de fetch/supabase en mensaje legible */
+  const parsearError = (error: unknown): string => {
+    if (!navigator.onLine) return 'Sin conexión a internet. Verifica tu red e intenta de nuevo.';
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))
+        return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+      return error.message;
+    }
+    return 'Error inesperado. Intenta de nuevo.';
+  };
+
+  const ejecutarPagoExpress = useCallback(async (chargeId: string, periodo: string, saldo: number) => {
+    if (!empadronado || procesandoExpress || liquidandoTodo) return;
+    if (!navigator.onLine) {
+      toast({ title: 'Sin conexión', description: 'Verifica tu internet e intenta de nuevo.', variant: 'destructive' });
+      return;
+    }
+    if (isMounted.current) setProcesandoExpress(chargeId);
     try {
       const numeroOp = `REG-${periodo}-${empadronado.numeroPadron}`;
       await registrarPagoV2(
@@ -218,23 +240,36 @@ export default function DetalleEmpadronadoModalV2({
         numeroOp,
         'Regularización express administrativa'
       );
-      toast({ title: '✅ Pago express registrado', description: `Cuota ${periodo} liquidada correctamente` });
-      cargarPagosEmpadronado();
+      if (isMounted.current) {
+        toast({ title: '✅ Pago express registrado', description: `Cuota ${periodo} liquidada correctamente` });
+        cargarPagosEmpadronado();
+      }
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Error inesperado';
-      toast({ title: 'Error en pago express', description: msg, variant: 'destructive' });
+      if (isMounted.current)
+        toast({ title: 'Error en pago express', description: parsearError(error), variant: 'destructive' });
     } finally {
-      setProcesandoExpress(null);
-      setPagoExpressConfirmar(null);
+      if (isMounted.current) {
+        setProcesandoExpress(null);
+        setPagoExpressConfirmar(null);
+      }
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empadronado, procesandoExpress, liquidandoTodo]);
 
-  const liquidarTodaDeudaVencida = async () => {
-    if (!empadronado || deudaItems.length === 0) return;
-    setLiquidandoTodo(true);
+  const liquidarTodaDeudaVencida = useCallback(async () => {
+    if (!empadronado || deudaItems.length === 0 || liquidandoTodo) return;
+    if (!navigator.onLine) {
+      toast({ title: 'Sin conexión', description: 'Verifica tu internet e intenta de nuevo.', variant: 'destructive' });
+      return;
+    }
+    if (isMounted.current) setLiquidandoTodo(true);
     let exitosos = 0;
     let fallidos = 0;
-    for (const item of deudaItems) {
+    // Snapshot de items al momento del clic (evita que cambios reactivos alteren el loop)
+    const itemsSnapshot = [...deudaItems];
+    for (const item of itemsSnapshot) {
+      // Si el componente se desmontó, terminamos el loop pero los pagos ya enviados se completan en Supabase
+      if (!isMounted.current) break;
       try {
         const numeroOp = `REG-${item.periodo}-${empadronado.numeroPadron}`;
         await registrarPagoV2(
@@ -251,16 +286,19 @@ export default function DetalleEmpadronadoModalV2({
         fallidos++;
       }
     }
-    setLiquidandoTodo(false);
-    toast({
-      title: exitosos > 0 ? '✅ Liquidación completada' : 'Error en liquidación',
-      description: fallidos === 0
-        ? `${exitosos} cuota(s) liquidadas correctamente`
-        : `${exitosos} exitosas, ${fallidos} fallidas`,
-      variant: fallidos > 0 ? 'destructive' : 'default',
-    });
-    cargarPagosEmpadronado();
-  };
+    if (isMounted.current) {
+      setLiquidandoTodo(false);
+      toast({
+        title: exitosos > 0 ? '✅ Liquidación completada' : 'Error en liquidación',
+        description: fallidos === 0
+          ? `${exitosos} cuota(s) liquidadas correctamente`
+          : `${exitosos} exitosas, ${fallidos} fallidas`,
+        variant: fallidos > 0 ? 'destructive' : 'default',
+      });
+      cargarPagosEmpadronado();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empadronado, deudaItems, liquidandoTodo]);
 
   const generarLinkCompartir = () => {
     if (!empadronado) return '';
@@ -280,20 +318,15 @@ export default function DetalleEmpadronadoModalV2({
 
   const handleRegistrarPago = async () => {
     if (!nuevoPago.chargeId) {
-      toast({
-        title: "Error",
-        description: "Debe seleccionar las cuotas a pagar desde Estado de Cuenta",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Debe seleccionar las cuotas a pagar desde Estado de Cuenta", variant: "destructive" });
       return;
     }
-    
     if (!nuevoPago.monto || !nuevoPago.metodoPago) {
-      toast({
-        title: "Error",
-        description: "Complete todos los campos obligatorios",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "Complete todos los campos obligatorios", variant: "destructive" });
+      return;
+    }
+    if (!navigator.onLine) {
+      toast({ title: "Sin conexión", description: "Verifica tu internet e intenta de nuevo.", variant: "destructive" });
       return;
     }
 
