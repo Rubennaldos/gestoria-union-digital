@@ -696,26 +696,11 @@ export default function DetalleEmpadronadoModalV2({
           {/* Resumen de deuda */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-lg flex items-center justify-between">
                 <span>Resumen de Deuda Vencida</span>
-                <div className="flex items-center gap-3 flex-wrap">
-                  {deudaItems.length > 0 && (
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white font-bold shadow-md"
-                      disabled={liquidandoTodo}
-                      onClick={liquidarTodaDeudaVencida}
-                    >
-                      {liquidandoTodo
-                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Liquidando…</>
-                        : <><Zap className="h-4 w-4 mr-2" />⚡ Liquidar Deuda Vencida ({deudaItems.length})</>
-                      }
-                    </Button>
-                  )}
-                  <span className={`text-2xl font-bold ${deudaTotal > 0 ? 'text-destructive' : 'text-green-600'}`}>
-                    {formatearMoneda(deudaTotal)}
-                  </span>
-                </div>
+                <span className={`text-2xl font-bold ${deudaTotal > 0 ? 'text-destructive' : 'text-green-600'}`}>
+                  {formatearMoneda(deudaTotal)}
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -773,29 +758,43 @@ export default function DetalleEmpadronadoModalV2({
             {/* Estado de Cuenta */}
             <TabsContent value="estado-cuenta">
               <div className="space-y-4">
-                {/* Botón seleccionar todos y anular */}
+                {/* Barra de acciones: Seleccionar + Liquidar Todo */}
                 {(deudaItems.length > 0 || deudaItemsFuturos.length > 0) && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-muted rounded-lg">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={seleccionarTodosDeudas}
-                    >
-                      {chargesSeleccionados.length === [...deudaItems, ...deudaItemsFuturos].length && chargesSeleccionados.length > 0 ? (
-                        <>
-                          <Square className="h-4 w-4 mr-1" />
-                          Quitar todas
-                        </>
-                      ) : (
-                        <>
-                          <CheckSquare className="h-4 w-4 mr-1" />
-                          Seleccionar todas
-                        </>
+                  <div className="space-y-2">
+                    {/* Fila 1: Seleccionar todas + ⚡ Liquidar Deuda Vencida */}
+                    <div className="flex flex-wrap items-center gap-2 p-2 bg-muted rounded-lg">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={seleccionarTodosDeudas}
+                      >
+                        {chargesSeleccionados.length === [...deudaItems, ...deudaItemsFuturos].length && chargesSeleccionados.length > 0 ? (
+                          <><Square className="h-4 w-4 mr-1" />Quitar todas</>
+                        ) : (
+                          <><CheckSquare className="h-4 w-4 mr-1" />Seleccionar todas</>
+                        )}
+                      </Button>
+
+                      {/* ⚡ BOTÓN LIQUIDAR TODA LA DEUDA VENCIDA */}
+                      {deudaItems.length > 0 && (
+                        <Button
+                          size="sm"
+                          className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
+                          disabled={liquidandoTodo}
+                          onClick={liquidarTodaDeudaVencida}
+                        >
+                          {liquidandoTodo ? (
+                            <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Liquidando…</>
+                          ) : (
+                            <><Zap className="h-4 w-4 mr-1" />⚡ Liquidar Deuda Vencida ({deudaItems.length})</>
+                          )}
+                        </Button>
                       )}
-                    </Button>
-                    
+                    </div>
+
+                    {/* Fila 2: Acciones sobre seleccionadas */}
                     {chargesSeleccionados.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 px-2">
                         <Badge variant="secondary">
                           {chargesSeleccionados.length} seleccionadas
                         </Badge>
@@ -867,31 +866,35 @@ export default function DetalleEmpadronadoModalV2({
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <div className="text-right">
-                                <div className="font-bold text-red-600">{formatearMoneda(item.saldo)}</div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              <div className="text-right mr-1">
+                                <div className="font-bold text-red-600 text-sm">{formatearMoneda(item.saldo)}</div>
                                 <Badge variant="destructive" className="text-[10px]">
                                   {item.esMoroso ? 'Moroso' : 'Vencido'}
                                 </Badge>
                               </div>
 
-                              {/* Botón express ⚡ */}
+                              {/* ⚡ BOTÓN PAGO RÁPIDO — principal verde */}
                               <Button
                                 size="sm"
-                                variant="outline"
-                                className="border-green-500 text-green-700 hover:bg-green-50 px-2"
-                                title="Pago Express (sin comprobante)"
+                                className="bg-green-600 hover:bg-green-700 text-white font-semibold"
                                 disabled={procesandoExpress === item.chargeId || liquidandoTodo}
                                 onClick={() => setPagoExpressConfirmar({ chargeId: item.chargeId, periodo: item.periodo, saldo: item.saldo })}
                               >
-                                {procesandoExpress === item.chargeId
-                                  ? <Loader2 className="h-3 w-3 animate-spin" />
-                                  : <Zap className="h-3 w-3" />
-                                }
+                                {procesandoExpress === item.chargeId ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <><Zap className="h-3 w-3 mr-1" />Rápido</>
+                                )}
                               </Button>
 
-                              <Button 
-                                size="sm" 
+                              {/* Pagar con detalle — secundario */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs px-2"
+                                title="Pagar con comprobante y detalle"
+                                disabled={liquidandoTodo}
                                 onClick={() => {
                                   setNuevoPago({
                                     chargeId: item.chargeId,
@@ -903,8 +906,7 @@ export default function DetalleEmpadronadoModalV2({
                                   setActiveTab("registrar-pago");
                                 }}
                               >
-                                <CreditCard className="h-3 w-3 mr-1" />
-                                Pagar
+                                <CreditCard className="h-3 w-3" />
                               </Button>
                             </div>
                           </div>
