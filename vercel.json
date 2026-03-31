@@ -1,6 +1,5 @@
 {
-  "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "npm install @supabase/supabase-js@2.45.0 --legacy-peer-deps --no-save && npm run build",
+  "installCommand": "npm ci --legacy-peer-deps",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
